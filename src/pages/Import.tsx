@@ -19,6 +19,7 @@ import {
 } from "../import/pipeline";
 import { money, decimalMoney, parseMoney } from "../domain/money";
 import { cashFlow } from "../analytics/calculations";
+import { validatePeriod } from "../parsers/period";
 export default function ImportPage() {
   const [files, setFiles] = useState<File[]>([]);
   const [index, setIndex] = useState(0);
@@ -31,6 +32,9 @@ export default function ImportPage() {
   const [accountId, setAccountId] = useState("");
   const [override, setOverride] = useState(false);
   const [success, setSuccess] = useState("");
+  const [manualPeriod, setManualPeriod] = useState(false);
+  const [periodStart, setPeriodStart] = useState("");
+  const [periodEnd, setPeriodEnd] = useState("");
   const amountErrors = useRef(new Set<string>());
   const navigate = useNavigate();
   const accounts = useLiveQuery(
@@ -41,19 +45,34 @@ export default function ImportPage() {
     () => db.categories.filter((c) => !c.archived && !c.parentId).toArray(),
     [],
   );
-  const process = async (file: File, ocr = false, existing?: ExtractedFile) => {
+  const resetPeriod = () => {
+    setManualPeriod(false);
+    setPeriodStart("");
+    setPeriodEnd("");
+  };
+  const process = async (
+    file: File,
+    ocr = false,
+    existing?: ExtractedFile,
+    useEnteredDates = true,
+  ) => {
     setBusy(true);
     setError("");
     setDraft(undefined);
     setOverride(false);
     amountErrors.current.clear();
     try {
+      const period =
+        useEnteredDates && manualPeriod
+          ? validatePeriod({ start: periodStart, end: periodEnd })
+          : undefined;
       const result = existing ?? (await extractFile(file, setStatus, ocr));
       setExtracted(result);
       const d = await prepareDraft(
         result,
         bank || undefined,
         accounts?.find((a) => a.id === accountId),
+        period,
       );
       setDraft(d);
       setStatus("Ready to review");
@@ -73,7 +92,8 @@ export default function ImportPage() {
     setIndex(0);
     setSuccess("");
     setExtracted(undefined);
-    await process(selected[0]);
+    resetPeriod();
+    await process(selected[0], false, undefined, false);
   };
   const updateRow = (
     tid: string,
@@ -103,10 +123,11 @@ export default function ImportPage() {
         `Imported ${n} new transactions from ${draft.statement.institution}.`,
       );
       setDraft(undefined);
+      resetPeriod();
       if (index + 1 < files.length) {
         setIndex(index + 1);
         setExtracted(undefined);
-        await process(files[index + 1]);
+        await process(files[index + 1], false, undefined, false);
       } else {
         setFiles([]);
         setStatus("Import complete");
@@ -188,10 +209,10 @@ export default function ImportPage() {
           <span>{error}</span>
         </div>
       )}
-      {(error || draft) && files[index] && (
+      {(error || draft || extracted) && files[index] && (
         <details className="card parse-options" open={!!error}>
           <summary>
-            Bank and account selection <ChevronDown size={16} />
+            Bank, account and statement dates <ChevronDown size={16} />
           </summary>
           <div className="form-grid">
             <label>
@@ -224,6 +245,49 @@ export default function ImportPage() {
               </select>
             </label>
           </div>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={manualPeriod}
+              onChange={(e) => {
+                setManualPeriod(e.target.checked);
+                setDraft(undefined);
+              }}
+            />
+            Enter statement dates from PDF
+          </label>
+          {manualPeriod && (
+            <>
+              <p className="muted">
+                Copy both dates from the statement header. These dates apply
+                only to this file; balance validation still runs.
+              </p>
+              <div className="form-grid">
+                <label>
+                  Statement start date
+                  <input
+                    type="date"
+                    value={periodStart}
+                    onChange={(e) => {
+                      setPeriodStart(e.target.value);
+                      setDraft(undefined);
+                    }}
+                  />
+                </label>
+                <label>
+                  Statement end date
+                  <input
+                    type="date"
+                    value={periodEnd}
+                    onChange={(e) => {
+                      setPeriodEnd(e.target.value);
+                      setDraft(undefined);
+                    }}
+                  />
+                </label>
+              </div>
+            </>
+          )}
           <div className="actions">
             <button
               disabled={busy}
@@ -245,7 +309,8 @@ export default function ImportPage() {
               onClick={() => {
                 setIndex(index + 1);
                 setExtracted(undefined);
-                void process(files[index + 1]);
+                resetPeriod();
+                void process(files[index + 1], false, undefined, false);
               }}
             >
               Skip this file and review next
@@ -271,9 +336,14 @@ export default function ImportPage() {
               {draft.statement.currency}
             </p>
             <p>
+              {draft.statement.periodSource === "transaction-coverage" &&
+                "Transaction coverage: "}
               {draft.statement.statementPeriodStart} to{" "}
               {draft.statement.statementPeriodEnd}
             </p>
+            {draft.statement.statementDate && (
+              <p>Statement issued: {draft.statement.statementDate}</p>
+            )}
             <div className="review-metrics">
               <div>
                 <span>Transactions extracted</span>

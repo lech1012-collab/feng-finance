@@ -6,7 +6,8 @@ import type {
   Reconciliation,
   TextRow,
 } from "../domain/models";
-export const PARSER_VERSION = "1.0.0";
+import type { StatementPeriod } from "./period";
+export const PARSER_VERSION = "1.0.1";
 export interface StatementParser {
   institution: Institution;
   canParse(rows: TextRow[]): boolean;
@@ -26,5 +27,5 @@ export interface StatementParser {
     currency: string,
   ): { transactions: ParsedTransaction[]; warnings: string[] };
   validate(statement: ParsedStatement): Reconciliation;
-  parse(rows: TextRow[]): ParsedStatement;
+  parse(rows: TextRow[], periodOverride?: StatementPeriod): ParsedStatement;
 }

@@ -1,10 +1,10 @@
 import type { Institution, TextRow } from "../domain/models";
 const signals: Record<Exclude<Institution, "Other">, [RegExp, number][]> = {
   Barclays: [
-    [/\bBARCLAYS\b/i, 0.55],
-    [/money out/i, 0.15],
-    [/money in/i, 0.15],
-    [/sort code|current account|account number/i, 0.15],
+    [/\bBARCLAYS\b|\bBARCLAYCARD\b/i, 0.55],
+    [/money out|your previous balance/i, 0.15],
+    [/money in|payments towards your account/i, 0.15],
+    [/sort code|current account|account number|your .*visa statement/i, 0.15],
   ],
   "American Express": [
     [/AMERICAN EXPRESS|\bAMEX\b/i, 0.55],

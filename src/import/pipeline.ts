@@ -14,6 +14,7 @@ import { reconstructRows } from "./layout";
 import { detectBank } from "./detection";
 import { getParser } from "../parsers";
 import { PARSER_VERSION } from "../parsers/interface";
+import type { StatementPeriod } from "../parsers/period";
 import { duplicateStatus } from "./duplicates";
 import { categorize } from "../categorization/engine";
 import { matchTransfers } from "../transfers/engine";
@@ -65,6 +66,7 @@ export async function prepareDraft(
   extracted: ExtractedFile,
   selectedBank?: Institution,
   selectedAccount?: Account,
+  periodOverride?: StatementPeriod,
 ): Promise<ImportDraft> {
   const detection = detectBank(extracted.rows);
   if (
@@ -76,8 +78,11 @@ export async function prepareDraft(
     throw new Error(
       "Bank detection is uncertain. Select the bank and parse again.",
     );
-  const parser = getParser(selectedBank ?? detection.institution);
-  const parsed = parser.parse(extracted.rows);
+  const parser = getParser(
+    selectedBank ?? detection.institution,
+    extracted.rows,
+  );
+  const parsed = parser.parse(extracted.rows, periodOverride);
   const now = new Date().toISOString();
   const accounts = await db.accounts.toArray();
   const existingAccounts = accounts.filter(
@@ -85,6 +90,7 @@ export async function prepareDraft(
       !a.isDemo &&
       a.institution === parsed.institution &&
       a.currency === parsed.currency &&
+      (a.accountType === "credit") === (parsed.accountType === "credit") &&
       a.maskedAccountIdentifier === parsed.accountIdentifier,
   );
   if (!selectedAccount && !parsed.accountIdentifier)
@@ -110,10 +116,11 @@ export async function prepareDraft(
   if (
     account.institution !== parsed.institution ||
     account.currency !== parsed.currency ||
+    (account.accountType === "credit") !== (parsed.accountType === "credit") ||
     account.isDemo
   )
     throw new Error(
-      "Selected account does not match this statement bank and currency.",
+      "Selected account does not match this statement bank, currency and account type.",
     );
   const sid = id();
   const validation = parser.validate(parsed);
@@ -170,6 +177,8 @@ export async function prepareDraft(
       accountId: account.id,
       statementPeriodStart: parsed.periodStart,
       statementPeriodEnd: parsed.periodEnd,
+      periodSource: parsed.periodSource,
+      statementDate: parsed.statementDate,
       openingBalance: parsed.openingBalance,
       closingBalance: parsed.closingBalance,
       currency: parsed.currency,
@@ -288,6 +297,8 @@ export async function commitDraft(
           (a) =>
             !a.isDemo &&
             a.currency === draft.account.currency &&
+            (a.accountType === "credit") ===
+              (draft.account.accountType === "credit") &&
             a.maskedAccountIdentifier === draft.account.maskedAccountIdentifier,
         )
         .toArray();

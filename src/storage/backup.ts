@@ -39,6 +39,10 @@ const statement = z.object({
   accountId: identifier,
   statementPeriodStart: date,
   statementPeriodEnd: date,
+  periodSource: z
+    .enum(["printed", "manual", "transaction-coverage"])
+    .optional(),
+  statementDate: date.optional(),
   openingBalance: minor.optional(),
   closingBalance: minor.optional(),
   currency,

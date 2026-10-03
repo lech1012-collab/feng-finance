@@ -62,7 +62,7 @@ describe("Barclays adapter", () => {
       parser.parse(
         bankRows().filter((r) => !r.text.includes("Statement period")),
       ),
-    ).toThrow("period");
+    ).toThrow("Statement dates");
     expect(() =>
       parser.parse(bankRows().filter((r) => !r.text.includes("Currency"))),
     ).toThrow("currency");

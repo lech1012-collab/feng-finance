@@ -156,6 +156,75 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
     page.locator(".hero-number").getByText("-€22.22", { exact: true }),
   ).toBeVisible();
 });
+test("Barclaycard issue date, two reading columns and repayment exclusion", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclaycard");
+  await expect(
+    page.getByRole("heading", { name: "Barclays detected" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Transaction coverage: 2026-09-02 to 2026-10-04", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Statement issued: 2026-10-04", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await confirmImport(page);
+  await page.getByRole("button", { name: "View dashboard" }).click();
+  await page.locator('input[type="month"]').fill("2026-09");
+  await expect(page.locator(".hero-number")).toHaveText("-£109.68");
+  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: /\+£900\.00/ }),
+  ).toContainText("Transfer");
+});
+
+test("Barclays header date ranges and manual statement-date fallback", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays-header-range");
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("2026-09-01 to 2026-09-30", { exact: true }),
+  ).toBeVisible();
+  await selectStatement(page, "barclays-no-period");
+  await expect(page.getByRole("alert")).toContainText(
+    "Enter the start and end dates",
+  );
+  await page.getByLabel("Enter statement dates from PDF").check();
+  await page.getByLabel("Statement start date").fill("2026-09-01");
+  await page.getByLabel("Statement end date").fill("2026-09-30");
+  await page.getByRole("button", { name: "Parse again", exact: true }).click();
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await confirmImport(page);
+  await openImport(page);
+  await selectStatement(page, "barclays-october");
+  await expect(
+    page.getByText("2026-10-01 to 2026-10-31", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByLabel("Enter statement dates from PDF"),
+  ).not.toBeChecked();
+});
 test("reconciliation warning cannot be silently committed", async ({
   page,
 }) => {

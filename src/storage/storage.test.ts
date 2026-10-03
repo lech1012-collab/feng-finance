@@ -153,6 +153,41 @@ describe("atomic import and editing", () => {
     expect(s?.validationOverride).toBe(true);
     expect(s?.validationDifference).toBe(100);
   });
+  it("keeps current and credit accounts separate even when masked suffixes match", async () => {
+    await db.accounts.put({ ...accounts[0], accountType: "credit" });
+    const draft = await prepareDraft(extraction());
+    expect(draft.account.id).not.toBe(accounts[0].id);
+    expect(draft.account.accountType).toBe("current");
+    await expect(
+      prepareDraft(extraction(), undefined, {
+        ...accounts[0],
+        accountType: "credit",
+      }),
+    ).rejects.toThrow("account type");
+    await commitDraft(draft);
+    expect(await db.accounts.count()).toBe(2);
+  });
+  it("requires review of manually entered statement dates and preserves period provenance in backups", async () => {
+    const source = {
+      ...extraction(),
+      rows: bankRows().filter((r) => !r.text.includes("Statement period")),
+    };
+    const draft = await prepareDraft(source, undefined, undefined, {
+      start: "2026-09-01",
+      end: "2026-09-30",
+    });
+    expect(draft.statement.periodSource).toBe("manual");
+    await expect(commitDraft(draft)).rejects.toThrow("warnings");
+    expect(await db.transactions.count()).toBe(0);
+    draft.reviewedWarnings = true;
+    await commitDraft(draft);
+    const backup = validateBackup(await createBackup());
+    expect(backup.statements[0].periodSource).toBe("manual");
+    await restoreBackup(backup);
+    expect((await db.statements.get(draft.statement.id))?.periodSource).toBe(
+      "manual",
+    );
+  });
   it("blocks unreviewed OCR, extraction warnings and kept duplicates", async () => {
     const d = await prepareDraft(extraction());
     d.transactions[0].extractionConfidence = 0.6;

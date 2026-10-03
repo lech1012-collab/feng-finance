@@ -14,8 +14,8 @@ Implemented as a React / strict TypeScript / Vite static PWA with Dexie, PDF.js,
 
 ## Automated checks
 
-- **94 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries.
-- **18 browser checks**: nine workflows each in Chromium and Playwright WebKit at 390 × 844. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records.
+- **127 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries.
+- **22 browser checks**: eleven workflows each in Chromium and Playwright WebKit at 390 × 844. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records.
 - Production TypeScript/Vite build and local offline precache generation; static output includes PDF worker/fonts/CMaps/WASM and English OCR assets.
 - `npm audit`: zero known vulnerabilities in installed production and development dependencies at verification time.
 - Prettier formatting check and manual visual inspection of generated-data dashboards at 390 and 1440 pixels.
@@ -35,8 +35,12 @@ The update test advances only the test host's service-worker bytes, waits for th
 | Offline dashboard/import/backup      | Both browsers pass against a stopped static origin; all parsing assets are precached. Real iOS storage eviction remains outside the app's control.                                               |
 | Service-worker updates               | Automated prompt→explicit update→reload→preserved-records test. Verify a real deployed version upgrade on iPhone.                                                                                |
 | 20,000 transactions                  | Indexed-storage test, date-window queries and 60-row pagination. This establishes architecture/functional capacity, not an on-device latency guarantee; measure with the real-device checklist.  |
-| Deployable production output         | Production build, provider configs and detailed Vercel/Cloudflare/GitHub Pages instructions. No hosting account is configured or publication performed here.                                     |
+| Deployable production output         | Production build, provider configs and detailed Vercel/Cloudflare/GitHub Pages instructions. Published to GitHub Pages; live digital import and offline Chromium checks passed.                  |
 
 ## Operational release steps
 
 Deploy `dist/` to HTTPS, complete the real-iPhone checklist, locally compare every transaction/sign/balance from representative private statements, and retain a backup before the first real import. Record layout differences using synthetic regressions; never commit real PDFs, backups, screenshots or traces. This is a complete local implementation with automated validation; it is not a claim that every bank layout or iOS version has been certified.
+
+## Version 1.0.1 statement-layout update
+
+Added dedicated two-column Barclaycard GBP parsing, liability signs, repayment transfers, refund handling, foreign references and source-date provenance. An issue-date-only statement shows explicitly labeled transaction coverage and requires acknowledgement; it does not claim an unprinted period start. Added wrapped/unlabeled Barclays header range detection and a reviewed date-entry fallback, with no database reset or schema migration. Private-layout checks run locally with outbound requests blocked; committed regressions use fully fictional statements only.

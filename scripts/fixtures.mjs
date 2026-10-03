@@ -6,6 +6,7 @@ async function statement(
   filename,
   {
     period = "01 Sep 2026 to 30 Sep 2026",
+    periodLabel = "Statement period: ",
     account = "12344321",
     currency = "GBP",
     opening = 1000,
@@ -35,7 +36,7 @@ async function statement(
   const heading = () => {
     write(bank, 35, 50, 22);
     write(amex ? "Statement of Account" : "Account statement", 35, 78, 12);
-    write(`Statement period: ${period}`, 35, 103);
+    if (period !== null) write(`${periodLabel}${period}`, 35, 103);
     write(`${amex ? "Card ending" : "Account number"}: ${account}`, 35, 123);
     if (bank === "Barclays")
       write("Sort code: 00-00-00 · Current account".replace("·", "-"), 35, 143);
@@ -166,6 +167,15 @@ await statement("Barclays", "barclays-regenerated", {
 await statement("Barclays", "barclays-october", {
   period: "01 Oct 2026 to 31 Oct 2026",
   rows: [{ date: "03 Oct", description: "JOHN LEWIS", amount: -45 }],
+});
+await statement("Barclays", "barclays-header-range", {
+  period: "1 – 30 September 2026",
+  periodLabel: "",
+  rows: [{ date: "03 Sep", description: "FICTIONAL STORE", amount: -75 }],
+});
+await statement("Barclays", "barclays-no-period", {
+  period: null,
+  rows: [{ date: "03 Sep", description: "FICTIONAL STORE", amount: -75 }],
 });
 await statement("Barclays", "barclays-warning", {
   closing: 950,

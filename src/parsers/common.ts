@@ -10,6 +10,7 @@ import { parseMoney, currencyPrecision } from "../domain/money";
 import { normalizeDescription, normalizeMerchant } from "../domain/normalize";
 import { reconcile } from "../domain/reconcile";
 import type { StatementParser } from "./interface";
+import { identifyPeriod, validatePeriod, type StatementPeriod } from "./period";
 const dateSource =
   "(?:\\d{4}-\\d{2}-\\d{2}|\\d{1,2}[/.]\\d{1,2}[/.]\\d{2,4}|\\d{1,2}\\s+[A-Za-z]{3,9}(?:\\s+\\d{2,4})?)";
 const amountRE =
@@ -41,23 +42,7 @@ export abstract class BaseParser implements StatementParser {
     };
   }
   identifyStatementPeriod(rows: TextRow[]) {
-    for (const row of rows) {
-      const m = row.text.match(
-        new RegExp(
-          `(?:statement period|period|statement from|account statement)\\s*:?\\s*(${dateSource})\\s*(?:to|–|—|-)\\s*(${dateSource})`,
-          "i",
-        ),
-      );
-      if (m) {
-        const end = parseDate(m[2], m[1].match(/\d{4}/)?.[0] + "-12-31");
-        const start = parseDate(m[1], end);
-        if (start > end) throw new Error("Statement period is reversed.");
-        return { start, end };
-      }
-    }
-    throw new Error(
-      "Statement period could not be identified. Select the bank or use a PDF with an explicit statement period.",
-    );
+    return identifyPeriod(rows);
   }
   identifyCurrency(rows: TextRow[]) {
     const header = rows
@@ -351,8 +336,10 @@ export abstract class BaseParser implements StatementParser {
       );
     return { transactions, warnings };
   }
-  parse(rows: TextRow[]): ParsedStatement {
-    const period = this.identifyStatementPeriod(rows);
+  parse(rows: TextRow[], periodOverride?: StatementPeriod): ParsedStatement {
+    const period = periodOverride
+      ? validatePeriod(periodOverride)
+      : this.identifyStatementPeriod(rows);
     const currency = this.identifyCurrency(rows);
     const account = this.identifyAccount(rows);
     const balances = this.extractBalances(rows, currency);
@@ -366,11 +353,17 @@ export abstract class BaseParser implements StatementParser {
       accountType: account.accountType,
       periodStart: period.start,
       periodEnd: period.end,
+      periodSource: periodOverride ? "manual" : "printed",
       currency,
       openingBalance: balances.opening,
       closingBalance: balances.closing,
       transactions: extraction.transactions,
       warnings: [
+        ...(periodOverride
+          ? [
+              "Statement dates were entered manually. Check both dates against the source PDF before importing.",
+            ]
+          : []),
         ...extraction.warnings,
         ...(outside.length
           ? [

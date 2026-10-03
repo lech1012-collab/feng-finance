@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.0.0";
+export const APP_VERSION = "1.0.1";
 export const SCHEMA_VERSION = 2;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";
@@ -22,6 +22,8 @@ export interface Statement {
   accountId: string;
   statementPeriodStart: string;
   statementPeriodEnd: string;
+  periodSource?: "printed" | "manual" | "transaction-coverage";
+  statementDate?: string;
   openingBalance?: number;
   closingBalance?: number;
   currency: string;
@@ -137,6 +139,8 @@ export interface ParsedStatement {
   accountType: Account["accountType"];
   periodStart: string;
   periodEnd: string;
+  periodSource?: "printed" | "manual" | "transaction-coverage";
+  statementDate?: string;
   currency: string;
   openingBalance?: number;
   closingBalance?: number;

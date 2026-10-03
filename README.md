@@ -1,6 +1,6 @@
 # Feng Finance
 
-A client-only personal-finance PWA for importing monthly Barclays, American Express and Revolut PDF statements. Financial information stays in IndexedDB in the browser. The deployment contains only static assets; there is no backend, account login, external AI, telemetry or cloud sync.
+A client-only personal-finance PWA for importing monthly Barclays (including Barclaycard), American Express and Revolut PDF statements. Financial information stays in IndexedDB in the browser. The deployment contains only static assets; there is no backend, account login, external AI, telemetry or cloud sync.
 
 ## Run locally
 
@@ -68,6 +68,8 @@ Pipeline: file type/size/magic validation → SHA-256 → PDF.js worker → embe
 
 The interface exposes `canParse`, account, period and currency identification, balances, transactions and validation. The bank adapters select their provider/credit-card semantics and share layout primitives. A dated row without an amount, unsupported dates, both debit/credit values, out-of-period dates and unrecognized transaction-like rows generate explicit review warnings. OCR is used for pages with effectively no embedded text, or explicitly retried when extraction fails. It renders one page at a time, uses Tesseract word bounding boxes and caps transaction confidence at 0.6. Uncertain rows need acknowledgement. Failed reconciliation requires a separate override, stored with the statement for audit.
 
+Barclaycard GBP statements use a separate credit-card adapter within the Barclays institution. It separates the two reading columns before reconstructing rows, treats balances as liabilities, preserves refunds and foreign-currency references, and marks card repayments as transfers. When the PDF prints only an issue date, the review labels **transaction coverage** from the earliest extracted date to that issue date and requires acknowledgement. This does not assert an unprinted billing-period start. `periodSource` and `statementDate` preserve that distinction in the database and backups. Explicit header ranges, including wrapped dates and shared years/months, remain preferred. Missing or conflicting date ranges can be corrected using **Enter statement dates from PDF → Parse again**; manual dates require a source-review acknowledgement and never bypass reconciliation.
+
 Exact PDF duplicates require a separate override. Known transaction duplicates are excluded by default and remain visible; keeping one requires explicit review. Statement-period matches detect regenerated PDFs. Fingerprints include account, date, normalized description, exact amount, currency, running balance (if present) and repeated-row occurrence. Without balance evidence, overlapping identical rows are potential duplicates rather than silently removed. Import rechecks history inside a single IndexedDB write transaction, including account-creation races. Financial data never partially commits if the transaction fails.
 
 Add another bank by implementing `StatementParser`, registering it in `src/parsers/index.ts`, adding independent header signals and generating a synthetic layout fixture. Add tests for signs, balances, multiline descriptions, page breaks, repeated purchases, currency references and invalid rows. Extend adapter-specific column identification when a real layout differs; do not relax reconciliation to make it pass.
@@ -80,7 +82,7 @@ IndexedDB starts at schema 1. Schema 2 adds the merchant index and fills missing
 
 ## Deployment and installation
 
-See [static deployment instructions](docs/deployment.md). `dist/` is the complete deployable artifact for Vercel, Cloudflare Pages or GitHub Pages. No API keys are required. No host account was configured in this workspace; publishing is a hosting-account action, while the production artifact is ready locally.
+The application is hosted at [Feng Finance](https://lech1012-collab.github.io/feng-finance/). See [static deployment instructions](docs/deployment.md). `dist/` is the complete deployable artifact for Vercel, Cloudflare Pages or GitHub Pages. No API keys are required. Verified pushes to `main` deploy automatically through GitHub Actions.
 
 On iPhone: open the HTTPS URL in Safari → **Share** → **Add to Home Screen** → enable **Open as Web App** → **Add**. Launch from the icon. Wait for the offline cache to complete before testing airplane mode. Each browser/profile/origin has a separate database; installing or changing the deployment URL does not move data. Export/restore when moving origins or devices.
 
