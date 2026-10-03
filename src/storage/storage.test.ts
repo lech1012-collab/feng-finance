@@ -85,19 +85,17 @@ describe("storage and backup integrity", () => {
   it("preserves transactions through a v1 to v2 migration", async () => {
     const name = "migration-test";
     const old = new Dexie(name);
-    old
-      .version(1)
-      .stores({
-        accounts: "id,institution,currency",
-        statements:
-          "id,accountId,sourceFileHash,statementPeriodEnd,[accountId+statementPeriodStart+statementPeriodEnd]",
-        transactions:
-          "id,date,accountId,statementId,categoryId,transactionFingerprint,[currency+date],[accountId+date]",
-        categories: "id,parentId",
-        rules: "id,priority",
-        transferLinks: "id",
-        settings: "key",
-      });
+    old.version(1).stores({
+      accounts: "id,institution,currency",
+      statements:
+        "id,accountId,sourceFileHash,statementPeriodEnd,[accountId+statementPeriodStart+statementPeriodEnd]",
+      transactions:
+        "id,date,accountId,statementId,categoryId,transactionFingerprint,[currency+date],[accountId+date]",
+      categories: "id,parentId",
+      rules: "id,priority",
+      transferLinks: "id",
+      settings: "key",
+    });
     const t = transaction();
     const { occurrence: _o, isReviewed: _r, tags: _tags, ...legacy } = t;
     await old.table("transactions").put(legacy);

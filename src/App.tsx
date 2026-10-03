@@ -60,6 +60,8 @@ function Shell() {
       );
     if ("serviceWorker" in navigator)
       applyUpdate = registerSW({
+        // The explicit Update action owns reloads, including first-session updates.
+        onNeedReload: () => {},
         onNeedRefresh: () => setUpdateAvailable(true),
         onOfflineReady: () => setOfflineReady(true),
         onRegisteredSW: (_url, registration) => {
@@ -99,6 +101,23 @@ function Shell() {
   useEffect(() => {
     window.scrollTo(0, 0);
   }, [location.pathname]);
+  const updateApp = async () => {
+    const registration = await navigator.serviceWorker.getRegistration();
+    if (!registration?.waiting) {
+      window.location.reload();
+      return;
+    }
+    const reload = () => window.location.reload();
+    navigator.serviceWorker.addEventListener("controllerchange", reload, {
+      once: true,
+    });
+    try {
+      await applyUpdate(true);
+    } catch {
+      navigator.serviceWorker.removeEventListener("controllerchange", reload);
+      setStorageWarning("Update failed. Reconnect and try again.");
+    }
+  };
   return (
     <div className="app">
       <a
@@ -185,7 +204,7 @@ function Shell() {
               Feng Finance update available. Save any import review first;
               updating reloads the app.
             </span>
-            <button onClick={() => void applyUpdate(true)}>Update</button>
+            <button onClick={() => void updateApp()}>Update</button>
           </div>
         )}
         {storageWarning && (

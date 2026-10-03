@@ -228,3 +228,9 @@ it("reports a meaningful category decrease even when current spend is zero", () 
   expect(c.items.find((c) => c.id === "transport")?.difference).toBe(-15000);
   expect(c.text).toContain("Lower Transport spending");
 });
+it("formats every accepted minor unit exactly, including extremes and tiny signs", () => {
+  expect(money(Number.MAX_SAFE_INTEGER)).toBe("£90,071,992,547,409.91");
+  expect(money(-1, "GBP", true)).toBe("-£0.01");
+  expect(money(1, "GBP", true)).toBe("+£0.01");
+  expect(money(1234, "KWD")).toContain("1.234");
+});

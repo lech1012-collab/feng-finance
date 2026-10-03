@@ -49,12 +49,25 @@ export function decimalMoney(minor: number, currency = "GBP") {
   return `${minor < 0 ? "-" : ""}${value / factor}${p ? "." + String(value % factor).padStart(p, "0") : ""}`;
 }
 export function money(minor: number, currency = "GBP", signed = false) {
-  return new Intl.NumberFormat("en-GB", {
+  const p = currencyPrecision(currency);
+  const value = BigInt(minor);
+  const factor = BigInt(10 ** p);
+  const whole = value / factor;
+  const fraction = String((value < 0n ? -value : value) % factor).padStart(
+    p,
+    "0",
+  );
+  const formatter = new Intl.NumberFormat("en-GB", {
     style: "currency",
     currency,
-    maximumFractionDigits: currencyPrecision(currency),
-    signDisplay: signed ? "exceptZero" : "auto",
-  }).format((minor === 0 ? 0 : minor) / 10 ** currencyPrecision(currency));
+    minimumFractionDigits: p,
+    maximumFractionDigits: p,
+    signDisplay: signed && minor !== 0 ? "always" : "auto",
+  });
+  return formatter
+    .formatToParts(whole === 0n && minor < 0 ? -0 : whole)
+    .map((part) => (part.type === "fraction" ? fraction : part.value))
+    .join("");
 }
 export function safeSum(values: number[]) {
   return values.reduce((s, x) => {

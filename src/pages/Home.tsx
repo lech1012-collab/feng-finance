@@ -2,6 +2,7 @@ import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowUpRight,
+  ArrowDownRight,
   Building2,
   CheckCircle2,
   Upload,
@@ -124,7 +125,11 @@ export default function Home({
               t.date.startsWith(monthOffset(month, -1)),
             ) ? (
               <>
-                <ArrowUpRight size={16} />
+                {difference >= 0 ? (
+                  <ArrowUpRight size={16} />
+                ) : (
+                  <ArrowDownRight size={16} />
+                )}
                 {money(difference, currency, true)} vs previous month
               </>
             ) : (

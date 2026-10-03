@@ -25,7 +25,9 @@ export function detectBank(rows: TextRow[]) {
       /\bDate\b/i.test(r.text) &&
       /Description|Details|Transaction|Merchant/i.test(r.text),
   );
-  const text = (tableStart >= 0 ? rows.slice(0, tableStart + 1) : rows.slice(0, 30))
+  const text = (
+    tableStart >= 0 ? rows.slice(0, tableStart + 1) : rows.slice(0, 30)
+  )
     .map((r) => r.text)
     .join("\n");
   const candidates = Object.entries(signals)

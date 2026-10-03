@@ -335,13 +335,11 @@ test("unsupported PDF is explicit and leaves the database empty", async ({
   page,
 }) => {
   await openImport(page);
-  await page
-    .getByLabel("Select PDF statements")
-    .setInputFiles({
-      name: "invalid.pdf",
-      mimeType: "application/pdf",
-      buffer: Buffer.from("This is not a PDF"),
-    });
+  await page.getByLabel("Select PDF statements").setInputFiles({
+    name: "invalid.pdf",
+    mimeType: "application/pdf",
+    buffer: Buffer.from("This is not a PDF"),
+  });
   await expect(page.getByRole("alert")).toHaveText(
     "This file is not a valid PDF.",
   );
