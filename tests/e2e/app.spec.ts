@@ -616,6 +616,22 @@ test("dark default, persistent appearance and mobile layouts without overlapping
       document.documentElement.style.fontSize = "";
     });
   }
+  // A wider fallback font reproduces the long-title overflow seen on CI WebKit.
+  await gotoRoute(page, "/transactions");
+  await expect(page.locator("h1")).toHaveText("Transactions");
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "230%";
+    document.documentElement.style.fontFamily = "serif";
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+    )
+    .toBe(0);
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "";
+    document.documentElement.style.fontFamily = "";
+  });
   await gotoRoute(page, "/analysis");
   await page
     .getByRole("combobox", { name: "Period", exact: true })

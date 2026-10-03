@@ -2537,3 +2537,13 @@ label,
     gap: 12px;
   }
 }
+/* Long page titles must reflow when system fonts or accessibility sizes widen them. */
+h1,
+h2,
+h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.page-heading > div {
+  max-width: 100%;
+}
