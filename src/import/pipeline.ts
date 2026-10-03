@@ -143,7 +143,7 @@ export async function prepareDraft(
       tags: [],
       transactionFingerprint: "",
       occurrence: 0,
-      isTransfer: false,
+      isTransfer: p.type === "transfer",
       isReviewed: false,
       createdAt: now,
       updatedAt: now,

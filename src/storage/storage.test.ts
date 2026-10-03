@@ -10,7 +10,7 @@ import {
   exportCsv,
 } from "./backup";
 import { editTransaction, linkTransfers } from "./transactions";
-import { transaction, accounts, bankRows } from "../tests/helpers";
+import { transaction, accounts, bankRows, rows } from "../tests/helpers";
 import { prepareDraft, commitDraft, validateDraft } from "../import/pipeline";
 import { cashFlow } from "../analytics/calculations";
 beforeEach(async () => {
@@ -250,4 +250,46 @@ describe("atomic import and editing", () => {
     expect(cashFlow(month, "GBP").expenses).toBeGreaterThan(0);
     expect(await db.transactions.count()).toBe(20000);
   }, 20000);
+});
+
+it("excludes an unpaired Amex card repayment from income before counterpart import", async () => {
+  const statementRows = rows([
+    [[30, "American Express Statement of Account"]],
+    [[30, "Statement period: 01 Sep 2026 to 30 Sep 2026"]],
+    [[30, "Card ending: 1008"]],
+    [[30, "Currency: GBP"]],
+    [
+      [30, "Previous balance"],
+      [550, "1,000.00"],
+    ],
+    [
+      [30, "Date"],
+      [140, "Description"],
+      [550, "Amount"],
+    ],
+    [
+      [30, "03 Sep"],
+      [140, "BARCLAYS PAYMENT RECEIVED"],
+      [550, "500.00 CR"],
+    ],
+    [
+      [30, "New balance"],
+      [550, "500.00"],
+    ],
+  ]);
+  const draft = await prepareDraft({
+    rows: statementRows,
+    hash: "card-payment-only",
+    filename: "synthetic.pdf",
+    method: "embedded-text",
+    warnings: [],
+  });
+  expect(draft.transactions[0].isTransfer).toBe(true);
+  await commitDraft(draft);
+  expect(cashFlow(await db.transactions.toArray(), "GBP")).toEqual({
+    income: 0,
+    expenses: 0,
+    net: 0,
+  });
+  validateBackup(await createBackup());
 });

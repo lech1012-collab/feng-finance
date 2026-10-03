@@ -156,7 +156,11 @@ export default function ImportPage() {
             accept="application/pdf,.pdf"
             multiple
             disabled={busy}
-            onChange={(e) => void selectFiles(Array.from(e.target.files ?? []))}
+            onChange={(e) => {
+              const selected = Array.from(e.target.files ?? []);
+              e.target.value = "";
+              void selectFiles(selected);
+            }}
           />
         </label>
         <p className="muted">

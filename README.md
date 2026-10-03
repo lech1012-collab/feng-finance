@@ -60,7 +60,7 @@ Routing uses hash URLs so static hosting requires no server rewrites. Pages and 
 
 Money entering the finances is positive; money leaving is negative. Amex reported amounts owed are stored as negative balances. Purchases are negative, refunds/payments positive. All cash-flow and property totals exclude `isTransfer` or transfer-type rows. Different currencies are never summed or converted. Monetary summation checks safe integer precision. Reconciliation accepts at most one minor unit difference.
 
-A transfer match requires exact opposite amounts, different known accounts, the same currency, dates within five days and reciprocal institution/account evidence in the descriptions. Ambiguous matches remain unlinked. Mark or link a transfer manually when descriptions are insufficient. A partial card payment can pair with its actual opposite deposit; it never matches a purchase or a differently sized payment. Transfers are excluded only after classification/matching: review unlinked payments so they do not inflate totals.
+A transfer match requires exact opposite amounts, different known accounts, the same currency, dates within five days and reciprocal institution/account evidence in the descriptions. Ambiguous matches remain unlinked. Mark or link a transfer manually when descriptions are insufficient. A partial card payment can pair with its actual opposite deposit; it never matches a purchase or a differently sized payment. Clearly labeled Amex card repayments are classified as transfers immediately, even before the bank-side statement is imported. Other ambiguous or unlinked payments require review so they do not inflate totals.
 
 ### Bank parser architecture
 

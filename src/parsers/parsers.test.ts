@@ -127,6 +127,7 @@ describe("Amex liability adapter", () => {
       -12050, 2000, 50000, 1000,
     ]);
     expect(p.openingBalance).toBe(-100000);
+    expect(p.transactions[2].type).toBe("transfer");
     expect(p.closingBalance).toBe(-59050);
     expect(parser.validate(p).status).toBe("reconciled");
   });

@@ -6,7 +6,7 @@ Implemented as a React / strict TypeScript / Vite static PWA with Dexie, PDF.js,
 
 1. Foundation: responsive React shell, hash routing, manifest/icons, offline cache, versioned IndexedDB, unit/browser tooling.
 2. Data model: minor-unit money, accounts/statements/transactions/categories/rules/transfer links, atomic storage, demo, backup and restore.
-   3–6. PDF engine and three adapters: file hashing/limits, coordinates, rows/columns, header detection, periods/accounts/currency, separate current-account and Amex liability semantics, generated bank fixtures.
+   3–6. PDF engine and three adapters: file hashing/limits, coordinates, rows/columns, header detection, periods/accounts/currency, separate current-account and Amex liability semantics (including unpaired card repayments as transfers), generated bank fixtures.
 3. OCR: local English worker/model, scanned-page rendering and word coordinates, lower confidence and explicit acknowledgement.
    8–9. Protection and categorization: statement/transaction duplicates with balance and occurrence evidence, concurrency checks, conservative transfers/manual links, deterministic rules, reviewed merchant history and correction rules.
    10–12. Product UI: monthly dashboard, currency selector, transaction filters/detail, property/annual/YTD/custom analysis, trends, comparisons, recurring suggestions and settings.
@@ -14,7 +14,7 @@ Implemented as a React / strict TypeScript / Vite static PWA with Dexie, PDF.js,
 
 ## Automated checks
 
-- **93 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries.
+- **94 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries.
 - **18 browser checks**: nine workflows each in Chromium and Playwright WebKit at 390 × 844. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records.
 - Production TypeScript/Vite build and local offline precache generation; static output includes PDF worker/fonts/CMaps/WASM and English OCR assets.
 - `npm audit`: zero known vulnerabilities in installed production and development dependencies at verification time.

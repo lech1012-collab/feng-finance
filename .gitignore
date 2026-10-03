@@ -12,3 +12,5 @@ public/pdfjs/
 *.tsbuildinfo
 .DS_Store
 *.backup.json
+feng-finance-backup-*.json
+feng-finance-transactions-*.csv
