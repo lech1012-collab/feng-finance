@@ -69,10 +69,20 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   ).toBeVisible();
   await page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }).click();
   await page.getByLabel("Category", { exact: true }).selectOption("household");
+  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
+    "household",
+  );
   await page.getByLabel(/Always categorize similar transactions/).check();
+  await expect(page.getByLabel("Transactions containing")).toHaveValue(
+    "JOHN LEWIS",
+  );
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
+  ).toBeVisible();
+  await gotoRoute(page, "/settings");
+  await expect(
+    page.getByText("JOHN LEWIS → Household", { exact: true }),
   ).toBeVisible();
   await openImport(page);
   await selectStatement(page, "barclays-october");
