@@ -49,6 +49,7 @@ function resolveRange(startText: string, endText: string): StatementPeriod {
 export function identifyPeriod(
   rows: TextRow[],
   allowHeaderRange = false,
+  headerLimit = 30,
 ): StatementPeriod {
   // Header-only matching avoids treating merchant references and fee periods as
   // the account's statement period. Repeated page headers are not evidence for
@@ -60,7 +61,7 @@ export function identifyPeriod(
       /\bdate\b/i.test(r.text) &&
       /description|details|transaction|merchant/i.test(r.text),
   );
-  const header = table >= 0 ? page.slice(0, table) : page.slice(0, 30);
+  const header = table >= 0 ? page.slice(0, table) : page.slice(0, headerLimit);
   const found = new Map<string, StatementPeriod>();
   for (let i = 0; i < header.length; i++) {
     let text = "";

@@ -1,6 +1,6 @@
 {
   "name": "feng-finance",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "fixtures": "node scripts/fixtures.mjs && node scripts/card-fixture.mjs",
+    "fixtures": "node scripts/fixtures.mjs && node scripts/card-fixture.mjs && node scripts/layout-fixtures.mjs",
     "prepare:assets": "node scripts/assets.mjs",
     "postinstall": "npm run prepare:assets",
     "check": "npm test && npm run build && npm run test:e2e",

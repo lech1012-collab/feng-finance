@@ -25,6 +25,14 @@ export function isoDate(year: number, month: number, day: number) {
   return date.toISOString().slice(0, 10);
 }
 export function parseDate(raw: string, referenceEnd?: string) {
+  const monthFirst = raw
+    .trim()
+    .match(/^([A-Za-z]{3,9})\s+(\d{1,2})(?:\s+(\d{2,4}))?$/);
+  if (monthFirst)
+    return parseDate(
+      `${monthFirst[2]} ${monthFirst[1]}${monthFirst[3] ? ` ${monthFirst[3]}` : ""}`,
+      referenceEnd,
+    );
   let m = raw.trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (m) return isoDate(+m[1], +m[2], +m[3]);
   m = raw.trim().match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/);

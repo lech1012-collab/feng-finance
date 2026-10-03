@@ -7,8 +7,8 @@ const signals: Record<Exclude<Institution, "Other">, [RegExp, number][]> = {
     [/sort code|current account|account number|your .*visa statement/i, 0.15],
   ],
   "American Express": [
-    [/AMERICAN EXPRESS|\bAMEX\b/i, 0.55],
-    [/previous balance|new balance/i, 0.15],
+    [/AMERICAN EXPRESS|\bAMEX\b|\bamericanexpress\.co\.uk\b/i, 0.55],
+    [/previous (?:closing )?balance|new balance/i, 0.15],
     [/card ending|card number|membership/i, 0.15],
     [/payment received|statement of account/i, 0.15],
   ],

@@ -425,3 +425,58 @@ test("unsupported PDF is explicit and leaves the database empty", async ({
   await gotoRoute(page, "/settings");
   await expect(page.getByText(/0 transactions stored/)).toBeVisible();
 });
+
+test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and import sequentially", async ({
+  page,
+}) => {
+  await openImport(page);
+  await page
+    .getByLabel("Select PDF statements")
+    .setInputFiles([fixture("amex-uk-layout"), fixture("revolut-uk-layout")]);
+  await expect(
+    page.getByRole("heading", { name: "American Express detected" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("2026-09-06 to 2026-10-05", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText(/1 transaction dates fall outside/),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await page
+    .getByRole("button", { name: "Confirm import", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Revolut detected" }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("2026-09-01 to 2026-09-30", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await confirmImport(page);
+  await page.getByRole("button", { name: "View dashboard" }).click();
+  await page.locator('input[type="month"]').fill("2026-09");
+  await expect(page.locator(".hero-number")).toHaveText("+£455.00");
+  await openImport(page);
+  await selectStatement(page, "revolut-uk-layout");
+  await expect(
+    page.getByText("This statement has already been imported.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+});

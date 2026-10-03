@@ -7,7 +7,7 @@ import type {
   TextRow,
 } from "../domain/models";
 import type { StatementPeriod } from "./period";
-export const PARSER_VERSION = "1.0.1";
+export const PARSER_VERSION = "1.0.2";
 export interface StatementParser {
   institution: Institution;
   canParse(rows: TextRow[]): boolean;
