@@ -25,7 +25,14 @@ npm ci
 VITE_BASE_PATH=/feng-finance/ npm run build
 ```
 
-Upload the contents of `dist` using the GitHub Pages Actions artifact/deployment workflow. For a custom-domain root deployment leave `VITE_BASE_PATH=/`. Set Pages HTTPS enforcement. Hash routes and relative manifest scope make subpath deployment work. GitHub Pages cannot configure the provided HTTP security headers; use Vercel/Cloudflare when CSP/response-header control is required. Never build a root-path artifact and place it under a subpath.
+An automated Pages workflow is included at `.github/workflows/pages.yml`:
+
+1. Create an empty GitHub repository, add it as `origin`, and push the `main` branch.
+2. In the repository's **Settings → Pages**, select **GitHub Actions** as the source. GitHub's free plans require a public repository for Pages; private repositories require a supported paid plan. The deployed app URL is public even when its source repository is private, unless your plan explicitly supports private Pages access.
+3. The verification workflow runs the financial and browser tests, production build and dependency audit. After a successful push verification, the Pages workflow builds the verified commit using the repository's actual base path, then deploys only `dist/`.
+4. Open the deployment URL shown in **Actions → Deploy Feng Finance to GitHub Pages**, and install it from Safari. The workflow can also be started manually from Actions; manual runs repeat unit tests and the production build.
+
+The workflow also supports a configured custom domain automatically. Set Pages HTTPS enforcement. Hash routes and relative manifest scope make subpath deployment work. GitHub Pages cannot configure the provided HTTP security headers; use Vercel/Cloudflare when CSP/response-header control is required. Never build a root-path artifact and place it under a subpath. Repository uploads contain application source and synthetic test generators only; financial statements, backups, exports and local database records are excluded.
 
 ## Installation and updates
 
