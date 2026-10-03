@@ -184,9 +184,9 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.locator(".hero-number")).toHaveText("-£109.68");
   await page.getByRole("link", { name: "Transactions", exact: true }).click();
-  await expect(
-    page.getByRole("link", { name: /\+£900\.00/ }),
-  ).toContainText("Transfer");
+  await expect(page.getByRole("link", { name: /\+£900\.00/ })).toContainText(
+    "Transfer",
+  );
 });
 
 test("Barclays header date ranges and manual statement-date fallback", async ({
