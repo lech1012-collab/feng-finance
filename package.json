@@ -1,0 +1,51 @@
+{
+  "name": "feng-finance",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "fixtures": "node scripts/fixtures.mjs",
+    "prepare:assets": "node scripts/assets.mjs",
+    "postinstall": "npm run prepare:assets",
+    "check": "npm test && npm run build && npm run test:e2e",
+    "format": "prettier --write src scripts tests *.json *.ts docs README.md",
+    "format:check": "prettier --check src scripts tests *.json *.ts docs README.md"
+  },
+  "dependencies": {
+    "@tesseract.js-data/eng": "^1.0.0",
+    "dexie": "^4.2.0",
+    "dexie-react-hooks": "^4.2.0",
+    "lucide-react": "^0.544.0",
+    "pdfjs-dist": "^6.2.108",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-router-dom": "^7.9.4",
+    "recharts": "^3.3.0",
+    "tesseract.js": "^6.0.1",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.56.0",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.0",
+    "@types/node": "^24.7.0",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.0.4",
+    "fake-indexeddb": "^6.2.3",
+    "jsdom": "^27.0.0",
+    "pdf-lib": "^1.17.1",
+    "prettier": "^3.9.9",
+    "sharp": "^0.35.5",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9",
+    "vite-plugin-pwa": "^1.1.0",
+    "vitest": "^5.0.3"
+  }
+}

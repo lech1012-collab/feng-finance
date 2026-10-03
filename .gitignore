@@ -1,0 +1,14 @@
+node_modules/
+dist/
+test-results/
+playwright-report/
+*.pdf
+/private-fixtures/
+.env*
+!.env.example
+public/ocr/
+public/icons/
+public/pdfjs/
+*.tsbuildinfo
+.DS_Store
+*.backup.json
