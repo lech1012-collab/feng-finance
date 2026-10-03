@@ -2547,3 +2547,7 @@ h3 {
 .page-heading > div {
   max-width: 100%;
 }
+.pagination {
+  flex-wrap: wrap;
+  gap: 12px;
+}
