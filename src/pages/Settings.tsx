@@ -1,3 +1,5 @@
+import { ThemeSetting } from "../components/Theme";
+import { PersonalRules } from "../components/PersonalRules";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -91,6 +93,8 @@ export default function Settings() {
         </div>
         <span className="small-chip">v{APP_VERSION}</span>
       </div>
+      <ThemeSetting />
+      <PersonalRules />
       {notice && (
         <div className="notice success" role="status">
           {notice}
@@ -344,8 +348,8 @@ export default function Settings() {
           </button>
         </details>
       </section>
-      <section className="card">
-        <h2>Categories</h2>
+      <details className="card settings-disclosure">
+        <summary>Categories</summary>
         <p className="muted">
           Archiving preserves historical transactions. Property and Property
           income retain their analysis roles when renamed.
@@ -430,9 +434,9 @@ export default function Settings() {
           <Plus size={16} />
           Add {categoryParent ? "subcategory" : "category"}
         </button>
-      </section>
-      <section className="card">
-        <h2>Categorization & transfer rules</h2>
+      </details>
+      <details className="card settings-disclosure">
+        <summary>Categorization & transfer rules</summary>
         <p className="muted">
           User exact rules run first, then user text rules, then built-in
           mappings. Changes apply to future imports.
@@ -476,9 +480,9 @@ export default function Settings() {
               <p key={r.id}>{r.name}</p>
             ))}
         </details>
-      </section>
-      <section className="card">
-        <h2>Statement history</h2>
+      </details>
+      <details className="card settings-disclosure">
+        <summary>Statement history</summary>
         <p className="muted">
           Source PDFs are not stored. Filenames, parser version, review warnings
           and balance differences remain available for traceability.
@@ -511,7 +515,7 @@ export default function Settings() {
             </p>
           )}
         </div>
-      </section>
+      </details>
       <section className="card">
         <h2>Demo data</h2>
         <p>

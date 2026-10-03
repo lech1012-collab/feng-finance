@@ -20,7 +20,11 @@ import {
 import { money, decimalMoney, parseMoney } from "../domain/money";
 import { cashFlow } from "../analytics/calculations";
 import { validatePeriod } from "../parsers/period";
-export default function ImportPage() {
+export default function ImportPage({
+  onImported,
+}: {
+  onImported: (month: string, currency: string) => void;
+}) {
   const [files, setFiles] = useState<File[]>([]);
   const [index, setIndex] = useState(0);
   const [extracted, setExtracted] = useState<ExtractedFile>();
@@ -36,6 +40,9 @@ export default function ImportPage() {
   const [periodStart, setPeriodStart] = useState("");
   const [periodEnd, setPeriodEnd] = useState("");
   const amountErrors = useRef(new Set<string>());
+  const [showAll, setShowAll] = useState(false);
+  const [importedCount, setImportedCount] = useState(0);
+  const latestImported = useRef("");
   const navigate = useNavigate();
   const accounts = useLiveQuery(
     () => db.accounts.filter((a) => !a.isDemo).toArray(),
@@ -57,6 +64,7 @@ export default function ImportPage() {
     useEnteredDates = true,
   ) => {
     setBusy(true);
+    window.scrollTo({ top: 0 });
     setError("");
     setDraft(undefined);
     setOverride(false);
@@ -70,11 +78,12 @@ export default function ImportPage() {
       setExtracted(result);
       const d = await prepareDraft(
         result,
-        bank || undefined,
-        accounts?.find((a) => a.id === accountId),
+        useEnteredDates ? bank || undefined : undefined,
+        useEnteredDates ? accounts?.find((a) => a.id === accountId) : undefined,
         period,
       );
       setDraft(d);
+      setShowAll(false);
       setStatus("Ready to review");
     } catch (e) {
       setError(
@@ -89,6 +98,10 @@ export default function ImportPage() {
   const selectFiles = async (selected: File[]) => {
     if (!selected.length) return;
     setFiles(selected);
+    setBank("");
+    setAccountId("");
+    setImportedCount(0);
+    latestImported.current = "";
     setIndex(0);
     setSuccess("");
     setExtracted(undefined);
@@ -119,6 +132,17 @@ export default function ImportPage() {
     setError("");
     try {
       const n = await commitDraft(draft, override);
+      const latest = draft.transactions
+        .filter((t) => t.include)
+        .map((t) => t.date)
+        .sort()
+        .at(-1);
+      if (latest) {
+        latestImported.current =
+          latest > latestImported.current ? latest : latestImported.current;
+        onImported(latestImported.current.slice(0, 7), draft.account.currency);
+      }
+      setImportedCount((count) => count + n);
       setSuccess(
         `Imported ${n} new transactions from ${draft.statement.institution}.`,
       );
@@ -143,7 +167,12 @@ export default function ImportPage() {
     }
   };
   const validation = draft && draftReconciliation(draft);
-  const flow = draft && cashFlow(draft.transactions, draft.statement.currency);
+  const flow =
+    draft &&
+    cashFlow(
+      draft.transactions.filter((t) => t.include),
+      draft.statement.currency,
+    );
   const issues =
     draft?.transactions.filter(
       (t) =>
@@ -151,20 +180,29 @@ export default function ImportPage() {
         (!t.categoryId && !t.isTransfer) ||
         t.duplicate !== "none",
     ) ?? [];
+  const needsCheck = (t: ImportDraft["transactions"][number]) =>
+    t.extractionConfidence < 0.8 ||
+    t.duplicate !== "none" ||
+    (draft &&
+      (t.date < draft.statement.statementPeriodStart ||
+        t.date > draft.statement.statementPeriodEnd));
+  const checks = draft?.transactions.filter(needsCheck) ?? [];
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">LOCAL PDF PROCESSING</p>
+          <p className="eyebrow">ADD YOUR LATEST ACTIVITY</p>
           <h1>Import statements</h1>
         </div>
       </div>
-      <section className="card upload-card">
+      <section
+        className={`card upload-card ${draft || busy || success ? "compact-upload" : ""}`}
+      >
         <Upload size={28} />
-        <h2>A month of clarity starts here.</h2>
+        <h2>Add your statements</h2>
         <p>
-          Select monthly PDFs from Barclays, American Express or Revolut.
-          Original PDFs are not retained.
+          Select monthly PDFs from Barclays, American Express or Revolut. We’ll
+          check the numbers and highlight anything that needs you.
         </p>
         <label
           className={`button primary file-button ${busy ? "disabled" : ""}`}
@@ -189,6 +227,12 @@ export default function ImportPage() {
           pages per PDF.
         </p>
       </section>
+      {files.length > 1 && (
+        <p className="queue-progress">
+          Statement {index + 1} of {files.length} · {importedCount} transactions
+          saved
+        </p>
+      )}
       {busy && (
         <div className="notice" role="status">
           <span className="spinner" />
@@ -196,10 +240,13 @@ export default function ImportPage() {
           {files.length > 1 && ` · Statement ${index + 1} of ${files.length}`}
         </div>
       )}
-      {success && (
+      {success && !draft && !busy && (
         <div className="notice success" role="status">
           <CheckCircle2 size={18} />
-          {success}
+          <div>
+            <strong>Import complete</strong>
+            <p>{importedCount} transactions added. Your overview is ready.</p>
+          </div>
           <button onClick={() => navigate("/")}>View dashboard</button>
         </div>
       )}
@@ -327,7 +374,9 @@ export default function ImportPage() {
                 {draft.statement.institution} detected
               </h2>
               <span className="small-chip">
-                {draft.statement.extractionMethod}
+                {draft.statement.extractionMethod === "OCR"
+                  ? "OCR"
+                  : "Digital PDF"}
               </span>
             </div>
             <p>
@@ -350,11 +399,11 @@ export default function ImportPage() {
                 <strong>{draft.transactions.length}</strong>
               </div>
               <div>
-                <span>Income before transfer matching</span>
+                <span>Income to add</span>
                 <strong>{money(flow.income, draft.statement.currency)}</strong>
               </div>
               <div>
-                <span>Expenses before transfer matching</span>
+                <span>Expenses to add</span>
                 <strong>
                   {money(flow.expenses, draft.statement.currency)}
                 </strong>
@@ -370,6 +419,11 @@ export default function ImportPage() {
                     ? "⚠ Statement validation failed"
                     : "Balance validation unavailable"}
               </strong>
+              {draft.account.accountType === "credit" && (
+                <p className="muted">
+                  Credit card balances below use a minus sign for money owed.
+                </p>
+              )}
               <dl className="totals">
                 <div>
                   <dt>Opening balance</dt>
@@ -480,17 +534,35 @@ export default function ImportPage() {
               </div>
             )}
             <p>
-              <strong>{issues.length} transactions need review.</strong> Verify
-              uncertain amounts; you can categorize other transactions later.
+              <strong>{checks.length} transactions to check.</strong>{" "}
+              {issues.filter((t) => !t.categoryId && !t.isTransfer).length} can
+              be categorized later.
             </p>
           </section>
           <section className="card review-transactions">
             <h2>Review transactions</h2>
-            <p className="muted">
-              All extracted rows are shown. Duplicates are kept only when you
-              select them. Amount corrections update reconciliation.
-            </p>
-            {[...draft.transactions]
+            <div
+              className="review-tabs"
+              role="group"
+              aria-label="Transaction review"
+            >
+              <button aria-pressed={!showAll} onClick={() => setShowAll(false)}>
+                To check ({checks.length})
+              </button>
+              <button aria-pressed={showAll} onClick={() => setShowAll(true)}>
+                All transactions ({draft.transactions.length})
+              </button>
+            </div>
+            {!showAll && !checks.length && (
+              <div className="review-clear">
+                <CheckCircle2 size={24} />
+                <p>
+                  Amounts and dates look good. Confirm the summary above, or
+                  open all transactions to make changes.
+                </p>
+              </div>
+            )}
+            {(showAll ? [...draft.transactions] : [...checks])
               .sort(
                 (a, b) =>
                   Number(a.extractionConfidence >= 0.8) -
@@ -499,10 +571,25 @@ export default function ImportPage() {
                     Number(b.duplicate === "none"),
               )
               .map((t) => (
-                <div
+                <details
+                  open={!!needsCheck(t)}
                   className={`review-row ${t.extractionConfidence < 0.8 ? "uncertain" : ""}`}
                   key={t.id}
                 >
+                  <summary className="review-compact">
+                    <span>
+                      <strong>{t.merchant || t.description}</strong>
+                      <small>
+                        {t.date} ·{" "}
+                        {t.isTransfer
+                          ? "Transfer"
+                          : (categories?.find((c) => c.id === t.categoryId)
+                              ?.name ?? "Uncategorized")}
+                      </small>
+                    </span>
+                    <strong>{money(t.amount, t.currency, true)}</strong>
+                    <ChevronDown size={16} />
+                  </summary>
                   <div className="review-row-title">
                     <label className="check">
                       <input
@@ -583,6 +670,7 @@ export default function ImportPage() {
                       Category
                       <select
                         aria-label="Category"
+                        disabled={t.isTransfer}
                         value={t.categoryId ?? ""}
                         onChange={(e) =>
                           updateRow(t.id, {
@@ -636,7 +724,7 @@ export default function ImportPage() {
                         {t.duplicate !== "none" ? "and want to keep it" : ""}.
                       </label>
                     )}
-                </div>
+                </details>
               ))}
           </section>
           <div className="import-footer">

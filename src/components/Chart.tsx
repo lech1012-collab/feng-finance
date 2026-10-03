@@ -40,51 +40,65 @@ export function CashChart({
             data={data}
             margin={{ top: 12, right: 8, left: -16, bottom: 0 }}
           >
-            <CartesianGrid vertical={false} stroke="#e9eced" />
+            <CartesianGrid vertical={false} stroke="var(--line)" />
             <XAxis
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 13, fill: "#67716e" }}
+              tick={{ fontSize: 13, fill: "var(--muted)" }}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 12, fill: "#67716e" }}
-              tickFormatter={(v) => `${Math.round(Number(v) / factor / 1000)}k`}
+              tick={{ fontSize: 12, fill: "var(--muted)" }}
+              tickFormatter={(v) => {
+                const n = Number(v) / factor;
+                return Math.abs(n) >= 1000
+                  ? `${+(n / 1000).toFixed(1)}k`
+                  : String(Math.round(n));
+              }}
             />
             <Tooltip
               formatter={(value) => money(Number(value), currency)}
-              contentStyle={{ borderRadius: 10, border: "1px solid #dde3e0" }}
+              contentStyle={{
+                borderRadius: 12,
+                border: "1px solid var(--line)",
+                background: "var(--surface)",
+                color: "var(--ink)",
+              }}
             />
             {property ? (
               <Line
+                isAnimationActive={false}
                 name="Property net"
                 dataKey="property"
-                stroke="#326857"
+                stroke="var(--chart-income)"
                 strokeWidth={2}
                 dot={false}
               />
             ) : (
               <>
                 <Bar
+                  isAnimationActive={false}
                   name="Income"
                   dataKey="income"
-                  fill="#326857"
+                  fill="var(--chart-income)"
                   radius={[3, 3, 0, 0]}
                   maxBarSize={16}
                 />
                 <Bar
+                  isAnimationActive={false}
                   name="Expenses"
                   dataKey="expenses"
-                  fill="#becdc6"
+                  fill="var(--chart-expense)"
                   radius={[3, 3, 0, 0]}
                   maxBarSize={16}
                 />
                 <Line
+                  isAnimationActive={false}
                   name="Net cash flow"
                   dataKey="net"
-                  stroke="#b78644"
+                  stroke="var(--chart-net)"
                   strokeWidth={2}
                   dot={false}
                 />

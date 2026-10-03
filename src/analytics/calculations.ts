@@ -1,5 +1,5 @@
 import type { Category, Transaction } from "../domain/models";
-import { monthOffset } from "../domain/dates";
+import { monthOffset, monthBounds } from "../domain/dates";
 import { money, safeSum, currencyPrecision } from "../domain/money";
 export function cashFlow(transactions: Transaction[], currency: string) {
   const items = transactions.filter(
@@ -77,6 +77,26 @@ export function monthlySeries(
     };
   });
 }
+export function comparableMonths(
+  transactions: Transaction[],
+  a: string,
+  b: string,
+  currency: string,
+) {
+  const accounts = (month: string) =>
+    new Set(
+      transactions
+        .filter((t) => t.currency === currency && t.date.startsWith(month))
+        .map((t) => t.accountId),
+    );
+  const current = accounts(a),
+    previous = accounts(b);
+  return (
+    current.size > 0 &&
+    current.size === previous.size &&
+    [...current].every((id) => previous.has(id))
+  );
+}
 export function comparisons(
   transactions: Transaction[],
   categories: Category[],
@@ -90,16 +110,14 @@ export function comparisons(
   );
   const previous = Array.from({ length: 6 }, (_, i) =>
     monthOffset(month, -i - 1),
-  ).filter((m) =>
-    transactions.some((t) => t.currency === currency && t.date.startsWith(m)),
-  );
+  ).filter((m) => comparableMonths(transactions, month, m, currency));
   if (!previous.length)
     return {
       items: [],
       average: 0,
       difference: 0,
       sampleMonths: 0,
-      text: "Import previous months to see spending comparisons.",
+      text: "Add previous statements for the same accounts to see a fair spending comparison.",
     };
   const historical = categorySpending(
     transactions.filter((t) => previous.includes(t.date.slice(0, 7))),
@@ -177,4 +195,17 @@ export function recurring(transactions: Transaction[], currency: string) {
         : [];
     })
     .sort((a, b) => b.amount - a.amount);
+}
+
+/** A dated snapshot must reach the month end (or today for a month still in progress). */
+export function statementIsCurrent(
+  end: string | undefined,
+  month: string,
+  today = new Date().toISOString().slice(0, 10),
+) {
+  const lastDay = new Date(Date.parse(monthBounds(month)[1]) - 86400000)
+    .toISOString()
+    .slice(0, 10);
+  const target = lastDay < today ? lastDay : today;
+  return !!end && end >= target && end >= monthBounds(month)[0];
 }

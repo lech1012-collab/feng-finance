@@ -1,3 +1,4 @@
+import { ThemeSync } from "./components/Theme";
 import {
   useEffect,
   useState,
@@ -20,6 +21,7 @@ import {
   ChartNoAxesCombined,
   Settings as SettingsIcon,
   ShieldCheck,
+  Plus,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { registerSW } from "virtual:pwa-register";
@@ -34,6 +36,18 @@ let applyUpdate: (reload?: boolean) => Promise<void>;
 function Shell() {
   const location = useLocation();
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [monthChosen, setMonthChosen] = useState(false);
+  const latestDate = useLiveQuery(
+    async () => (await db.transactions.orderBy("date").last())?.date,
+    [],
+  );
+  useEffect(() => {
+    if (!monthChosen && latestDate) setMonth(latestDate.slice(0, 7));
+  }, [latestDate, monthChosen]);
+  const chooseMonth = (value: string) => {
+    setMonth(value);
+    setMonthChosen(true);
+  };
   const [currency, setCurrency] = useState("GBP");
   const [initialized, setInitialized] = useState(false);
   const [initError, setInitError] = useState("");
@@ -120,6 +134,7 @@ function Shell() {
   };
   return (
     <div className="app">
+      <ThemeSync />
       <a
         className="skip-link"
         href="#main"
@@ -143,6 +158,7 @@ function Shell() {
           {[
             ["/", "Home", HomeIcon],
             ["/transactions", "Transactions", List],
+            ["/import", "Import", Plus],
             ["/analysis", "Analyse", ChartNoAxesCombined],
             ["/settings", "Settings", SettingsIcon],
           ].map(([path, label, Icon]) => {
@@ -225,12 +241,22 @@ function Shell() {
                   element={
                     <Home
                       month={month}
-                      setMonth={setMonth}
+                      setMonth={chooseMonth}
                       currency={currency}
                     />
                   }
                 />
-                <Route path="/import" element={<Import />} />
+                <Route
+                  path="/import"
+                  element={
+                    <Import
+                      onImported={(latest, importedCurrency) => {
+                        chooseMonth(latest);
+                        setCurrency(importedCurrency);
+                      }}
+                    />
+                  }
+                />
                 <Route
                   path="/transactions"
                   element={
@@ -247,7 +273,7 @@ function Shell() {
                   element={
                     <Analysis
                       month={month}
-                      setMonth={setMonth}
+                      setMonth={chooseMonth}
                       currency={currency}
                     />
                   }
@@ -258,7 +284,7 @@ function Shell() {
                     <Analysis
                       key="property"
                       month={month}
-                      setMonth={setMonth}
+                      setMonth={chooseMonth}
                       currency={currency}
                       property
                     />
@@ -270,7 +296,7 @@ function Shell() {
                   element={
                     <Home
                       month={month}
-                      setMonth={setMonth}
+                      setMonth={chooseMonth}
                       currency={currency}
                     />
                   }

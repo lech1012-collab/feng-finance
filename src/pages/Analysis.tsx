@@ -9,11 +9,16 @@ import {
   propertyFlow,
   monthlySeries,
   comparisons,
+  comparableMonths,
   recurring,
 } from "../analytics/calculations";
 import { money } from "../domain/money";
 import { MonthPicker, Metric } from "../components/common";
 import { CashChart } from "../components/Chart";
+const shiftDate = (date: string, days: number) =>
+  new Date(Date.parse(`${date}T00:00:00Z`) + days * 86400000)
+    .toISOString()
+    .slice(0, 10);
 export default function Analysis({
   month,
   setMonth,
@@ -27,7 +32,9 @@ export default function Analysis({
 }) {
   const [period, setPeriod] = useState(property ? "ytd" : "6");
   const [customFrom, setCustomFrom] = useState(monthBounds(month)[0]);
-  const [customTo, setCustomTo] = useState(monthBounds(month)[1]);
+  const [customTo, setCustomTo] = useState(
+    shiftDate(monthBounds(month)[1], -1),
+  );
   const start =
     period === "custom"
       ? customFrom
@@ -39,15 +46,20 @@ export default function Analysis({
   const end =
     period === "custom"
       ? customTo
+        ? shiftDate(customTo, 1)
+        : ""
       : period === "annual"
         ? `${Number(month.slice(0, 4)) + 1}-01-01`
         : monthBounds(month)[1];
   const data = useLiveQuery(
     async () => ({
-      items: await db.transactions
-        .where("[currency+date]")
-        .between([currency, start], [currency, end], true, false)
-        .toArray(),
+      items:
+        !start || !end || start >= end
+          ? []
+          : await db.transactions
+              .where("[currency+date]")
+              .between([currency, start], [currency, end], true, false)
+              .toArray(),
       comparison: await db.transactions
         .where("[currency+date]")
         .between(
@@ -151,7 +163,7 @@ export default function Analysis({
       {period === "custom" && (
         <div className="card form-grid">
           <label>
-            From (inclusive)
+            From
             <input
               type="date"
               value={customFrom}
@@ -159,7 +171,7 @@ export default function Analysis({
             />
           </label>
           <label>
-            To (exclusive)
+            To
             <input
               type="date"
               value={customTo}
@@ -169,7 +181,10 @@ export default function Analysis({
         </div>
       )}
       <p className="muted">
-        {start} to {end} (end exclusive) · {currency} · transfers excluded
+        {start && end && start < end
+          ? `${start} to ${shiftDate(end, -1)}`
+          : "Choose a valid date range"}{" "}
+        · {currency} · transfers excluded
       </p>
       <section className="card metric-strip">
         <Metric
@@ -284,33 +299,54 @@ export default function Analysis({
           <section className="card">
             <h2>Month-over-month · {monthLabel(month)}</h2>
             <dl className="totals">
+              {comparableMonths(
+                data.comparison,
+                month,
+                monthOffset(month, -1),
+                currency,
+              ) && (
+                <>
+                  <div>
+                    <dt>Income change</dt>
+                    <dd>
+                      {money(current.income - previous.income, currency, true)}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Expense change</dt>
+                    <dd>
+                      {money(
+                        current.expenses - previous.expenses,
+                        currency,
+                        true,
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt>Net cash flow change</dt>
+                    <dd>{money(current.net - previous.net, currency, true)}</dd>
+                  </div>
+                </>
+              )}
               <div>
-                <dt>Income change</dt>
+                <dt>Average expenses · comparable previous months</dt>
                 <dd>
-                  {money(current.income - previous.income, currency, true)}
+                  {insights.sampleMonths
+                    ? money(insights.average, currency)
+                    : "Not enough history"}
                 </dd>
               </div>
               <div>
-                <dt>Expense change</dt>
-                <dd>
-                  {money(current.expenses - previous.expenses, currency, true)}
-                </dd>
+                <dt>12-month income</dt>
+                <dd>{money(rolling.income, currency)}</dd>
               </div>
               <div>
-                <dt>Net cash flow change</dt>
-                <dd>{money(current.net - previous.net, currency, true)}</dd>
+                <dt>12-month expenses</dt>
+                <dd>{money(rolling.expenses, currency)}</dd>
               </div>
               <div>
-                <dt>Average expenses · up to 6 previous months with data</dt>
-                <dd>{money(insights.average, currency)}</dd>
-              </div>
-              <div>
-                <dt>Rolling 12-month income / expenses / net</dt>
-                <dd>
-                  {money(rolling.income, currency)} /{" "}
-                  {money(rolling.expenses, currency)} /{" "}
-                  {money(rolling.net, currency, true)}
-                </dd>
+                <dt>12-month net cash flow</dt>
+                <dd>{money(rolling.net, currency, true)}</dd>
               </div>
             </dl>
             <p>{insights.text}</p>

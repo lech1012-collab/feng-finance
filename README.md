@@ -34,7 +34,8 @@ npm run check              # Tests, build and browser tests (generate fixtures f
 - Search and indexed date/currency filters, accounts/categories/type/amount/property filters, paginated lists, transaction source metadata, merchant/tag/category editing and learned rules.
 - Period analysis, monthly/category/property trends, YTD/annual/custom periods, month comparisons, rolling totals and evidence-based recurring-cost suggestions.
 - Configurable accounts, categories/subcategories, archiving, deterministic priority rules, JSON backup/replace restore, CSV export, demo deletion and explicit local-data deletion.
-- Installable mobile PWA, safe-area padding, offline shell and parsing, and a user-controlled service-worker update prompt.
+- Dark by default, optional persistent light mode, mobile Import navigation, exception-first review, statement balance snapshots, safe-area padding and user-controlled offline PWA updates.
+- Private personal-rules file import previews and applies classification corrections to existing records, then remembers rules for future statements.
 
 ## Architecture
 
@@ -76,6 +77,12 @@ Exact PDF duplicates require a separate override. Known transaction duplicates a
 
 Add another bank by implementing `StatementParser`, registering it in `src/parsers/index.ts`, adding independent header signals and generating a synthetic layout fixture. Add tests for signs, balances, multiline descriptions, page breaks, repeated purchases, currency references and invalid rows. Extend adapter-specific column identification when a real layout differs; do not relax reconciliation to make it pass.
 
+### Personal corrections and appearance
+
+Settings → **Import personal rules** accepts a local JSON file with format `feng-finance-rules`, version `1`, `categories` and `rules` arrays. Category entries contain `id`, `name`, `kind`. Rule entries contain `name`, `match` (`contains`, `starts-with`, `exact`), `pattern`, `direction`, and either `categoryId` or `type: "transfer"`. Preview the matching record count, then **Apply corrections & remember rules**. This is an atomic local update: printed dates/amounts and statement balances are preserved; demo rows are excluded. Conflicting outcomes, unavailable categories, linked transfers and stale previews are rejected. Reapplying the same rules is idempotent. Keep files containing personal names or references out of the repository. The deployed site cannot change another device's records remotely.
+
+Dark is the default theme. Appearance is stored in IndexedDB and included in backups; a localStorage copy of the theme name prevents a light-mode reload flash. No financial data is stored in localStorage. Import opens on uncertain/duplicate/date-exception rows; **All transactions** exposes every extracted row and optional categorization. After import the overview opens on the latest imported transaction month. Account balances are dated statement snapshots, not inferred current balances; card liabilities display as **amount owed**.
+
 ### Backup and schema migrations
 
 Format: `{format:"feng-finance", version:1, schemaVersion:2, moneyUnit:"minor", exportedAt, accounts, statements, transactions, categories, rules, transferLinks, settings}`. The original PDFs are not included. Zod validation checks primitive formats/versions, safe integer money, reference integrity, unique IDs, account/currency consistency, category hierarchy, statement counts and transfer pairing before any write. Replace restore runs atomically and requires an explicit UI acknowledgement. Merge restore is deliberately not implemented in V1. Backups are unencrypted sensitive files; save them to a protected location.
@@ -102,5 +109,5 @@ Place real files only in `private-fixtures/` (ignored) and select them using the
 - Native iPhone Safari file picking, installation, storage persistence and update behavior require the documented manual device checks. Playwright WebKit is useful but is not an actual iPhone.
 - English embedded text and English OCR; password-protected PDFs must be unlocked locally first. Statements with multiple accounts/currencies must be exported separately. 30 MB / 100 pages maximum. OCR can be slow and consume memory on a phone.
 - No exchange-rate conversion, encrypted database, multi-device sync or statement PDF retention. A device passcode and regular backups are essential. The app host cannot recover lost browser data.
-- Comparisons use previous months with data; incomplete statement coverage can make totals and averages incomplete. Account freshness makes this visible. Recurrence needs at least three approximately monthly, similarly priced payments and remains a suggestion.
+- Comparisons require matching sets of accounts with transactions in both months. This is a conservative coverage check, not proof that every statement or every day is covered; totals and averages may still be incomplete. Account freshness makes this visible. Recurrence needs at least three approximately monthly, similarly priced payments and remains a suggestion.
 - Property means cash flow only, with the configured Property and Property income categories; this is not tax, accrual accounting, depreciation or investment profitability.

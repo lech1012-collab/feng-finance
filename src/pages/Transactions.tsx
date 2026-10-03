@@ -26,7 +26,7 @@ export default function Transactions({
     new Date(Date.parse(bounds[1]) - 86400000).toISOString().slice(0, 10),
   );
   const [search, setSearch] = useState("");
-  const [account, setAccount] = useState("");
+  const [account, setAccount] = useState(params.get("account") ?? "");
   const [category, setCategory] = useState(params.get("category") ?? "");
   const [type, setType] = useState("");
   const [uncategorized, setUncategorized] = useState(
@@ -130,70 +130,78 @@ export default function Transactions({
             Filters
           </button>
         </div>
-        <div className="form-grid">
-          <label>
-            From
-            <input
-              type="date"
-              value={from}
-              onChange={(e) => {
-                setFrom(e.target.value);
-                reset();
-              }}
-            />
-          </label>
-          <label>
-            To
-            <input
-              type="date"
-              value={to}
-              onChange={(e) => {
-                setTo(e.target.value);
-                reset();
-              }}
-            />
-          </label>
-          <label>
-            Category
-            <select
-              aria-label="Category"
-              value={category}
-              onChange={(e) => {
-                setCategory(e.target.value);
-                setUncategorized(e.target.value === "uncategorized");
-                reset();
-              }}
-            >
-              <option value="">All categories</option>
-              <option value="uncategorized">Uncategorized</option>
-              {data?.categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.parentId ? "↳ " : ""}
-                  {c.name}
-                  {c.archived ? " (archived)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Account
-            <select
-              aria-label="Account"
-              value={account}
-              onChange={(e) => {
-                setAccount(e.target.value);
-                reset();
-              }}
-            >
-              <option value="">All accounts</option>
-              {data?.accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.institution} · {a.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
+        <p className="filter-context">
+          {from} — {to}
+          {category && category !== "uncategorized"
+            ? ` · ${data?.categories.find((c) => c.id === category)?.name ?? ""}`
+            : ""}
+        </p>
+        {advanced && (
+          <div className="form-grid">
+            <label>
+              From
+              <input
+                type="date"
+                value={from}
+                onChange={(e) => {
+                  setFrom(e.target.value);
+                  reset();
+                }}
+              />
+            </label>
+            <label>
+              To
+              <input
+                type="date"
+                value={to}
+                onChange={(e) => {
+                  setTo(e.target.value);
+                  reset();
+                }}
+              />
+            </label>
+            <label>
+              Category
+              <select
+                aria-label="Filter category"
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  setUncategorized(e.target.value === "uncategorized");
+                  reset();
+                }}
+              >
+                <option value="">All categories</option>
+                <option value="uncategorized">Uncategorized</option>
+                {data?.categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.parentId ? "↳ " : ""}
+                    {c.name}
+                    {c.archived ? " (archived)" : ""}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Account
+              <select
+                aria-label="Account"
+                value={account}
+                onChange={(e) => {
+                  setAccount(e.target.value);
+                  reset();
+                }}
+              >
+                <option value="">All accounts</option>
+                {data?.accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.institution} · {a.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        )}
         {advanced && (
           <>
             <div className="form-grid">

@@ -33,7 +33,7 @@ async function confirmImport(page: Page) {
     .getByRole("button", { name: "Confirm import", exact: true })
     .click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Imported" }),
+    page.getByRole("status").filter({ hasText: "Import complete" }),
   ).toBeVisible();
 }
 async function offlineInstalled(page: Page) {
@@ -90,6 +90,10 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
   await gotoRoute(page, "/settings");
+  await page
+    .locator("summary")
+    .filter({ hasText: "Categorization & transfer rules" })
+    .click();
   await expect(
     page.getByText("JOHN LEWIS → Household", { exact: true }),
   ).toBeVisible();
@@ -98,6 +102,8 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(
     page.getByRole("heading", { name: "Barclays detected" }),
   ).toBeVisible();
+  await page.getByRole("button", { name: /All transactions/ }).click();
+  await page.locator(".review-row > summary").click();
   await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
     "household",
   );
@@ -250,6 +256,10 @@ test("reconciliation warning cannot be silently committed", async ({
     .check();
   await confirmImport(page);
   await gotoRoute(page, "/settings");
+  await page
+    .locator("summary")
+    .filter({ hasText: "Statement history" })
+    .click();
   await expect(
     page.getByText(/Barclays · 2026-09-30 · 1 new transactions · warning/),
   ).toBeVisible();
@@ -488,4 +498,175 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and impor
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
+});
+
+test("dark default, persistent appearance and mobile layouts without overlapping controls", async ({
+  page,
+}) => {
+  test.setTimeout(120000);
+  await gotoRoute(page, "/settings");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await page
+    .getByRole("button", { name: "Load demo data", exact: true })
+    .click();
+  await expect(page.getByText(/133 transactions stored/)).toBeVisible();
+  await page.getByRole("button", { name: "Light", exact: true }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Light", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
+  await page.getByRole("button", { name: "Dark", exact: true }).click();
+  for (const width of [320, 390, 430, 768, 1440]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const route of [
+      "/",
+      "/analysis",
+      "/property",
+      "/transactions",
+      "/settings",
+    ]) {
+      await gotoRoute(page, route);
+      await expect(page.locator("h1")).toHaveText(
+        route === "/"
+          ? "Overview"
+          : route === "/analysis"
+            ? "Analyse"
+            : route === "/property"
+              ? "Property"
+              : route === "/transactions"
+                ? "Transactions"
+                : "Settings",
+      );
+      await expect
+        .poll(() =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth <= innerWidth + 1,
+          ),
+        )
+        .toBe(true);
+      const overlap = await page.locator(".toolbar").evaluateAll((toolbars) =>
+        toolbars.some((toolbar) => {
+          const rects = [...toolbar.querySelectorAll("button, input, select")]
+            .map((el) => el.getBoundingClientRect())
+            .filter((r) => r.width && r.height);
+          return rects.some((r, i) =>
+            rects
+              .slice(i + 1)
+              .some(
+                (s) =>
+                  r.left < s.right - 1 &&
+                  r.right > s.left + 1 &&
+                  r.top < s.bottom - 1 &&
+                  r.bottom > s.top + 1,
+              ),
+          );
+        }),
+      );
+      expect(overlap, `${route} at ${width}px`).toBe(false);
+    }
+  }
+  await page.setViewportSize({ width: 390, height: 844 });
+  for (const route of ["/", "/analysis", "/transactions", "/settings"]) {
+    await gotoRoute(page, route);
+    await expect(page.locator("h1")).toHaveText(
+      route === "/"
+        ? "Overview"
+        : route === "/analysis"
+          ? "Analyse"
+          : route === "/property"
+            ? "Property"
+            : route === "/transactions"
+              ? "Transactions"
+              : "Settings",
+    );
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "200%";
+    });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+      `${route} enlarged text`,
+    ).toBe(true);
+    await page.evaluate(() => {
+      document.documentElement.style.fontSize = "";
+    });
+  }
+  await gotoRoute(page, "/analysis");
+  await page
+    .getByRole("combobox", { name: "Period", exact: true })
+    .selectOption("custom");
+  await page.getByLabel("From", { exact: true }).fill("2026-09-30");
+  await page.getByLabel("To", { exact: true }).fill("2026-09-01");
+  await expect(page.getByText(/Choose a valid date range/)).toBeVisible();
+  await page.getByLabel("From", { exact: true }).fill("2026-09-01");
+  await page.getByLabel("To", { exact: true }).fill("2026-09-30");
+  await expect(page.getByText(/2026-09-01 to 2026-09-30/)).toBeVisible();
+});
+
+test("personal rule corrections update existing transactions and future imports locally", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays");
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "To check (0)", exact: true }),
+  ).toBeVisible();
+  await confirmImport(page);
+  await gotoRoute(page, "/settings");
+  await page
+    .getByLabel("Import personal rules", { exact: true })
+    .setInputFiles({
+      name: "synthetic-rules.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(
+        JSON.stringify({
+          format: "feng-finance-rules",
+          version: 1,
+          categories: [],
+          rules: [
+            {
+              name: "My household purchases",
+              match: "contains",
+              pattern: "JOHN LEWIS",
+              direction: "negative",
+              categoryId: "household",
+            },
+          ],
+        }),
+      ),
+    });
+  await expect(
+    page.getByRole("heading", { name: "1 transactions to update" }),
+  ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Apply corrections & remember rules" })
+    .click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "1 transactions updated" }),
+  ).toBeVisible();
+  await gotoRoute(page, "/");
+  await expect(page.locator('input[type="month"]')).toHaveValue("2026-09");
+  await page.getByRole("link", { name: /Household £1,200.00/ }).click();
+  await expect(
+    page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }),
+  ).toBeVisible();
+  await openImport(page);
+  await selectStatement(page, "barclays-october");
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /All transactions/ }).click();
+  await page.locator(".review-row > summary").click();
+  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
+    "household",
+  );
+  await confirmImport(page);
+  await page.getByRole("button", { name: "View dashboard" }).click();
+  await expect(page.locator('input[type="month"]')).toHaveValue("2026-10");
 });

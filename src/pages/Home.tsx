@@ -20,6 +20,8 @@ import {
   propertyFlow,
   monthlySeries,
   comparisons,
+  comparableMonths,
+  statementIsCurrent,
 } from "../analytics/calculations";
 import { money } from "../domain/money";
 import { MonthPicker, Metric } from "../components/common";
@@ -66,6 +68,21 @@ export default function Home({
     data.categories,
     month,
     currency,
+  );
+  const partialCoverage = data.accounts.some(
+    (a) =>
+      !statementIsCurrent(
+        data.statements
+          .filter(
+            (s) =>
+              s.accountId === a.id &&
+              s.statementPeriodStart < monthBounds(month)[1],
+          )
+          .map((s) => s.statementPeriodEnd)
+          .sort()
+          .at(-1),
+        month,
+      ),
   );
   const uncategorized = current.filter(
     (t) => !t.categoryId && !t.isTransfer,
@@ -120,9 +137,13 @@ export default function Home({
             <span className="small-chip">{currency}</span>
           </div>
           <div className="hero-number">{money(flow.net, currency, true)}</div>
+          <p className="hero-basis">By transaction date · transfers excluded</p>
           <p className="hero-comparison">
-            {data.transactions.some((t) =>
-              t.date.startsWith(monthOffset(month, -1)),
+            {comparableMonths(
+              data.transactions,
+              month,
+              monthOffset(month, -1),
+              currency,
             ) ? (
               <>
                 {difference >= 0 ? (
@@ -133,9 +154,15 @@ export default function Home({
                 {money(difference, currency, true)} vs previous month
               </>
             ) : (
-              "Income minus expenses · transfers excluded"
+              "Based on your imported statements"
             )}
           </p>
+          {data.count > 0 && partialCoverage && (
+            <p className="coverage-note">
+              Partial month coverage. Some accounts need newer statements;
+              totals may be incomplete.
+            </p>
+          )}
           <div className="hero-footer">
             <Metric label="Income" value={flow.income} currency={currency} />
             <Metric
@@ -257,8 +284,10 @@ export default function Home({
               .sort((a, b) =>
                 b.statementPeriodEnd.localeCompare(a.statementPeriodEnd),
               )[0];
-            const stale =
-              !latest || latest.statementPeriodEnd < monthBounds(month)[0];
+            const stale = !statementIsCurrent(
+              latest?.statementPeriodEnd,
+              month,
+            );
             return (
               <div className="account-tile" key={a.id}>
                 <span
@@ -275,6 +304,25 @@ export default function Home({
                   <p>
                     {a.displayName} · {a.maskedAccountIdentifier}
                   </p>
+                  {latest?.closingBalance !== undefined && (
+                    <div className="account-balance">
+                      <span>
+                        {a.accountType === "credit"
+                          ? latest.closingBalance <= 0
+                            ? "Statement amount owed"
+                            : "Statement credit"
+                          : "Statement closing balance"}
+                      </span>
+                      <strong>
+                        {money(
+                          a.accountType === "credit"
+                            ? Math.abs(latest.closingBalance)
+                            : latest.closingBalance,
+                          a.currency,
+                        )}
+                      </strong>
+                    </div>
+                  )}
                   <span className={stale ? "stale" : "fresh"}>
                     {stale ? "Update needed" : <CheckCircle2 size={12} />}{" "}
                     {latest

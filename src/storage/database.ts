@@ -54,10 +54,25 @@ export async function initializeDatabase(database = db) {
     database.rules,
     database.settings,
     async () => {
-      if (await database.settings.get("initialized")) return;
+      if (await database.settings.get("initialized")) {
+        if (!(await database.settings.get("defaults-1.1"))) {
+          const cleaning = defaultCategories.find((c) => c.id === "cleaning")!;
+          if (!(await database.categories.get(cleaning.id)))
+            await database.categories.add(cleaning);
+          for (const r of defaultRules.filter((r) =>
+            ["XIAOMI", "REFERENCE: RENT", "TAX FREE CHILDCARE"].includes(
+              r.pattern,
+            ),
+          ))
+            if (!(await database.rules.get(r.id))) await database.rules.add(r);
+          await database.settings.put({ key: "defaults-1.1", value: "true" });
+        }
+        return;
+      }
       await database.categories.bulkPut(defaultCategories);
       await database.rules.bulkPut(defaultRules);
       await database.settings.put({ key: "initialized", value: "true" });
+      await database.settings.put({ key: "defaults-1.1", value: "true" });
     },
   );
 }
@@ -75,6 +90,7 @@ const expenses = [
   "Healthcare",
   "Entertainment",
   "Household",
+  "Cleaning",
   "Property",
   "Fees",
   "Cash withdrawal",
@@ -134,12 +150,12 @@ export const defaultCategories: Category[] = [
 ];
 const mappings: Record<string, string[]> = {
   Groceries: ["WAITROSE", "SAINSBURY", "TESCO", "LIDL", "ALDI"],
-  Shopping: ["JOHN LEWIS", "IKEA"],
+  Shopping: ["JOHN LEWIS", "IKEA", "XIAOMI"],
   Transport: ["TFL", "UBER"],
   Subscriptions: ["NETFLIX", "SPOTIFY"],
   Salary: ["SIEMENS", "SALARY"],
-  "Property income": ["RENT RECEIVED", "RENTAL INCOME"],
-  Childcare: ["NURSERY"],
+  "Property income": ["RENT RECEIVED", "RENTAL INCOME", "REFERENCE: RENT"],
+  Childcare: ["NURSERY", "TAX FREE CHILDCARE"],
   Property: ["MORTGAGE", "SERVICE CHARGE"],
   Restaurants: ["RESTAURANT"],
   Utilities: ["OCTOPUS ENERGY"],

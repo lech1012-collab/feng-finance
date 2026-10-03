@@ -25,3 +25,12 @@ Record iOS version, device, deployment origin and app version. These checks must
 - [ ] Export a backup, restart device, confirm data remains; test browser storage/persistence settings. Do not treat this as guaranteed retention.
 
 Only after those checks, test private real statements from ignored `private-fixtures/`, compare each transaction and closing balance locally and record layout differences using synthetic reproductions. Do not share real financial screenshots or traces.
+
+## Version 1.1 appearance and review
+
+- [ ] Starts dark; Settings → Appearance → Light persists through relaunch.
+- [ ] Home, Import, Analyse and transaction details have readable, non-overlapping controls at the device's default and enlarged text sizes.
+- [ ] Import is reachable from the bottom navigation; confirmation remains above the home indicator and the last editable field can scroll fully into view.
+- [ ] The review starts with extraction exceptions; All transactions reveals editable rows without obscuring the confirmation button.
+- [ ] A private personal-rules JSON can be selected from Files, previewed and applied; the expected categories/transfers appear in existing transactions and after the next import.
+- [ ] After importing statements, Home selects their latest activity month. Account balances are clearly dated statement snapshots.
