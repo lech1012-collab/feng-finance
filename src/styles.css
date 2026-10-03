@@ -2501,3 +2501,39 @@ label,
   line-height: 1.6;
   color: var(--muted);
 }
+/* Navigation must grow with accessible text sizes, including wider Safari fonts. */
+:root {
+  --mobile-nav-height: max(76px, 4.75rem);
+}
+.category-meta > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.chart-legend {
+  flex-wrap: wrap;
+}
+@media (max-width: 760px) {
+  .sidebar {
+    height: calc(var(--mobile-nav-height) + env(safe-area-inset-bottom));
+  }
+  .sidebar nav {
+    height: 100%;
+  }
+  .sidebar nav a {
+    overflow-wrap: anywhere;
+    text-align: center;
+    justify-content: center;
+  }
+  main {
+    padding-bottom: calc(
+      var(--mobile-nav-height) + 36px + env(safe-area-inset-bottom)
+    );
+  }
+  .import-footer {
+    bottom: calc(var(--mobile-nav-height) + 8px + env(safe-area-inset-bottom));
+  }
+  .mobile-header {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}

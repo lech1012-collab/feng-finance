@@ -584,12 +584,34 @@ test("dark default, persistent appearance and mobile layouts without overlapping
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "200%";
     });
-    expect(
-      await page.evaluate(
-        () => document.documentElement.scrollWidth <= innerWidth + 1,
-      ),
-      `${route} enlarged text`,
-    ).toBe(true);
+    // ResizeObserver-driven charts settle after the font/layout change.
+    await expect
+      .poll(
+        () =>
+          page.evaluate(() => ({
+            overflow: Math.max(
+              0,
+              document.documentElement.scrollWidth - innerWidth,
+            ),
+            outside: [...document.querySelectorAll("body *")]
+              .filter((el) => {
+                const r = el.getBoundingClientRect();
+                return (
+                  r.width > 0 &&
+                  r.right > innerWidth &&
+                  !el.closest(".chart-data, .table-scroll")
+                );
+              })
+              .slice(0, 8)
+              .map((el) => ({
+                tag: el.tagName,
+                class: String(el.className),
+                right: el.getBoundingClientRect().right,
+              })),
+          })),
+        { message: `${route} enlarged text` },
+      )
+      .toMatchObject({ overflow: 0 });
     await page.evaluate(() => {
       document.documentElement.style.fontSize = "";
     });
