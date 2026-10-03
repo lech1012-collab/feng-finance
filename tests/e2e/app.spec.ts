@@ -49,6 +49,12 @@ async function offlineInstalled(page: Page) {
 test("PDF import, drill-down, correction, learned rule and duplicate protection", async ({
   page,
 }) => {
+  // Exercise a slow lazy-loaded editor: the prior screen can remain interactive
+  // during the route transition and has its own Category filter.
+  await page.route("**/assets/TransactionDetail-*.js", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await route.continue();
+  });
   await page.goto("/");
   await openImport(page);
   await selectStatement(page, "barclays");
@@ -68,6 +74,9 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
     page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }),
   ).toBeVisible();
   await page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }).click();
+  await expect(
+    page.getByRole("button", { name: "Save changes", exact: true }),
+  ).toBeVisible();
   await page.getByLabel("Category", { exact: true }).selectOption("household");
   await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
     "household",
