@@ -104,12 +104,12 @@ const incomes = [
   "Other income",
 ];
 const colors = [
-  "#537965",
+  "#536079",
   "#48708b",
   "#a07650",
   "#86689c",
-  "#4d8586",
-  "#71864b",
+  "#526ea1",
+  "#4b5f86",
 ];
 export function categoryId(name: string) {
   return name.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-");
@@ -145,7 +145,7 @@ export const defaultCategories: Category[] = [
     name,
     kind: "expense" as const,
     archived: false,
-    color: "#537965",
+    color: "#536079",
   })),
 ];
 const mappings: Record<string, string[]> = {

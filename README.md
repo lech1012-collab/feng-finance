@@ -129,3 +129,11 @@ Swipe a charge left to plan cancellation, or right to keep it. Status tiles prov
 ### Rechecking an import after a parser update
 
 Version 1.3.1 (parser 1.0.3) fixes Barclays statements that print a date only once for several transactions. Previously imported records are not changed automatically. Back up before testing a fresh import; use an empty test browser profile or the documented Settings reset. Do not blindly override duplicate protection to repair an earlier incomplete import, because changed descriptions can also affect duplicate matching. Check every transaction and reconciliation before confirming.
+
+### Category overviews and spending context
+
+Tap any Home spending category to open its monthly KPIs, trend, subcategories and source transactions. Browse all categories also includes income and zero-spend categories. Property has its rent/cost/net metrics within this overview; the duplicate Home tile is removed. Tap chart bars or month tiles to drill down. Home can switch category percentages between share of spending and share of recorded income (unavailable with no income; values may exceed 100%).
+
+Compare against the preceding six or twelve calendar months. Only months covered continuously by statements for every account in the selected currency enter the baseline. Inferred transaction-coverage periods and failed reconciliations are excluded. Covered months with no category spending count as zero; missing months do not. Sample standard deviation uses n−1 and requires at least three complete months. The mean ± one standard deviation band is descriptive, not a budget or prediction. The current month is excluded from the baseline, and partial current coverage prevents an overspending alert. Transfers are excluded throughout. Property cash flow includes rental income; category spending remains gross outflows, with refunds shown in the transaction evidence and recorded income.
+
+Navigation is Import · Transactions · Home · Analyse · Settings, with Home central on mobile. Page accents are blue, violet, amber, coral and slate on neutral dark/light surfaces; the former green branding, charts and category colors are replaced. Existing financial records and category assignments are unchanged.

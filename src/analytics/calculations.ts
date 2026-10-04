@@ -1,3 +1,4 @@
+import { categoryColor } from "../domain/palette";
 import type { Category, Transaction } from "../domain/models";
 import { monthOffset, monthBounds } from "../domain/dates";
 import { money, safeSum, currencyPrecision } from "../domain/money";
@@ -35,7 +36,7 @@ export function categorySpending(
     .map(([id, amount]) => ({
       id,
       name: categories.find((c) => c.id === id)?.name ?? "Uncategorized",
-      color: categories.find((c) => c.id === id)?.color ?? "#8c939b",
+      color: categoryColor(id),
       amount,
       percent: total ? (amount / total) * 100 : 0,
     }))

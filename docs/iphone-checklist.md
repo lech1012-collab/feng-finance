@@ -48,3 +48,8 @@ Only after those checks, test private real statements from ignored `private-fixt
 - Open Subscription review from Home; swipe a charge left to plan cancellation and right to keep it. Scroll vertically without changing status.
 - Open All detected to reverse a decision. Mark a fictitious service cancelled, reload, and confirm its state persists under Cancellation plans.
 - Inspect source charges and check category/amounts are unchanged. Confirm the provider separately before marking a real cancellation.
+
+- Confirm Import · Transactions · Home · Analyse · Settings, with Home central and page-specific accents in both dark and light modes.
+- Tap a Home category, swipe its month selector, switch six/twelve-month history, and tap a chart bar or month tile to inspect matching transactions.
+- Verify partial coverage is labelled, income ratios identify their denominator, and unavailable historical statistics do not show a misleading zero.
+- Check Shopping and Property overviews at enlarged text size, including subcategories, standard deviation and the source transaction links.

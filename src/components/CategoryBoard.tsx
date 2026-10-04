@@ -1,3 +1,4 @@
+import { categoryColor } from "../domain/palette";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -216,7 +217,7 @@ export function CategoryBoard({
           >
             <span
               className="category-tile-icon"
-              style={{ borderColor: c.color }}
+              style={{ borderColor: categoryColor(c.id) }}
             >
               {c.name.slice(0, 1)}
             </span>

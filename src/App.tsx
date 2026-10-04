@@ -28,6 +28,7 @@ import { registerSW } from "virtual:pwa-register";
 import { db, initializeDatabase } from "./storage/database";
 import Home from "./pages/Home";
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
+const Category = lazy(() => import("./pages/Category"));
 const Transactions = lazy(() => import("./pages/Transactions"));
 const Detail = lazy(() => import("./pages/TransactionDetail"));
 const Analysis = lazy(() => import("./pages/Analysis"));
@@ -134,7 +135,20 @@ function Shell() {
     }
   };
   return (
-    <div className="app">
+    <div
+      className="app"
+      data-page={
+        location.pathname.startsWith("/transactions")
+          ? "transactions"
+          : location.pathname === "/import"
+            ? "import"
+            : location.pathname === "/settings"
+              ? "settings"
+              : location.pathname === "/"
+                ? "home"
+                : "analysis"
+      }
+    >
       <ThemeSync />
       <a
         className="skip-link"
@@ -157,9 +171,9 @@ function Shell() {
         </NavLink>
         <nav aria-label="Main navigation">
           {[
-            ["/", "Home", HomeIcon],
-            ["/transactions", "Transactions", List],
             ["/import", "Import", Plus],
+            ["/transactions", "Transactions", List],
+            ["/", "Home", HomeIcon],
             ["/analysis", "Analyse", ChartNoAxesCombined],
             ["/settings", "Settings", SettingsIcon],
           ].map(([path, label, Icon]) => {
@@ -294,6 +308,17 @@ function Shell() {
                 <Route
                   path="/subscriptions"
                   element={<Subscriptions currency={currency} />}
+                />
+                <Route
+                  path="/categories/:id"
+                  element={
+                    <Category
+                      key={location.pathname + currency}
+                      month={month}
+                      currency={currency}
+                      setMonth={chooseMonth}
+                    />
+                  }
                 />
                 <Route path="/settings" element={<Settings />} />
                 <Route

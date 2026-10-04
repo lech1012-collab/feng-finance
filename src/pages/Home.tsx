@@ -1,10 +1,10 @@
+import { useState } from "react";
 import { SubscriptionNotice } from "../components/SubscriptionNotice";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowUpRight,
   ArrowDownRight,
-  Building2,
   CheckCircle2,
   Upload,
   Wallet,
@@ -18,7 +18,6 @@ import { monthBounds, monthOffset } from "../domain/dates";
 import {
   cashFlow,
   categorySpending,
-  propertyFlow,
   monthlySeries,
   comparisons,
   comparableMonths,
@@ -36,6 +35,7 @@ export default function Home({
   setMonth: (m: string) => void;
   currency: string;
 }) {
+  const [share, setShare] = useState("spending");
   const data = useLiveQuery(async () => {
     const transactions = await db.transactions
       .where("[currency+date]")
@@ -63,7 +63,6 @@ export default function Home({
   );
   const difference = flow.net - previous.net;
   const categories = categorySpending(current, data.categories, currency);
-  const property = propertyFlow(current, currency);
   const insights = comparisons(
     data.transactions,
     data.categories,
@@ -191,23 +190,51 @@ export default function Home({
             <h2>Where did my money go?</h2>
             <ShoppingBag size={19} />
           </div>
+          <div
+            className="theme-options"
+            role="group"
+            aria-label="Category percentage basis"
+          >
+            {["spending", "income"].map((value) => (
+              <button
+                key={value}
+                aria-pressed={share === value}
+                onClick={() => setShare(value)}
+              >
+                Share of {value}
+              </button>
+            ))}
+          </div>
+          <p className="muted">
+            Percentages use recorded {share} for this month. Tap a category for
+            its overview.
+          </p>
           {categories.length ? (
             categories.map((c) => (
               <Link
                 key={c.id}
                 className="category-row"
-                to={`/transactions?category=${c.id}&month=${month}`}
+                to={`/categories/${c.id}?month=${month}`}
               >
                 <div className="category-meta">
                   <span>{c.name}</span>
                   <strong>
                     {money(c.amount, currency)}{" "}
-                    <small>{Math.round(c.percent)}%</small>
+                    <small>
+                      {share === "income"
+                        ? flow.income > 0
+                          ? `${((c.amount / flow.income) * 100).toFixed(1)}%`
+                          : "Unavailable"
+                        : `${Math.round(c.percent)}%`}
+                    </small>
                   </strong>
                 </div>
                 <div className="bar-track">
                   <div
-                    style={{ width: `${c.percent}%`, background: c.color }}
+                    style={{
+                      width: `${Math.min(100, share === "income" ? (flow.income > 0 ? (c.amount / flow.income) * 100 : 0) : c.percent)}%`,
+                      background: c.color,
+                    }}
                   />
                 </div>
               </Link>
@@ -215,6 +242,18 @@ export default function Home({
           ) : (
             <p className="muted">No expenses for this month.</p>
           )}
+          <details className="all-categories">
+            <summary>Browse all categories</summary>
+            <div className="category-months">
+              {data.categories
+                .filter((c) => !c.archived && !c.parentId)
+                .map((c) => (
+                  <Link key={c.id} to={`/categories/${c.id}?month=${month}`}>
+                    {c.name}
+                  </Link>
+                ))}
+            </div>
+          </details>
           {uncategorized > 0 && (
             <Link
               className="review-link"
@@ -226,28 +265,6 @@ export default function Home({
           )}
         </section>
         <div className="right-stack">
-          <Link to="/property" className="card property-card">
-            <div className="section-heading">
-              <h2>
-                <Building2 size={18} /> Property
-              </h2>
-              <ChevronRight size={18} />
-            </div>
-            <dl className="totals">
-              <div>
-                <dt>Rent received</dt>
-                <dd>{money(property.income, currency, true)}</dd>
-              </div>
-              <div>
-                <dt>Costs</dt>
-                <dd>{money(-property.expenses, currency)}</dd>
-              </div>
-              <div className="total">
-                <dt>Net property</dt>
-                <dd>{money(property.net, currency, true)}</dd>
-              </div>
-            </dl>
-          </Link>
           <section className="card insight-card">
             <p className="eyebrow">THE BIGGER PICTURE</p>
             <h2>A little perspective</h2>
@@ -256,7 +273,7 @@ export default function Home({
               <Link
                 className="insight-row"
                 key={c.id}
-                to={`/transactions?category=${c.id}&month=${month}`}
+                to={`/categories/${c.id}?month=${month}`}
               >
                 <span>{c.name}</span>
                 <strong>

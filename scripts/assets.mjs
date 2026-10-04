@@ -22,7 +22,7 @@ for (const [src, dest] of paths) {
 }
 await mkdir("public/icons", { recursive: true });
 const svg = Buffer.from(
-  '<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" rx="100" fill="#123f36"/><path d="M168 350V162h184v42H212v39h110v41H212v66Z" fill="white"/><path d="M290 310h62v40h-62Z" fill="#94d0b5"/></svg>',
+  '<svg width="512" height="512" xmlns="http://www.w3.org/2000/svg"><rect width="512" height="512" rx="100" fill="#12213f"/><path d="M168 350V162h184v42H212v39h110v41H212v66Z" fill="white"/><path d="M290 310h62v40h-62Z" fill="#94a8d0"/></svg>',
 );
 for (const n of [192, 512])
   await sharp(svg).resize(n, n).png().toFile(`public/icons/icon-${n}.png`);

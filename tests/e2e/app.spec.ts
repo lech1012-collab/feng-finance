@@ -71,6 +71,12 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(page.getByText("+£2,802.35", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: /Shopping £1,200.00/ }).click();
   await expect(
+    page.getByRole("heading", { name: "Shopping", exact: true }),
+  ).toBeVisible();
+  await page
+    .getByRole("link", { name: "View all transactions", exact: true })
+    .click();
+  await expect(
     page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }),
   ).toBeVisible();
   await page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }).click();
@@ -386,7 +392,7 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
       () => document.documentElement.scrollWidth <= innerWidth,
     ),
   ).toBe(true);
-  await page.getByRole("link", { name: /Property Rent received/ }).click();
+  await page.locator(".category-row").filter({ hasText: "Property" }).click();
   await expect(
     page.getByRole("heading", { name: "Property", exact: true }),
   ).toBeVisible();
@@ -937,4 +943,72 @@ test("Barclays blank dates retain every grouped transaction across pages", async
         !t.description.includes("REGISTERED IN ENGLAND"),
     ),
   ).toBe(true);
+});
+
+test("category overview, income shares, central Home navigation and page palettes", async ({
+  page,
+}) => {
+  await gotoRoute(page, "/settings");
+  await page
+    .getByRole("button", { name: "Load demo data", exact: true })
+    .click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(page.locator('nav[aria-label="Main navigation"] a')).toHaveText([
+    "Import",
+    "Transactions",
+    "Home",
+    "Analyse",
+    "Settings",
+  ]);
+  await expect(page.locator(".property-card")).toHaveCount(0);
+  const palette = () =>
+    page
+      .locator(".app")
+      .evaluate((el) =>
+        getComputedStyle(el).getPropertyValue("--accent").trim(),
+      );
+  const home = await palette();
+  await page.locator('input[type="month"]').fill("2026-09");
+  await page
+    .getByRole("button", { name: "Share of income", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Share of income", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.locator(".category-row").filter({ hasText: "Shopping" }).click();
+  await expect(
+    page.getByRole("heading", { name: "Shopping", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Monthly average", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Share of income spent", { exact: true }),
+  ).toBeVisible();
+  expect(await palette()).not.toBe(home);
+  await page.getByRole("button", { name: "12 months", exact: true }).click();
+  await page
+    .getByText("Average and standard deviation explained", { exact: true })
+    .click();
+  await expect(page.getByText(/Sample standard deviation:/)).toBeVisible();
+  for (const width of [320, 390, 768]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+  }
+  await page
+    .getByRole("link", { name: "View all transactions", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Transactions", exact: true }),
+  ).toBeVisible();
+  const transactions = await palette();
+  expect(transactions).not.toBe(home);
+  await page.getByRole("link", { name: "Import", exact: true }).click();
+  expect(await palette()).not.toBe(transactions);
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  expect(await palette()).toBe(home);
 });

@@ -14,7 +14,7 @@ export function ThemeSync() {
     }
     document
       .querySelector('meta[name="theme-color"]')
-      ?.setAttribute("content", theme === "dark" ? "#101715" : "#f3f6f3");
+      ?.setAttribute("content", theme === "dark" ? "#101217" : "#f3f4f6");
   }, [setting]);
   return null;
 }
