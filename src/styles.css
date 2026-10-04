@@ -2964,3 +2964,10 @@ h3 {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Keep the previous SVG size inside its panel while ResizeObserver recalculates. */
+.category-trend [role="img"] {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+}
