@@ -240,3 +240,15 @@ scan
   .drawImage(scanImage, { x: 0, y: 0, width: 650, height: 842 });
 await writeFile("tests/fixtures/barclays-scanned.pdf", await scan.save());
 console.log("Generated synthetic bank statements (no personal information).");
+
+await statement("Barclays", "barclays-sort", {
+  rows: [
+    { description: "CORNER SHOP", amount: -20, date: "03 Sep" },
+    { description: "CORNER SHOP", amount: -30, date: "04 Sep" },
+    { description: "ANOTHER SHOP", amount: -15, date: "05 Sep" },
+  ],
+});
+await statement("Barclays", "barclays-sort-next", {
+  period: "01 Oct 2026 to 31 Oct 2026",
+  rows: [{ description: "CORNER SHOP", amount: -12, date: "03 Oct" }],
+});

@@ -1,5 +1,5 @@
 import { useState, useMemo } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   Search,
@@ -8,6 +8,10 @@ import {
   ArrowUpRight,
   ArrowLeftRight,
 } from "lucide-react";
+import { CategoryBoard } from "../components/CategoryBoard";
+import { SwipeTransaction } from "../components/SwipeTransaction";
+import type { Transaction } from "../domain/models";
+import { undoCategory, type CategoryReceipt } from "../storage/categorize";
 import { db } from "../storage/database";
 import { monthBounds } from "../domain/dates";
 import { money, parseMoney } from "../domain/money";
@@ -19,6 +23,10 @@ export default function Transactions({
   currency: string;
 }) {
   const [params] = useSearchParams();
+  const [sorting, setSorting] = useState<Transaction>();
+  const [receipt, setReceipt] = useState<CategoryReceipt>();
+  const [undoBusy, setUndoBusy] = useState(false);
+  const [undoError, setUndoError] = useState("");
   const selectedMonth = params.get("month") ?? month;
   const bounds = monthBounds(selectedMonth);
   const [from, setFrom] = useState(bounds[0]);
@@ -96,6 +104,44 @@ export default function Transactions({
   const totalPages = Math.max(1, Math.ceil(filtered.length / 60));
   const currentPage = Math.min(page, totalPages - 1);
   const items = filtered.slice(currentPage * 60, (currentPage + 1) * 60);
+  const feedback = (
+    <>
+      {receipt && (
+        <div className="category-feedback" role="status">
+          <span>
+            {receipt.after.length} transaction
+            {receipt.after.length === 1 ? "" : "s"} → {receipt.categoryName}
+            {receipt.rule ? " · merchant remembered" : ""}
+          </span>
+          <button
+            disabled={undoBusy}
+            onClick={async () => {
+              setUndoBusy(true);
+              setUndoError("");
+              try {
+                await undoCategory(receipt);
+                setSorting(receipt.before[0]);
+                setReceipt(undefined);
+              } catch (err) {
+                setUndoError(
+                  err instanceof Error ? err.message : "Undo failed.",
+                );
+              } finally {
+                setUndoBusy(false);
+              }
+            }}
+          >
+            Undo
+          </button>
+        </div>
+      )}
+      {undoError && (
+        <p role="alert" className="notice warning">
+          {undoError}
+        </p>
+      )}
+    </>
+  );
   return (
     <>
       <div className="page-heading">
@@ -273,12 +319,45 @@ export default function Transactions({
           </>
         )}
       </section>
+      <p className="gesture-hint">
+        Tap an uncategorized transaction to sort it. Swipe a purchase to change
+        its category. Keyboard: focus a transaction and press C.
+      </p>
+      {!sorting && feedback}
+      {sorting && data && (
+        <CategoryBoard
+          key={sorting.id}
+          transaction={sorting}
+          categories={data.categories}
+          feedback={feedback}
+          onClose={() => setSorting(undefined)}
+          onSaved={(result) => {
+            setReceipt(result);
+            setUndoError("");
+            const changed = new Set(result.after.map((t) => t.id));
+            setSorting(
+              uncategorized
+                ? filtered.find(
+                    (t) =>
+                      !changed.has(t.id) &&
+                      !t.categoryId &&
+                      !t.isTransfer &&
+                      t.type !== "transfer",
+                  )
+                : undefined,
+            );
+          }}
+        />
+      )}
       <section className="card transaction-list">
         {items.map((t) => (
-          <Link
-            className="transaction-row"
+          <SwipeTransaction
             key={t.id}
-            to={`/transactions/${t.id}`}
+            transaction={t}
+            onCategorize={() => {
+              setSorting(t);
+              setUndoError("");
+            }}
           >
             <span className={`transaction-icon ${t.type}`}>
               {t.isTransfer ? (
@@ -304,7 +383,7 @@ export default function Transactions({
             <strong className={t.amount > 0 && !t.isTransfer ? "positive" : ""}>
               {money(t.amount, t.currency, true)}
             </strong>
-          </Link>
+          </SwipeTransaction>
         ))}
         {!items.length && (
           <div className="empty">

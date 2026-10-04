@@ -197,12 +197,21 @@ export default function ImportPage({
       </div>
       <section
         className={`card upload-card ${draft || busy || success ? "compact-upload" : ""}`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = busy ? "none" : "copy";
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          if (!busy) void selectFiles(Array.from(e.dataTransfer.files));
+        }}
       >
         <Upload size={28} />
         <h2>Add your statements</h2>
         <p>
-          Select monthly PDFs from Barclays, American Express or Revolut. We’ll
-          check the numbers and highlight anything that needs you.
+          Select or drop monthly PDFs from Barclays, American Express or
+          Revolut. We’ll check the numbers and highlight anything that needs
+          you.
         </p>
         <label
           className={`button primary file-button ${busy ? "disabled" : ""}`}

@@ -34,3 +34,13 @@ Only after those checks, test private real statements from ignored `private-fixt
 - [ ] The review starts with extraction exceptions; All transactions reveals editable rows without obscuring the confirmation button.
 - [ ] A private personal-rules JSON can be selected from Files, previewed and applied; the expected categories/transfers appear in existing transactions and after the next import.
 - [ ] After importing statements, Home selects their latest activity month. Account balances are clearly dated statement snapshots.
+
+## Direct sorting gestures
+
+- [ ] Swiping a transaction sideways opens category choices; scrolling the list vertically does not.
+- [ ] Dragging the transaction card onto a visible tile saves once; dropping elsewhere or interrupting the touch saves nothing.
+- [ ] Category tiles can also be tapped, including after searching, with no separate Save action.
+- [ ] Grouping and remembering merchants are opt-in; Undo restores the chosen records and rule.
+- [ ] The next uncategorized card appears after a choice; completing the queue returns to the list.
+- [ ] Month-selector swipes work without triggering Safari navigation from the middle of the screen.
+- [ ] VoiceOver can open the sheet, choose a tile, Undo and close it; focus remains within the modal while open.

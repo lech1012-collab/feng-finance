@@ -37,6 +37,14 @@ npm run check              # Tests, build and browser tests (generate fixtures f
 - Dark by default, optional persistent light mode, mobile Import navigation, exception-first review, statement balance snapshots, safe-area padding and user-controlled offline PWA updates.
 - Private personal-rules file import previews and applies classification corrections to existing records, then remembers rules for future statements.
 
+## Categorizing with gestures
+
+On Home, tap **transactions need a category**. Tap an uncategorized transaction or swipe a purchase sideways to open the sorting sheet. Drag its card onto a category tile, or tap the tile: the category saves immediately. The uncategorized queue advances to the next card. **Undo** restores the last assignment, including an optional group and newly learned rule, unless another edit has since changed those records.
+
+The sheet can apply your choice to matching uncategorized transactions from the same merchant, account, currency and amount direction. Grouping and learning a future rule are separate, explicit choices. Already categorized transactions and transfers are protected. Property subcategories are available as tiles too. Press **C** on a focused transaction for keyboard access; category tiles support Enter. Tap **View transaction details** for tags, transfer controls and source information.
+
+Swipe the month selector left/right to change month. Desktop users can drop PDFs directly onto the Import card. Touch sorting uses Pointer Events rather than relying on desktop-only HTML drag events; vertical list scrolling and cancelled drags do not save changes.
+
 ## Architecture
 
 ```text

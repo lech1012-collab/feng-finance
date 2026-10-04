@@ -1,3 +1,4 @@
+import { useSwipe } from "./useSwipe";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { monthLabel, monthOffset } from "../domain/dates";
 import { money } from "../domain/money";
@@ -8,8 +9,21 @@ export function MonthPicker({
   month: string;
   onChange: (v: string) => void;
 }) {
+  const swipe = useSwipe((direction) =>
+    onChange(monthOffset(month, direction === "left" ? 1 : -1)),
+  );
   return (
-    <div className="month-picker">
+    <div
+      className="month-picker"
+      {...swipe.bind}
+      onClickCapture={(e) => {
+        if (swipe.consumeClick()) {
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      }}
+      title="Swipe left or right to change month"
+    >
       <button
         aria-label="Previous month"
         onClick={() => onChange(monthOffset(month, -1))}

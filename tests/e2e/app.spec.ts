@@ -708,3 +708,127 @@ test("personal rule corrections update existing transactions and future imports 
   await page.getByRole("button", { name: "View dashboard" }).click();
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-10");
 });
+
+test("swipe, drag-to-category, grouped sorting, undo and remembered future imports", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays-sort");
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await confirmImport(page);
+  await page.getByRole("button", { name: "View dashboard" }).click();
+  await expect(page.locator(".hero-number")).toHaveText("-£65.00");
+  await page
+    .getByRole("link", { name: /3 transactions need a category/ })
+    .click();
+  const row = page.getByRole("link", { name: /CORNER SHOP/ }).first();
+  await row.scrollIntoViewIfNeeded();
+  const rect = (await row.boundingBox())!;
+  await page.mouse.move(rect.x + rect.width * 0.75, rect.y + rect.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 30, rect.y + rect.height / 2, { steps: 12 });
+  await page.mouse.up();
+  const dialog = page.getByRole("dialog", { name: "Where does this belong?" });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator(".sorting-card")).toContainText("CORNER SHOP");
+  await dialog.getByLabel(/Also sort 1 uncategorized/).check();
+  await dialog.getByLabel(/Remember this merchant/).check();
+  const target = dialog.getByRole("button", {
+    name: "Categorize as Groceries",
+    exact: true,
+  });
+  await target.scrollIntoViewIfNeeded();
+  const card = (await dialog.locator(".sorting-card").boundingBox())!;
+  const tile = (await target.boundingBox())!;
+  await page.mouse.move(card.x + card.width / 2, card.y + card.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(tile.x + tile.width / 2, tile.y + tile.height / 2, {
+    steps: 16,
+  });
+  await page.mouse.up();
+  await expect(dialog.getByRole("status")).toContainText(
+    "2 transactions → Groceries",
+  );
+  await expect(dialog.locator(".sorting-card")).toContainText("ANOTHER SHOP");
+  await dialog.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(dialog.locator(".sorting-card")).toContainText("CORNER SHOP");
+  await dialog.getByLabel(/Also sort 1 uncategorized/).check();
+  await dialog.getByLabel(/Remember this merchant/).check();
+  await dialog
+    .getByRole("button", { name: "Categorize as Cleaning", exact: true })
+    .click();
+  await expect(dialog.locator(".sorting-card")).toContainText("ANOTHER SHOP");
+  await dialog
+    .getByRole("button", { name: "Categorize as Shopping", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "No transactions found" }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(page.locator(".hero-number")).toHaveText("-£65.00");
+  await expect(
+    page.getByRole("link", { name: /Cleaning £50.00/ }),
+  ).toBeVisible();
+  await openImport(page);
+  await selectStatement(page, "barclays-sort-next");
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /All transactions/ }).click();
+  await page.locator(".review-row > summary").click();
+  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
+    "cleaning",
+  );
+});
+
+test("uncategorized card tap, cancelled drag, keyboard categorization and month swipes", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays-sort");
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await confirmImport(page);
+  await gotoRoute(page, "/transactions?uncategorized=1&month=2026-09");
+  await page.getByRole("link", { name: /ANOTHER SHOP/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  const card = (await dialog.locator(".sorting-card").boundingBox())!;
+  await page.mouse.move(card.x + 40, card.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(5, 5, { steps: 12 });
+  await page.mouse.up();
+  await expect(dialog.locator(".sorting-card")).toContainText("ANOTHER SHOP");
+  await dialog.getByRole("button", { name: "Close categorization" }).click();
+  const row = page.getByRole("link", { name: /ANOTHER SHOP/ });
+  await row.focus();
+  await page.keyboard.press("c");
+  await expect(dialog).toBeVisible();
+  const category = dialog.getByRole("button", {
+    name: "Categorize as Shopping",
+    exact: true,
+  });
+  await category.focus();
+  await page.keyboard.press("Enter");
+  await expect(dialog.getByRole("status")).toContainText(
+    "1 transaction → Shopping",
+  );
+  await dialog.getByRole("button", { name: "Close categorization" }).click();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(page.locator('input[type="month"]')).toHaveValue("2026-09");
+  const picker = (await page.locator(".month-picker").boundingBox())!;
+  await page.mouse.move(
+    picker.x + picker.width - 55,
+    picker.y + picker.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(picker.x + 55, picker.y + picker.height / 2, {
+    steps: 12,
+  });
+  await page.mouse.up();
+  await expect(page.locator('input[type="month"]')).toHaveValue("2026-10");
+});
