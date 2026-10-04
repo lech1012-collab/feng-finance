@@ -27,6 +27,7 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { registerSW } from "virtual:pwa-register";
 import { db, initializeDatabase } from "./storage/database";
 import Home from "./pages/Home";
+const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Transactions = lazy(() => import("./pages/Transactions"));
 const Detail = lazy(() => import("./pages/TransactionDetail"));
 const Analysis = lazy(() => import("./pages/Analysis"));
@@ -289,6 +290,10 @@ function Shell() {
                       property
                     />
                   }
+                />
+                <Route
+                  path="/subscriptions"
+                  element={<Subscriptions currency={currency} />}
                 />
                 <Route path="/settings" element={<Settings />} />
                 <Route

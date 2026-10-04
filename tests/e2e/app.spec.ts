@@ -832,3 +832,56 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
   await page.mouse.up();
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-10");
 });
+
+test("subscription notification centre supports review, cancellation plans and persistent decisions", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: /Try fictitious demo data/ }).click();
+  await page.getByRole("link", { name: /Subscription review/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Subscription review", exact: true }),
+  ).toBeVisible();
+  const netflix = page.getByRole("article", { name: "NETFLIX", exact: true });
+  await expect(netflix).toBeVisible();
+  await netflix.locator(".subscription-swipe").scrollIntoViewIfNeeded();
+  const box = (await netflix.locator(".subscription-swipe").boundingBox())!;
+  await page.mouse.move(box.x + box.width - 25, box.y + 30);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 25, box.y + 30, { steps: 12 });
+  await page.mouse.up();
+  await expect(
+    netflix.getByRole("button", { name: "Cancel next", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    netflix.getByText("Finish cancellation with the provider"),
+  ).toBeVisible();
+  await netflix
+    .getByRole("button", { name: "I cancelled", exact: true })
+    .click();
+  await page
+    .getByRole("button", { name: "Cancellation plans", exact: true })
+    .click();
+  await expect(
+    netflix.getByRole("button", { name: "I cancelled", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.reload();
+  await page.getByRole("button", { name: "All detected", exact: true }).click();
+  await expect(
+    netflix.getByRole("button", { name: "I cancelled", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await netflix.locator("summary").click();
+  await expect(netflix.locator(".subscription-evidence").first()).toBeVisible();
+  await netflix.getByRole("button", { name: "Review", exact: true }).click();
+  await expect(
+    netflix.getByRole("button", { name: "Review", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  for (const width of [320, 390]) {
+    await page.setViewportSize({ width, height: 844 });
+    expect(
+      await page.evaluate(
+        () => document.documentElement.scrollWidth <= innerWidth + 1,
+      ),
+    ).toBe(true);
+  }
+});

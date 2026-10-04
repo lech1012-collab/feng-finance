@@ -1,3 +1,4 @@
+import { SubscriptionNotice } from "../components/SubscriptionNotice";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -106,6 +107,7 @@ export default function Home({
           On-device only
         </span>
       </div>
+      <SubscriptionNotice currency={currency} />
       {!data.count && (
         <section className="welcome card">
           <Wallet size={30} />

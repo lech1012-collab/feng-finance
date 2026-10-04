@@ -44,3 +44,7 @@ Only after those checks, test private real statements from ignored `private-fixt
 - [ ] The next uncategorized card appears after a choice; completing the queue returns to the list.
 - [ ] Month-selector swipes work without triggering Safari navigation from the middle of the screen.
 - [ ] VoiceOver can open the sheet, choose a tile, Undo and close it; focus remains within the modal while open.
+
+- Open Subscription review from Home; swipe a charge left to plan cancellation and right to keep it. Scroll vertically without changing status.
+- Open All detected to reverse a decision. Mark a fictitious service cancelled, reload, and confirm its state persists under Cancellation plans.
+- Inspect source charges and check category/amounts are unchanged. Confirm the provider separately before marking a real cancellation.

@@ -2733,3 +2733,83 @@ h3 {
   user-select: none;
   -webkit-user-select: none;
 }
+
+.subscription-notice {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin: 16px 0;
+  color: var(--text);
+  text-decoration: none;
+}
+.subscription-notice span {
+  flex: 1;
+  min-width: 0;
+}
+.subscription-notice small {
+  display: block;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.subscription-tabs,
+.subscription-states {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.subscription-tabs [aria-pressed="true"],
+.subscription-states [aria-pressed="true"] {
+  border-color: var(--green);
+  background: var(--soft);
+  box-shadow: inset 0 0 0 1px var(--green);
+}
+.subscription-list {
+  display: grid;
+  gap: 16px;
+}
+.subscription-card {
+  overflow: hidden;
+  min-width: 0;
+}
+.subscription-swipe {
+  touch-action: pan-y;
+  user-select: none;
+  -webkit-user-select: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+}
+.subscription-swipe h2,
+.subscription-swipe p {
+  overflow-wrap: anywhere;
+}
+.subscription-swipe > div {
+  min-width: 0;
+  flex: 1 1 200px;
+}
+.subscription-amount {
+  font-size: 1.6rem;
+}
+.subscription-amount small {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.subscription-evidence {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+}
+.subscription-evidence span {
+  flex: 1 1 180px;
+  overflow-wrap: anywhere;
+}
+.subscription-card summary {
+  min-height: 44px;
+  padding: 12px 0;
+}

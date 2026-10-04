@@ -38,6 +38,20 @@ describe("storage and backup integrity", () => {
     expect(after.accounts).toEqual(before.accounts);
     expect(after.categories).toEqual(before.categories);
   });
+  it("preserves subscription review decisions through backup and restore", async () => {
+    await loadDemo();
+    const value = JSON.stringify({
+      groupKey: '["demo","GBP","NETFLIX",true]',
+      status: "cancel",
+      date: "2026-10-04",
+      amount: 1599,
+    });
+    await db.settings.put({ key: "subscription:abc", value });
+    const backup = validateBackup(await createBackup());
+    await clearLocalData();
+    await restoreBackup(backup);
+    expect((await db.settings.get("subscription:abc"))?.value).toBe(value);
+  });
   it("rejects malformed, future and orphaned backups before mutation", async () => {
     await loadDemo();
     const b = await createBackup();
