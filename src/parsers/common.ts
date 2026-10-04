@@ -19,6 +19,10 @@ export abstract class BaseParser implements StatementParser {
   abstract institution: Institution;
   abstract canParse(rows: TextRow[]): boolean;
   protected credit = false;
+  protected inheritBlankDates = false;
+  protected isUndatedTransactionStart(_text: string) {
+    return false;
+  }
   identifyAccount(rows: TextRow[]): {
     identifier?: string;
     accountType: Account["accountType"];
@@ -117,6 +121,8 @@ export abstract class BaseParser implements StatementParser {
     type Column = { x: number; kind: "out" | "in" | "balance" | "amount" };
     let columns: Column[] = [];
     let inTable = false;
+    let lastDate: string | undefined;
+    let descriptionX = 0;
     let pending:
       | {
           date: string;
@@ -224,6 +230,12 @@ export abstract class BaseParser implements StatementParser {
         });
         if (!columns.length)
           throw new Error("Transaction columns could not be located.");
+        descriptionX =
+          row.items.find((i) =>
+            /^(?:Description|Details|Transaction|Merchant)$/i.test(
+              i.text.trim(),
+            ),
+          )?.x ?? 0;
         inTable = true;
         continue;
       }
@@ -232,6 +244,7 @@ export abstract class BaseParser implements StatementParser {
           row.text,
         )
       ) {
+        lastDate = undefined;
         if (pending) {
           warnings.push(
             `Page ${pending.sourcePage}: a dated transaction has no readable amount.`,
@@ -270,6 +283,7 @@ export abstract class BaseParser implements StatementParser {
         }
         try {
           const date = parseDate(dateMatch[1], periodEnd);
+          lastDate = date;
           const second = row.items[1];
           const bookingDate =
             second &&
@@ -288,11 +302,24 @@ export abstract class BaseParser implements StatementParser {
           };
           finish(row);
         } catch {
+          lastDate = undefined;
           warnings.push(
             `Page ${row.page}: unsupported transaction date. No import without review.`,
           );
         }
       } else if (pending) {
+        if (
+          this.inheritBlankDates &&
+          pending.description.trim() &&
+          first.x >= descriptionX - 3 &&
+          this.isUndatedTransactionStart(row.text)
+        ) {
+          warnings.push(
+            `Page ${pending.sourcePage}: a transaction has no readable amount. Review the source statement.`,
+          );
+          pending.description = "";
+          pending.sourcePage = row.page;
+        }
         pending.description +=
           " " +
           row.items
@@ -303,6 +330,31 @@ export abstract class BaseParser implements StatementParser {
           pending.confidence,
           ...row.items.map((i) => i.confidence ?? 1),
         );
+        finish(row);
+      } else if (
+        this.inheritBlankDates &&
+        lastDate &&
+        first &&
+        first.x >= descriptionX - 3 &&
+        (this.isUndatedTransactionStart(row.text) ||
+          row.items.some(
+            (i) =>
+              amountRE.test(i.text.trim()) &&
+              i.x >= minX - 45 &&
+              [...columns].sort(
+                (a, b) => Math.abs(a.x - i.x) - Math.abs(b.x - i.x),
+              )[0]?.kind !== "balance",
+          ))
+      ) {
+        pending = {
+          date: lastDate,
+          description: row.items
+            .filter((i) => i.x < minX - 45)
+            .map((i) => i.text)
+            .join(" "),
+          sourcePage: row.page,
+          confidence: Math.min(1, ...row.items.map((i) => i.confidence ?? 1)),
+        };
         finish(row);
       } else if (
         first &&

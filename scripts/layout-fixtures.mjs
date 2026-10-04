@@ -26,3 +26,28 @@ for (const bank of ["amex", "revolut"]) {
   await writeFile(`tests/fixtures/${bank}-uk-layout.pdf`, await doc.save());
 }
 console.log("Generated fictitious UK card and account statement layouts.");
+const grouped = await build({
+  entryPoints: ["src/tests/barclays-grouped.ts"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+});
+const { groupedBarclaysItems } = await import(
+  "data:text/javascript;base64," +
+    Buffer.from(grouped.outputFiles[0].text).toString("base64")
+);
+const groupedDoc = await PDFDocument.create();
+const groupedFont = await groupedDoc.embedFont(StandardFonts.Helvetica);
+const groupedPages = [
+  groupedDoc.addPage([595, 842]),
+  groupedDoc.addPage([595, 842]),
+];
+for (const item of groupedBarclaysItems())
+  groupedPages[item.page - 1].drawText(item.text, {
+    x: item.x,
+    y: 842 - item.y,
+    size: 8,
+    font: groupedFont,
+  });
+await writeFile("tests/fixtures/barclays-grouped.pdf", await groupedDoc.save());

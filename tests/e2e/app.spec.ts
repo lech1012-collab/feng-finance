@@ -885,3 +885,56 @@ test("subscription notification centre supports review, cancellation plans and p
     ).toBe(true);
   }
 });
+
+test("Barclays blank dates retain every grouped transaction across pages", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays-grouped");
+  await expect(
+    page.getByText("✓ Statement reconciled", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /All transactions/ }).click();
+  await expect(page.locator(".review-row")).toHaveCount(6);
+  await confirmImport(page);
+  await gotoRoute(page, "/settings");
+  const downloaded = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
+    .click();
+  const path = await (await downloaded).path();
+  const backup = JSON.parse(await readFile(path!, "utf8"));
+  expect(
+    backup.transactions
+      .map((t: { date: string; amount: number }) => [t.date, t.amount])
+      .sort(),
+  ).toEqual(
+    [
+      ["2026-09-03", -1000],
+      ["2026-09-03", 20000],
+      ["2026-09-03", -3000],
+      ["2026-09-03", -4000],
+      ["2026-09-03", -2000],
+      ["2026-09-04", -5000],
+    ].sort(),
+  );
+  expect(backup.statements[0]).toMatchObject({
+    transactionCount: 6,
+    openingBalance: 100000,
+    closingBalance: 105000,
+    validationStatus: "reconciled",
+    parserVersion: "1.0.3",
+  });
+  expect(
+    backup.transactions.find((t: { description: string }) =>
+      t.description.includes("EXAMPLE COUNCIL"),
+    ).sourcePage,
+  ).toBe(2);
+  expect(
+    backup.transactions.every(
+      (t: { description: string }) =>
+        !t.description.includes("ACCOUNT NUMBER") &&
+        !t.description.includes("REGISTERED IN ENGLAND"),
+    ),
+  ).toBe(true);
+});
