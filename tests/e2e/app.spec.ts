@@ -948,6 +948,10 @@ test("Barclays blank dates retain every grouped transaction across pages", async
 test("category overview, income shares, central Home navigation and page palettes", async ({
   page,
 }) => {
+  await page.route("**/assets/Import-*.js", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 200));
+    await route.continue();
+  });
   await gotoRoute(page, "/settings");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
@@ -1008,7 +1012,15 @@ test("category overview, income shares, central Home navigation and page palette
   const transactions = await palette();
   expect(transactions).not.toBe(home);
   await page.getByRole("link", { name: "Import", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Import statements", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".app")).toHaveAttribute("data-page", "import");
   expect(await palette()).not.toBe(transactions);
   await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Overview", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".app")).toHaveAttribute("data-page", "home");
   expect(await palette()).toBe(home);
 });
