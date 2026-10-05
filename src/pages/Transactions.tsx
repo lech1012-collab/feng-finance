@@ -1,3 +1,4 @@
+import { AccountBalances } from "../components/AccountBalances";
 import { useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -29,36 +30,54 @@ export default function Transactions({
   const [undoError, setUndoError] = useState("");
   const selectedMonth = params.get("month") ?? month;
   const bounds = monthBounds(selectedMonth);
-  const [from, setFrom] = useState(bounds[0]);
-  const [to, setTo] = useState(
-    new Date(Date.parse(bounds[1]) - 86400000).toISOString().slice(0, 10),
+  const [allDates, setAllDates] = useState(
+    params.get("allDates") === "1" ||
+      (!params.has("allDates") &&
+        (params.has("uncategorized") ||
+          params.get("category") === "uncategorized")),
   );
-  const [search, setSearch] = useState("");
+  const [from, setFrom] = useState(
+    /^\d{4}-\d{2}-\d{2}$/.test(params.get("from") ?? "")
+      ? params.get("from")!
+      : bounds[0],
+  );
+  const [to, setTo] = useState(
+    /^\d{4}-\d{2}-\d{2}$/.test(params.get("to") ?? "")
+      ? params.get("to")!
+      : new Date(Date.parse(bounds[1]) - 86400000).toISOString().slice(0, 10),
+  );
+  const [search, setSearch] = useState(params.get("search") ?? "");
   const [account, setAccount] = useState(params.get("account") ?? "");
   const [category, setCategory] = useState(params.get("category") ?? "");
-  const [type, setType] = useState("");
+  const [type, setType] = useState(params.get("type") ?? "");
   const [uncategorized, setUncategorized] = useState(
     params.has("uncategorized") || category === "uncategorized",
   );
-  const [property, setProperty] = useState(false);
-  const [min, setMin] = useState("");
-  const [max, setMax] = useState("");
+  const [property, setProperty] = useState(params.get("property") === "1");
+  const [min, setMin] = useState(params.get("min") ?? "");
+  const [max, setMax] = useState(params.get("max") ?? "");
   const [page, setPage] = useState(0);
-  const [advanced, setAdvanced] = useState(false);
+  const [advanced, setAdvanced] = useState(params.get("advanced") === "1");
   const data = useLiveQuery(
     async () => ({
       items:
-        from && to && from <= to
+        allDates || (from && to && from <= to)
           ? await db.transactions
               .where("[currency+date]")
-              .between([currency, from], [currency, to], true, true)
+              .between(
+                [currency, allDates ? "0000" : from],
+                [currency, allDates ? "9999" : to],
+                true,
+                true,
+              )
               .reverse()
               .toArray()
           : [],
       accounts: await db.accounts.where("currency").equals(currency).toArray(),
       categories: await db.categories.toArray(),
+      statements: await db.statements.toArray(),
     }),
-    [from, to, currency],
+    [from, to, currency, allDates],
   );
   const filtered = useMemo(() => {
     if (!data) return [];
@@ -81,7 +100,12 @@ export default function Transactions({
           t.categoryId === category ||
           t.subcategoryId === category) &&
         (!type || t.type === type) &&
-        (!uncategorized || (!t.categoryId && !t.isTransfer)) &&
+        (!uncategorized ||
+          (!t.categoryId &&
+            !t.subcategoryId &&
+            !t.isTransfer &&
+            t.type !== "transfer" &&
+            !t.transferPairId)) &&
         (!property ||
           t.categoryId === "property" ||
           t.categoryId === "property-income") &&
@@ -104,6 +128,25 @@ export default function Transactions({
   const totalPages = Math.max(1, Math.ceil(filtered.length / 60));
   const currentPage = Math.min(page, totalPages - 1);
   const items = filtered.slice(currentPage * 60, (currentPage + 1) * 60);
+  const returnParams = new URLSearchParams({
+    month: selectedMonth,
+    allDates: allDates ? "1" : "0",
+    from,
+    to,
+  });
+  for (const [key, value] of Object.entries({
+    category,
+    account,
+    search,
+    type,
+    min,
+    max,
+    uncategorized: uncategorized ? "1" : "",
+    property: property ? "1" : "",
+    advanced: advanced ? "1" : "",
+  }))
+    if (value) returnParams.set(key, value);
+  const returnTo = `/transactions?${returnParams}`;
   const feedback = (
     <>
       {receipt && (
@@ -146,13 +189,21 @@ export default function Transactions({
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">EVERY TRANSACTION, TRACEABLE</p>
           <h1>Transactions</h1>
         </div>
         <span className="count-chip">
           {filtered.length} results · {currency}
         </span>
       </div>
+      {data && (
+        <AccountBalances
+          accounts={data.accounts}
+          statements={data.statements}
+          month={selectedMonth}
+          currency={currency}
+          detailed
+        />
+      )}
       <section className="card filters">
         <div className="search-line">
           <label className="search-input">
@@ -176,8 +227,69 @@ export default function Transactions({
             Filters
           </button>
         </div>
+        <div
+          className="category-filter-buttons"
+          role="group"
+          aria-label="Transaction category filters"
+        >
+          {[
+            { id: "", name: "All categories" },
+            { id: "uncategorized", name: "Uncategorized" },
+            ...(data?.categories.filter((c) => !c.archived && !c.parentId) ??
+              []),
+          ].map((c) => (
+            <button
+              key={c.id}
+              aria-pressed={
+                c.id === "uncategorized"
+                  ? uncategorized
+                  : !uncategorized && category === c.id
+              }
+              onClick={() => {
+                setCategory(c.id);
+                setUncategorized(c.id === "uncategorized");
+                setType("");
+                setProperty(false);
+                if (c.id === "uncategorized") {
+                  setAllDates(true);
+                  setAccount("");
+                  setSearch("");
+                  setMin("");
+                  setMax("");
+                }
+                reset();
+              }}
+            >
+              {c.name}
+            </button>
+          ))}
+        </div>
+        <div
+          className="date-scope"
+          role="group"
+          aria-label="Transaction date range"
+        >
+          <button
+            aria-pressed={allDates}
+            onClick={() => {
+              setAllDates(true);
+              reset();
+            }}
+          >
+            All dates
+          </button>
+          <button
+            aria-pressed={!allDates}
+            onClick={() => {
+              setAllDates(false);
+              reset();
+            }}
+          >
+            Date range
+          </button>
+        </div>
         <p className="filter-context">
-          {from} — {to}
+          {allDates ? "All imported dates" : `${from} — ${to}`}
           {category && category !== "uncategorized"
             ? ` · ${data?.categories.find((c) => c.id === category)?.name ?? ""}`
             : ""}
@@ -190,6 +302,7 @@ export default function Transactions({
                 type="date"
                 value={from}
                 onChange={(e) => {
+                  setAllDates(false);
                   setFrom(e.target.value);
                   reset();
                 }}
@@ -201,6 +314,7 @@ export default function Transactions({
                 type="date"
                 value={to}
                 onChange={(e) => {
+                  setAllDates(false);
                   setTo(e.target.value);
                   reset();
                 }}
@@ -214,6 +328,7 @@ export default function Transactions({
                 onChange={(e) => {
                   setCategory(e.target.value);
                   setUncategorized(e.target.value === "uncategorized");
+                  if (e.target.value === "uncategorized") setAllDates(true);
                   reset();
                 }}
               >
@@ -299,6 +414,8 @@ export default function Transactions({
                   checked={uncategorized}
                   onChange={(e) => {
                     setUncategorized(e.target.checked);
+                    setCategory(e.target.checked ? "uncategorized" : "");
+                    if (e.target.checked) setAllDates(true);
                     reset();
                   }}
                 />
@@ -328,24 +445,14 @@ export default function Transactions({
         <CategoryBoard
           key={sorting.id}
           transaction={sorting}
+          returnTo={returnTo}
           categories={data.categories}
           feedback={feedback}
           onClose={() => setSorting(undefined)}
           onSaved={(result) => {
             setReceipt(result);
             setUndoError("");
-            const changed = new Set(result.after.map((t) => t.id));
-            setSorting(
-              uncategorized
-                ? filtered.find(
-                    (t) =>
-                      !changed.has(t.id) &&
-                      !t.categoryId &&
-                      !t.isTransfer &&
-                      t.type !== "transfer",
-                  )
-                : undefined,
-            );
+            setSorting(undefined);
           }}
         />
       )}
@@ -354,6 +461,7 @@ export default function Transactions({
           <SwipeTransaction
             key={t.id}
             transaction={t}
+            returnTo={returnTo}
             onCategorize={() => {
               setSorting(t);
               setUndoError("");
@@ -370,6 +478,15 @@ export default function Transactions({
             </span>
             <div className="transaction-description">
               <strong>{t.merchant || t.description}</strong>
+              <span
+                className={`transaction-status ${t.isTransfer || t.type === "transfer" || t.transferPairId ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+              >
+                {t.isTransfer || t.type === "transfer" || t.transferPairId
+                  ? "Transfer"
+                  : t.categoryId || t.subcategoryId
+                    ? "Categorized"
+                    : "Needs category"}
+              </span>
               <span>
                 {t.date} ·{" "}
                 {t.isTransfer

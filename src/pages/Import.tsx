@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -22,7 +22,11 @@ import { cashFlow } from "../analytics/calculations";
 import { validatePeriod } from "../parsers/period";
 export default function ImportPage({
   onImported,
+  selectedFiles,
+  onFilesStarted,
 }: {
+  selectedFiles?: File[];
+  onFilesStarted?: () => void;
   onImported: (month: string, currency: string) => void;
 }) {
   const [files, setFiles] = useState<File[]>([]);
@@ -108,6 +112,14 @@ export default function ImportPage({
     resetPeriod();
     await process(selected[0], false, undefined, false);
   };
+  const startedFiles = useRef<File[] | undefined>(undefined);
+  useEffect(() => {
+    if (selectedFiles?.length && startedFiles.current !== selectedFiles) {
+      startedFiles.current = selectedFiles;
+      void selectFiles(selectedFiles);
+      onFilesStarted?.();
+    }
+  }, [selectedFiles]);
   const updateRow = (
     tid: string,
     patch: Partial<ImportDraft["transactions"][number]>,
@@ -155,6 +167,10 @@ export default function ImportPage({
       } else {
         setFiles([]);
         setStatus("Import complete");
+        navigate("/", {
+          replace: true,
+          state: { importedCount: importedCount + n },
+        });
       }
     } catch (e) {
       setError(
@@ -247,16 +263,6 @@ export default function ImportPage({
           <span className="spinner" />
           {status}
           {files.length > 1 && ` · Statement ${index + 1} of ${files.length}`}
-        </div>
-      )}
-      {success && !draft && !busy && (
-        <div className="notice success" role="status">
-          <CheckCircle2 size={18} />
-          <div>
-            <strong>Import complete</strong>
-            <p>{importedCount} transactions added. Your overview is ready.</p>
-          </div>
-          <button onClick={() => navigate("/")}>View dashboard</button>
         </div>
       )}
       {error && (

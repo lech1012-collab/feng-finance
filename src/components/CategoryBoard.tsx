@@ -1,6 +1,6 @@
 import { categoryColor } from "../domain/palette";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { X, Grip } from "lucide-react";
 import type { Transaction, Category } from "../domain/models";
@@ -12,17 +12,20 @@ import {
 } from "../storage/categorize";
 export function CategoryBoard({
   transaction: t,
+  returnTo,
   categories,
   onClose,
   onSaved,
   feedback,
 }: {
   transaction: Transaction;
+  returnTo?: string;
   categories: Category[];
   onClose: () => void;
   onSaved: (receipt: CategoryReceipt) => void;
   feedback?: ReactNode;
 }) {
+  const location = useLocation();
   const dialog = useRef<HTMLDialogElement>(null);
   const origin = useRef<{ x: number; y: number; id: number } | null>(null);
   const [position, setPosition] = useState({ x: 0, y: 0 });
@@ -41,6 +44,7 @@ export function CategoryBoard({
   const available = categories.filter(
     (c) =>
       !c.archived &&
+      c.parentId !== "property" &&
       (!c.parentId ||
         categories.some((p) => p.id === c.parentId && !p.archived)) &&
       c.kind === (t.amount >= 0 ? "income" : "expense") &&
@@ -241,6 +245,7 @@ export function CategoryBoard({
       <Link
         className="sort-details"
         to={`/transactions/${t.id}`}
+        state={{ returnTo: returnTo ?? location.pathname + location.search }}
         onClick={onClose}
       >
         View transaction details

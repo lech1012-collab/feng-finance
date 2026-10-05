@@ -7,12 +7,14 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
+  ReferenceLine,
 } from "recharts";
 import { money, currencyPrecision } from "../domain/money";
 export function CashChart({
   data,
   currency,
   property = false,
+  showValues = true,
 }: {
   data: {
     label: string;
@@ -23,6 +25,7 @@ export function CashChart({
   }[];
   currency: string;
   property?: boolean;
+  showValues?: boolean;
 }) {
   const factor = 10 ** currencyPrecision(currency);
   return (
@@ -37,7 +40,7 @@ export function CashChart({
       >
         <ResponsiveContainer width="100%" height={210}>
           <ComposedChart
-            data={data}
+            data={data.map((d) => ({ ...d, expenses: -Math.abs(d.expenses) }))}
             margin={{ top: 12, right: 8, left: -16, bottom: 0 }}
           >
             <CartesianGrid vertical={false} stroke="var(--line)" />
@@ -67,6 +70,7 @@ export function CashChart({
                 color: "var(--ink)",
               }}
             />
+            <ReferenceLine y={0} stroke="var(--muted)" />
             {property ? (
               <Line
                 isAnimationActive={false}
@@ -91,7 +95,7 @@ export function CashChart({
                   name="Expenses"
                   dataKey="expenses"
                   fill="var(--chart-expense)"
-                  radius={[3, 3, 0, 0]}
+                  radius={[0, 0, 3, 3]}
                   maxBarSize={16}
                 />
                 <Line
@@ -122,44 +126,46 @@ export function CashChart({
             </span>
             <span>
               <i className="net-key" />
-              Net
+              Net cash flow
             </span>
           </>
         )}
       </div>
-      <details className="chart-data">
-        <summary>View chart values</summary>
-        <table>
-          <thead>
-            <tr>
-              <th>Month</th>
-              <th>{property ? "Property net" : "Income"}</th>
-              {!property && (
-                <>
-                  <th>Expenses</th>
-                  <th>Net</th>
-                </>
-              )}
-            </tr>
-          </thead>
-          <tbody>
-            {data.map((d, i) => (
-              <tr key={i}>
-                <th>{d.label}</th>
-                <td>
-                  {money(property ? (d.property ?? 0) : d.income, currency)}
-                </td>
+      {showValues && (
+        <details className="chart-data">
+          <summary>View chart values</summary>
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>{property ? "Property net" : "Income"}</th>
                 {!property && (
                   <>
-                    <td>{money(d.expenses, currency)}</td>
-                    <td>{money(d.net, currency)}</td>
+                    <th>Expenses</th>
+                    <th>Net</th>
                   </>
                 )}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </details>
+            </thead>
+            <tbody>
+              {data.map((d, i) => (
+                <tr key={i}>
+                  <th>{d.label}</th>
+                  <td>
+                    {money(property ? (d.property ?? 0) : d.income, currency)}
+                  </td>
+                  {!property && (
+                    <>
+                      <td>{money(-d.expenses, currency)}</td>
+                      <td>{money(d.net, currency)}</td>
+                    </>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
     </div>
   );
 }

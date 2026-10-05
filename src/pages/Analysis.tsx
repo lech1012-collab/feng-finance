@@ -1,3 +1,4 @@
+import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -140,12 +141,8 @@ export default function Analysis({
           </p>
           <h1>{property ? "Property" : "Analyse"}</h1>
         </div>
-        {!property && (
-          <Link className="button" to="/property">
-            Property analysis
-          </Link>
-        )}
       </div>
+      {!property && <CategoryAnalysisPicker month={month} />}
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
         <label className="period-label">
@@ -231,7 +228,13 @@ export default function Analysis({
               {subcategories.map((c) => (
                 <div key={c.id}>
                   <dt>
-                    <Link to={`/transactions?category=${c.id}&month=${month}`}>
+                    <Link
+                      to={
+                        c.id === "uncategorized"
+                          ? "/transactions?uncategorized=1&allDates=1"
+                          : `/categories/${c.id}?month=${month}`
+                      }
+                    >
                       {c.name}
                     </Link>
                   </dt>
@@ -261,7 +264,11 @@ export default function Analysis({
               <Link
                 key={c.id}
                 className="category-row"
-                to={`/transactions?category=${c.id}&month=${month}`}
+                to={
+                  c.id === "uncategorized"
+                    ? "/transactions?uncategorized=1&allDates=1"
+                    : `/categories/${c.id}?month=${month}`
+                }
               >
                 <div className="category-meta">
                   <span>{c.name}</span>

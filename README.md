@@ -39,9 +39,9 @@ npm run check              # Tests, build and browser tests (generate fixtures f
 
 ## Categorizing with gestures
 
-On Home, tap **transactions need a category**. Tap an uncategorized transaction or swipe a purchase sideways to open the sorting sheet. Drag its card onto a category tile, or tap the tile: the category saves immediately. The uncategorized queue advances to the next card. **Undo** restores the last assignment, including an optional group and newly learned rule, unless another edit has since changed those records.
+On Home, tap **transactions need a category**. Tap an uncategorized transaction or swipe a purchase sideways to open the sorting sheet. Drag its card onto a category tile, or tap the tile: the category saves immediately. The sheet closes after saving and those transactions immediately leave the uncategorized queue. **Undo** restores the last assignment, including an optional group and newly learned rule, unless another edit has since changed those records.
 
-The sheet can apply your choice to matching uncategorized transactions from the same merchant, account, currency and amount direction. Grouping and learning a future rule are separate, explicit choices. Already categorized transactions and transfers are protected. Property subcategories are available as tiles too. Press **C** on a focused transaction for keyboard access; category tiles support Enter. Tap **View transaction details** for tags, transfer controls and source information.
+The sheet can apply your choice to matching uncategorized transactions from the same merchant, account, currency and amount direction. Grouping and learning a future rule are separate, explicit choices. Already categorized transactions and transfers are protected. Property has one tile in the sorting sheet; existing subcategory data remains available in detailed records. Press **C** on a focused transaction for keyboard access; category tiles support Enter. Tap **View transaction details** for tags, transfer controls and source information.
 
 Swipe the month selector left/right to change month. Desktop users can drop PDFs directly onto the Import card. Touch sorting uses Pointer Events rather than relying on desktop-only HTML drag events; vertical list scrolling and cancelled drags do not save changes.
 
@@ -137,3 +137,32 @@ Tap any Home spending category to open its monthly KPIs, trend, subcategories an
 Compare against the preceding six or twelve calendar months. Only months covered continuously by statements for every account in the selected currency enter the baseline. Inferred transaction-coverage periods and failed reconciliations are excluded. Covered months with no category spending count as zero; missing months do not. Sample standard deviation uses n−1 and requires at least three complete months. The mean ± one standard deviation band is descriptive, not a budget or prediction. The current month is excluded from the baseline, and partial current coverage prevents an overspending alert. Transfers are excluded throughout. Property cash flow includes rental income; category spending remains gross outflows, with refunds shown in the transaction evidence and recorded income.
 
 Navigation is Import · Transactions · Home · Analyse · Settings, with Home central on mobile. Page accents are blue, violet, amber, coral and slate on neutral dark/light surfaces; the former green branding, charts and category colors are replaced. Existing financial records and category assignments are unchanged.
+
+## Home balances and simplified workflow
+
+Home's Import statement control opens the native PDF picker directly. The Import
+navigation tab does the same. PDFs process locally, with reconciliation and
+exception review before committing. A multi-file queue stays in review until its
+last statement is confirmed, then returns to Home automatically.
+
+Home shows net cash flow, total balance and each account's signed statement
+balance, with 1/3/6/12-month percentage comparisons. Credit-card debt reduces
+the total. Balances use the latest statement ending on or before the selected
+month end; older snapshots are dated and the total is labelled partial when any
+account is stale, unverified or missing. Percentage comparisons require current,
+reliable statements for all the same accounts at both endpoints and a nonzero
+prior total. Change is `(current - previous) / abs(previous) × 100`, so debt
+repayment produces a positive change. Failed validation and inferred periods
+withhold comparisons. Monthly balance charts leave gaps instead of inventing
+history; a dashed line shows the total. Currency totals remain separate.
+
+Expenses plot below zero, income above zero, and net cash flow uses a distinct
+line. Home charts have tooltips and legends; detailed value tables remain in
+Analyse. Account freshness and identifiers are shown at the top of Transactions.
+
+Uncategorized on Home opens an all-dates transaction queue. Main category
+buttons, including Uncategorized, select filters. Rows explicitly say Needs
+category, Categorized or Transfer. Saving through either the sorting sheet or
+transaction editor removes categorized rows from that queue. Analyse's category
+selector opens the category's charts, complete-month average/sample deviation
+and same-month income percentage.

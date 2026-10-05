@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, defaultRules } from "../storage/database";
 import { suggestRulePattern } from "../categorization/engine";
@@ -72,6 +72,12 @@ function Editor({
 }) {
   const { t, account, statement, categories, possible } = data;
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo =
+    typeof location.state?.returnTo === "string" &&
+    /^\/transactions(?:\?|$)/.test(location.state.returnTo)
+      ? location.state.returnTo
+      : "/transactions";
   const [merchant, setMerchant] = useState(t.merchant);
   const [category, setCategory] = useState(t.categoryId ?? "");
   const [subcategory, setSubcategory] = useState(t.subcategoryId ?? "");
@@ -117,7 +123,7 @@ function Editor({
             }
           : undefined,
       );
-      navigate("/transactions");
+      navigate(returnTo);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Changes could not be saved.");
     } finally {
@@ -126,7 +132,7 @@ function Editor({
   };
   return (
     <>
-      <Link className="back-link" to="/transactions">
+      <Link className="back-link" to={returnTo}>
         Back to transactions
       </Link>
       <section className="card detail-card">
@@ -308,7 +314,7 @@ function Editor({
             onClick={async () => {
               try {
                 await linkTransfers(t.id, pair);
-                navigate("/transactions");
+                navigate(returnTo);
               } catch (e) {
                 setError(
                   e instanceof Error ? e.message : "Transfer link failed.",

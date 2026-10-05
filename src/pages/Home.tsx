@@ -1,14 +1,15 @@
+import { AccountBalances } from "../components/AccountBalances";
+import { BalanceChart } from "../components/BalanceChart";
+import { ImportButton } from "../components/ImportPicker";
 import { useState } from "react";
 import { SubscriptionNotice } from "../components/SubscriptionNotice";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ArrowUpRight,
   ArrowDownRight,
-  CheckCircle2,
   Upload,
   Wallet,
-  ShieldCheck,
   ShoppingBag,
   ChevronRight,
 } from "lucide-react";
@@ -35,6 +36,7 @@ export default function Home({
   setMonth: (m: string) => void;
   currency: string;
 }) {
+  const location = useLocation();
   const [share, setShare] = useState("spending");
   const data = useLiveQuery(async () => {
     const transactions = await db.transactions
@@ -52,6 +54,18 @@ export default function Home({
       accounts: await db.accounts.where("currency").equals(currency).toArray(),
       statements: await db.statements.toArray(),
       count: await db.transactions.count(),
+      uncategorized: await db.transactions
+        .where("[currency+date]")
+        .between([currency, "0000"], [currency, "9999"], true, true)
+        .filter(
+          (t) =>
+            !t.categoryId &&
+            !t.subcategoryId &&
+            !t.isTransfer &&
+            t.type !== "transfer" &&
+            !t.transferPairId,
+        )
+        .count(),
     };
   }, [month, currency]);
   if (!data) return <p role="status">Loading your finances…</p>;
@@ -84,28 +98,26 @@ export default function Home({
         month,
       ),
   );
-  const uncategorized = current.filter(
-    (t) => !t.categoryId && !t.isTransfer,
-  ).length;
+  const uncategorized = data.uncategorized;
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">YOUR MONTH AT A GLANCE</p>
           <h1>Overview</h1>
         </div>
-        <Link className="button primary import-main" to="/import">
+        <ImportButton className="button primary import-main">
           <Upload size={18} />
           Import statement
-        </Link>
+        </ImportButton>
       </div>
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
-        <span className="privacy-badge">
-          <ShieldCheck size={15} />
-          On-device only
-        </span>
       </div>
+      {location.state?.importedCount !== undefined && (
+        <p className="notice" role="status">
+          Import complete · {location.state.importedCount} transactions added
+        </p>
+      )}
       <SubscriptionNotice currency={currency} />
       {!data.count && (
         <section className="welcome card">
@@ -116,9 +128,9 @@ export default function Home({
             stay on this device.
           </p>
           <div className="actions">
-            <Link className="button primary" to="/import">
+            <ImportButton className="button primary">
               Import your first statement
-            </Link>
+            </ImportButton>
             <button onClick={() => void loadDemo()}>
               Try fictitious demo data
             </button>
@@ -179,11 +191,24 @@ export default function Home({
             <span className="muted">Last 6 months</span>
           </div>
           <CashChart
+            showValues={false}
             data={monthlySeries(data.transactions, month, 6, currency)}
             currency={currency}
           />
         </section>
       </div>
+      <AccountBalances
+        accounts={data.accounts}
+        statements={data.statements}
+        month={month}
+        currency={currency}
+      />
+      <BalanceChart
+        accounts={data.accounts}
+        statements={data.statements}
+        month={month}
+        currency={currency}
+      />
       <div className="content-grid">
         <section className="card categories-card">
           <div className="section-heading">
@@ -215,7 +240,11 @@ export default function Home({
               <Link
                 key={c.id}
                 className="category-row"
-                to={`/categories/${c.id}?month=${month}`}
+                to={
+                  c.id === "uncategorized"
+                    ? "/transactions?uncategorized=1&allDates=1"
+                    : `/categories/${c.id}?month=${month}`
+                }
               >
                 <div className="category-meta">
                   <span>{c.name}</span>
@@ -249,7 +278,14 @@ export default function Home({
               {data.categories
                 .filter((c) => !c.archived && !c.parentId)
                 .map((c) => (
-                  <Link key={c.id} to={`/categories/${c.id}?month=${month}`}>
+                  <Link
+                    key={c.id}
+                    to={
+                      c.id === "uncategorized"
+                        ? "/transactions?uncategorized=1&allDates=1"
+                        : `/categories/${c.id}?month=${month}`
+                    }
+                  >
                     {c.name}
                   </Link>
                 ))}
@@ -258,7 +294,7 @@ export default function Home({
           {uncategorized > 0 && (
             <Link
               className="review-link"
-              to={`/transactions?uncategorized=1&month=${month}`}
+              to="/transactions?uncategorized=1&allDates=1"
             >
               {uncategorized} transactions need a category{" "}
               <ChevronRight size={16} />
@@ -274,7 +310,11 @@ export default function Home({
               <Link
                 className="insight-row"
                 key={c.id}
-                to={`/categories/${c.id}?month=${month}`}
+                to={
+                  c.id === "uncategorized"
+                    ? "/transactions?uncategorized=1&allDates=1"
+                    : `/categories/${c.id}?month=${month}`
+                }
               >
                 <span>{c.name}</span>
                 <strong>
@@ -288,82 +328,6 @@ export default function Home({
           </section>
         </div>
       </div>
-      <section className="card accounts-card">
-        <div className="section-heading">
-          <h2>Your accounts</h2>
-          <Link to="/settings">Manage</Link>
-        </div>
-        <div className="account-grid">
-          {data.accounts.map((a) => {
-            const latest = data.statements
-              .filter(
-                (s) =>
-                  s.accountId === a.id &&
-                  s.statementPeriodStart < monthBounds(month)[1],
-              )
-              .sort((a, b) =>
-                b.statementPeriodEnd.localeCompare(a.statementPeriodEnd),
-              )[0];
-            const stale = !statementIsCurrent(
-              latest?.statementPeriodEnd,
-              month,
-            );
-            return (
-              <div className="account-tile" key={a.id}>
-                <span
-                  className={`bank-mark ${a.institution === "Barclays" ? "barclays" : a.institution === "Revolut" ? "revolut" : "amex"}`}
-                >
-                  {a.institution === "Barclays"
-                    ? "B"
-                    : a.institution === "Revolut"
-                      ? "R"
-                      : "AE"}
-                </span>
-                <div>
-                  <strong>{a.institution}</strong>
-                  <p>
-                    {a.displayName} · {a.maskedAccountIdentifier}
-                  </p>
-                  {latest?.closingBalance !== undefined && (
-                    <div className="account-balance">
-                      <span>
-                        {a.accountType === "credit"
-                          ? latest.closingBalance <= 0
-                            ? "Statement amount owed"
-                            : "Statement credit"
-                          : "Statement closing balance"}
-                      </span>
-                      <strong>
-                        {money(
-                          a.accountType === "credit"
-                            ? Math.abs(latest.closingBalance)
-                            : latest.closingBalance,
-                          a.currency,
-                        )}
-                      </strong>
-                    </div>
-                  )}
-                  <span className={stale ? "stale" : "fresh"}>
-                    {stale ? "Update needed" : <CheckCircle2 size={12} />}{" "}
-                    {latest
-                      ? `Statement to ${latest.statementPeriodEnd}`
-                      : "No statement imported"}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
-          {!data.accounts.length && (
-            <p className="muted">
-              Accounts appear when you import a statement.
-            </p>
-          )}
-        </div>
-      </section>
-      <p className="local-note">
-        <ShieldCheck size={14} /> Financial data stays in this browser. Back up
-        regularly in Settings.
-      </p>
     </>
   );
 }

@@ -14,8 +14,8 @@ Implemented as a React / strict TypeScript / Vite static PWA with Dexie, PDF.js,
 
 ## Automated checks
 
-- **174 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries.
-- **38 browser checks**: nineteen workflows each in Chromium and Playwright WebKit at 390 × 844. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records.
+- **181 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries.
+- **44 browser checks**: twenty-two workflows each in Chromium and Playwright WebKit at 390 × 844. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records.
 - Production TypeScript/Vite build and local offline precache generation; static output includes PDF worker/fonts/CMaps/WASM and English OCR assets.
 - `npm audit`: zero known vulnerabilities in installed production and development dependencies at verification time.
 - Prettier formatting check and manual visual inspection of generated-data dashboards at 390 and 1440 pixels.
@@ -98,3 +98,21 @@ category statistics, property analysis and subscriptions share the preference;
 original transaction currencies remain unchanged and amounts are never converted
 or combined across currencies. Browser coverage checks separate GBP/EUR totals,
 reload persistence, backup inclusion and removal of per-page selectors.
+
+### 1.5.0 import workflow, account balances and transaction queue
+
+Home and Import navigation invoke a continuously mounted native file input from
+inside the user gesture, preserving iOS file-picker activation. Selected files are
+passed to the importer, consumed once, and processed sequentially. Final commit
+returns Home with a local confirmation. The uncategorized queue spans all dates,
+excludes transfers and removes saved rows; editor navigation preserves its filter.
+Status labels and main-category buttons make categorization state explicit.
+
+Seven balance-domain tests cover credit liabilities, future/missing snapshots,
+stale history, account/currency coverage, zero and negative baselines, failed
+validation, and 1/3/6/12-month change mathematics. Browser regressions cover the
+native picker, immediate Home return, multi-month uncategorized queue, both editing
+paths, main category filters, category analysis selection and property sorting.
+Home charts omit value tables; expense bars are negative with separate colours.
+Account metadata moved to Transactions. The iPhone checklist covers real Files
+activation and touch chart interactions, which require a physical device check.

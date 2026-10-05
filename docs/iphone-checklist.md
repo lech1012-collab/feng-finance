@@ -53,3 +53,11 @@ Only after those checks, test private real statements from ignored `private-fixt
 - Tap a Home category, swipe its month selector, switch six/twelve-month history, and tap a chart bar or month tile to inspect matching transactions.
 - Verify partial coverage is labelled, income ratios identify their denominator, and unavailable historical statistics do not show a misleading zero.
 - Check Shopping and Property overviews at enlarged text size, including subcategories, standard deviation and the source transaction links.
+
+- [ ] Home Import statement and the Import tab each open Files in one tap; cancelling keeps the current screen.
+- [ ] Selecting multiple PDFs processes all statements, then the final confirmation returns directly to Home.
+- [ ] Compare each displayed account balance and total to source statements, including negative card debt. Check 1/3/6/12 month changes and unavailable history.
+- [ ] Tap Uncategorized on Home, sort one row, then confirm it disappears from the all-dates queue. Repeat via the detailed editor; Undo returns it.
+- [ ] Main category filter buttons work comfortably by touch and every transaction has a readable status label.
+- [ ] Home balance and cash-flow chart tooltips work by touch. Expense bars are below zero. Missing balance months show gaps.
+- [ ] Analyse category selection shows category plots, average/deviation and percentage of income.

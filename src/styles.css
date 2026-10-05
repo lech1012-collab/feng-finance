@@ -3109,3 +3109,131 @@ h3 {
     gap: var(--space-xs);
   }
 }
+/* Distinct chart roles: income blue, spending coral below zero, net amber line. */
+:root {
+  --chart-income: #7ab8ff;
+  --chart-expense: #f59485;
+  --chart-net: #ffd179;
+}
+:root[data-theme="light"] {
+  --chart-income: #286ab8;
+  --chart-expense: #b83f31;
+  --chart-net: #865500;
+}
+.app {
+  --chart-income: #7ab8ff;
+}
+:root[data-theme="light"] .app {
+  --chart-income: #286ab8;
+}
+.balance-total {
+  display: block;
+  font-size: clamp(1.625rem, 7vw, 2.625rem);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 13px;
+}
+.balance-periods,
+.date-scope {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin: 8px 0 13px;
+}
+.balance-periods button,
+.date-scope button {
+  padding: 8px 13px;
+  min-width: 44px;
+}
+.balance-account {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 13px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+.balance-account > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.balance-account small {
+  display: block;
+  color: var(--muted);
+  margin-top: 5px;
+}
+.balance-account-value {
+  text-align: right;
+}
+.balance-accounts {
+  margin-top: 13px;
+}
+.balance-chart [role="img"] {
+  overflow: hidden;
+  min-width: 0;
+  max-width: 100%;
+}
+.category-filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 13px;
+}
+.category-filter-buttons button {
+  padding: 8px 13px;
+  font-size: 0.8125rem;
+}
+.transaction-description .transaction-status {
+  display: inline-block;
+  padding: 3px 8px;
+  border-radius: 5px;
+  width: fit-content;
+  font-size: 0.75rem;
+  border: 1px solid var(--line);
+  margin: 5px 0;
+}
+.transaction-description .transaction-status.uncategorized {
+  color: var(--warning-ink, #ffd179);
+  background: var(--raised);
+  border-color: #9b7240;
+}
+:root[data-theme="light"]
+  .transaction-description
+  .transaction-status.uncategorized {
+  color: #775009;
+}
+.transaction-description .transaction-status.categorized {
+  color: var(--accent);
+}
+.analysis-category-picker {
+  margin-bottom: 21px;
+  max-width: 34rem;
+}
+@media (max-width: 760px) {
+  .balance-account-value {
+    max-width: 50%;
+  }
+  .balance-summary .section-heading {
+    flex-wrap: wrap;
+  }
+  .category-filter-buttons {
+    max-height: 11rem;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 3px;
+  }
+  .transaction-row {
+    padding-block: 13px;
+  }
+}
+
+.balance-total {
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.balance-summary .section-heading > a {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 8px;
+}

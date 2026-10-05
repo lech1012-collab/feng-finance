@@ -1,3 +1,4 @@
+import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -90,6 +91,7 @@ export default function CategoryPage({
           <h1>{name}</h1>
         </div>
       </div>
+      <CategoryAnalysisPicker month={selected} category={id} />
       <div className="toolbar">
         <MonthPicker month={selected} onChange={chooseMonth} />
         <div

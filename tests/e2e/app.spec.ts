@@ -66,7 +66,6 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   ).toBeVisible();
   await expect(page.getByText("10", { exact: true }).first()).toBeVisible();
   await confirmImport(page);
-  await page.getByRole("button", { name: "View dashboard" }).click();
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.getByText("+£2,802.35", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: /Shopping £1,200.00/ }).click();
@@ -156,7 +155,6 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
-  await page.getByRole("button", { name: "View dashboard" }).click();
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.getByText("+£5,588.65", { exact: true })).toBeVisible();
   await expect(
@@ -171,7 +169,6 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
-  await page.getByRole("button", { name: "View dashboard" }).click();
   await expect(page.locator(".hero-number")).toContainText("£");
   await gotoRoute(page, "/settings");
   await page.getByLabel("Global currency", { exact: true }).selectOption("EUR");
@@ -240,7 +237,6 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   ).toBeDisabled();
   await page.getByLabel(/I compared the extracted rows with the PDF/).check();
   await confirmImport(page);
-  await page.getByRole("button", { name: "View dashboard" }).click();
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.locator(".hero-number")).toHaveText("-£109.68");
   await page.getByRole("link", { name: "Transactions", exact: true }).click();
@@ -530,7 +526,6 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and impor
   ).toBeDisabled();
   await page.getByLabel(/I compared the extracted rows with the PDF/).check();
   await confirmImport(page);
-  await page.getByRole("button", { name: "View dashboard" }).click();
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.locator(".hero-number")).toHaveText("+£455.00");
   await openImport(page);
@@ -750,7 +745,6 @@ test("personal rule corrections update existing transactions and future imports 
     "household",
   );
   await confirmImport(page);
-  await page.getByRole("button", { name: "View dashboard" }).click();
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-10");
 });
 
@@ -763,7 +757,6 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
-  await page.getByRole("button", { name: "View dashboard" }).click();
   await expect(page.locator(".hero-number")).toHaveText("-£65.00");
   await page
     .getByRole("link", { name: /3 transactions need a category/ })
@@ -793,18 +786,20 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
     steps: 16,
   });
   await page.mouse.up();
-  await expect(dialog.getByRole("status")).toContainText(
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText(
     "2 transactions → Groceries",
   );
-  await expect(dialog.locator(".sorting-card")).toContainText("ANOTHER SHOP");
-  await dialog.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(page.getByRole("link", { name: /CORNER SHOP/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(dialog.locator(".sorting-card")).toContainText("CORNER SHOP");
   await dialog.getByLabel(/Also sort 1 uncategorized/).check();
   await dialog.getByLabel(/Remember this merchant/).check();
   await dialog
     .getByRole("button", { name: "Categorize as Cleaning", exact: true })
     .click();
-  await expect(dialog.locator(".sorting-card")).toContainText("ANOTHER SHOP");
+  await expect(dialog).toHaveCount(0);
+  await page.getByRole("link", { name: /ANOTHER SHOP/ }).click();
   await dialog
     .getByRole("button", { name: "Categorize as Shopping", exact: true })
     .click();
@@ -859,10 +854,10 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
   });
   await category.focus();
   await page.keyboard.press("Enter");
-  await expect(dialog.getByRole("status")).toContainText(
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText(
     "1 transaction → Shopping",
   );
-  await dialog.getByRole("button", { name: "Close categorization" }).click();
   await page.getByRole("link", { name: "Home", exact: true }).click();
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-09");
   const picker = (await page.locator(".month-picker").boundingBox())!;
@@ -1050,7 +1045,7 @@ test("category overview, income shares, central Home navigation and page palette
   ).toBeVisible();
   const transactions = await palette();
   expect(transactions).not.toBe(home);
-  await page.getByRole("link", { name: "Import", exact: true }).click();
+  await openImport(page);
   await expect(
     page.getByRole("heading", { name: "Import statements", exact: true }),
   ).toBeVisible();
@@ -1109,4 +1104,135 @@ test("navigation consistently selects the owning section for every route", async
     page.getByRole("heading", { name: "Analyse", exact: true }),
   ).toBeVisible();
   await expect(nav.locator('[aria-current="page"]')).toHaveText("Analyse");
+});
+
+test("Home selects PDFs immediately and completed imports return Home", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const choose = page.waitForEvent("filechooser");
+  await page
+    .getByRole("button", { name: "Import statement", exact: true })
+    .click();
+  await (await choose).setFiles(fixture("barclays-sort"));
+  await expect(
+    page.getByRole("heading", { name: "Barclays detected" }),
+  ).toBeVisible();
+  await confirmImport(page);
+  await expect(
+    page.getByRole("heading", { name: "Overview", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("navigation").locator('[aria-current="page"]'),
+  ).toHaveText("Home");
+  await expect(page.locator(".balance-total")).toHaveText("£935.00");
+  await expect(
+    page.getByRole("img", {
+      name: "Monthly total and individual account balances",
+    }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("View chart values", { exact: true }),
+  ).toHaveCount(0);
+  await expect(page.getByText("Local data", { exact: true })).toHaveCount(0);
+  await expect(
+    page.getByText("Personal finances", { exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("heading", { name: "Your accounts", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .locator(".category-row")
+    .filter({ hasText: "Uncategorized" })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Transactions", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Your accounts", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
+    3,
+  );
+  await page.getByRole("link", { name: /ANOTHER SHOP/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByRole("button", {
+      name: "Categorize as Mortgage / financing",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Categorize as Property", exact: true })
+    .click();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toHaveCount(0);
+  await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
+    2,
+  );
+  const filters = page.getByRole("group", {
+    name: "Transaction category filters",
+  });
+  await filters.getByRole("button", { name: "Property", exact: true }).click();
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toBeVisible();
+  await expect(page.locator(".transaction-status.categorized")).toHaveCount(1);
+  await filters
+    .getByRole("button", { name: "Uncategorized", exact: true })
+    .click();
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toHaveCount(0);
+  await page.getByRole("link", { name: "Analyse", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: "Property analysis", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByLabel("Category analysis", { exact: true })
+    .selectOption("property");
+  await expect(
+    page.getByRole("heading", { name: "Property", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Share of income spent", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByText("Monthly average", { exact: true }),
+  ).toBeVisible();
+});
+
+test("Uncategorized queue spans imported months and saves immediately disappear", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays-sort");
+  await confirmImport(page);
+  await openImport(page);
+  await selectStatement(page, "barclays-sort-next");
+  await confirmImport(page);
+  await gotoRoute(page, "/transactions");
+  await page
+    .getByRole("group", { name: "Transaction category filters" })
+    .getByRole("button", { name: "Uncategorized", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "All dates", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
+    4,
+  );
+  const row = page.getByRole("link", { name: /ANOTHER SHOP/ });
+  await row.click();
+  await page
+    .getByRole("dialog")
+    .getByRole("link", { name: "View transaction details", exact: true })
+    .click();
+  await page.getByLabel("Category", { exact: true }).selectOption("shopping");
+  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Transactions", exact: true }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(/uncategorized=1/);
+  await expect(page).toHaveURL(/allDates=1/);
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toHaveCount(0);
+  await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
+    3,
+  );
 });

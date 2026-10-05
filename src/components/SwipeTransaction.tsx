@@ -1,16 +1,19 @@
 import type { ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { Transaction } from "../domain/models";
 import { useSwipe } from "./useSwipe";
 export function SwipeTransaction({
   transaction: t,
+  returnTo,
   onCategorize,
   children,
 }: {
   transaction: Transaction;
+  returnTo?: string;
   onCategorize: () => void;
   children: ReactNode;
 }) {
+  const location = useLocation();
   const enabled = !t.isTransfer && t.type !== "transfer" && !t.transferPairId;
   const swipe = useSwipe(() => {
     if (enabled) onCategorize();
@@ -27,6 +30,7 @@ export function SwipeTransaction({
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
         to={`/transactions/${t.id}`}
+        state={{ returnTo: returnTo ?? location.pathname + location.search }}
         {...(enabled ? swipe.bind : {})}
         style={{ transform: `translateX(${swipe.offset}px)` }}
         aria-haspopup={enabled && !t.categoryId ? "dialog" : undefined}
