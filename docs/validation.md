@@ -70,3 +70,12 @@ Barclays transaction rows with blank date cells inherit the preceding valid tran
 ## Version 1.4.0 category context and page palettes
 
 Added reusable category overviews, sample standard deviation, six/twelve-month baseline controls, source drill-down, income ratios, property metrics and subcategory navigation. Coverage uses merged statement intervals across the same currency's account set and excludes inferred/failed statement periods. Tests distinguish zero activity from missing coverage, partial periods, zero income/variance, >100% ratios, transfers, currencies and property children. Home removes its duplicate Property tile and exposes all category overviews. Browser checks cover central Home navigation, page palettes, income-share switching and mobile category layouts. Brand and page styling use no green accent, including generated PWA icons.
+
+### 1.4.1 mobile proportions
+
+Mobile spacing uses a rounded golden-ratio scale (5, 8, 13, 21, 34, 55px).
+Cards, headings, metrics, category tiles and review controls share this rhythm.
+The Home percentage selector uses content-sized labels rather than stretching
+across the card. Controls retain a minimum 44px touch height; text can grow with
+accessibility settings. Golden-ratio sizing governs hierarchy and spacing, not
+mandatory aspect ratios for financial charts or minimum readable text.

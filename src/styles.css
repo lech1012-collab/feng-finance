@@ -2971,3 +2971,137 @@ h3 {
   max-width: 100%;
   overflow: hidden;
 }
+
+/* Golden-ratio rhythm: 5, 8, 13, 21, 34, 55. Touch targets retain a 44px floor.
+   Apply proportions to hierarchy and spacing, never to shrink readable text. */
+:root {
+  --space-xs: 0.3125rem;
+  --space-sm: 0.5rem;
+  --space-md: 0.8125rem;
+  --space-lg: 1.3125rem;
+  --space-xl: 2.125rem;
+  --radius: 13px;
+}
+.share-options {
+  display: inline-flex;
+  flex-wrap: wrap;
+  max-width: 100%;
+  gap: var(--space-xs);
+  margin-bottom: var(--space-sm);
+}
+.share-options button {
+  flex: 0 1 auto;
+  min-width: 44px;
+  min-height: 44px;
+  padding: var(--space-sm) var(--space-md);
+  font-size: 0.8125rem;
+  border-radius: 8px;
+}
+@media (max-width: 760px) {
+  main {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+    padding-top: var(--space-lg);
+  }
+  .mobile-header {
+    padding: calc(var(--space-md) + env(safe-area-inset-top)) var(--space-md)
+      var(--space-md);
+  }
+  .topline {
+    padding-inline: var(--space-md);
+  }
+  .card,
+  .hero,
+  .flow-card {
+    padding: var(--space-md);
+    border-radius: var(--radius);
+    margin-bottom: var(--space-lg);
+  }
+  .hero {
+    padding-block: var(--space-lg);
+  }
+  .page-heading,
+  .toolbar,
+  .section-heading {
+    gap: var(--space-md);
+    margin-bottom: var(--space-md);
+  }
+  .overview-grid,
+  .content-grid {
+    gap: var(--space-lg);
+  }
+  h1 {
+    font-size: 1.625rem;
+  }
+  h2 {
+    font-size: 1rem;
+  }
+  .hero-number {
+    font-size: clamp(2.125rem, 9vw, 3.4375rem);
+    margin: var(--space-lg) 0 var(--space-md);
+  }
+  .hero-footer {
+    gap: var(--space-lg);
+    padding-top: var(--space-md);
+  }
+  .hero .metric strong,
+  .category-kpis strong,
+  .metric-strip .metric strong {
+    font-size: clamp(1.3125rem, 5vw, 2.125rem);
+  }
+  .category-kpis {
+    gap: var(--space-lg);
+    margin: var(--space-md) 0;
+  }
+  .metric {
+    gap: var(--space-xs);
+  }
+  .category-row {
+    margin: 0;
+    min-height: 55px;
+    padding-block: var(--space-md);
+  }
+  .category-months {
+    gap: var(--space-sm);
+  }
+  .category-months a {
+    padding: var(--space-md);
+    border-radius: 8px;
+  }
+  .theme-options,
+  .review-tabs {
+    gap: var(--space-xs);
+  }
+  .theme-options button,
+  .review-tabs button {
+    padding: var(--space-sm);
+    font-size: 0.8125rem;
+    min-width: 44px;
+  }
+  .notice,
+  .filters,
+  .category-dialog {
+    padding: var(--space-md);
+  }
+  .category-tile-grid {
+    gap: var(--space-sm);
+  }
+  .category-tile {
+    padding: var(--space-sm);
+    border-radius: 8px;
+  }
+  .category-tile-icon {
+    width: 34px;
+    height: 34px;
+  }
+  .subscription-amount {
+    font-size: 1.625rem;
+  }
+  .account-tile,
+  .subscription-evidence {
+    padding-block: var(--space-md);
+  }
+  .sidebar nav a {
+    gap: var(--space-xs);
+  }
+}

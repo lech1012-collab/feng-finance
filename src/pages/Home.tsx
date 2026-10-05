@@ -191,17 +191,18 @@ export default function Home({
             <ShoppingBag size={19} />
           </div>
           <div
-            className="theme-options"
+            className="share-options"
             role="group"
             aria-label="Category percentage basis"
           >
             {["spending", "income"].map((value) => (
               <button
                 key={value}
+                aria-label={`Share of ${value}`}
                 aria-pressed={share === value}
                 onClick={() => setShare(value)}
               >
-                Share of {value}
+                {value === "spending" ? "Spending %" : "Income %"}
               </button>
             ))}
           </div>
