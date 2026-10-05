@@ -1024,3 +1024,50 @@ test("category overview, income shares, central Home navigation and page palette
   await expect(page.locator(".app")).toHaveAttribute("data-page", "home");
   expect(await palette()).toBe(home);
 });
+
+test("navigation consistently selects the owning section for every route", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Try fictitious demo data" }).click();
+  await page.locator(".category-row").filter({ hasText: "Shopping" }).click();
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(
+    page.getByRole("heading", { name: "Shopping", exact: true }),
+  ).toBeVisible();
+  await expect(nav.locator('[aria-current="page"]')).toHaveText("Analyse");
+  await page.goBack();
+  await expect(
+    page.getByRole("heading", { name: "Overview", exact: true }),
+  ).toBeVisible();
+  await expect(nav.locator('[aria-current="page"]')).toHaveText("Home");
+  await page.goForward();
+  await expect(
+    page.getByRole("heading", { name: "Shopping", exact: true }),
+  ).toBeVisible();
+  await expect(nav.locator('[aria-current="page"]')).toHaveText("Analyse");
+  for (const [path, label, palette] of [
+    ["/", "Home", "home"],
+    ["/import", "Import", "import"],
+    ["/transactions", "Transactions", "transactions"],
+    ["/transactions/missing", "Transactions", "transactions"],
+    ["/analysis", "Analyse", "analysis"],
+    ["/property", "Analyse", "analysis"],
+    ["/subscriptions", "Analyse", "analysis"],
+    ["/categories/shopping?month=2026-09", "Analyse", "analysis"],
+    ["/settings", "Settings", "settings"],
+    ["/unknown", "Home", "home"],
+  ]) {
+    await gotoRoute(page, path);
+    await expect(nav.locator('[aria-current="page"]')).toHaveText(label);
+    await expect(nav.locator(".active")).toHaveCount(1);
+    await expect(page.locator(".app")).toHaveAttribute("data-page", palette);
+  }
+  await expect(page).toHaveURL(/#\/$/);
+  await gotoRoute(page, "/property");
+  await page.getByRole("link", { name: "← Analyse", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Analyse", exact: true }),
+  ).toBeVisible();
+  await expect(nav.locator('[aria-current="page"]')).toHaveText("Analyse");
+});

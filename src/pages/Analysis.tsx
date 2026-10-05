@@ -128,6 +128,11 @@ export default function Analysis({
     : [];
   return (
     <>
+      {property && (
+        <Link className="back-link" to="/analysis">
+          ← Analyse
+        </Link>
+      )}
       <div className="page-heading">
         <div>
           <p className="eyebrow">

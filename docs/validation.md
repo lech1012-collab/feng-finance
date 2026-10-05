@@ -79,3 +79,12 @@ The Home percentage selector uses content-sized labels rather than stretching
 across the card. Controls retain a minimum 44px touch height; text can grow with
 accessibility settings. Golden-ratio sizing governs hierarchy and spacing, not
 mandatory aspect ratios for financial charts or minimum readable text.
+
+### 1.4.2 navigation consistency
+
+The active navigation tab and page palette use one section mapping. Category,
+property and subscription screens belong to Analyse; transaction details belong
+to Transactions. Only the active section has `aria-current="page"`. The central
+Home icon retains its position but only uses the selected fill on Home. Unknown
+URLs redirect to Home. Property analysis has an explicit return to Analyse.
+Browser coverage checks every route, direct links, and back/forward navigation.

@@ -1,3 +1,4 @@
+import { sectionForPath } from "./navigation/section";
 import { ThemeSync } from "./components/Theme";
 import {
   useEffect,
@@ -13,6 +14,8 @@ import {
   Routes,
   Route,
   NavLink,
+  Link,
+  Navigate,
   useLocation,
 } from "react-router-dom";
 import {
@@ -135,20 +138,7 @@ function Shell() {
     }
   };
   return (
-    <div
-      className="app"
-      data-page={
-        location.pathname.startsWith("/transactions")
-          ? "transactions"
-          : location.pathname === "/import"
-            ? "import"
-            : location.pathname === "/settings"
-              ? "settings"
-              : location.pathname === "/"
-                ? "home"
-                : "analysis"
-      }
-    >
+    <div className="app" data-page={sectionForPath(location.pathname)}>
       <ThemeSync />
       <a
         className="skip-link"
@@ -178,11 +168,19 @@ function Shell() {
             ["/settings", "Settings", SettingsIcon],
           ].map(([path, label, Icon]) => {
             const I = Icon as typeof HomeIcon;
+            const active =
+              sectionForPath(location.pathname) ===
+              sectionForPath(String(path));
             return (
-              <NavLink key={String(path)} to={String(path)} end={path === "/"}>
+              <Link
+                key={String(path)}
+                to={String(path)}
+                className={active ? "active" : undefined}
+                aria-current={active ? "page" : undefined}
+              >
                 <I size={20} />
                 <span>{String(label)}</span>
-              </NavLink>
+              </Link>
             );
           })}
         </nav>
@@ -321,16 +319,7 @@ function Shell() {
                   }
                 />
                 <Route path="/settings" element={<Settings />} />
-                <Route
-                  path="*"
-                  element={
-                    <Home
-                      month={month}
-                      setMonth={chooseMonth}
-                      currency={currency}
-                    />
-                  }
-                />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Routes>
             </Suspense>
           )}

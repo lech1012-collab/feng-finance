@@ -2222,6 +2222,10 @@ label,
     margin-top: -5px;
     margin-bottom: -5px;
     border-radius: 11px;
+    background: var(--raised);
+    color: var(--muted);
+  }
+  .sidebar nav a[href="#/"].active svg {
     background: var(--accent);
     color: var(--accent-ink);
   }
