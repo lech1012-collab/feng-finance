@@ -88,3 +88,13 @@ to Transactions. Only the active section has `aria-current="page"`. The central
 Home icon retains its position but only uses the selected fill on Home. Unknown
 URLs redirect to Home. Property analysis has an explicit return to Analyse.
 Browser coverage checks every route, direct links, and back/forward navigation.
+
+### 1.4.3 global currency preference
+
+Currency selection lives in Settings and persists in IndexedDB, including backups
+and restores. GBP and EUR are always offered, plus currencies from imported
+accounts. Imports no longer change this preference. Home, transaction search,
+category statistics, property analysis and subscriptions share the preference;
+original transaction currencies remain unchanged and amounts are never converted
+or combined across currencies. Browser coverage checks separate GBP/EUR totals,
+reload persistence, backup inclusion and removal of per-page selectors.

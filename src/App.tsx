@@ -1,3 +1,4 @@
+import { useGlobalCurrency } from "./components/CurrencySetting";
 import { sectionForPath } from "./navigation/section";
 import { ThemeSync } from "./components/Theme";
 import {
@@ -53,22 +54,13 @@ function Shell() {
     setMonth(value);
     setMonthChosen(true);
   };
-  const [currency, setCurrency] = useState("GBP");
+  const currency = useGlobalCurrency();
   const [initialized, setInitialized] = useState(false);
   const [initError, setInitError] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [offlineReady, setOfflineReady] = useState(false);
   const [online, setOnline] = useState(navigator.onLine);
   const [storageWarning, setStorageWarning] = useState("");
-  const currencies = useLiveQuery(
-    async () => [
-      ...new Set([
-        "GBP",
-        ...(await db.accounts.toArray()).map((a) => a.currency),
-      ]),
-    ],
-    [],
-  );
   useEffect(() => {
     void initializeDatabase()
       .then(() => setInitialized(true))
@@ -213,18 +205,6 @@ function Shell() {
                   ? "Offline ready"
                   : "Local data"}
             </span>
-            <label className="currency-select">
-              <span className="sr-only">Dashboard currency</span>
-              <select
-                aria-label="Dashboard currency"
-                value={currency}
-                onChange={(e) => setCurrency(e.target.value)}
-              >
-                {currencies?.map((c) => (
-                  <option key={c}>{c}</option>
-                ))}
-              </select>
-            </label>
           </div>
         </div>
         {updateAvailable && (
@@ -262,12 +242,7 @@ function Shell() {
                 <Route
                   path="/import"
                   element={
-                    <Import
-                      onImported={(latest, importedCurrency) => {
-                        chooseMonth(latest);
-                        setCurrency(importedCurrency);
-                      }}
-                    />
+                    <Import onImported={(latest) => chooseMonth(latest)} />
                   }
                 />
                 <Route

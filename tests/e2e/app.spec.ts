@@ -172,10 +172,49 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   ).toBeVisible();
   await confirmImport(page);
   await page.getByRole("button", { name: "View dashboard" }).click();
-  await page.getByLabel("Dashboard currency").selectOption("EUR");
+  await expect(page.locator(".hero-number")).toContainText("£");
+  await gotoRoute(page, "/settings");
+  await page.getByLabel("Global currency", { exact: true }).selectOption("EUR");
+  await expect(page.getByLabel("Global currency", { exact: true })).toHaveValue(
+    "EUR",
+  );
+  await gotoRoute(page, "/");
   await expect(
     page.locator(".hero-number").getByText("-€22.22", { exact: true }),
   ).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".hero-number")).toHaveText("-€22.22");
+  for (const route of [
+    "/transactions",
+    "/analysis",
+    "/categories/shopping",
+    "/subscriptions",
+    "/import",
+  ]) {
+    await gotoRoute(page, route);
+    await expect(
+      page.getByLabel("Global currency", { exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByLabel("Dashboard currency", { exact: true }),
+    ).toHaveCount(0);
+  }
+  await gotoRoute(page, "/settings");
+  await expect(page.getByLabel("Global currency", { exact: true })).toHaveValue(
+    "EUR",
+  );
+  const downloadPromise = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
+    .click();
+  const downloaded = await downloadPromise;
+  const backupPath = await downloaded.path();
+  expect(backupPath).not.toBeNull();
+  const backup = JSON.parse(await readFile(backupPath!, "utf8"));
+  expect(backup.settings).toContainEqual({ key: "currency", value: "EUR" });
+  await page.getByLabel("Global currency", { exact: true }).selectOption("GBP");
+  await gotoRoute(page, "/");
+  await expect(page.locator(".hero-number")).toHaveText("+£5,588.65");
 });
 test("Barclaycard issue date, two reading columns and repayment exclusion", async ({
   page,

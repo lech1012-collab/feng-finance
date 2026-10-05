@@ -1,3 +1,4 @@
+import { CurrencySetting } from "../components/CurrencySetting";
 import { ThemeSetting } from "../components/Theme";
 import { PersonalRules } from "../components/PersonalRules";
 import { useState } from "react";
@@ -94,6 +95,7 @@ export default function Settings() {
         <span className="small-chip">v{APP_VERSION}</span>
       </div>
       <ThemeSetting />
+      <CurrencySetting />
       <PersonalRules />
       {notice && (
         <div className="notice success" role="status">
