@@ -147,6 +147,13 @@ export default function Transactions({
   }))
     if (value) returnParams.set(key, value);
   const returnTo = `/transactions?${returnParams}`;
+  const quickFilterSelected = (filter: string) => {
+    if (filter === "uncategorized") return uncategorized;
+    if (uncategorized) return false;
+    if (filter === "property") return property || category === "property";
+    if (filter === "income") return type === "income" && !category && !property;
+    return category === filter && !type && !property;
+  };
   const feedback = (
     <>
       {receipt && (
@@ -233,24 +240,24 @@ export default function Transactions({
           aria-label="Transaction category filters"
         >
           {[
-            { id: "", name: "All categories" },
             { id: "uncategorized", name: "Uncategorized" },
-            ...(data?.categories.filter((c) => !c.archived && !c.parentId) ??
-              []),
+            { id: "groceries", name: "Groceries" },
+            { id: "income", name: "Income" },
+            { id: "property", name: "Property" },
+            { id: "salary", name: "Salary" },
           ].map((c) => (
             <button
               key={c.id}
-              aria-pressed={
-                c.id === "uncategorized"
-                  ? uncategorized
-                  : !uncategorized && category === c.id
-              }
+              aria-pressed={quickFilterSelected(c.id)}
               onClick={() => {
-                setCategory(c.id);
-                setUncategorized(c.id === "uncategorized");
-                setType("");
-                setProperty(false);
-                if (c.id === "uncategorized") {
+                const clear = quickFilterSelected(c.id);
+                setCategory(
+                  !clear && ["groceries", "salary"].includes(c.id) ? c.id : "",
+                );
+                setUncategorized(!clear && c.id === "uncategorized");
+                setType(!clear && c.id === "income" ? "income" : "");
+                setProperty(!clear && c.id === "property");
+                if (!clear && c.id === "uncategorized") {
                   setAllDates(true);
                   setAccount("");
                   setSearch("");

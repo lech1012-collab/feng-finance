@@ -116,3 +116,11 @@ paths, main category filters, category analysis selection and property sorting.
 Home charts omit value tables; expense bars are negative with separate colours.
 Account metadata moved to Transactions. The iPhone checklist covers real Files
 activation and touch chart interactions, which require a physical device check.
+
+### 1.5.1 focused transaction shortcuts
+
+Transactions offers exactly Uncategorized, Groceries, Income, Property and Salary
+as quick filters. Income selects income transactions; Property includes costs and
+property income. Tapping the selected shortcut clears it. Other categories remain
+available in the detailed Filters selector. Existing browser coverage verifies the
+five shortcuts and their results against fictitious demo records.

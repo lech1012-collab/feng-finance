@@ -438,6 +438,28 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
   await expect(
     page.getByRole("heading", { name: "Potential recurring costs" }),
   ).toBeVisible();
+  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  const quick = page.getByRole("group", {
+    name: "Transaction category filters",
+  });
+  await expect(quick.getByRole("button")).toHaveText([
+    "Uncategorized",
+    "Groceries",
+    "Income",
+    "Property",
+    "Salary",
+  ]);
+  for (const [name, count] of [
+    ["Groceries", 2],
+    ["Income", 2],
+    ["Property", 4],
+    ["Salary", 1],
+  ] as const) {
+    await quick.getByRole("button", { name, exact: true }).click();
+    await expect(page.locator(".transaction-row")).toHaveCount(count);
+  }
+  await quick.getByRole("button", { name: "Salary", exact: true }).click();
+  await expect(page.locator(".transaction-row")).toHaveCount(19);
   await page.screenshot({
     path: `test-results/dashboard-${test.info().project.name}.png`,
     fullPage: true,
