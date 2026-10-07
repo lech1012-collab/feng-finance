@@ -144,6 +144,11 @@ export default function Analysis({
           </p>
           <h1>{property ? "Property" : "Analyse"}</h1>
         </div>
+        {!property && (
+          <Link to="/planning" className="button">
+            Planning
+          </Link>
+        )}
       </div>
       {!property && <CategoryAnalysisPicker month={month} />}
       <div className="toolbar">

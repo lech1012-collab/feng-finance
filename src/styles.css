@@ -2953,6 +2953,209 @@ h3 {
   --surface: #202630;
   --raised: #2b3442;
 }
+.app[data-page="planning"] {
+  --accent: #eea4cf;
+  --accent-ink: #381c30;
+  --soft: #472c40;
+  --surface: #2a2028;
+  --raised: #392e37;
+}
+:root[data-theme="light"] .app[data-page="planning"] {
+  --accent: #913b70;
+  --accent-ink: #fff;
+  --soft: #fbe6f3;
+  --surface: #fffbfe;
+  --raised: #f8edf5;
+}
+.planning-entry {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 13px;
+}
+.planning-entry span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.planning-entry svg {
+  grid-column: 2;
+  grid-row: 1 / 3;
+  align-self: center;
+}
+.planning-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 21px;
+  margin: 21px 0;
+}
+.planning-kpis div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.planning-kpis span {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+.planning-kpis strong {
+  font-size: clamp(1.2rem, 3vw, 1.8rem);
+  overflow-wrap: anywhere;
+}
+.planning-category {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 13px;
+  margin: 21px 0;
+}
+.budget-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+.budget-card {
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  padding: 13px;
+  min-width: 0;
+}
+.budget-card h3 {
+  margin: 0;
+}
+.budget-card .section-heading {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.budget-card .section-heading span {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.budget-editor {
+  margin: 13px 0;
+}
+.budget-editor label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.budget-editor input {
+  width: 100%;
+  min-width: 0;
+}
+.budget-limit {
+  font-size: 1.1rem;
+  background: var(--raised);
+}
+.budget-suggestion {
+  margin: 5px 0;
+  font-size: 0.875rem;
+}
+.budget-progress {
+  height: 8px;
+  background: var(--raised);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.budget-progress span {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.warning-text,
+.payment-out {
+  color: var(--chart-expense);
+}
+.payment-in {
+  color: var(--accent);
+}
+.payment-timeline {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.payment-timeline li {
+  border-bottom: 1px solid var(--line);
+}
+.payment-timeline a {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 13px;
+  padding: 13px 0;
+}
+.payment-timeline a div {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.payment-timeline span,
+.payment-timeline small {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+.payment-timeline a > strong {
+  flex-shrink: 0;
+}
+.forecast-card details {
+  margin-top: 21px;
+  color: var(--muted);
+}
+.forecast-card summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--ink);
+}
+.mobile-planning {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 0.875rem;
+}
+.mobile-planning[aria-current="page"] {
+  color: var(--accent);
+}
+.mobile-header {
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.forecast-card .section-heading {
+  flex-wrap: wrap;
+  gap: 13px;
+}
+@media (max-width: 760px) {
+  .sidebar nav .planning-nav {
+    display: none;
+  }
+  .planning-kpis {
+    grid-template-columns: 1fr;
+    gap: 13px;
+  }
+  .planning-kpis div {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    gap: 13px;
+  }
+  .planning-kpis span {
+    max-width: 60%;
+  }
+  .planning-kpis strong {
+    text-align: right;
+  }
+  .budget-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 360px) {
+  .payment-timeline a {
+    flex-wrap: wrap;
+  }
+}
 :root[data-theme="light"] .app[data-page="transactions"] {
   --accent: #7040ad;
   --accent-ink: #fff;

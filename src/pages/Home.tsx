@@ -116,6 +116,13 @@ export default function Home({
       )}
       <SubscriptionNotice currency={currency} />
       <Reminders currency={currency} />
+      <Link to="/planning" className="card planning-entry">
+        <strong>Plan ahead</strong>
+        <span>
+          Monthly budgets, upcoming payments and your balance forecast
+        </span>
+        <ChevronRight size={20} />
+      </Link>
       {!data.count && (
         <section className="welcome card">
           <Wallet size={30} />

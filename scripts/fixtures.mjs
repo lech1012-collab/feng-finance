@@ -281,6 +281,25 @@ scan
 await writeFile("tests/fixtures/barclays-scanned.pdf", await scan.save());
 console.log("Generated synthetic bank statements (no personal information).");
 
+let planningOpening = 1000;
+for (const [month, label, end, groceries, bill] of [
+  ["07", "Jul", "31", 100, 10],
+  ["08", "Aug", "31", 120, 12],
+  ["09", "Sep", "30", 110, 12],
+]) {
+  await statement("Barclays", `barclays-planning-${month}`, {
+    account: "77774321",
+    opening: planningOpening,
+    period: `01 ${label} 2026 to ${end} ${label} 2026`,
+    rows: [
+      { date: `10 ${label}`, description: "NETFLIX", amount: -bill },
+      { date: `15 ${label}`, description: "WAITROSE", amount: -groceries },
+      { date: `25 ${label}`, description: "SIEMENS SALARY", amount: 3000 },
+    ],
+  });
+  planningOpening += 3000 - groceries - bill;
+}
+
 await statement("Barclays", "barclays-sort", {
   rows: [
     { description: "CORNER SHOP", amount: -20, date: "03 Sep" },

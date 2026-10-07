@@ -19,6 +19,95 @@ async function gotoRoute(page: Page, path: string) {
   await page.goto(origin + "/#" + path);
 }
 const fixture = (name: string) => resolve(`tests/fixtures/${name}.pdf`);
+test("Planning budgets persist, recurring timeline and forecast horizons stay connected", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-10-07T12:00:00Z"));
+  for (const month of ["07", "08", "09"]) {
+    await openImport(page);
+    await selectStatement(page, `barclays-planning-${month}`);
+    await confirmImport(page);
+  }
+  await page.getByRole("link", { name: /Plan ahead/ }).click();
+  await expect(
+    page.getByRole("heading", { name: "Planning", exact: true }),
+  ).toBeVisible();
+  await expect(page.locator(".app")).toHaveAttribute("data-page", "planning");
+  await expect(page.locator(".mobile-planning")).toHaveAttribute(
+    "aria-current",
+    "page",
+  );
+  await expect(page.locator(".forecast-card")).toContainText("£3,000.00");
+  await expect(page.locator(".payment-timeline")).toContainText("NETFLIX");
+  await expect(page.locator(".payment-timeline")).toContainText("2026-10-10");
+  await expect(page.locator(".forecast-card")).toContainText("2026-11-06");
+  await page
+    .getByRole("button", { name: "Set Groceries budget", exact: true })
+    .click();
+  await page
+    .getByLabel("Groceries monthly budget", { exact: true })
+    .fill("100");
+  await page.getByRole("button", { name: "Save budget", exact: true }).click();
+  const groceries = page.locator(".budget-card").filter({
+    has: page.getByRole("heading", { name: "Groceries", exact: true }),
+  });
+  await expect(groceries).toContainText("£10.00 over budget");
+  await gotoRoute(page, "/settings");
+  const backupEvent = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
+    .click();
+  const backup = await backupEvent;
+  const bytes = await readFile((await backup.path())!);
+  expect(JSON.parse(bytes.toString()).settings).toContainEqual({
+    key: "budget:GBP:groceries",
+    value: "10000",
+  });
+  await page
+    .getByLabel("Restore Feng Finance Backup", { exact: true })
+    .setInputFiles({
+      name: "plan-backup.json",
+      mimeType: "application/json",
+      buffer: bytes,
+    });
+  await page.getByLabel(/I understand that this replaces/).check();
+  await page
+    .getByRole("button", { name: "Replace data with backup", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: "Backup restored successfully." }),
+  ).toBeVisible();
+  await gotoRoute(page, "/planning");
+  await page.reload();
+  await expect(
+    page.getByRole("button", { name: "Edit Groceries budget", exact: true }),
+  ).toHaveText("£100.00");
+  await page.getByRole("button", { name: "Next month", exact: true }).click();
+  await expect(groceries).toContainText("£100.00 remaining");
+  await page.getByLabel("Forecast horizon", { exact: true }).selectOption("90");
+  await expect(page.locator(".forecast-card")).toContainText("2027-01-05");
+  await expect(page.locator(".forecast-card")).toContainText("£9,000.00");
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    await expect
+      .poll(() =>
+        page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+      )
+      .toBe(true);
+  }
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: /Plan ahead/ }).click();
+  await expect(
+    page.getByLabel("Forecast horizon", { exact: true }),
+  ).toHaveValue("30");
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  await expect(
+    nav.getByRole("link", { name: "Planning", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
+});
 test("verified deeper insights, statement reminders and private calendar export", async ({
   page,
 }) => {
@@ -1268,6 +1357,7 @@ test("navigation consistently selects the owning section for every route", async
     ["/transactions", "Transactions", "transactions"],
     ["/transactions/missing", "Transactions", "transactions"],
     ["/analysis", "Analyse", "analysis"],
+    ["/planning", "Planning", "planning"],
     ["/property", "Analyse", "analysis"],
     ["/subscriptions", "Analyse", "analysis"],
     ["/categories/shopping?month=2026-09", "Analyse", "analysis"],

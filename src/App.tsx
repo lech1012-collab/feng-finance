@@ -28,6 +28,7 @@ import {
   ChartNoAxesCombined,
   Settings as SettingsIcon,
   Plus,
+  CalendarClock,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { registerSW } from "virtual:pwa-register";
@@ -40,6 +41,7 @@ const Detail = lazy(() => import("./pages/TransactionDetail"));
 const Analysis = lazy(() => import("./pages/Analysis"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Import = lazy(() => import("./pages/Import"));
+const Planning = lazy(() => import("./pages/Planning"));
 let applyUpdate: (reload?: boolean) => Promise<void>;
 function Shell() {
   const location = useLocation();
@@ -181,6 +183,7 @@ function Shell() {
               ["/transactions", "Transactions", List],
               ["/", "Home", HomeIcon],
               ["/analysis", "Analyse", ChartNoAxesCombined],
+              ["/planning", "Planning", CalendarClock],
               ["/settings", "Settings", SettingsIcon],
             ].map(([path, label, Icon]) => {
               const I = Icon as typeof HomeIcon;
@@ -201,7 +204,10 @@ function Shell() {
                         }
                       : undefined
                   }
-                  className={active ? "active" : undefined}
+                  className={
+                    `${path === "/planning" ? "planning-nav " : ""}${active ? "active" : ""}`.trim() ||
+                    undefined
+                  }
                   aria-current={active ? "page" : undefined}
                 >
                   <I size={20} />
@@ -219,6 +225,16 @@ function Shell() {
               </span>
               Feng Finance
             </NavLink>
+            <Link
+              to="/planning"
+              className="mobile-planning"
+              aria-current={
+                location.pathname === "/planning" ? "page" : undefined
+              }
+            >
+              <CalendarClock size={18} />
+              Planning
+            </Link>
             {!online && <span className="small-chip">Offline</span>}
           </header>
           {updateAvailable && (
@@ -312,6 +328,16 @@ function Shell() {
                     }
                   />
                   <Route path="/settings" element={<Settings />} />
+                  <Route
+                    path="/planning"
+                    element={
+                      <Planning
+                        month={month}
+                        setMonth={chooseMonth}
+                        currency={currency}
+                      />
+                    }
+                  />
                   <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </Suspense>

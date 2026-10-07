@@ -140,6 +140,37 @@ Navigation is Import · Transactions · Home · Analyse · Settings, with Home c
 
 ## Home balances and simplified workflow
 
+### Planning
+
+Planning is a separate page, accessible from Home's Plan ahead card, Analyse,
+the desktop sidebar and the mobile header. The five mobile bottom tabs retain
+their positions. Planning has its own rose palette and remains entirely local.
+
+Monthly category budgets use currency-scoped settings included in JSON backups,
+without a database migration. Tap a category's limit to edit it; an empty value
+removes it. Limits repeat each month. Recorded negative spending is compared with
+the limit; transfers are excluded, refunds are not automatically matched against
+their original purchases, and incomplete imports can understate spending. Suggested
+limits require three complete prior months with verified rows and balances.
+
+Upcoming payments use repeated merchant/account/direction sequences and weekly,
+fortnightly, monthly, quarterly or annual cadence. Everyday shopping, refunds,
+transfers, stale patterns and recorded cancellations are excluded. Predictions
+are estimates, not confirmations. Payment rows link to their source transactions.
+
+The 30/60/90-day forecast always starts from today's local date, independently
+of the budget month. Its anchor is the latest shared verified balance across all
+accounts of the selected currency; credit-card debt reduces the total. Forecasts
+are withheld for missing/failed reconciliation, missing rows, anchors older than
+35 days or fewer than three complete historical months. Imported movement since
+the anchor is included, observed recurring payments are not duplicated, and missing
+recurring payments are estimated. Remaining variable spending uses its daily average
+across complete months. Income uses the lowest recent recurring payment; bills use
+their last amount. Cancelled services are excluded from future costs. Dashed lines
+show variable-spending scenarios ±25%, not statistical confidence limits. The
+forecast is a projected total financial position, not available cash or a safe
+spending allowance; budgets do not change its spending assumptions.
+
 ### Local insights and reminders
 
 Feng is a website/PWA; no native app or App Store onboarding is required.

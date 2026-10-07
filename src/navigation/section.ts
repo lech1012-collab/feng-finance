@@ -1,5 +1,5 @@
 export type Section =
-  "home" | "import" | "transactions" | "analysis" | "settings";
+  "home" | "import" | "transactions" | "analysis" | "planning" | "settings";
 
 /** One source of truth for the page palette and the selected navigation tab. */
 export function sectionForPath(pathname: string): Section {
@@ -7,6 +7,7 @@ export function sectionForPath(pathname: string): Section {
   if (root === "transactions") return "transactions";
   if (root === "import") return "import";
   if (root === "settings") return "settings";
+  if (root === "planning") return "planning";
   if (["analysis", "categories", "property", "subscriptions"].includes(root))
     return "analysis";
   return "home";
