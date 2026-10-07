@@ -79,6 +79,39 @@ test("desktop row drag opens suggested categories and drop saves without a secon
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     3,
   );
+  await row.scrollIntoViewIfNeeded();
+  const transferRect = (await row.boundingBox())!;
+  await page.mouse.move(
+    transferRect.x + 90,
+    transferRect.y + transferRect.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    transferRect.x + 120,
+    transferRect.y + transferRect.height / 2,
+    { steps: 4 },
+  );
+  const transfer = dialog.getByRole("button", {
+    name: "Categorize as Transfer",
+    exact: true,
+  });
+  await expect(transfer).toBeVisible();
+  const transferTile = (await transfer.boundingBox())!;
+  await page.mouse.move(
+    transferTile.x + transferTile.width / 2,
+    transferTile.y + transferTile.height / 2,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+  await expect(dialog).toHaveCount(0);
+  await expect(row).toHaveCount(0);
+  await expect(page.getByRole("status")).toContainText(
+    "1 transaction → Transfer",
+  );
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(page.locator(".hero-number")).toHaveText("-£50.00");
+  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await expect(row).toContainText("Transfer");
 });
 async function openImport(page: Page) {
   await gotoRoute(page, "/import");

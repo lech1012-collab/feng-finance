@@ -6,12 +6,54 @@ import {
   categorizeCards,
   matchingUncategorized,
   undoCategory,
+  TRANSFER_TARGET,
 } from "./categorize";
 import { categorize } from "../categorization/engine";
 import { cashFlow } from "../analytics/calculations";
 beforeEach(async () => {
   await clearLocalData();
   await initializeDatabase();
+});
+it("marks debit and credit transfers, excludes them from cash flow, learns safe rules and supports Undo", async () => {
+  for (const amount of [-50000, 50000]) {
+    const t = transaction({
+      amount,
+      merchant: "MY OTHER ACCOUNT",
+      description: "MY OTHER ACCOUNT",
+      categoryId: "shopping",
+      subcategoryId: "old",
+    });
+    await db.transactions.put(t);
+    const receipt = await categorizeCards([t], TRANSFER_TARGET, true);
+    expect(receipt.categoryName).toBe("Transfer");
+    expect(receipt.after[0]).toMatchObject({
+      amount,
+      type: "transfer",
+      isTransfer: true,
+    });
+    expect(receipt.after[0].categoryId).toBeUndefined();
+    expect(receipt.after[0].subcategoryId).toBeUndefined();
+    expect(receipt.after[0].transferPairId).toBeUndefined();
+    expect(cashFlow(receipt.after, "GBP")).toMatchObject({
+      income: 0,
+      expenses: 0,
+      net: 0,
+    });
+    expect(
+      categorize({ ...t, categoryId: undefined }, [receipt.rule!]),
+    ).toMatchObject({
+      type: "transfer",
+      isTransfer: true,
+      categoryId: undefined,
+    });
+    expect(
+      categorize({ ...t, accountId: "other-account" }, [receipt.rule!])
+        .isTransfer,
+    ).toBe(false);
+    await undoCategory(receipt);
+    expect(await db.transactions.get(t.id)).toEqual(t);
+    expect(await db.rules.get(receipt.rule!.id)).toBeUndefined();
+  }
 });
 it("categorizes a group and learns an account-specific rule without changing financial fields", async () => {
   const a = transaction({

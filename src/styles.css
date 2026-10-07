@@ -2607,6 +2607,26 @@ h3 {
   margin: 14px 0 0;
   font-size: 1rem;
 }
+.transfer-tile {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  padding: 13px;
+  margin: 13px 0;
+  text-align: left;
+  border: 2px solid var(--line);
+}
+.transfer-tile small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+  margin-top: 5px;
+}
+.transfer-tile.drop-target {
+  border-color: var(--accent);
+  background: var(--soft);
+}
 .category-dialog {
   background: var(--surface);
   color: var(--ink);

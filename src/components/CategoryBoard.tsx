@@ -12,6 +12,7 @@ import {
   categorizeCards,
   matchingUncategorized,
   type CategoryReceipt,
+  TRANSFER_TARGET,
 } from "../storage/categorize";
 export function CategoryBoard({
   transaction: t,
@@ -271,6 +272,19 @@ export function CategoryBoard({
         </section>
       )}
       {feedback}
+      <button
+        className={`transfer-tile ${target === TRANSFER_TARGET ? "drop-target" : ""}`}
+        data-category-target={TRANSFER_TARGET}
+        aria-label="Categorize as Transfer"
+        disabled={busy}
+        onClick={() => void choose(TRANSFER_TARGET)}
+      >
+        <span aria-hidden="true">↔</span>
+        <span>
+          <strong>Transfer</strong>
+          <small>Between your own accounts or paying your credit card</small>
+        </span>
+      </button>
       <div className="sort-options">
         {others.length > 0 && (
           <label className="check">

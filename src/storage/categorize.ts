@@ -1,6 +1,7 @@
 import type { Transaction, Rule } from "../domain/models";
 import { db } from "./database";
 import { id, normalizeMerchant } from "../domain/normalize";
+export const TRANSFER_TARGET = "__feng-transfer";
 export interface CategoryReceipt {
   before: Transaction[];
   after: Transaction[];
@@ -42,14 +43,19 @@ export async function categorizeCards(
     db.categories,
     db.rules,
     async () => {
-      const category = await db.categories.get(categoryId);
+      const transfer = categoryId === TRANSFER_TARGET;
+      const category = transfer
+        ? undefined
+        : await db.categories.get(categoryId);
+      const categoryName = transfer ? "Transfer" : category?.name;
       const parent = category?.parentId
         ? await db.categories.get(category.parentId)
         : undefined;
       if (
-        !category ||
-        category.archived ||
-        (category.parentId && (!parent || parent.archived))
+        !transfer &&
+        (!category ||
+          category.archived ||
+          (category.parentId && (!parent || parent.archived)))
       )
         throw new Error("This category is no longer available.");
       const current = await db.transactions.bulkGet(expected.map((t) => t.id));
@@ -88,8 +94,10 @@ export async function categorizeCards(
       const updatedAt = new Date().toISOString();
       const after = before.map((t) => ({
         ...t,
-        categoryId: parent?.id ?? category.id,
-        subcategoryId: parent ? category.id : undefined,
+        categoryId: transfer ? undefined : (parent?.id ?? category!.id),
+        subcategoryId: !transfer && parent ? category!.id : undefined,
+        type: transfer ? ("transfer" as const) : t.type,
+        isTransfer: transfer || t.isTransfer,
         isReviewed: true,
         updatedAt,
       }));
@@ -107,20 +115,21 @@ export async function categorizeCards(
           throw new Error("Rule priority is out of range.");
         rule = {
           id: id(),
-          name: `${pattern} → ${category.name}`,
+          name: `${pattern} → ${categoryName}`,
           match: "exact",
           pattern,
           accountId: first.accountId,
           direction: first.amount > 0 ? "positive" : "negative",
-          categoryId: parent?.id ?? category.id,
-          subcategoryId: parent ? category.id : undefined,
+          categoryId: transfer ? undefined : (parent?.id ?? category!.id),
+          subcategoryId: !transfer && parent ? category!.id : undefined,
+          type: transfer ? "transfer" : undefined,
           priority,
           builtIn: false,
         };
         await db.rules.add(rule);
       }
       await db.transactions.bulkPut(after);
-      return { before, after, rule, categoryName: category.name };
+      return { before, after, rule, categoryName: categoryName! };
     },
   );
 }

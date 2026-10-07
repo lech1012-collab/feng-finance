@@ -150,6 +150,13 @@ the full category list. Mobile tap/swipe, keyboard C, tile selection, grouped
 sorting, remembered rules and Undo remain available. Dropping outside a tile
 does not save; Escape cancels desktop dragging.
 
+The popup also includes a **Transfer** tile for movements between your own
+accounts and card repayments. Dropping or tapping clears spending categories,
+sets the transaction type to transfer and excludes it from income/expenses.
+It works for incoming and outgoing amounts, supports grouping, optional
+account-specific remembered rules and Undo. Mark both sides when necessary;
+this action does not invent a matching transaction or link an ambiguous pair.
+
 Home's Import statement control opens the native PDF picker directly. The Import
 navigation tab does the same. PDFs process locally, with reconciliation and
 exception review before committing. A multi-file queue stays in review until its
