@@ -955,11 +955,20 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and impor
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
   await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await expect(
+    page.locator(".review-metrics > div").filter({ hasText: "Money in" }),
+  ).toContainText("£950.00");
+  await expect(
+    page.locator(".review-metrics > div").filter({ hasText: "Money out" }),
+  ).toContainText("£510.00");
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.locator(".hero-number")).toHaveText("+£455.00");
   await openImport(page);
   await selectStatement(page, "revolut-uk-layout");
+  await expect(
+    page.locator(".review-metrics > div").filter({ hasText: "Money out" }),
+  ).toContainText("£510.00");
   await expect(
     page.getByText("This statement has already been imported.", {
       exact: true,

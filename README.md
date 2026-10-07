@@ -284,3 +284,9 @@ category, Categorized or Transfer. Saving through either the sorting sheet or
 transaction editor removes categorized rows from that queue. Analyse's category
 selector opens the category's charts, complete-month average/sample deviation
 and same-month income percentage.
+
+Import review shows **Money in** and **Money out** for all extracted statement
+rows, including transfers and rows excluded from import as duplicates. These
+statement totals update when extracted amounts are corrected; only selected rows
+are saved. Dashboard income, expenses and net cash flow continue to exclude
+transfers, preventing card repayments from counting twice.

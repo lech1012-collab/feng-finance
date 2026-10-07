@@ -18,7 +18,7 @@ import {
   type ExtractedFile,
 } from "../import/pipeline";
 import { money, decimalMoney, parseMoney } from "../domain/money";
-import { cashFlow } from "../analytics/calculations";
+import { statementMovements } from "../import/movements";
 import { validatePeriod } from "../parsers/period";
 export default function ImportPage({
   onImported,
@@ -184,11 +184,7 @@ export default function ImportPage({
   };
   const validation = draft && draftReconciliation(draft);
   const flow =
-    draft &&
-    cashFlow(
-      draft.transactions.filter((t) => t.include),
-      draft.statement.currency,
-    );
+    draft && statementMovements(draft.transactions, draft.statement.currency);
   const issues =
     draft?.transactions.filter(
       (t) =>
@@ -414,16 +410,20 @@ export default function ImportPage({
                 <strong>{draft.transactions.length}</strong>
               </div>
               <div>
-                <span>Income to add</span>
-                <strong>{money(flow.income, draft.statement.currency)}</strong>
+                <span>Money in</span>
+                <strong>{money(flow.moneyIn, draft.statement.currency)}</strong>
               </div>
               <div>
-                <span>Expenses to add</span>
+                <span>Money out</span>
                 <strong>
-                  {money(flow.expenses, draft.statement.currency)}
+                  {money(flow.moneyOut, draft.statement.currency)}
                 </strong>
               </div>
             </div>
+            <p className="coverage-note">
+              Statement totals include transfers. Only selected rows are
+              imported.
+            </p>
             <div
               className={`validation ${validation.status === "reconciled" ? "valid" : "warn"}`}
             >
