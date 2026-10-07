@@ -38,6 +38,7 @@ export default function Home({
 }) {
   const location = useLocation();
   const [share, setShare] = useState("spending");
+  const [balancePeriod, setBalancePeriod] = useState(1);
   const data = useLiveQuery(async () => {
     const transactions = await db.transactions
       .where("[currency+date]")
@@ -198,12 +199,17 @@ export default function Home({
         </section>
       </div>
       <AccountBalances
+        transactions={data.transactions}
+        period={balancePeriod}
+        onPeriodChange={setBalancePeriod}
         accounts={data.accounts}
         statements={data.statements}
         month={month}
         currency={currency}
       />
       <BalanceChart
+        period={balancePeriod}
+        transactions={data.transactions}
         accounts={data.accounts}
         statements={data.statements}
         month={month}
@@ -272,25 +278,6 @@ export default function Home({
           ) : (
             <p className="muted">No expenses for this month.</p>
           )}
-          <details className="all-categories">
-            <summary>Browse all categories</summary>
-            <div className="category-months">
-              {data.categories
-                .filter((c) => !c.archived && !c.parentId)
-                .map((c) => (
-                  <Link
-                    key={c.id}
-                    to={
-                      c.id === "uncategorized"
-                        ? "/transactions?uncategorized=1&allDates=1"
-                        : `/categories/${c.id}?month=${month}`
-                    }
-                  >
-                    {c.name}
-                  </Link>
-                ))}
-            </div>
-          </details>
           {uncategorized > 0 && (
             <Link
               className="review-link"

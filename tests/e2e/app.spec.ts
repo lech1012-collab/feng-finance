@@ -217,6 +217,9 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   page,
 }) => {
   await openImport(page);
+  await selectStatement(page, "barclays-card-payment");
+  await confirmImport(page);
+  await openImport(page);
   await selectStatement(page, "barclaycard");
   await expect(
     page.getByRole("heading", { name: "Barclays detected" }),
@@ -241,6 +244,9 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await expect(page.locator(".hero-number")).toHaveText("-£109.68");
   await page.getByRole("link", { name: "Transactions", exact: true }).click();
   await expect(page.getByRole("link", { name: /\+£900\.00/ })).toContainText(
+    "Transfer",
+  );
+  await expect(page.getByRole("link", { name: /-£900\.00/ })).toContainText(
     "Transfer",
   );
 });
@@ -1150,9 +1156,33 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   await expect(page.locator(".balance-total")).toHaveText("£935.00");
   await expect(
     page.getByRole("img", {
-      name: "Monthly total and individual account balances",
+      name: "1 month total and individual account balance history",
     }),
   ).toBeVisible();
+  await expect(
+    page.getByText("Browse all categories", { exact: true }),
+  ).toHaveCount(0);
+  const balanceCard = page.locator(".balance-summary");
+  await balanceCard.getByRole("button", { name: "3m", exact: true }).click();
+  await expect(
+    page.getByRole("img", {
+      name: "3 month total and individual account balance history",
+    }),
+  ).toBeVisible();
+  await expect(page.locator(".balance-chart .section-heading")).toContainText(
+    "3 months",
+  );
+  await balanceCard.getByRole("button", { name: "1m", exact: true }).click();
+  await expect(
+    page.locator(".balance-chart .recharts-line-curve").first(),
+  ).toHaveAttribute("d", /L/);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const settingsPosition = await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "Settings", exact: true })
+    .boundingBox();
+  expect(settingsPosition!.y).toBeGreaterThan(750);
+  await page.setViewportSize({ width: 390, height: 844 });
   await expect(
     page.getByText("View chart values", { exact: true }),
   ).toHaveCount(0);

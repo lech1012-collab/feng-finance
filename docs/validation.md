@@ -14,7 +14,15 @@ Implemented as a React / strict TypeScript / Vite static PWA with Dexie, PDF.js,
 
 ## Automated checks
 
-- **181 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries.
+Version 1.5.2 connects Home's 1/3/6/12-month selector to dated balance history and
+its percentage baseline. Verified daily movement includes transfers, while missing
+rows, failed reconciliation and conflicting overlap suppress reconstruction.
+The Home import workflow checks a visible balance curve, period switching, removal
+of Browse all categories and desktop Settings placement. The Barclaycard workflow
+imports both the bank debit and card repayment and verifies that neither inflates
+spending. Existing records are preserved; there is no schema migration or reset.
+
+- **191 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries. Dated balance reconstruction tests cover transfers, selected ranges, missing rows, reconciliation failures, conflicting overlap and shared comparison endpoints.
 - **44 browser checks**: twenty-two workflows each in Chromium and Playwright WebKit at 390 × 844. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records.
 - Production TypeScript/Vite build and local offline precache generation; static output includes PDF worker/fonts/CMaps/WASM and English OCR assets.
 - `npm audit`: zero known vulnerabilities in installed production and development dependencies at verification time.

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import type { Account, Statement } from "../domain/models";
+import type { Account, Statement, Transaction } from "../domain/models";
 import { balanceOverview } from "../analytics/balances";
 import { money } from "../domain/money";
 export function AccountBalances({
@@ -9,15 +9,29 @@ export function AccountBalances({
   month,
   currency,
   detailed = false,
+  period,
+  onPeriodChange,
+  transactions,
 }: {
   accounts: Account[];
   statements: Statement[];
   month: string;
   currency: string;
   detailed?: boolean;
+  period?: number;
+  onPeriodChange?: (period: number) => void;
+  transactions?: Transaction[];
 }) {
-  const [window, setWindow] = useState(1);
-  const summary = balanceOverview(accounts, statements, month, currency);
+  const [localPeriod, setLocalPeriod] = useState(1);
+  const window = period ?? localPeriod;
+  const setWindow = onPeriodChange ?? setLocalPeriod;
+  const summary = balanceOverview(
+    accounts,
+    statements,
+    month,
+    currency,
+    transactions,
+  );
   const change = summary.comparisons.find((c) => c.months === window)?.percent;
   const percent = (n: number | undefined) =>
     n === undefined

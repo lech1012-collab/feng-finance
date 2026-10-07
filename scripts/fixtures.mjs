@@ -115,6 +115,17 @@ async function statement(
   await writeFile(`tests/fixtures/${filename}.pdf`, await doc.save());
   return { closing: end, count: rows.length };
 }
+await statement("Barclays", "barclays-card-payment", {
+  opening: 1000,
+  rows: [
+    {
+      date: "28 Sep",
+      description: "Direct Debit to Barclaycard",
+      amount: -900,
+    },
+  ],
+  closing: 100,
+});
 await statement("Barclays", "barclays", {
   rows: [
     { description: "SIEMENS SALARY", amount: 5000, date: "01 Sep" },

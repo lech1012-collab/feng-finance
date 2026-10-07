@@ -153,8 +153,22 @@ account is stale, unverified or missing. Percentage comparisons require current,
 reliable statements for all the same accounts at both endpoints and a nonzero
 prior total. Change is `(current - previous) / abs(previous) × 100`, so debt
 repayment produces a positive change. Failed validation and inferred periods
-withhold comparisons. Monthly balance charts leave gaps instead of inventing
-history; a dashed line shows the total. Currency totals remain separate.
+withhold comparisons. The Home 1/3/6/12-month selector also controls balance history.
+The range ends at the latest eligible closing balance. Daily balances are reconstructed
+from the opening balance and all transactions, including transfers, only when the
+stored row count and amounts reconcile with the reported closing balance. Partial
+extraction, conflicting overlap and missing coverage leave gaps. A dashed line shows
+the total; totals and percentage comparisons require all accounts at both dated
+endpoints. Currency totals remain separate.
+
+Import both the bank and Barclaycard statements: individual card purchases receive
+spending categories, while repayments are transfers. Explicit bank payments to
+Barclaycard are paired with a unique same-currency, equal-value card repayment
+within five days during import. Refunds and ambiguous matches are excluded.
+For previously imported, unpaired bank repayments, open the transaction, choose
+Transfer and save; optionally link the matching card repayment. A repayment alone
+cannot reveal its underlying purchases, so card statements are needed for a complete
+spending breakdown.
 
 Expenses plot below zero, income above zero, and net cash flow uses a distinct
 line. Home charts have tooltips and legends; detailed value tables remain in

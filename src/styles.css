@@ -205,6 +205,14 @@ small {
   gap: 8px;
   margin-top: 52px;
 }
+@media (min-width: 761px) {
+  .sidebar nav {
+    flex: 1;
+  }
+  .sidebar nav a[href="#/settings"] {
+    margin-top: auto;
+  }
+}
 .sidebar nav a {
   display: flex;
   gap: 12px;

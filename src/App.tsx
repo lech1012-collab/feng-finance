@@ -27,7 +27,6 @@ import {
   List,
   ChartNoAxesCombined,
   Settings as SettingsIcon,
-  ShieldCheck,
   Plus,
 } from "lucide-react";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -211,14 +210,6 @@ function Shell() {
               );
             })}
           </nav>
-          <div className="sidebar-bottom">
-            <ShieldCheck size={18} />
-            <span>
-              Private by design
-              <br />
-              <small>Stored on your device</small>
-            </span>
-          </div>
         </aside>
         <div className="main-wrap">
           <header className="mobile-header">

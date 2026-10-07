@@ -195,4 +195,44 @@ describe("conservative transfer matching", () => {
       matchTransfers([p[0], { ...p[1], accountId: "a1" }], accounts),
     ).toHaveLength(0);
   });
+  it("links explicit Barclaycard bank payments with card repayments, never refunds or ambiguous matches", () => {
+    const card = { ...accounts[2], institution: "Barclays" as const };
+    const ownAccounts = [accounts[0], card];
+    const debit = transaction({
+      id: "bank",
+      amount: -90000,
+      description: "Direct Debit to Barclaycard",
+    });
+    const payment = transaction({
+      id: "card",
+      accountId: card.id,
+      amount: 90000,
+      date: "2026-09-04",
+      description: "Direct Debit - Payment",
+      type: "transfer",
+    });
+    expect(matchTransfers([debit, payment], ownAccounts)).toHaveLength(1);
+    for (const patch of [
+      { description: "MERCHANT REFUND" },
+      { amount: 80000 },
+      { date: "2026-09-10" },
+      { currency: "EUR" },
+    ]) {
+      expect(
+        matchTransfers([debit, { ...payment, ...patch }], ownAccounts),
+      ).toHaveLength(0);
+    }
+    expect(
+      matchTransfers(
+        [{ ...debit, description: "BARCLAYCARD FEES" }, payment],
+        ownAccounts,
+      ),
+    ).toHaveLength(0);
+    expect(
+      matchTransfers(
+        [debit, payment, { ...payment, id: "another" }],
+        ownAccounts,
+      ),
+    ).toHaveLength(0);
+  });
 });

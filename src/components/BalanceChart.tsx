@@ -8,8 +8,8 @@ import {
   CartesianGrid,
   ReferenceLine,
 } from "recharts";
-import type { Account, Statement } from "../domain/models";
-import { balanceHistory } from "../analytics/balances";
+import type { Account, Statement, Transaction } from "../domain/models";
+import { datedBalanceHistory } from "../analytics/balances";
 import { currencyPrecision, money } from "../domain/money";
 const accountColors = [
   "#7ab8ff",
@@ -24,24 +24,44 @@ export function BalanceChart({
   statements,
   month,
   currency,
+  period,
+  transactions,
 }: {
   accounts: Account[];
   statements: Statement[];
   month: string;
   currency: string;
+  period: number;
+  transactions: Transaction[];
 }) {
   const scoped = accounts.filter((a) => a.currency === currency);
-  const data = balanceHistory(scoped, statements, month, currency, 6);
+  const history = datedBalanceHistory(
+    scoped,
+    statements,
+    transactions,
+    month,
+    currency,
+    period,
+  );
+  const data = history.data;
+  const formatDate = (stamp: number) =>
+    new Date(stamp).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      timeZone: "UTC",
+    });
   const factor = 10 ** currencyPrecision(currency);
   return (
     <section className="card balance-chart">
       <div className="section-heading">
         <h2>Balance history</h2>
-        <span className="muted">6 months</span>
+        <span className="muted">
+          {period} {period === 1 ? "month" : "months"}
+        </span>
       </div>
       <div
         role="img"
-        aria-label="Monthly total and individual account balances"
+        aria-label={`${period} month total and individual account balance history`}
       >
         <ResponsiveContainer width="100%" height={240}>
           <ComposedChart
@@ -50,7 +70,11 @@ export function BalanceChart({
           >
             <CartesianGrid vertical={false} stroke="var(--line)" />
             <XAxis
-              dataKey="label"
+              dataKey="stamp"
+              type="number"
+              domain={[data[0]?.stamp ?? 0, data.at(-1)?.stamp ?? 0]}
+              tickFormatter={formatDate}
+              minTickGap={30}
               tickLine={false}
               tick={{ fontSize: 12, fill: "var(--muted)" }}
             />
@@ -63,7 +87,7 @@ export function BalanceChart({
             />
             <ReferenceLine y={0} stroke="var(--muted)" />
             <Tooltip
-              labelFormatter={(_, payload) => payload[0]?.payload.month ?? ""}
+              labelFormatter={(value) => formatDate(Number(value))}
               formatter={(value) => money(Number(value), currency)}
               contentStyle={{
                 background: "var(--surface)",
@@ -78,7 +102,13 @@ export function BalanceChart({
                 dataKey={`balances.account${i}`}
                 stroke={accountColors[i % accountColors.length]}
                 strokeWidth={2}
-                dot={{ r: 3 }}
+                type="stepAfter"
+                dot={
+                  data.filter((d) => d.balances[`account${i}`] !== null)
+                    .length < 3
+                    ? { r: 3 }
+                    : false
+                }
                 connectNulls={false}
                 isAnimationActive={false}
               />
@@ -89,13 +119,28 @@ export function BalanceChart({
               stroke="var(--ink)"
               strokeWidth={3}
               strokeDasharray="6 3"
-              dot={{ r: 4 }}
+              type="stepAfter"
+              dot={
+                data.filter((d) => d.total !== null).length < 3
+                  ? { r: 4 }
+                  : false
+              }
               connectNulls={false}
               isAnimationActive={false}
             />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
+      <p className="coverage-note">
+        {history.start} – {history.end}
+      </p>
+      {data.filter((d) => Object.values(d.balances).some((v) => v !== null))
+        .length < 2 && (
+        <p className="coverage-note">
+          Only one recorded balance or no verified history. Import earlier
+          statements to see a trend.
+        </p>
+      )}
       <div className="chart-legend">
         {scoped.map((a, i) => (
           <span key={a.id}>
@@ -109,7 +154,8 @@ export function BalanceChart({
       </div>
       {data.some((d) => d.total === null) && (
         <p className="coverage-note">
-          Gaps indicate missing or unverified monthly statement balances.
+          Gaps indicate missing or unverified history. Daily movement includes
+          transfers.
         </p>
       )}
     </section>
