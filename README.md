@@ -140,6 +140,16 @@ Navigation is Import · Transactions · Home · Analyse · Settings, with Home c
 
 ## Home balances and simplified workflow
 
+On desktop, press and drag a transaction row to open the category popup, then
+drop that same transaction directly onto a category tile. Uncategorized rows
+have no arrow icon. Up to three likely categories appear first, ranked from
+local user rules, reviewed merchant history in the same account, built-in rules
+and description clues. Suggestions require confirmation and never change
+financial amounts or classify transfers as spending. Unknown descriptions show
+the full category list. Mobile tap/swipe, keyboard C, tile selection, grouped
+sorting, remembered rules and Undo remain available. Dropping outside a tile
+does not save; Escape cancels desktop dragging.
+
 Home's Import statement control opens the native PDF picker directly. The Import
 navigation tab does the same. PDFs process locally, with reconciliation and
 exception review before committing. A multi-file queue stays in review until its

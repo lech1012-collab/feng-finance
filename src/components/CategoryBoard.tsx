@@ -5,6 +5,9 @@ import { useLiveQuery } from "dexie-react-hooks";
 import { X, Grip } from "lucide-react";
 import type { Transaction, Category } from "../domain/models";
 import { money } from "../domain/money";
+import { db } from "../storage/database";
+import { normalizeMerchant } from "../domain/normalize";
+import { categorySuggestions } from "../categorization/suggestions";
 import {
   categorizeCards,
   matchingUncategorized,
@@ -17,6 +20,7 @@ export function CategoryBoard({
   onClose,
   onSaved,
   feedback,
+  dragStart,
 }: {
   transaction: Transaction;
   returnTo?: string;
@@ -24,6 +28,7 @@ export function CategoryBoard({
   onClose: () => void;
   onSaved: (receipt: CategoryReceipt) => void;
   feedback?: ReactNode;
+  dragStart?: { x: number; y: number; pointerId: number };
 }) {
   const location = useLocation();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -36,6 +41,27 @@ export function CategoryBoard({
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState("");
+  const [externalDragging, setExternalDragging] = useState(!!dragStart);
+  const [cursor, setCursor] = useState({
+    x: dragStart?.x ?? 0,
+    y: dragStart?.y ?? 0,
+  });
+  const evidence = useLiveQuery(
+    async () => ({
+      rules: await db.rules.toArray(),
+      history: await db.transactions
+        .where("accountId")
+        .equals(t.accountId)
+        .filter(
+          (p) =>
+            normalizeMerchant(p.merchant) === normalizeMerchant(t.merchant) &&
+            p.isReviewed &&
+            !!p.categoryId,
+        )
+        .toArray(),
+    }),
+    [t.id, t.updatedAt],
+  );
   const matches = useLiveQuery(
     () => matchingUncategorized(t),
     [t.id, t.updatedAt],
@@ -94,6 +120,60 @@ export function CategoryBoard({
       : "";
   };
   const dragging = !!(position.x || position.y);
+  const suggested = search
+    ? []
+    : categorySuggestions(
+        t,
+        categories,
+        evidence?.rules ?? [],
+        evidence?.history ?? [],
+      );
+  useEffect(() => {
+    if (!externalDragging || !dragStart) return;
+    const move = (e: PointerEvent) => {
+      if (e.pointerId !== dragStart.pointerId) return;
+      setCursor({ x: e.clientX, y: e.clientY });
+      setTarget(hit(e.clientX, e.clientY));
+    };
+    const release = (e: PointerEvent) => {
+      if (e.pointerId !== dragStart.pointerId) return;
+      const category = e.type === "pointerup" ? hit(e.clientX, e.clientY) : "";
+      setExternalDragging(false);
+      setTarget("");
+      if (category) void choose(category);
+    };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
+    return () => {
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+    };
+  });
+  const tile = (c: Category) => (
+    <button
+      key={c.id}
+      className={`category-tile ${target === c.id ? "drop-target" : ""}`}
+      data-category-target={c.id}
+      disabled={busy}
+      onClick={() => void choose(c.id)}
+      aria-label={`Categorize as ${c.parentId ? `${categories.find((p) => p.id === c.parentId)?.name}: ` : ""}${c.name}`}
+    >
+      <span
+        className="category-tile-icon"
+        style={{ borderColor: categoryColor(c.id) }}
+      >
+        {c.name.slice(0, 1)}
+      </span>
+      <span>
+        {c.parentId && (
+          <small>{categories.find((p) => p.id === c.parentId)?.name}</small>
+        )}
+        {c.name}
+      </span>
+    </button>
+  );
   return (
     <dialog
       ref={dialog}
@@ -123,12 +203,21 @@ export function CategoryBoard({
         save immediately.
       </p>
       <article
-        className={`sorting-card ${dragging ? "is-dragging" : ""}`}
+        className={`sorting-card ${dragging || externalDragging ? "is-dragging" : ""}`}
         aria-label={`Drag ${t.merchant} to a category`}
         aria-describedby="drag-help"
         style={{
-          transform: `translate(${position.x}px, ${position.y}px)`,
-          pointerEvents: dragging ? "none" : undefined,
+          ...(externalDragging
+            ? {
+                position: "fixed",
+                left: cursor.x + 12,
+                top: cursor.y + 12,
+                width: 330,
+                maxWidth: "calc(100vw - 24px)",
+                margin: 0,
+              }
+            : { transform: `translate(${position.x}px, ${position.y}px)` }),
+          pointerEvents: dragging || externalDragging ? "none" : undefined,
         }}
         onPointerDown={(e) => {
           if (busy || !e.isPrimary || e.button !== 0) return;
@@ -172,6 +261,15 @@ export function CategoryBoard({
         </div>
         <strong>{money(t.amount, t.currency, true)}</strong>
       </article>
+      {suggested.length > 0 && (
+        <section
+          className="suggested-categories"
+          aria-label="Suggested categories"
+        >
+          <h3>Likely categories</h3>
+          <div className="category-tile-grid">{suggested.map(tile)}</div>
+        </section>
+      )}
       {feedback}
       <div className="sort-options">
         {others.length > 0 && (
@@ -210,31 +308,9 @@ export function CategoryBoard({
         aria-label="Categories"
         aria-busy={busy}
       >
-        {available.map((c) => (
-          <button
-            key={c.id}
-            className={`category-tile ${target === c.id ? "drop-target" : ""}`}
-            data-category-target={c.id}
-            disabled={busy}
-            onClick={() => void choose(c.id)}
-            aria-label={`Categorize as ${c.parentId ? `${categories.find((p) => p.id === c.parentId)?.name}: ` : ""}${c.name}`}
-          >
-            <span
-              className="category-tile-icon"
-              style={{ borderColor: categoryColor(c.id) }}
-            >
-              {c.name.slice(0, 1)}
-            </span>
-            <span>
-              {c.parentId && (
-                <small>
-                  {categories.find((p) => p.id === c.parentId)?.name}
-                </small>
-              )}
-              {c.name}
-            </span>
-          </button>
-        ))}
+        {available
+          .filter((c) => !suggested.some((s) => s.id === c.id))
+          .map(tile)}
         {!available.length && <p>No matching categories.</p>}
       </div>
       {error && (

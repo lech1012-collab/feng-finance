@@ -25,6 +25,11 @@ export default function Transactions({
 }) {
   const [params] = useSearchParams();
   const [sorting, setSorting] = useState<Transaction>();
+  const [dragStart, setDragStart] = useState<{
+    x: number;
+    y: number;
+    pointerId: number;
+  }>();
   const [receipt, setReceipt] = useState<CategoryReceipt>();
   const [undoBusy, setUndoBusy] = useState(false);
   const [undoError, setUndoError] = useState("");
@@ -444,19 +449,24 @@ export default function Transactions({
         )}
       </section>
       <p className="gesture-hint">
-        Tap an uncategorized transaction to sort it. Swipe a purchase to change
-        its category. Keyboard: focus a transaction and press C.
+        Drag a transaction onto a category on desktop. On mobile, tap to sort or
+        swipe to change its category. Keyboard: press C.
       </p>
       {!sorting && feedback}
       {sorting && data && (
         <CategoryBoard
           key={sorting.id}
           transaction={sorting}
+          dragStart={dragStart}
           returnTo={returnTo}
           categories={data.categories}
           feedback={feedback}
-          onClose={() => setSorting(undefined)}
+          onClose={() => {
+            setSorting(undefined);
+            setDragStart(undefined);
+          }}
           onSaved={(result) => {
+            setDragStart(undefined);
             setReceipt(result);
             setUndoError("");
             setSorting(undefined);
@@ -470,19 +480,31 @@ export default function Transactions({
             transaction={t}
             returnTo={returnTo}
             onCategorize={() => {
+              setDragStart(undefined);
+              setSorting(t);
+              setUndoError("");
+            }}
+            onDragCategorize={(start) => {
+              setDragStart(start);
               setSorting(t);
               setUndoError("");
             }}
           >
-            <span className={`transaction-icon ${t.type}`}>
-              {t.isTransfer ? (
-                <ArrowLeftRight size={18} />
-              ) : t.amount >= 0 ? (
-                <ArrowDownLeft size={18} />
-              ) : (
-                <ArrowUpRight size={18} />
-              )}
-            </span>
+            {(t.categoryId ||
+              t.subcategoryId ||
+              t.isTransfer ||
+              t.type === "transfer" ||
+              t.transferPairId) && (
+              <span className={`transaction-icon ${t.type}`}>
+                {t.isTransfer ? (
+                  <ArrowLeftRight size={18} />
+                ) : t.amount >= 0 ? (
+                  <ArrowDownLeft size={18} />
+                ) : (
+                  <ArrowUpRight size={18} />
+                )}
+              </span>
+            )}
             <div className="transaction-description">
               <strong>{t.merchant || t.description}</strong>
               <span

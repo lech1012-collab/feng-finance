@@ -126,6 +126,15 @@ await statement("Barclays", "barclays-card-payment", {
   ],
   closing: 100,
 });
+await statement("Barclays", "barclays-drag", {
+  opening: 1000,
+  rows: [
+    { description: "FICTIONAL WATER", amount: -10 },
+    { description: "CITY LEISURE MEMBERSHIP", amount: -20 },
+    { description: "UNKNOWN MERCHANT", amount: -30 },
+  ],
+  closing: 940,
+});
 await statement("Barclays", "barclays", {
   rows: [
     { description: "SIEMENS SALARY", amount: 5000, date: "01 Sep" },

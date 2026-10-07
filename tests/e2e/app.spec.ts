@@ -19,6 +19,67 @@ async function gotoRoute(page: Page, path: string) {
   await page.goto(origin + "/#" + path);
 }
 const fixture = (name: string) => resolve(`tests/fixtures/${name}.pdf`);
+test("desktop row drag opens suggested categories and drop saves without a second drag", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openImport(page);
+  await selectStatement(page, "barclays-drag");
+  await confirmImport(page);
+  await page
+    .getByRole("link", { name: /3 transactions need a category/ })
+    .click();
+  const row = page.getByRole("link", { name: /FICTIONAL WATER/ });
+  await expect(row.locator(".transaction-icon")).toHaveCount(0);
+  await row.scrollIntoViewIfNeeded();
+  const rect = (await row.boundingBox())!;
+  await page.mouse.move(rect.x + 90, rect.y + rect.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 94, rect.y + rect.height / 2);
+  const dialog = page.getByRole("dialog", { name: "Where does this belong?" });
+  await expect(dialog).toHaveCount(0);
+  await page.mouse.move(rect.x + 120, rect.y + rect.height / 2, { steps: 4 });
+  await expect(dialog).toBeVisible();
+  const suggested = dialog.getByRole("region", {
+    name: "Suggested categories",
+  });
+  const target = suggested.getByRole("button", {
+    name: "Categorize as Utilities",
+    exact: true,
+  });
+  await expect(target).toBeVisible();
+  const tile = (await target.boundingBox())!;
+  await page.mouse.move(tile.x + tile.width / 2, tile.y + tile.height / 2, {
+    steps: 12,
+  });
+  await expect(target).toHaveClass(/drop-target/);
+  await page.mouse.up();
+  await expect(dialog).toHaveCount(0);
+  await expect(row).toHaveCount(0);
+  await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
+    2,
+  );
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole("button", { name: "Close categorization" }).click();
+  await expect(row).toBeVisible();
+  const remaining = page.getByRole("link", { name: /UNKNOWN MERCHANT/ });
+  await remaining.scrollIntoViewIfNeeded();
+  const box = (await remaining.boundingBox())!;
+  await page.mouse.move(box.x + 90, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(box.x + 120, box.y + box.height / 2, { steps: 4 });
+  await expect(dialog).toBeVisible();
+  await expect(
+    dialog.getByRole("region", { name: "Suggested categories" }),
+  ).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await page.mouse.up();
+  await expect(dialog).toHaveCount(0);
+  await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
+    3,
+  );
+});
 async function openImport(page: Page) {
   await gotoRoute(page, "/import");
   await expect(

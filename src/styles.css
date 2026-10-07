@@ -2593,6 +2593,20 @@ h3 {
   font-size: 0.875rem;
   line-height: 1.6;
 }
+@media (min-width: 761px) {
+  .swipe-transaction .transaction-row {
+    user-select: none;
+    -webkit-user-select: none;
+    cursor: grab;
+  }
+  .swipe-transaction .transaction-row:active {
+    cursor: grabbing;
+  }
+}
+.suggested-categories h3 {
+  margin: 14px 0 0;
+  font-size: 1rem;
+}
 .category-dialog {
   background: var(--surface);
   color: var(--ink);
