@@ -19,6 +19,7 @@ import { duplicateStatus } from "./duplicates";
 import { categorize } from "../categorization/engine";
 import { matchTransfers } from "../transfers/engine";
 import { reconcile } from "../domain/reconcile";
+import { rememberCategory } from "../storage/category-memory";
 export interface ExtractedFile {
   rows: TextRow[];
   hash: string;
@@ -253,9 +254,18 @@ export async function commitDraft(
   overrideValidation = false,
 ) {
   const validation = validateDraft(draft, overrideValidation);
+  const manuallyCategorized = new Set(
+    draft.transactions.filter((t) => t.manualCategory).map((t) => t.id),
+  );
   const incoming: Transaction[] = [];
   for (const row of draft.transactions.filter((t) => t.include)) {
-    const { duplicate: _d, include: _i, acknowledged: _a, ...t } = row;
+    const {
+      duplicate: _d,
+      include: _i,
+      acknowledged: _a,
+      manualCategory: _m,
+      ...t
+    } = row;
     t.isReviewed = row.acknowledged;
     t.updatedAt = new Date().toISOString();
     t.transactionFingerprint = await fingerprint(t);
@@ -263,11 +273,14 @@ export async function commitDraft(
   }
   await db.transaction(
     "rw",
-    db.accounts,
-    db.statements,
-    db.transactions,
-    db.transferLinks,
-    db.categories,
+    [
+      db.accounts,
+      db.statements,
+      db.transactions,
+      db.transferLinks,
+      db.categories,
+      db.rules,
+    ],
     async () => {
       const categories = await db.categories.toArray();
       for (const t of incoming) {
@@ -370,6 +383,9 @@ export async function commitDraft(
           validation.status === "warning" && overrideValidation,
       });
       await db.transactions.bulkAdd(incoming);
+      for (const t of incoming) {
+        if (manuallyCategorized.has(t.id)) await rememberCategory(t);
+      }
       const updates = [...changed.values()].filter(
         (t) => !incoming.some((i) => i.id === t.id),
       );

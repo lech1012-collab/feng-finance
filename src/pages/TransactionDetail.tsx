@@ -2,7 +2,6 @@ import { useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
-import { id, normalizeMerchant } from "../domain/normalize";
 import { money } from "../domain/money";
 import type {
   Account,
@@ -83,9 +82,6 @@ function Editor({
   const [subcategory, setSubcategory] = useState(t.subcategoryId ?? "");
   const [type, setType] = useState(financialType(t));
   const [tags, setTags] = useState(t.tags.join(", "));
-  const [createRule, setCreateRule] = useState(
-    !t.isDemo && !!normalizeMerchant(t.merchant),
-  );
   const [pair, setPair] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -93,41 +89,16 @@ function Editor({
     setBusy(true);
     setError("");
     try {
-      const pattern = normalizeMerchant(merchant);
-      const remember =
-        createRule && !t.isDemo && (type === "transfer" || !!category);
-      if (remember && !pattern)
-        throw new Error(
-          "A rule needs a pattern and category, or transfer type.",
-        );
-      await editTransaction(
-        t.id,
-        {
-          merchant: merchant.trim(),
-          categoryId: category || undefined,
-          subcategoryId: subcategory || undefined,
-          type,
-          tags: tags
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean),
-        },
-        remember
-          ? {
-              id: id(),
-              name: `${pattern} → ${type === "transfer" ? "Transfer" : categories.find((c) => c.id === category)?.name}`,
-              match: "exact",
-              pattern,
-              accountId: t.accountId,
-              direction: t.amount >= 0 ? "positive" : "negative",
-              categoryId: type === "transfer" ? undefined : category,
-              subcategoryId: subcategory || undefined,
-              type: type === "transfer" ? "transfer" : undefined,
-              priority: 100,
-              builtIn: false,
-            }
-          : undefined,
-      );
+      await editTransaction(t.id, {
+        merchant: merchant.trim(),
+        categoryId: category || undefined,
+        subcategoryId: subcategory || undefined,
+        type,
+        tags: tags
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean),
+      });
       navigate(returnTo);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Changes could not be saved.");
@@ -272,27 +243,6 @@ function Editor({
           amounts. Transfers are excluded from net cash flow but still move
           account balances.
         </p>
-        {!t.isDemo && (
-          <div className="rule-offer">
-            <label className="check">
-              <input
-                type="checkbox"
-                checked={createRule}
-                onChange={(e) => setCreateRule(e.target.checked)}
-              />
-              Always categorize this merchant in this account
-              {type === "transfer"
-                ? " as transfers"
-                : category
-                  ? ` as ${categories.find((c) => c.id === category)?.name}`
-                  : ""}
-            </label>
-            <p className="muted">
-              Saved rules survive deleting imported records. Uncheck for a
-              one-off choice.
-            </p>
-          </div>
-        )}
         {error && (
           <p role="alert" className="warning-text">
             {error}

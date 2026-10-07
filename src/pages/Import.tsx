@@ -689,6 +689,7 @@ export default function ImportPage({
                         value={t.categoryId ?? ""}
                         onChange={(e) =>
                           updateRow(t.id, {
+                            manualCategory: true,
                             categoryId: e.target.value || undefined,
                             subcategoryId: undefined,
                           })
@@ -709,6 +710,7 @@ export default function ImportPage({
                         value={t.type}
                         onChange={(e) =>
                           updateRow(t.id, {
+                            manualCategory: true,
                             type: e.target.value as typeof t.type,
                             isTransfer: e.target.value === "transfer",
                             categoryId:

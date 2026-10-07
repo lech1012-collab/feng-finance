@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.8.2";
+export const APP_VERSION = "1.8.3";
 export const SCHEMA_VERSION = 2;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";
@@ -47,6 +47,7 @@ export interface Transaction {
   bookingDate?: string;
   description: string;
   merchant: string;
+  sourceMerchant?: string;
   amount: number;
   currency: string;
   balanceAfterTransaction?: number;
@@ -163,6 +164,7 @@ export interface DraftTransaction extends Transaction {
   duplicate: "none" | "certain" | "possible";
   include: boolean;
   acknowledged: boolean;
+  manualCategory?: boolean;
 }
 export interface ImportDraft {
   statement: Statement;

@@ -38,9 +38,6 @@ export function CategoryBoard({
   const [target, setTarget] = useState("");
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState(false);
-  const [remember, setRemember] = useState(
-    !t.isDemo && !!normalizeMerchant(t.merchant),
-  );
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState("");
@@ -102,7 +99,6 @@ export function CategoryBoard({
       const receipt = await categorizeCards(
         [t, ...(group ? others : [])],
         categoryId,
-        remember,
       );
       onSaved(receipt);
     } catch (err) {
@@ -298,17 +294,6 @@ export function CategoryBoard({
             />
             Also sort {others.length} uncategorized transactions from this
             merchant in this account
-          </label>
-        )}
-        {!t.isDemo && (
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={remember}
-              disabled={busy}
-              onChange={(e) => setRemember(e.target.checked)}
-            />
-            Remember this merchant for future imports in this account
           </label>
         )}
       </div>

@@ -3,13 +3,7 @@ import { useState, useMemo } from "react";
 import { financialType } from "../domain/transaction-type";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import {
-  Search,
-  SlidersHorizontal,
-  ArrowDownLeft,
-  ArrowUpRight,
-  ArrowLeftRight,
-} from "lucide-react";
+import { Search, SlidersHorizontal } from "lucide-react";
 import { CategoryBoard } from "../components/CategoryBoard";
 import { SwipeTransaction } from "../components/SwipeTransaction";
 import type { Transaction } from "../domain/models";
@@ -491,21 +485,6 @@ export default function Transactions({
               setUndoError("");
             }}
           >
-            {(t.categoryId ||
-              t.subcategoryId ||
-              t.isTransfer ||
-              t.type === "transfer" ||
-              t.transferPairId) && (
-              <span className={`transaction-icon ${t.type}`}>
-                {t.isTransfer ? (
-                  <ArrowLeftRight size={18} />
-                ) : t.amount >= 0 ? (
-                  <ArrowDownLeft size={18} />
-                ) : (
-                  <ArrowUpRight size={18} />
-                )}
-              </span>
-            )}
             <div className="transaction-description">
               <strong>{t.merchant || t.description}</strong>
               <span
@@ -514,16 +493,13 @@ export default function Transactions({
                 {t.isTransfer || t.type === "transfer" || t.transferPairId
                   ? "Transfer"
                   : t.categoryId || t.subcategoryId
-                    ? "Categorized"
+                    ? (data?.categories.find(
+                        (c) => c.id === (t.categoryId ?? t.subcategoryId),
+                      )?.name ?? "Category unavailable")
                     : "Needs category"}
               </span>
               <span>
                 {t.date} ·{" "}
-                {t.isTransfer
-                  ? "Transfer"
-                  : (data?.categories.find((c) => c.id === t.categoryId)
-                      ?.name ?? "Uncategorized")}{" "}
-                ·{" "}
                 {data?.accounts.find((a) => a.id === t.accountId)?.institution}
               </span>
             </div>

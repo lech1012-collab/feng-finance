@@ -71,6 +71,7 @@ const transaction = z.object({
   bookingDate: date.optional(),
   description: text,
   merchant: text,
+  sourceMerchant: text.optional(),
   amount: minor,
   currency,
   balanceAfterTransaction: minor.optional(),

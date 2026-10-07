@@ -206,21 +206,26 @@ the web app does not schedule reliable background alerts itself. Re-export to
 refresh predicted dates. Disabling reminders in Feng does not delete calendar events;
 remove them in the calendar if needed. Reminder preferences are included in backups.
 
-Manual categorization remembers the normalized merchant by default, scoped to the
-same account and incoming/outgoing direction. This saves a separate IndexedDB rule;
-it does not depend on retaining transaction history. Uncheck **Remember** (or
-**Always categorize this merchant**) for a one-off assignment. Review/delete learned
-rules in Settings → Categorization & transfer rules. Exact matching avoids broad
-rules silently affecting unrelated descriptions; broader rules remain configurable
-in Settings. Rules are included in JSON backups and Undo removes its learned rule.
+Every manual category or transfer assignment automatically saves an exact merchant
+rule scoped to the same account and incoming/outgoing direction. The latest manual
+choice becomes the default for future matching imports, including corrections made
+in import review. There is no remembering checkbox or second action. Rules live in
+IndexedDB separately from transaction history and are included in JSON backups.
+The original merchant identity is retained when you rename a transaction, so
+future PDF imports still receive your latest category. This optional metadata is
+included in backups; existing backups remain compatible. Demo transactions never
+create rules for real financial records. Undo reverses the
+assignment and its learned rule. Rules remain configurable in Settings.
 
-For repeat-import testing: categorize the transaction with Remember checked, then
-Settings → **Delete imported records**, check the warning and delete. Reimport the
-PDF. This removes statements, transactions and transfer links while preserving
-accounts (including their IDs), categories, rules and preferences. **Clear local
-data** deliberately removes all of those, including categorization memory. Choices
-previously saved without Remember must be categorized again with it enabled before
-history is deleted. Already erased choices require a prior backup to recover.
+For repeat-import testing: categorize the transaction, then Settings → **Delete
+imported records**, check the warning and delete. Reimport the PDF. This removes
+statements, transactions and transfer links while preserving accounts (including
+their IDs), categories, rules and preferences. **Clear local data** deliberately
+removes all of those, including categorization memory. Choices saved in older
+versions without Remember must be categorized again before history is deleted.
+Already erased choices require a prior backup to recover. Transaction rows show
+the actual category in their status badge, without an arrow or duplicate category
+text in the date/account line.
 
 On desktop, press and drag a transaction row to open the category popup, then
 drop that same transaction directly onto a category tile. Uncategorized rows
@@ -235,7 +240,7 @@ does not save; Escape cancels desktop dragging.
 The popup also includes a **Transfer** tile for movements between your own
 accounts and card repayments. Dropping or tapping clears spending categories,
 sets the transaction type to transfer and excludes it from income/expenses.
-It works for incoming and outgoing amounts, supports grouping, optional
+It works for incoming and outgoing amounts, supports grouping, automatic
 account-specific remembered rules and Undo. Mark both sides when necessary;
 this action does not invent a matching transaction or link an ambiguous pair.
 

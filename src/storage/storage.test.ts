@@ -133,6 +133,19 @@ describe("atomic import and editing", () => {
     method: "embedded-text" as const,
     warnings: [],
   });
+  it("automatically remembers only explicit import-review category corrections", async () => {
+    const d = await prepareDraft(extraction());
+    d.transactions[0].categoryId = "childcare";
+    d.transactions[0].manualCategory = true;
+    await commitDraft(d);
+    expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(1);
+    const next = await prepareDraft({ ...extraction(), hash: "changed-hash" });
+    expect(next.transactions[0].categoryId).toBe("childcare");
+    expect(
+      (await db.transactions.get(d.transactions[0].id))!,
+    ).not.toHaveProperty("manualCategory");
+    validateBackup(await createBackup());
+  });
   it("commits only reviewed data and prevents exact or regenerated reimports", async () => {
     const d = await prepareDraft(extraction());
     expect(d.transactions).toHaveLength(4);
@@ -251,6 +264,11 @@ describe("atomic import and editing", () => {
         builtIn: false,
       },
     );
+    const backup = validateBackup(await createBackup());
+    expect(backup.transactions.find((p) => p.id === t.id)?.sourceMerchant).toBe(
+      t.merchant,
+    );
+    await restoreBackup(backup);
     const next = await prepareDraft({ ...extraction(), hash: "next-hash" });
     expect(next.transactions[0].categoryId).toBe("household");
     expect((await db.transactions.get(t.id))?.tags).toEqual(["home"]);

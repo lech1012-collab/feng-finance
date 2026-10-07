@@ -1,7 +1,8 @@
 import type { Transaction, Rule } from "../domain/models";
 import { db } from "./database";
-import { id, normalizeMerchant } from "../domain/normalize";
+import { normalizeMerchant } from "../domain/normalize";
 import { amountType } from "../domain/transaction-type";
+import { rememberCategory } from "./category-memory";
 export const TRANSFER_TARGET = "__feng-transfer";
 export interface CategoryReceipt {
   before: Transaction[];
@@ -10,7 +11,7 @@ export interface CategoryReceipt {
   categoryName: string;
 }
 export async function matchingUncategorized(t: Transaction) {
-  const merchant = normalizeMerchant(t.merchant);
+  const merchant = normalizeMerchant(t.sourceMerchant ?? t.merchant);
   if (!merchant) return [];
   return db.transactions
     .where("accountId")
@@ -24,14 +25,13 @@ export async function matchingUncategorized(t: Transaction) {
         p.currency === t.currency &&
         !!p.isDemo === !!t.isDemo &&
         Math.sign(p.amount) === Math.sign(t.amount) &&
-        normalizeMerchant(p.merchant) === merchant,
+        normalizeMerchant(p.sourceMerchant ?? p.merchant) === merchant,
     )
     .toArray();
 }
 export async function categorizeCards(
   expected: Transaction[],
   categoryId: string,
-  remember = false,
 ): Promise<CategoryReceipt> {
   if (
     !expected.length ||
@@ -90,8 +90,8 @@ export async function categorizeCards(
             t.accountId !== first.accountId ||
             t.currency !== first.currency ||
             Math.sign(t.amount) !== Math.sign(first.amount) ||
-            normalizeMerchant(t.merchant) !==
-              normalizeMerchant(first.merchant) ||
+            normalizeMerchant(t.sourceMerchant ?? t.merchant) !==
+              normalizeMerchant(first.sourceMerchant ?? first.merchant) ||
             !!t.isDemo !== !!first.isDemo,
         )
       )
@@ -110,33 +110,7 @@ export async function categorizeCards(
         isReviewed: true,
         updatedAt,
       }));
-      let rule: Rule | undefined;
-      if (remember) {
-        const pattern = normalizeMerchant(first.merchant);
-        if (!pattern || first.isDemo)
-          throw new Error(
-            "Rules can only be learned from a real, named merchant.",
-          );
-        const priority =
-          Math.max(100, ...(await db.rules.toArray()).map((r) => r.priority)) +
-          1;
-        if (!Number.isSafeInteger(priority))
-          throw new Error("Rule priority is out of range.");
-        rule = {
-          id: id(),
-          name: `${pattern} → ${categoryName}`,
-          match: "exact",
-          pattern,
-          accountId: first.accountId,
-          direction: first.amount > 0 ? "positive" : "negative",
-          categoryId: transfer ? undefined : (parent?.id ?? category!.id),
-          subcategoryId: !transfer && parent ? category!.id : undefined,
-          type: transfer ? "transfer" : undefined,
-          priority,
-          builtIn: false,
-        };
-        await db.rules.add(rule);
-      }
+      const rule = await rememberCategory(after[0]);
       await db.transactions.bulkPut(after);
       return { before, after, rule, categoryName: categoryName! };
     },

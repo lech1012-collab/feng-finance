@@ -28,11 +28,20 @@ test("manual category memory survives deleting imports and reimporting the same 
   await gotoRoute(page, "/transactions?uncategorized=true");
   await page.getByRole("link", { name: /HAMM&FULH CTAX/ }).click();
   const dialog = page.getByRole("dialog");
-  await expect(dialog.getByLabel(/Remember this merchant/)).toBeChecked();
+  await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   await dialog
     .getByRole("button", { name: "Categorize as Childcare", exact: true })
     .click();
   await expect(page.getByText(/merchant remembered/)).toBeVisible();
+  await page
+    .getByRole("button", { name: "Uncategorized", exact: true })
+    .click();
+  const categorizedRow = page.getByRole("link", { name: /HAMM&FULH CTAX/ });
+  await expect(categorizedRow.locator(".transaction-status")).toHaveText(
+    "Childcare",
+  );
+  await expect(categorizedRow.locator(".transaction-icon")).toHaveCount(0);
+  await expect(page.getByText("Categorized", { exact: true })).toHaveCount(0);
   await gotoRoute(page, "/settings");
   await page
     .getByLabel("I understand my imported transaction history will be deleted.")
@@ -53,8 +62,28 @@ test("manual category memory survives deleting imports and reimporting the same 
   await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
     "childcare",
   );
+  await page.getByLabel("Category", { exact: true }).selectOption("utilities");
   await confirmImport(page);
   await expect(page.locator(".balance-summary")).toContainText("£845.00");
+  await gotoRoute(page, "/settings");
+  await page
+    .getByLabel("I understand my imported transaction history will be deleted.")
+    .check();
+  await page
+    .getByRole("button", { name: "Delete imported records", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Imported records deleted. Accounts and saved categorization rules kept.",
+    ),
+  ).toBeVisible();
+  await openImport(page);
+  await selectStatement(page, "barclays-memory");
+  await page.getByRole("button", { name: /All transactions/ }).click();
+  await page.locator(".review-row > summary").click();
+  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
+    "utilities",
+  );
 });
 test("Salary and Income filters agree with cash flow and verified balance", async ({
   page,
@@ -82,6 +111,12 @@ test("Salary and Income filters agree with cash flow and verified balance", asyn
   ).toBeVisible();
   await expect(page.getByRole("link", { name: /WAITROSE/ })).toHaveCount(0);
   await page.getByRole("button", { name: "Salary", exact: true }).click();
+  await expect(
+    page
+      .getByRole("link", { name: /FICTIONAL EMPLOYER/ })
+      .locator(".transaction-status"),
+  ).toHaveText("Salary");
+  await expect(page.locator(".transaction-icon")).toHaveCount(0);
   await expect(
     page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }),
   ).toBeVisible();
@@ -436,9 +471,9 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
     "household",
   );
-  await expect(
-    page.getByLabel(/Always categorize this merchant/),
-  ).toBeChecked();
+  await expect(page.getByLabel(/Always categorize this merchant/)).toHaveCount(
+    0,
+  );
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
@@ -1167,7 +1202,7 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
   await expect(dialog).toBeVisible();
   await expect(dialog.locator(".sorting-card")).toContainText("CORNER SHOP");
   await dialog.getByLabel(/Also sort 1 uncategorized/).check();
-  await dialog.getByLabel(/Remember this merchant/).check();
+  await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   const target = dialog.getByRole("button", {
     name: "Categorize as Groceries",
     exact: true,
@@ -1189,7 +1224,7 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(dialog.locator(".sorting-card")).toContainText("CORNER SHOP");
   await dialog.getByLabel(/Also sort 1 uncategorized/).check();
-  await dialog.getByLabel(/Remember this merchant/).check();
+  await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   await dialog
     .getByRole("button", { name: "Categorize as Cleaning", exact: true })
     .click();

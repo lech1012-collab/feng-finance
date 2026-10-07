@@ -2,6 +2,7 @@ import type { Rule, Transaction, TransferLink } from "../domain/models";
 import { db } from "./database";
 import { id } from "../domain/normalize";
 import { amountType } from "../domain/transaction-type";
+import { rememberCategory } from "./category-memory";
 export async function editTransaction(
   tid: string,
   patch: Pick<
@@ -48,6 +49,8 @@ export async function editTransaction(
       }
       await db.transactions.update(tid, {
         ...patch,
+        sourceMerchant:
+          current.sourceMerchant ?? (current.merchant || current.description),
         type:
           patch.type === "transfer" ? "transfer" : amountType(current.amount),
         categoryId: patch.type === "transfer" ? undefined : patch.categoryId,
@@ -59,6 +62,10 @@ export async function editTransaction(
         isReviewed: true,
         updatedAt: new Date().toISOString(),
       });
+      if (!rule) {
+        const saved = (await db.transactions.get(tid))!;
+        await rememberCategory(saved);
+      }
       if (rule) {
         const priority =
           Math.max(100, ...(await db.rules.toArray()).map((r) => r.priority)) +
@@ -71,39 +78,48 @@ export async function editTransaction(
   );
 }
 export async function linkTransfers(aId: string, bId: string) {
-  await db.transaction("rw", db.transactions, db.transferLinks, async () => {
-    const a = await db.transactions.get(aId),
-      b = await db.transactions.get(bId);
-    if (
-      !a ||
-      !b ||
-      a.id === b.id ||
-      a.accountId === b.accountId ||
-      a.currency !== b.currency ||
-      a.amount !== -b.amount ||
-      a.amount === 0 ||
-      a.transferPairId ||
-      b.transferPairId
-    )
-      throw new Error(
-        "Choose unlinked transactions in different accounts with exactly opposite amounts and the same currency.",
-      );
-    const link: TransferLink = {
-      id: id(),
-      transactionIds: [a.id, b.id],
-      createdAt: new Date().toISOString(),
-      manual: true,
-    };
-    await db.transferLinks.add(link);
-    for (const t of [a, b])
-      await db.transactions.update(t.id, {
-        type: "transfer",
-        isTransfer: true,
-        transferPairId: link.id,
-        categoryId: undefined,
-        subcategoryId: undefined,
-        isReviewed: true,
-        updatedAt: link.createdAt,
-      });
-  });
+  await db.transaction(
+    "rw",
+    db.transactions,
+    db.transferLinks,
+    db.categories,
+    db.rules,
+    async () => {
+      const a = await db.transactions.get(aId),
+        b = await db.transactions.get(bId);
+      if (
+        !a ||
+        !b ||
+        a.id === b.id ||
+        a.accountId === b.accountId ||
+        a.currency !== b.currency ||
+        a.amount !== -b.amount ||
+        a.amount === 0 ||
+        a.transferPairId ||
+        b.transferPairId
+      )
+        throw new Error(
+          "Choose unlinked transactions in different accounts with exactly opposite amounts and the same currency.",
+        );
+      const link: TransferLink = {
+        id: id(),
+        transactionIds: [a.id, b.id],
+        createdAt: new Date().toISOString(),
+        manual: true,
+      };
+      await db.transferLinks.add(link);
+      for (const t of [a, b]) {
+        await db.transactions.update(t.id, {
+          type: "transfer",
+          isTransfer: true,
+          transferPairId: link.id,
+          categoryId: undefined,
+          subcategoryId: undefined,
+          isReviewed: true,
+          updatedAt: link.createdAt,
+        });
+        await rememberCategory((await db.transactions.get(t.id))!);
+      }
+    },
+  );
 }
