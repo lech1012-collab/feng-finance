@@ -2,6 +2,8 @@
 
 Record iOS version, device, deployment origin and app version. These checks must be done on an actual device; automated WebKit is not a substitute. Use synthetic data first.
 
+- [ ] Settings → Reminders: change review day, disable/re-enable, reload and verify persistence. Export the generic calendar file; import into the device's calendar, verify 09:00 local time and alert permissions, and test an alert with Feng closed. Check desktop calendar import too. Remove test events afterwards; Feng does not synchronize or remove exported events.
+
 - [ ] Open HTTPS site in Safari; first load has no blocking errors or horizontal overflow at 390 × 844 and larger iPhone sizes.
 - [ ] Share → Add to Home Screen → Open as Web App → Add; icon/name appear correctly.
 - [ ] Launch icon; app is standalone, correct theme and safe-area top/bottom padding; navigation and import confirmation clear the home indicator.

@@ -1,4 +1,6 @@
 import { AccountBalances } from "../components/AccountBalances";
+import { DeeperInsights } from "../components/DeeperInsights";
+import { Reminders } from "../components/Reminders";
 import { BalanceChart } from "../components/BalanceChart";
 import { ImportButton } from "../components/ImportPicker";
 import { useState } from "react";
@@ -20,7 +22,6 @@ import {
   cashFlow,
   categorySpending,
   monthlySeries,
-  comparisons,
   comparableMonths,
   statementIsCurrent,
 } from "../analytics/calculations";
@@ -78,12 +79,6 @@ export default function Home({
   );
   const difference = flow.net - previous.net;
   const categories = categorySpending(current, data.categories, currency);
-  const insights = comparisons(
-    data.transactions,
-    data.categories,
-    month,
-    currency,
-  );
   const partialCoverage = data.accounts.some(
     (a) =>
       !statementIsCurrent(
@@ -120,6 +115,7 @@ export default function Home({
         </p>
       )}
       <SubscriptionNotice currency={currency} />
+      <Reminders currency={currency} />
       {!data.count && (
         <section className="welcome card">
           <Wallet size={30} />
@@ -289,30 +285,15 @@ export default function Home({
           )}
         </section>
         <div className="right-stack">
-          <section className="card insight-card">
-            <p className="eyebrow">THE BIGGER PICTURE</p>
-            <h2>A little perspective</h2>
-            <p>{insights.text}</p>
-            {insights.items.slice(0, 3).map((c) => (
-              <Link
-                className="insight-row"
-                key={c.id}
-                to={
-                  c.id === "uncategorized"
-                    ? "/transactions?uncategorized=1&allDates=1"
-                    : `/categories/${c.id}?month=${month}`
-                }
-              >
-                <span>{c.name}</span>
-                <strong>
-                  {money(c.difference, currency, true)}
-                  {c.change !== undefined && (
-                    <small> / {Math.round(c.change)}%</small>
-                  )}
-                </strong>
-              </Link>
-            ))}
-          </section>
+          <DeeperInsights
+            transactions={data.transactions}
+            accounts={data.accounts}
+            statements={data.statements}
+            categories={data.categories}
+            month={month}
+            currency={currency}
+            compact
+          />
         </div>
       </div>
     </>

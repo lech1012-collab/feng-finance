@@ -19,6 +19,66 @@ async function gotoRoute(page: Page, path: string) {
   await page.goto(origin + "/#" + path);
 }
 const fixture = (name: string) => resolve(`tests/fixtures/${name}.pdf`);
+test("verified deeper insights, statement reminders and private calendar export", async ({
+  page,
+}) => {
+  await page.clock.setFixedTime(new Date("2026-10-07T12:00:00Z"));
+  for (const month of ["04", "05", "06", "07"]) {
+    await openImport(page);
+    await selectStatement(page, `barclays-deeper-${month}`);
+    await confirmImport(page);
+  }
+  await expect(page.locator(".deeper-insights")).toContainText(
+    "Income is lower than usual",
+  );
+  await expect(page.locator(".deeper-insights")).toContainText(
+    "Shopping +£400.00",
+  );
+  await expect(page.locator(".finance-reminders")).toContainText(
+    "2026-09 or later",
+  );
+  const choose = page.waitForEvent("filechooser");
+  await page
+    .locator(".finance-reminders")
+    .getByRole("button", { name: /Update/ })
+    .click();
+  await (await choose).setFiles([]);
+  await gotoRoute(page, "/analysis");
+  await expect(page.locator(".deeper-insights")).toContainText(
+    "Larger payment to JOHN LEWIS",
+  );
+  await gotoRoute(page, "/settings");
+  await page
+    .getByLabel("Monthly statement review day", { exact: true })
+    .selectOption("7");
+  const exported = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export calendar reminders", exact: true })
+    .click();
+  const file = await exported;
+  expect(file.suggestedFilename()).toBe("feng-finance-reminders.ics");
+  const calendar = await readFile((await file.path())!, "utf8");
+  expect(calendar).toContain("RRULE:FREQ=MONTHLY");
+  expect(calendar).toContain("20261007T090000");
+  expect(calendar).not.toContain("JOHN LEWIS");
+  expect(calendar).not.toContain("Barclays");
+  await page.getByLabel("Show statement and bill reminders").uncheck();
+  await expect(
+    page.getByRole("button", {
+      name: "Export calendar reminders",
+      exact: true,
+    }),
+  ).toBeDisabled();
+  await page.reload();
+  await expect(
+    page.getByLabel("Monthly statement review day", { exact: true }),
+  ).toHaveValue("7");
+  await expect(
+    page.getByLabel("Show statement and bill reminders"),
+  ).not.toBeChecked();
+  await gotoRoute(page, "/");
+  await expect(page.locator(".finance-reminders")).toHaveCount(0);
+});
 test("desktop row drag opens suggested categories and drop saves without a second drag", async ({
   page,
 }) => {

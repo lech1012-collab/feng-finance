@@ -1,4 +1,5 @@
 import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
+import { DeeperInsights } from "../components/DeeperInsights";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -71,6 +72,8 @@ export default function Analysis({
         )
         .toArray(),
       categories: await db.categories.toArray(),
+      accounts: await db.accounts.where("currency").equals(currency).toArray(),
+      statements: await db.statements.toArray(),
     }),
     [start, end, currency, month],
   );
@@ -205,6 +208,16 @@ export default function Analysis({
           currency={currency}
         />
       </section>
+      {!property && (
+        <DeeperInsights
+          transactions={data.comparison}
+          accounts={data.accounts}
+          statements={data.statements}
+          categories={data.categories}
+          month={month}
+          currency={currency}
+        />
+      )}
       <section className="card">
         <div className="section-heading">
           <h2>

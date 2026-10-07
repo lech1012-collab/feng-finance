@@ -135,6 +135,26 @@ await statement("Barclays", "barclays-drag", {
   ],
   closing: 940,
 });
+let deeperOpening = 1000;
+for (const [number, name, days] of [
+  ["04", "Apr", "30"],
+  ["05", "May", "31"],
+  ["06", "Jun", "30"],
+  ["07", "Jul", "31"],
+]) {
+  const income = number === "07" ? 400 : 1000;
+  const spending = number === "07" ? 500 : 100;
+  await statement("Barclays", `barclays-deeper-${number}`, {
+    period: `01 ${name} 2026 to ${days} ${name} 2026`,
+    opening: deeperOpening,
+    rows: [
+      { date: `02 ${name}`, description: "SALARY", amount: income },
+      { date: `03 ${name}`, description: "JOHN LEWIS", amount: -spending },
+    ],
+    closing: deeperOpening + income - spending,
+  });
+  deeperOpening += income - spending;
+}
 await statement("Barclays", "barclays", {
   rows: [
     { description: "SIEMENS SALARY", amount: 5000, date: "01 Sep" },

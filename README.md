@@ -140,6 +140,31 @@ Navigation is Import · Transactions · Home · Analyse · Settings, with Home c
 
 ## Home balances and simplified workflow
 
+### Local insights and reminders
+
+Feng is a website/PWA; no native app or App Store onboarding is required.
+Home shows a short insight list and Analyse shows the full evidence. Local,
+deterministic analysis highlights spending drivers, lower income, spending
+outside its usual range, unusually large merchant payments, subscription price
+rises, possible overlapping services and charges after a recorded cancellation.
+Monthly comparisons require a complete verified selected month and at least
+three complete months in the previous six. Transfers, future dates and other
+currencies are excluded. These are prompts to investigate, not proof of errors.
+
+Settings → Reminders enables reminders and sets a monthly statement-review day
+(1–28). Home flags missing recent statements and estimated recurring bills.
+Bill dates require observed monthly/quarterly/annual recurrence; an expected date
+does not prove a payment is unpaid. Reminders work locally whenever Feng is open.
+
+Export calendar reminders downloads a generic `.ics` file for your existing
+calendar. It contains a monthly review and upcoming bill-review events at 09:00
+local time with alarm requests, without merchant names, amounts or account details.
+Import the file and check your calendar's alert permissions. This provides alerts
+while Feng is closed without adding a notification server. Calendar support varies;
+the web app does not schedule reliable background alerts itself. Re-export to
+refresh predicted dates. Disabling reminders in Feng does not delete calendar events;
+remove them in the calendar if needed. Reminder preferences are included in backups.
+
 On desktop, press and drag a transaction row to open the category popup, then
 drop that same transaction directly onto a category tile. Uncategorized rows
 have no arrow icon. Up to three likely categories appear first, ranked from

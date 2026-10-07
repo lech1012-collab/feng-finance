@@ -1,4 +1,6 @@
 import { CurrencySetting } from "../components/CurrencySetting";
+import { Reminders } from "../components/Reminders";
+import { useGlobalCurrency } from "../components/CurrencySetting";
 import { ThemeSetting } from "../components/Theme";
 import { PersonalRules } from "../components/PersonalRules";
 import { useState } from "react";
@@ -32,6 +34,7 @@ import {
 } from "../domain/models";
 import { parseMoney } from "../domain/money";
 export default function Settings() {
+  const currency = useGlobalCurrency();
   const data = useLiveQuery(
     async () => ({
       accounts: await db.accounts.toArray(),
@@ -96,6 +99,7 @@ export default function Settings() {
       </div>
       <ThemeSetting />
       <CurrencySetting />
+      <Reminders currency={currency} settings />
       <PersonalRules />
       {notice && (
         <div className="notice success" role="status">

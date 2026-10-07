@@ -14,6 +14,14 @@ Implemented as a React / strict TypeScript / Vite static PWA with Dexie, PDF.js,
 
 ## Automated checks
 
+Version 1.7.0 adds local deeper insights and reminders. Tests cover complete-month
+baseline gating, spending drivers, income drops, merchant medians, currency and
+transfer isolation, recurring-price/overlap warnings, reminder cadence and stale
+history, configuration persistence and generic calendar exports without financial
+identifiers. A four-month synthetic import workflow verifies the explanations,
+direct reminder file picker, calendar download and disabling reminders after reload.
+No database reset, AI API, native app or notification backend is introduced.
+
 Version 1.6.1 adds a Transfer drop/tap tile to the sorting popup. Storage tests
 check incoming/outgoing transfer classification, cleared spending categories,
 cash-flow exclusion, remembered rule account scope and atomic Undo. The desktop
@@ -28,8 +36,8 @@ of Browse all categories and desktop Settings placement. The Barclaycard workflo
 imports both the bank debit and card repayment and verifies that neither inflates
 spending. Existing records are preserved; there is no schema migration or reset.
 
-- **196 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries. Dated balance reconstruction tests cover transfers, selected ranges, missing rows, reconciliation failures, conflicting overlap and shared comparison endpoints. Category suggestion tests cover rules/history priority, description clues, archived categories, direction, unknown descriptions, property rollup and transfers.
-- **46 browser checks**: twenty-three workflows each in Chromium and Playwright WebKit, primarily at 390 × 844; desktop dragging is tested at 1440 × 900. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records. Desktop checks drag directly from a row into a suggested tile, verify queue removal and Undo, and cancel a drag with Escape without modifying data.
+- **206 unit/storage/parser/component tests**: exact currency and date parsing, normalization/hashing, legitimate duplicate occurrences, rule ordering/ranges/account constraints, transfer matching and ambiguity, reconciliation cases, cash flow/property/monthly aggregation/comparison/recurrence, backup schema/reference validation and round trips, atomic imports/races, editing, v1→v2 migration, indexed retrieval with 20,000 persisted rows, labeled month controls and monetary formatting at safe-integer boundaries. Dated balance reconstruction tests cover transfers, selected ranges, missing rows, reconciliation failures, conflicting overlap and shared comparison endpoints. Category suggestion tests cover rules/history priority, description clues, archived categories, direction, unknown descriptions, property rollup and transfers.
+- **48 browser checks**: twenty-four workflows each in Chromium and Playwright WebKit, primarily at 390 × 844; desktop dragging is tested at 1440 × 900. Actual digital/scanned PDF fixtures, multi-bank import, rule correction/reimport, exact/regenerated duplicates, transfer totals, EUR isolation, explicit reconciliation override, backup/restore/demo deletion, unavailable-origin offline reload/import/export, local OCR offline, navigation/property/analysis, explicit service-worker update with preserved database, invalid PDF with unchanged records. Desktop checks drag directly from a row into a suggested tile, verify queue removal and Undo, and cancel a drag with Escape without modifying data.
 - Production TypeScript/Vite build and local offline precache generation; static output includes PDF worker/fonts/CMaps/WASM and English OCR assets.
 - `npm audit`: zero known vulnerabilities in installed production and development dependencies at verification time.
 - Prettier formatting check and manual visual inspection of generated-data dashboards at 390 and 1440 pixels.

@@ -2623,6 +2623,34 @@ h3 {
   font-weight: 400;
   margin-top: 5px;
 }
+.financial-insight {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 13px 0;
+  min-height: 44px;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.financial-insight span {
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.reminder-import {
+  width: 100%;
+  text-align: left;
+  align-items: flex-start;
+  background: transparent;
+  border-radius: 0;
+}
+.reminder-day {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 13px;
+  margin: 13px 0;
+}
 .transfer-tile.drop-target {
   border-color: var(--accent);
   background: var(--soft);
