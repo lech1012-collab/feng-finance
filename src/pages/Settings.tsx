@@ -21,6 +21,7 @@ import {
   download,
   exportCsv,
   clearLocalData,
+  deleteImportedRecords,
 } from "../storage/backup";
 import { loadDemo, deleteDemo } from "../storage/demo";
 import { id } from "../domain/normalize";
@@ -53,6 +54,7 @@ export default function Settings() {
   const [pending, setPending] = useState<Backup>();
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
   const [clearConfirmed, setClearConfirmed] = useState(false);
+  const [deleteImportsConfirmed, setDeleteImportsConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [categoryName, setCategoryName] = useState("");
   const [categoryKind, setCategoryKind] = useState<"income" | "expense">(
@@ -572,6 +574,34 @@ export default function Settings() {
           App {APP_VERSION} · IndexedDB schema {SCHEMA_VERSION} · Backup format
           1
         </p>
+      </section>
+      <section className="card danger-zone">
+        <h2>Delete imported records</h2>
+        <p>
+          Deletes all statements, transactions (including demo transactions) and
+          transfer links. Keeps accounts, categories, saved categorization rules
+          and settings so you can reimport your PDFs. Download a backup first.
+        </p>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={deleteImportsConfirmed}
+            onChange={(e) => setDeleteImportsConfirmed(e.target.checked)}
+          />
+          I understand my imported transaction history will be deleted.
+        </label>
+        <button
+          className="danger"
+          disabled={busy || !deleteImportsConfirmed}
+          onClick={() =>
+            void run(async () => {
+              await deleteImportedRecords();
+              setDeleteImportsConfirmed(false);
+            }, "Imported records deleted. Accounts and saved categorization rules kept.")
+          }
+        >
+          Delete imported records
+        </button>
       </section>
       <section className="card danger-zone">
         <h2>Clear local data</h2>

@@ -280,6 +280,17 @@ scan
   .drawImage(scanImage, { x: 0, y: 0, width: 650, height: 842 });
 await writeFile("tests/fixtures/barclays-scanned.pdf", await scan.save());
 console.log("Generated synthetic bank statements (no personal information).");
+await statement("Barclays", "barclays-memory", {
+  opening: 1000,
+  rows: [
+    {
+      description: "DIRECT DEBIT TO HAMM&FULH CTAX",
+      continuation: "REF: 12345678",
+      amount: -155,
+    },
+  ],
+  closing: 845,
+});
 await statement("Barclays", "barclays-income", {
   opening: 1000,
   rows: [

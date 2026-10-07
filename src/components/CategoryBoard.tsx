@@ -38,7 +38,9 @@ export function CategoryBoard({
   const [target, setTarget] = useState("");
   const [search, setSearch] = useState("");
   const [group, setGroup] = useState(false);
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(
+    !t.isDemo && !!normalizeMerchant(t.merchant),
+  );
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState("");

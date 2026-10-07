@@ -206,6 +206,22 @@ the web app does not schedule reliable background alerts itself. Re-export to
 refresh predicted dates. Disabling reminders in Feng does not delete calendar events;
 remove them in the calendar if needed. Reminder preferences are included in backups.
 
+Manual categorization remembers the normalized merchant by default, scoped to the
+same account and incoming/outgoing direction. This saves a separate IndexedDB rule;
+it does not depend on retaining transaction history. Uncheck **Remember** (or
+**Always categorize this merchant**) for a one-off assignment. Review/delete learned
+rules in Settings → Categorization & transfer rules. Exact matching avoids broad
+rules silently affecting unrelated descriptions; broader rules remain configurable
+in Settings. Rules are included in JSON backups and Undo removes its learned rule.
+
+For repeat-import testing: categorize the transaction with Remember checked, then
+Settings → **Delete imported records**, check the warning and delete. Reimport the
+PDF. This removes statements, transactions and transfer links while preserving
+accounts (including their IDs), categories, rules and preferences. **Clear local
+data** deliberately removes all of those, including categorization memory. Choices
+previously saved without Remember must be categorized again with it enabled before
+history is deleted. Already erased choices require a prior backup to recover.
+
 On desktop, press and drag a transaction row to open the category popup, then
 drop that same transaction directly onto a category tile. Uncategorized rows
 have no arrow icon. Up to three likely categories appear first, ranked from

@@ -59,7 +59,14 @@ export async function editTransaction(
         isReviewed: true,
         updatedAt: new Date().toISOString(),
       });
-      if (rule) await db.rules.add(rule);
+      if (rule) {
+        const priority =
+          Math.max(100, ...(await db.rules.toArray()).map((r) => r.priority)) +
+          1;
+        if (!Number.isSafeInteger(priority))
+          throw new Error("Rule priority is out of range.");
+        await db.rules.add({ ...rule, priority });
+      }
     },
   );
 }

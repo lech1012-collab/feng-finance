@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { db, defaultRules } from "../storage/database";
-import { suggestRulePattern } from "../categorization/engine";
-import { id } from "../domain/normalize";
+import { db } from "../storage/database";
+import { id, normalizeMerchant } from "../domain/normalize";
 import { money } from "../domain/money";
 import type {
   Account,
@@ -84,8 +83,9 @@ function Editor({
   const [subcategory, setSubcategory] = useState(t.subcategoryId ?? "");
   const [type, setType] = useState(financialType(t));
   const [tags, setTags] = useState(t.tags.join(", "));
-  const [createRule, setCreateRule] = useState(false);
-  const [pattern, setPattern] = useState(suggestRulePattern(t, defaultRules));
+  const [createRule, setCreateRule] = useState(
+    !t.isDemo && !!normalizeMerchant(t.merchant),
+  );
   const [pair, setPair] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -93,7 +93,10 @@ function Editor({
     setBusy(true);
     setError("");
     try {
-      if (createRule && (!pattern.trim() || (type !== "transfer" && !category)))
+      const pattern = normalizeMerchant(merchant);
+      const remember =
+        createRule && !t.isDemo && (type === "transfer" || !!category);
+      if (remember && !pattern)
         throw new Error(
           "A rule needs a pattern and category, or transfer type.",
         );
@@ -109,12 +112,13 @@ function Editor({
             .map((s) => s.trim())
             .filter(Boolean),
         },
-        createRule
+        remember
           ? {
               id: id(),
               name: `${pattern} → ${type === "transfer" ? "Transfer" : categories.find((c) => c.id === category)?.name}`,
-              match: "contains",
-              pattern: pattern.trim(),
+              match: "exact",
+              pattern,
+              accountId: t.accountId,
               direction: t.amount >= 0 ? "positive" : "negative",
               categoryId: type === "transfer" ? undefined : category,
               subcategoryId: subcategory || undefined,
@@ -268,31 +272,27 @@ function Editor({
           amounts. Transfers are excluded from net cash flow but still move
           account balances.
         </p>
-        <div className="rule-offer">
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={createRule}
-              onChange={(e) => setCreateRule(e.target.checked)}
-            />
-            Always categorize similar transactions
-            {type === "transfer"
-              ? " as transfers"
-              : category
-                ? ` as ${categories.find((c) => c.id === category)?.name}`
-                : ""}
-          </label>
-          {createRule && (
-            <label>
-              Transactions containing
+        {!t.isDemo && (
+          <div className="rule-offer">
+            <label className="check">
               <input
-                value={pattern}
-                onChange={(e) => setPattern(e.target.value)}
-                maxLength={500}
+                type="checkbox"
+                checked={createRule}
+                onChange={(e) => setCreateRule(e.target.checked)}
               />
+              Always categorize this merchant in this account
+              {type === "transfer"
+                ? " as transfers"
+                : category
+                  ? ` as ${categories.find((c) => c.id === category)?.name}`
+                  : ""}
             </label>
-          )}
-        </div>
+            <p className="muted">
+              Saved rules survive deleting imported records. Uncheck for a
+              one-off choice.
+            </p>
+          </div>
+        )}
         {error && (
           <p role="alert" className="warning-text">
             {error}

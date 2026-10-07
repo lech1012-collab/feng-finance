@@ -259,6 +259,20 @@ export async function clearLocalData() {
     await db.settings.put({ key: "initialized", value: "true" });
   });
 }
+/** Remove imported history, retaining account IDs so learned rules still match. */
+export async function deleteImportedRecords() {
+  await db.transaction(
+    "rw",
+    db.statements,
+    db.transactions,
+    db.transferLinks,
+    async () => {
+      await db.statements.clear();
+      await db.transactions.clear();
+      await db.transferLinks.clear();
+    },
+  );
+}
 export function download(contents: string, type: string, filename: string) {
   const url = URL.createObjectURL(new Blob([contents], { type }));
   const a = document.createElement("a");

@@ -19,6 +19,43 @@ async function gotoRoute(page: Page, path: string) {
   await page.goto(origin + "/#" + path);
 }
 const fixture = (name: string) => resolve(`tests/fixtures/${name}.pdf`);
+test("manual category memory survives deleting imports and reimporting the same PDF", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays-memory");
+  await confirmImport(page);
+  await gotoRoute(page, "/transactions?uncategorized=true");
+  await page.getByRole("link", { name: /HAMM&FULH CTAX/ }).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog.getByLabel(/Remember this merchant/)).toBeChecked();
+  await dialog
+    .getByRole("button", { name: "Categorize as Childcare", exact: true })
+    .click();
+  await expect(page.getByText(/merchant remembered/)).toBeVisible();
+  await gotoRoute(page, "/settings");
+  await page
+    .getByLabel("I understand my imported transaction history will be deleted.")
+    .check();
+  await page
+    .getByRole("button", { name: "Delete imported records", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Imported records deleted. Accounts and saved categorization rules kept.",
+    ),
+  ).toBeVisible();
+  await page.reload();
+  await openImport(page);
+  await selectStatement(page, "barclays-memory");
+  await page.getByRole("button", { name: /All transactions/ }).click();
+  await page.locator(".review-row > summary").click();
+  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
+    "childcare",
+  );
+  await confirmImport(page);
+  await expect(page.locator(".balance-summary")).toContainText("£845.00");
+});
 test("Salary and Income filters agree with cash flow and verified balance", async ({
   page,
 }) => {
@@ -399,10 +436,9 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
     "household",
   );
-  await page.getByLabel(/Always categorize similar transactions/).check();
-  await expect(page.getByLabel("Transactions containing")).toHaveValue(
-    "JOHN LEWIS",
-  );
+  await expect(
+    page.getByLabel(/Always categorize this merchant/),
+  ).toBeChecked();
   await page.getByRole("button", { name: "Save changes" }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
@@ -413,7 +449,25 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
     .filter({ hasText: "Categorization & transfer rules" })
     .click();
   await expect(
-    page.getByText("JOHN LEWIS → Household", { exact: true }),
+    page.getByText("JOHN LEWIS LONDON STORE → Household", { exact: true }),
+  ).toBeVisible();
+  await page
+    .getByLabel("I understand my imported transaction history will be deleted.")
+    .check();
+  await page
+    .getByRole("button", { name: "Delete imported records", exact: true })
+    .click();
+  await expect(
+    page.getByText(
+      "Imported records deleted. Accounts and saved categorization rules kept.",
+    ),
+  ).toBeVisible();
+  await openImport(page);
+  await selectStatement(page, "barclays");
+  await confirmImport(page);
+  await gotoRoute(page, "/transactions?category=household");
+  await expect(
+    page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }),
   ).toBeVisible();
   await openImport(page);
   await selectStatement(page, "barclays-october");
@@ -423,7 +477,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await page.getByRole("button", { name: /All transactions/ }).click();
   await page.locator(".review-row > summary").click();
   await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
-    "household",
+    "shopping",
   );
   await confirmImport(page);
   await openImport(page);

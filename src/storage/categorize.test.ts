@@ -1,7 +1,12 @@
 import { beforeEach, expect, it } from "vitest";
 import { db, initializeDatabase } from "./database";
-import { clearLocalData } from "./backup";
-import { transaction } from "../tests/helpers";
+import {
+  clearLocalData,
+  deleteImportedRecords,
+  createBackup,
+  restoreBackup,
+} from "./backup";
+import { transaction, accounts } from "../tests/helpers";
 import {
   categorizeCards,
   matchingUncategorized,
@@ -14,6 +19,45 @@ import { editTransaction } from "./transactions";
 beforeEach(async () => {
   await clearLocalData();
   await initializeDatabase();
+});
+it("remembers a direct debit after import deletion, reload and backup restore, scoped to its account and direction", async () => {
+  const t = transaction({
+    merchant: "DIRECT DEBIT TO HAMM&FULH CTAX REF: 12345678",
+    description: "DIRECT DEBIT TO HAMM&FULH CTAX REF: 12345678",
+    amount: -15500,
+  });
+  await db.accounts.bulkPut(accounts);
+  await db.transactions.put(t);
+  const receipt = await categorizeCards([t], "childcare", true);
+  await deleteImportedRecords();
+  const backup = await createBackup();
+  db.close();
+  await db.open();
+  expect(await db.transactions.count()).toBe(0);
+  expect(await db.accounts.get(t.accountId)).toEqual(accounts[0]);
+  const rules = await db.rules.toArray();
+  expect(rules).toContainEqual(receipt.rule);
+  expect(categorize(t, rules).categoryId).toBe("childcare");
+  expect(
+    categorize({ ...t, accountId: "different" }, rules).categoryId,
+  ).toBeUndefined();
+  expect(categorize({ ...t, amount: 15500 }, rules).categoryId).toBeUndefined();
+  await restoreBackup(backup);
+  await deleteImportedRecords();
+  expect(categorize(t, await db.rules.toArray()).categoryId).toBe("childcare");
+  await clearLocalData();
+  expect(categorize(t, await db.rules.toArray()).categoryId).toBeUndefined();
+});
+it("one-off categorization does not create a saved rule", async () => {
+  const t = transaction({
+    merchant: "UNIQUE MERCHANT",
+    description: "UNIQUE MERCHANT",
+  });
+  await db.transactions.put(t);
+  const receipt = await categorizeCards([t], "childcare", false);
+  expect(receipt.rule).toBeUndefined();
+  await deleteImportedRecords();
+  expect(categorize(t, await db.rules.toArray()).categoryId).toBeUndefined();
 });
 it("Salary categorization repairs an incoming payment type without changing money or provenance", async () => {
   const salary = transaction({
