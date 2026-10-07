@@ -1262,13 +1262,9 @@ test("category overview, income shares, central Home navigation and page palette
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
   await page.getByRole("link", { name: "Home", exact: true }).click();
-  await expect(page.locator('nav[aria-label="Main navigation"] a')).toHaveText([
-    "Import",
-    "Transactions",
-    "Home",
-    "Analyse",
-    "Settings",
-  ]);
+  await expect(
+    page.locator('nav[aria-label="Main navigation"] a:visible'),
+  ).toHaveText(["Import", "Transactions", "Home", "Analyse", "Settings"]);
   await expect(page.locator(".property-card")).toHaveCount(0);
   const palette = () =>
     page
