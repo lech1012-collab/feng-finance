@@ -280,6 +280,14 @@ scan
   .drawImage(scanImage, { x: 0, y: 0, width: 650, height: 842 });
 await writeFile("tests/fixtures/barclays-scanned.pdf", await scan.save());
 console.log("Generated synthetic bank statements (no personal information).");
+await statement("Barclays", "barclays-income", {
+  opening: 1000,
+  rows: [
+    { date: "15 Sep", description: "FICTIONAL EMPLOYER", amount: 3726 },
+    { date: "18 Sep", description: "FICTIONAL INCOME", amount: 500 },
+    { date: "20 Sep", description: "WAITROSE", amount: -100 },
+  ],
+});
 
 let planningOpening = 1000;
 for (const [month, label, end, groceries, bill] of [

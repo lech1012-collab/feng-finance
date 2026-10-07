@@ -1,6 +1,7 @@
 import type { Transaction, Rule } from "../domain/models";
 import { db } from "./database";
 import { id, normalizeMerchant } from "../domain/normalize";
+import { amountType } from "../domain/transaction-type";
 export const TRANSFER_TARGET = "__feng-transfer";
 export interface CategoryReceipt {
   before: Transaction[];
@@ -68,6 +69,14 @@ export async function categorizeCards(
           "A transaction changed. Reopen it before categorizing.",
         );
       const before = current as Transaction[];
+      if (
+        !transfer &&
+        (parent ?? category)?.kind === "income" &&
+        before.some((t) => t.amount < 0)
+      )
+        throw new Error(
+          "This is money out. Income and Salary require a positive payment. Check the source statement before correcting its amount.",
+        );
       const first = before[0];
       if (
         before.some(
@@ -96,7 +105,7 @@ export async function categorizeCards(
         ...t,
         categoryId: transfer ? undefined : (parent?.id ?? category!.id),
         subcategoryId: !transfer && parent ? category!.id : undefined,
-        type: transfer ? ("transfer" as const) : t.type,
+        type: transfer ? ("transfer" as const) : amountType(t.amount),
         isTransfer: transfer || t.isTransfer,
         isReviewed: true,
         updatedAt,

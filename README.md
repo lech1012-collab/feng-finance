@@ -140,6 +140,16 @@ Navigation is Import · Transactions · Home · Analyse · Settings, with Home c
 
 ## Home balances and simplified workflow
 
+### Income and balances
+
+Income labels and filters follow the signed statement amount: a positive Salary
+payment is income, even when an older stored type label says expense. Categorizing
+or editing a credit as Salary saves its type as income. Categories never reverse
+amounts; negative Salary assignments require checking the source statement.
+Any transfer marker, including a linked pair, excludes the movement from income,
+expenses and net cash flow. Account balances include every signed movement and
+retain the reported statement balance. No existing amounts or balances are rewritten.
+
 ### Planning
 
 Planning is a separate page, accessible from Home's Plan ahead card, Analyse,

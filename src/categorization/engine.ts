@@ -1,5 +1,6 @@
 import type { Category, Rule, Transaction } from "../domain/models";
 import { normalizeDescription, normalizeMerchant } from "../domain/normalize";
+import { financialType, amountType } from "../domain/transaction-type";
 export function suggestRulePattern(t: Transaction, rules: Rule[]) {
   const merchantRule = rules
     .filter((r) => r.builtIn && matches(r, t))
@@ -32,7 +33,7 @@ export function categorize(
   history: Transaction[] = [],
   categories?: Category[],
 ): Pick<Transaction, "categoryId" | "subcategoryId" | "type" | "isTransfer"> {
-  if (t.isTransfer || t.transferPairId)
+  if (financialType(t) === "transfer")
     return {
       categoryId: undefined,
       subcategoryId: undefined,
@@ -56,7 +57,7 @@ export function categorize(
     return {
       categoryId: rule.categoryId,
       subcategoryId: rule.subcategoryId,
-      type: rule.type ?? (t.amount >= 0 ? "income" : "expense"),
+      type: rule.type === "transfer" ? "transfer" : amountType(t.amount),
       isTransfer: rule.type === "transfer",
     };
   const previous = history.filter(

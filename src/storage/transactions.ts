@@ -1,6 +1,7 @@
 import type { Rule, Transaction, TransferLink } from "../domain/models";
 import { db } from "./database";
 import { id } from "../domain/normalize";
+import { amountType } from "../domain/transaction-type";
 export async function editTransaction(
   tid: string,
   patch: Pick<
@@ -14,9 +15,21 @@ export async function editTransaction(
     db.transactions,
     db.rules,
     db.transferLinks,
+    db.categories,
     async () => {
       const current = await db.transactions.get(tid);
       if (!current) throw new Error("Transaction no longer exists.");
+      const category = patch.categoryId
+        ? await db.categories.get(patch.categoryId)
+        : undefined;
+      if (
+        patch.type !== "transfer" &&
+        category?.kind === "income" &&
+        current.amount < 0
+      )
+        throw new Error(
+          "This is money out. Income and Salary require a positive payment. Check the source statement before correcting its amount.",
+        );
       if (current.transferPairId && patch.type !== "transfer") {
         const pair = await db.transferLinks.get(current.transferPairId);
         if (pair) {
@@ -35,6 +48,8 @@ export async function editTransaction(
       }
       await db.transactions.update(tid, {
         ...patch,
+        type:
+          patch.type === "transfer" ? "transfer" : amountType(current.amount),
         categoryId: patch.type === "transfer" ? undefined : patch.categoryId,
         subcategoryId:
           patch.type === "transfer" ? undefined : patch.subcategoryId,

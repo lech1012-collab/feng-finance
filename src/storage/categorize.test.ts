@@ -10,9 +10,61 @@ import {
 } from "./categorize";
 import { categorize } from "../categorization/engine";
 import { cashFlow } from "../analytics/calculations";
+import { editTransaction } from "./transactions";
 beforeEach(async () => {
   await clearLocalData();
   await initializeDatabase();
+});
+it("Salary categorization repairs an incoming payment type without changing money or provenance", async () => {
+  const salary = transaction({
+    amount: 372600,
+    merchant: "SIEMENS",
+    description: "SIEMENS",
+    type: "expense",
+    categoryId: undefined,
+  });
+  await db.transactions.put(salary);
+  const receipt = await categorizeCards([salary], "salary", true);
+  expect(receipt.after[0]).toMatchObject({
+    amount: 372600,
+    type: "income",
+    categoryId: "salary",
+    statementId: salary.statementId,
+    transactionFingerprint: salary.transactionFingerprint,
+    isTransfer: false,
+  });
+  expect(cashFlow(receipt.after, "GBP").income).toBe(372600);
+  await undoCategory(receipt);
+  expect(await db.transactions.get(salary.id)).toEqual(salary);
+});
+it("detail edits classify salary and income by credit direction, and refuse debit salary", async () => {
+  const salary = transaction({ amount: 372600, type: "expense" });
+  await db.transactions.put(salary);
+  await editTransaction(salary.id, {
+    merchant: "SIEMENS",
+    categoryId: "salary",
+    subcategoryId: undefined,
+    type: "expense",
+    tags: [],
+  });
+  expect(await db.transactions.get(salary.id)).toMatchObject({
+    amount: 372600,
+    type: "income",
+    categoryId: "salary",
+  });
+  const debit = transaction({ id: "debit", amount: -15228 });
+  await db.transactions.put(debit);
+  await expect(categorizeCards([debit], "salary")).rejects.toThrow("money out");
+  await expect(
+    editTransaction(debit.id, {
+      merchant: "SIEMENS",
+      categoryId: "salary",
+      subcategoryId: undefined,
+      type: "income",
+      tags: [],
+    }),
+  ).rejects.toThrow("money out");
+  expect(await db.transactions.get(debit.id)).toEqual(debit);
 });
 it("marks debit and credit transfers, excludes them from cash flow, learns safe rules and supports Undo", async () => {
   for (const amount of [-50000, 50000]) {

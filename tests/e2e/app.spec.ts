@@ -19,6 +19,76 @@ async function gotoRoute(page: Page, path: string) {
   await page.goto(origin + "/#" + path);
 }
 const fixture = (name: string) => resolve(`tests/fixtures/${name}.pdf`);
+test("Salary and Income filters agree with cash flow and verified balance", async ({
+  page,
+}) => {
+  await openImport(page);
+  await selectStatement(page, "barclays-income");
+  await confirmImport(page);
+  await expect(page.locator(".hero")).toContainText("+£4,126.00");
+  await expect(page.locator(".hero")).toContainText("£4,226.00");
+  await expect(page.locator(".balance-summary")).toContainText("£5,126.00");
+  await page
+    .getByRole("link", { name: /2 transactions need a category/ })
+    .click();
+  await page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }).click();
+  await page
+    .getByRole("dialog")
+    .getByRole("button", { name: "Categorize as Salary", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Income", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /FICTIONAL INCOME/ }),
+  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /WAITROSE/ })).toHaveCount(0);
+  await page.getByRole("button", { name: "Salary", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /FICTIONAL INCOME/ }),
+  ).toHaveCount(0);
+  // Reproduce a legacy label mismatch without changing source amounts/balances.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolve, reject) => {
+        const request = indexedDB.open("feng-finance");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const database = request.result;
+          const tx = database.transaction("transactions", "readwrite");
+          const table = tx.objectStore("transactions");
+          const records = table.getAll();
+          records.onsuccess = () => {
+            for (const t of records.result)
+              if (t.amount > 0) table.put({ ...t, type: "expense" });
+          };
+          tx.oncomplete = () => {
+            database.close();
+            resolve();
+          };
+          tx.onerror = () => {
+            database.close();
+            reject(tx.error);
+          };
+        };
+      }),
+  );
+  await page.reload();
+  await page.getByRole("button", { name: "Income", exact: true }).click();
+  await expect(
+    page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("link", { name: /FICTIONAL INCOME/ }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(page.locator(".hero")).toContainText("+£4,126.00");
+  await expect(page.locator(".balance-summary")).toContainText("£5,126.00");
+});
 test("Planning budgets persist, recurring timeline and forecast horizons stay connected", async ({
   page,
 }) => {

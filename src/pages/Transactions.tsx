@@ -1,5 +1,6 @@
 import { AccountBalances } from "../components/AccountBalances";
 import { useState, useMemo } from "react";
+import { financialType } from "../domain/transaction-type";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -104,7 +105,7 @@ export default function Transactions({
           category === "uncategorized" ||
           t.categoryId === category ||
           t.subcategoryId === category) &&
-        (!type || t.type === type) &&
+        (!type || financialType(t) === type) &&
         (!uncategorized ||
           (!t.categoryId &&
             !t.subcategoryId &&

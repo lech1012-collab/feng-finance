@@ -2,9 +2,10 @@ import { categoryColor } from "../domain/palette";
 import type { Category, Transaction } from "../domain/models";
 import { monthOffset, monthBounds } from "../domain/dates";
 import { money, safeSum, currencyPrecision } from "../domain/money";
+import { financialType } from "../domain/transaction-type";
 export function cashFlow(transactions: Transaction[], currency: string) {
   const items = transactions.filter(
-    (t) => t.currency === currency && !t.isTransfer && t.type !== "transfer",
+    (t) => t.currency === currency && financialType(t) !== "transfer",
   );
   const income = safeSum(
     items.filter((t) => t.amount > 0).map((t) => t.amount),
@@ -24,8 +25,7 @@ export function categorySpending(
     if (
       t.currency === currency &&
       t.amount < 0 &&
-      !t.isTransfer &&
-      t.type !== "transfer"
+      financialType(t) !== "transfer"
     ) {
       const parent = categories.find((c) => c.id === t.categoryId)?.parentId;
       const key = parent ?? t.categoryId ?? "uncategorized";
@@ -165,8 +165,7 @@ export function recurring(transactions: Transaction[], currency: string) {
     if (
       t.currency === currency &&
       t.amount < 0 &&
-      !t.isTransfer &&
-      t.type !== "transfer"
+      financialType(t) !== "transfer"
     )
       groups.set(t.merchant, [...(groups.get(t.merchant) ?? []), t]);
   return [...groups]

@@ -12,6 +12,7 @@ import type {
   Transaction,
 } from "../domain/models";
 import { editTransaction, linkTransfers } from "../storage/transactions";
+import { financialType, amountType } from "../domain/transaction-type";
 export default function TransactionDetail() {
   const { id: tid } = useParams();
   const data = useLiveQuery(async () => {
@@ -81,7 +82,7 @@ function Editor({
   const [merchant, setMerchant] = useState(t.merchant);
   const [category, setCategory] = useState(t.categoryId ?? "");
   const [subcategory, setSubcategory] = useState(t.subcategoryId ?? "");
-  const [type, setType] = useState(t.type);
+  const [type, setType] = useState(financialType(t));
   const [tags, setTags] = useState(t.tags.join(", "));
   const [createRule, setCreateRule] = useState(false);
   const [pattern, setPattern] = useState(suggestRulePattern(t, defaultRules));
@@ -194,7 +195,12 @@ function Editor({
               }}
             >
               {["income", "expense", "transfer"].map((v) => (
-                <option key={v}>{v}</option>
+                <option
+                  key={v}
+                  disabled={v !== "transfer" && v !== amountType(t.amount)}
+                >
+                  {v}
+                </option>
               ))}
             </select>
           </label>
@@ -207,12 +213,16 @@ function Editor({
               onChange={(e) => {
                 setCategory(e.target.value);
                 setSubcategory("");
+                setType(amountType(t.amount));
               }}
             >
               <option value="">Uncategorized</option>
               {categories
                 .filter(
-                  (c) => !c.parentId && (!c.archived || c.id === category),
+                  (c) =>
+                    !c.parentId &&
+                    (!c.archived || c.id === category) &&
+                    (t.amount >= 0 || c.kind !== "income" || c.id === category),
                 )
                 .map((c) => (
                   <option key={c.id} value={c.id}>
@@ -252,6 +262,12 @@ function Editor({
             />
           </label>
         </div>
+        <p className="coverage-note">
+          Money in counts as income; money out counts as spending. Salary is
+          income when its statement amount is positive. Categories never reverse
+          amounts. Transfers are excluded from net cash flow but still move
+          account balances.
+        </p>
         <div className="rule-offer">
           <label className="check">
             <input
