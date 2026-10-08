@@ -1,4 +1,10 @@
-import { useRef, useState, type ReactNode, type MouseEvent } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type MouseEvent,
+} from "react";
 import { GripVertical } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import type { Transaction } from "../domain/models";
@@ -35,6 +41,22 @@ export function SwipeTransaction({
   const drag = useRef<{ x: number; y: number; pointerId: number } | null>(null);
   const dragged = useRef(false);
   const [revealed, setRevealed] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
+  useEffect(() => {
+    if (!isDragging) return;
+    const release = () => setIsDragging(false);
+    const cancel = (event: KeyboardEvent) => {
+      if (event.key === "Escape") release();
+    };
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    window.addEventListener("keydown", cancel);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+      window.removeEventListener("keydown", cancel);
+    };
+  }, [isDragging]);
   const enabled = !t.isTransfer && t.type !== "transfer" && !t.transferPairId;
   const swipe = useSwipe((direction) => {
     if (!enabled) return;
@@ -44,7 +66,7 @@ export function SwipeTransaction({
   });
   return (
     <div
-      className={`swipe-transaction ${selected ? "selected" : ""} ${revealed ? "revealed" : ""}`}
+      className={`swipe-transaction ${selected ? "selected" : ""} ${revealed ? "revealed" : ""} ${isDragging ? "is-dragging" : ""}`}
     >
       {enabled && revealed && (
         <div className="swipe-actions">
@@ -105,6 +127,7 @@ export function SwipeTransaction({
           ) {
             drag.current = null;
             dragged.current = true;
+            setIsDragging(true);
             onDragCategorize?.({
               x: e.clientX,
               y: e.clientY,
@@ -114,10 +137,12 @@ export function SwipeTransaction({
         }}
         onPointerUp={(e) => {
           drag.current = null;
+          setIsDragging(false);
           if (enabled && !dragged.current) swipe.bind.onPointerUp(e);
         }}
         onPointerCancel={() => {
           drag.current = null;
+          setIsDragging(false);
           swipe.bind.onPointerCancel();
         }}
         style={{ transform: `translateX(${revealed ? -160 : swipe.offset}px)` }}
@@ -181,11 +206,16 @@ export function SwipeTransaction({
             className="row-selection"
             aria-label={`Select ${displayMerchant(t)}`}
             aria-pressed={!!selected}
+            disabled={isDragging}
             onClick={onSelect}
           >
             Select
           </button>
-          <button title="Categorize (C)" onClick={onCategorize}>
+          <button
+            title="Categorize (C)"
+            disabled={isDragging}
+            onClick={onCategorize}
+          >
             Categorize
           </button>
         </div>

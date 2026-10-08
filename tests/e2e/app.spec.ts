@@ -839,6 +839,23 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await expect(
     page.getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
+  const statement = page.locator(".import-statement-card");
+  await statement
+    .getByText("Bank, account and statement dates", { exact: true })
+    .click();
+  await page.getByLabel("Bank", { exact: true }).selectOption("Barclays");
+  await expect(statement).toHaveClass(/import-statement-blocking/);
+  await expect(statement.locator(":scope > summary .small-chip")).toHaveText(
+    "Parse again",
+  );
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+  await page.getByRole("button", { name: "Parse again", exact: true }).click();
+  await expect(statement.locator(":scope > summary .small-chip")).toHaveText(
+    "✓ Reconciled",
+  );
+  await expect(statement).not.toHaveClass(/import-statement-blocking/);
   await selectStatement(page, "barclays-no-period");
   await expect(page.getByRole("alert")).toContainText(
     "Enter the start and end dates",

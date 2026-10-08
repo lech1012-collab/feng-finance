@@ -77,3 +77,12 @@ Only after those checks, test private real statements from ignored `private-fixt
 - [ ] Generate a backup, save the download in Files, inspect the restore preview, then cancel without changing records. Full erasure stays disabled until ERASE is typed.
 - [ ] Switch account currency in Settings. If other accounts are hidden, their currency and count remain visible in the scope notice.
 - [ ] On desktop, drag a selected batch to a suggested category, scroll the category rail during a drag, cancel with Escape, and verify Undo restores all changed records/defaults.
+
+## Remaining UX review checks (1.9.2)
+
+- [ ] Cash-flow spending bars visibly extend below zero; income remains above it. Check 12-month labels and missing months in both themes.
+- [ ] Categorize one of seven pending payments, then Undo. All seven return and queue progress includes them; a previously skipped item remains deferred.
+- [ ] Type in category search and use keyboard Undo: only the text changes. Detail navigation waits for any category save.
+- [ ] Restore preview counts and labels stay separate at 320px and 200% text. Invalid, incompatible or inconsistent backups explain recovery without exposing their contents or changing local records.
+- [ ] Change bank or statement dates in an otherwise reconciled import. The statement header asks for a new parse and confirmation remains unavailable until review succeeds.
+- [ ] On desktop, hover/focus/select a transaction: Select and Categorize remain beside its amount without covering it. Dragging disables those actions.

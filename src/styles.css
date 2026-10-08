@@ -3987,10 +3987,28 @@ kbd {
 .backup-status--overdue {
   border-style: dashed;
 }
-.settings-preview dl {
+.settings-preview {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px 13px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 7rem), 1fr));
+  gap: 13px 21px;
+}
+.restore-count {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.restore-count dt {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.restore-count dd {
+  order: -1;
+  font-size: 1.382rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
 }
 .settings-preview dt,
 .settings-preview dd {
@@ -4274,19 +4292,32 @@ summary {
     display: none;
   }
   .row-hover-actions {
-    position: absolute;
-    right: 8px;
-    top: 50%;
-    transform: translateY(-50%);
+    position: static;
+    flex-shrink: 0;
     z-index: 2;
     padding: 4px;
     border-radius: 8px;
     background: var(--surface);
     opacity: 0;
+    pointer-events: none;
+  }
+  .swipe-transaction {
+    display: flex;
+    align-items: center;
+  }
+  .swipe-transaction .transaction-row {
+    flex: 1;
+    min-width: 0;
   }
   .swipe-transaction:hover .row-hover-actions,
-  .swipe-transaction:focus-within .row-hover-actions {
+  .swipe-transaction:focus-within .row-hover-actions,
+  .swipe-transaction.selected .row-hover-actions {
     opacity: 1;
+    pointer-events: auto;
+  }
+  .swipe-transaction.is-dragging .row-hover-actions {
+    opacity: 0;
+    pointer-events: none;
   }
 }
 @media (max-width: 760px) {

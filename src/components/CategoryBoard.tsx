@@ -31,12 +31,13 @@ export function CategoryBoard({
   onSkip,
   onMove,
   onUndo,
+  navigationBusy = false,
 }: {
   transaction: Transaction;
   returnTo?: string;
   categories: Category[];
   onClose: () => void;
-  onSaved: (receipt: CategoryReceipt) => void;
+  onSaved: (receipt: CategoryReceipt) => void | Promise<void>;
   feedback?: ReactNode;
   dragStart?: { x: number; y: number; pointerId: number };
   selection?: Transaction[];
@@ -44,6 +45,7 @@ export function CategoryBoard({
   onSkip?: () => void;
   onMove?: (direction: -1 | 1) => void;
   onUndo?: () => void;
+  navigationBusy?: boolean;
 }) {
   const location = useLocation();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -51,7 +53,8 @@ export function CategoryBoard({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [target, setTarget] = useState("");
   const [search, setSearch] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [savingBusy, setBusy] = useState(false);
+  const busy = savingBusy || navigationBusy;
   const saving = useRef(false);
   const [error, setError] = useState("");
   const [externalDragging, setExternalDragging] = useState(!!dragStart);
@@ -116,7 +119,7 @@ export function CategoryBoard({
         categoryId,
         { allowMultipleMerchants: true, backfill: true },
       );
-      onSaved(receipt);
+      await onSaved(receipt);
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Category could not be saved.",
@@ -156,6 +159,9 @@ export function CategoryBoard({
       const editing =
         event.target instanceof HTMLElement &&
         !!event.target.closest("input,select,textarea");
+      // Text inputs keep native Undo; a category receipt must only be undone
+      // when focus is on the board itself.
+      if (editing) return;
       if (
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "z" &&
@@ -165,7 +171,7 @@ export function CategoryBoard({
         onUndo();
         return;
       }
-      if (editing || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (event.metaKey || event.ctrlKey || event.altKey) return;
       if (/^[123]$/.test(event.key)) {
         const category = suggested[Number(event.key) - 1];
         if (category) {
@@ -271,8 +277,19 @@ export function CategoryBoard({
         follow your choice.
       </p>
       <p className="desktop-only keyboard-hints">
-        Keyboard: <kbd>1</kbd>–<kbd>3</kbd> suggestions · <kbd>J</kbd>/
-        <kbd>K</kbd> next/previous · <kbd>⌘Z</kbd> Undo
+        Keyboard: <kbd>1</kbd>–<kbd>3</kbd> suggestions
+        {onMove && (
+          <>
+            {" "}
+            · <kbd>J</kbd>/<kbd>K</kbd> next/previous
+          </>
+        )}
+        {onUndo && (
+          <>
+            {" "}
+            · <kbd>⌘Z</kbd> Undo
+          </>
+        )}
       </p>
       <article
         className={`sorting-card ${dragging || externalDragging ? "is-dragging" : ""}`}
@@ -413,7 +430,11 @@ export function CategoryBoard({
         className="sort-details"
         to={`/transactions/${t.id}`}
         state={{ returnTo: returnTo ?? location.pathname + location.search }}
-        onClick={onClose}
+        aria-disabled={busy || undefined}
+        onClick={(event) => {
+          if (busy) event.preventDefault();
+          else onClose();
+        }}
       >
         View transaction details
       </Link>

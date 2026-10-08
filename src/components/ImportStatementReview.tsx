@@ -17,7 +17,11 @@ import { decimalMoney, money, parseMoney } from "../domain/money";
 import { draftReconciliation } from "../import/pipeline";
 import { statementMovements } from "../import/movements";
 import { statementPeriodNotices } from "../import/batch";
-import { needsRowCheck, type FileReview } from "../import/review-model";
+import {
+  importBlockers,
+  needsRowCheck,
+  type FileReview,
+} from "../import/review-model";
 
 export function ImportStatementReview({
   entry,
@@ -39,7 +43,8 @@ export function ImportStatementReview({
   const d = entry.draft;
   const validation = d && draftReconciliation(d);
   const flow = d && statementMovements(d.transactions, d.statement.currency);
-  const exactSkipped = d?.exactDuplicate && !d.duplicateOverride;
+  const exactSkipped =
+    d?.exactDuplicate && !d.duplicateOverride && !entry.requiresBatchRecheck;
   const checks = d?.transactions.filter((t) => needsRowCheck(t, d)) ?? [];
   const updateDraft = (update: Partial<ImportDraft>) =>
     d && patch({ draft: { ...d, ...update } });
@@ -53,16 +58,10 @@ export function ImportStatementReview({
         t.id === id ? { ...t, ...update } : t,
       ),
     });
-  const warning = !!d?.warnings.length && !d.reviewedWarnings;
+  const blockers = importBlockers(entry);
   const blocking =
-    !entry.skip &&
-    !exactSkipped &&
-    (entry.error ||
-      (validation?.status === "warning" && !entry.override) ||
-      warning ||
-      checks.some(
-        (t) => t.include && t.extractionConfidence < 0.8 && !t.acknowledged,
-      ));
+    (entry.state === "review" || entry.state === "error") &&
+    blockers.length > 0;
   const notices = d ? statementPeriodNotices(d, history) : [];
   const outsideDates = d?.transactions.some(
     (t) =>
@@ -76,17 +75,29 @@ export function ImportStatementReview({
         ? `${entry.imported ?? 0} imported`
         : entry.error
           ? "Couldn't read this PDF"
-          : validation?.status === "warning"
-            ? entry.override
+          : blocking
+            ? entry.requiresBatchRecheck
+              ? "Recheck statement"
+              : entry.optionsChanged
+                ? "Parse again"
+                : entry.invalidAmounts.length
+                  ? "Correct invalid amounts"
+                  : validation?.status === "warning" && !entry.override
+                    ? "Balances don't add up"
+                    : checks.some(
+                          (t) =>
+                            t.include &&
+                            !t.acknowledged &&
+                            (t.extractionConfidence < 0.8 ||
+                              t.duplicate !== "none"),
+                        )
+                      ? "Verify highlighted rows"
+                      : "Review needed"
+            : validation?.status === "warning"
               ? "Unverified · accepted difference"
-              : "Balances don't add up"
-            : checks.some((t) => t.include && !t.acknowledged)
-              ? "Amounts need checking"
-              : warning
-                ? "Review needed"
-                : validation?.status === "reconciled"
-                  ? "✓ Reconciled"
-                  : "Balance unavailable";
+              : validation?.status === "reconciled"
+                ? "✓ Reconciled"
+                : "Balance unavailable";
   return (
     <details
       className={`card import-statement-card ${blocking ? "import-statement-blocking" : ""} ${entry.skip || exactSkipped ? "import-statement-skipped" : ""}`}

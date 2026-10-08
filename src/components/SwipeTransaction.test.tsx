@@ -10,12 +10,21 @@ beforeEach(() =>
     value: vi.fn(),
   }),
 );
-afterEach(cleanup);
-function pointer(element: HTMLElement, type: string, x: number, y = 100) {
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
+function pointer(
+  element: HTMLElement,
+  type: string,
+  x: number,
+  y = 100,
+  pointerType = "touch",
+) {
   const event = new Event(type, { bubbles: true });
   Object.assign(event, {
     pointerId: 1,
-    pointerType: "touch",
+    pointerType,
     isPrimary: true,
     button: 0,
     clientX: x,
@@ -65,5 +74,44 @@ it("leaves iOS back-edge gestures and vertical scrolling to the browser", () => 
   pointer(row, "pointerdown", 200);
   pointer(row, "pointermove", 202, 160);
   pointer(row, "pointerup", 280, 200);
+  expect(categorize).not.toHaveBeenCalled();
+});
+
+it("disables same-row hover actions during object drag and restores them on Escape", () => {
+  vi.stubGlobal(
+    "matchMedia",
+    vi.fn(() => ({ matches: true })),
+  );
+  const categorize = vi.fn();
+  const drag = vi.fn();
+  render(
+    <MemoryRouter>
+      <SwipeTransaction
+        transaction={transaction()}
+        onCategorize={categorize}
+        onDragCategorize={drag}
+      >
+        Corner shop
+      </SwipeTransaction>
+    </MemoryRouter>,
+  );
+  const row = screen.getByRole("link", { name: "Corner shop" });
+  pointer(row, "pointerdown", 200, 100, "mouse");
+  pointer(row, "pointermove", 220, 100, "mouse");
+  expect(drag).toHaveBeenCalledExactlyOnceWith({
+    x: 220,
+    y: 100,
+    pointerId: 1,
+  });
+  expect(row.parentElement).toHaveClass("is-dragging");
+  expect(screen.getByRole("button", { name: "Categorize" })).toBeDisabled();
+  expect(
+    screen.getByRole("button", { name: "Select Waitrose" }),
+  ).toBeDisabled();
+  fireEvent.keyDown(window, { key: "Escape" });
+  expect(row.parentElement).not.toHaveClass("is-dragging");
+  expect(screen.getByRole("button", { name: "Categorize" })).toBeEnabled();
+  pointer(row, "pointerup", 220, 100, "mouse");
+  fireEvent.click(row);
   expect(categorize).not.toHaveBeenCalled();
 });

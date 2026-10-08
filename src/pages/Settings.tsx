@@ -40,6 +40,7 @@ import { parseMoney, decimalMoney } from "../domain/money";
 import { matches } from "../categorization/engine";
 import { saveRule, deleteRule } from "../storage/rules";
 import { formatUkDate } from "../domain/dates";
+import { backupErrorMessage } from "../storage/backup-error";
 export default function Settings() {
   const currency = useGlobalCurrency();
   const [searchParams] = useSearchParams();
@@ -82,7 +83,11 @@ export default function Settings() {
   const [accountName, setAccountName] = useState("");
   const [accountCurrency, setAccountCurrency] = useState("GBP");
   const [accountMask, setAccountMask] = useState("");
-  const run = async (fn: () => Promise<unknown>, message: string) => {
+  const run = async (
+    fn: () => Promise<unknown>,
+    message: string,
+    errorMessage?: (error: unknown) => string,
+  ) => {
     setBusy(true);
     setError("");
     setNotice("");
@@ -91,9 +96,11 @@ export default function Settings() {
       setNotice(message);
     } catch (e) {
       setError(
-        e instanceof Error
-          ? e.message
-          : "The operation failed. Your existing data is safe.",
+        errorMessage
+          ? errorMessage(e)
+          : e instanceof Error
+            ? e.message
+            : "The operation failed. Your existing data is safe.",
       );
     } finally {
       setBusy(false);
@@ -225,11 +232,15 @@ export default function Settings() {
               if (!file) return;
               setPending(undefined);
               setReplaceConfirmed(false);
-              await run(async () => {
-                if (file.size > 50 * 1024 * 1024)
-                  throw new Error("Backup exceeds the 50 MB limit.");
-                setPending(validateBackup(JSON.parse(await file.text())));
-              }, "Backup validated. Review the replacement warning below.");
+              await run(
+                async () => {
+                  if (file.size > 50 * 1024 * 1024)
+                    throw new Error("Backup exceeds the 50 MB limit.");
+                  setPending(validateBackup(JSON.parse(await file.text())));
+                },
+                "Backup validated. Review the replacement warning below.",
+                backupErrorMessage,
+              );
               e.target.value = "";
             }}
           />
@@ -237,23 +248,22 @@ export default function Settings() {
         {pending && (
           <div className="restore-warning">
             <h3>Replace all local financial data?</h3>
-            <div className="settings-preview" aria-label="Backup contents">
-              <span>
-                <strong>{pending.accounts.length}</strong> accounts
-              </span>
-              <span>
-                <strong>{pending.transactions.length}</strong> transactions
-              </span>
-              <span>
-                <strong>{pending.statements.length}</strong> statements
-              </span>
-              <span>
-                <strong>
-                  {pending.rules.filter((r) => !r.builtIn).length}
-                </strong>{" "}
-                personal rules
-              </span>
-            </div>
+            <dl className="settings-preview" aria-label="Backup contents">
+              {[
+                { count: pending.accounts.length, label: "account" },
+                { count: pending.transactions.length, label: "transaction" },
+                { count: pending.statements.length, label: "statement" },
+                {
+                  count: pending.rules.filter((r) => !r.builtIn).length,
+                  label: "personal rule",
+                },
+              ].map(({ count, label }) => (
+                <div className="restore-count" key={label}>
+                  <dt>{count === 1 ? label : `${label}s`}</dt>
+                  <dd>{count}</dd>
+                </div>
+              ))}
+            </dl>
             <p className="muted">
               Exported {formatUkDate(pending.exportedAt.slice(0, 10))} · Backup
               version {pending.version} · Database version{" "}
@@ -279,10 +289,14 @@ export default function Settings() {
                 disabled={!replaceConfirmed || busy}
                 className="danger"
                 onClick={() =>
-                  void run(async () => {
-                    await restoreBackup(pending);
-                    setPending(undefined);
-                  }, "Backup restored successfully.")
+                  void run(
+                    async () => {
+                      await restoreBackup(pending);
+                      setPending(undefined);
+                    },
+                    "Backup restored successfully.",
+                    (error) => backupErrorMessage(error, "restore"),
+                  )
                 }
               >
                 Replace data with backup

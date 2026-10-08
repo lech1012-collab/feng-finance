@@ -1,8 +1,8 @@
 import { test, expect, type Page } from "@playwright/test";
-import type { Statement } from "../../src/domain/models";
+import type { Statement, Transaction } from "../../src/domain/models";
 import { accounts, transaction } from "../../src/tests/helpers";
 
-async function seedSortingQueue(page: Page) {
+async function seedSortingQueue(page: Page, extraRows: Transaction[] = []) {
   await page.goto("/#/transactions?uncategorized=1&allDates=1");
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
@@ -23,6 +23,7 @@ async function seedSortingQueue(page: Page) {
       amount: -900,
       isReviewed: false,
     }),
+    ...extraRows,
   ];
   const statement: Statement = {
     id: "s1",
@@ -31,7 +32,7 @@ async function seedSortingQueue(page: Page) {
     statementPeriodStart: "2026-09-01",
     statementPeriodEnd: "2026-09-30",
     openingBalance: 100000,
-    closingBalance: 98100,
+    closingBalance: 100000 + rows.reduce((total, row) => total + row.amount, 0),
     currency: "GBP",
     sourceFilename: "synthetic-sorting.pdf",
     sourceFileHash: "synthetic-sorting-fixture",
@@ -40,7 +41,7 @@ async function seedSortingQueue(page: Page) {
     extractionMethod: "embedded-text",
     validationStatus: "reconciled",
     validationDifference: 0,
-    transactionCount: 2,
+    transactionCount: rows.length,
     warnings: [],
     periodSource: "printed",
   };
@@ -70,7 +71,10 @@ async function seedSortingQueue(page: Page) {
   );
   await page.reload();
   await expect(
-    page.getByRole("button", { name: "Uncategorized 2", exact: true }),
+    page.getByRole("button", {
+      name: `Uncategorized ${rows.length}`,
+      exact: true,
+    }),
   ).toBeVisible();
 }
 
@@ -120,6 +124,13 @@ test("desktop dragging scrolls the category rail and Escape stops it without sav
     Math.min(railBounds.y + railBounds.height - 6, 894),
     { steps: 15 },
   );
+  await expect(row.locator("..").locator(".row-hover-actions")).toHaveCSS(
+    "opacity",
+    "0",
+  );
+  await expect(
+    row.locator("..").getByRole("button", { name: "Select Waitrose" }),
+  ).toBeDisabled();
   await expect
     .poll(() => rail.evaluate((element) => element.scrollTop))
     .toBeGreaterThan(40);
@@ -149,15 +160,35 @@ test("desktop rail suggests categories and multi-selection learns and undoes bot
   await seedSortingQueue(page);
   const first = page.getByRole("link", { name: /^Waitrose,/ });
   const second = page.getByRole("link", { name: /^Corner Shop,/ });
-  // Hover controls overlay the row; they must not reserve an empty strip below it.
+  // Controls share the row with the amount and never add an empty strip below it.
   const rowLayout = await first.evaluate((row) => ({
     row: row.getBoundingClientRect().height,
     object: row.closest(".swipe-transaction")!.getBoundingClientRect().height,
   }));
   expect(rowLayout.object).toBeLessThanOrEqual(rowLayout.row + 1);
+  const controls = first.locator("..").locator(".row-hover-actions");
+  const assertAmountIsClear = async () => {
+    const amount = (await first.locator(":scope > strong").boundingBox())!;
+    const buttons = (await controls.boundingBox())!;
+    const container = (await first.locator("..").boundingBox())!;
+    expect(amount.x + amount.width).toBeLessThanOrEqual(buttons.x + 1);
+    expect(buttons.x + buttons.width).toBeLessThanOrEqual(
+      container.x + container.width + 1,
+    );
+  };
+  await first.hover();
+  await expect(controls).toHaveCSS("opacity", "1");
+  await assertAmountIsClear();
+  await first.focus();
+  await page.mouse.move(0, 0);
+  await expect(controls).toHaveCSS("opacity", "1");
+  await assertAmountIsClear();
   await first.click({ modifiers: ["Meta"] });
   await second.click({ modifiers: ["Shift"] });
   await expect(page.locator(".swipe-transaction.selected")).toHaveCount(2);
+  await page.mouse.move(0, 0);
+  await expect(controls).toHaveCSS("opacity", "1");
+  await assertAmountIsClear();
   const rail = page.getByRole("complementary", {
     name: "Category drop targets",
   });
@@ -174,8 +205,8 @@ test("desktop rail suggests categories and multi-selection learns and undoes bot
   await expect(
     page.getByRole("button", { name: "Uncategorized 0", exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole("status")).toContainText("2 merchants");
-  await expect(page.getByRole("status")).toContainText(
+  await expect(page.locator(".category-feedback")).toContainText("2 merchants");
+  await expect(page.locator(".category-feedback")).toContainText(
     "Future matching payments will follow",
   );
   expect(await manualRuleCount(page)).toBe(2);
@@ -208,6 +239,9 @@ test("mobile queue advances after a suggestion and Skip defers the remaining pay
     .click();
   dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Corner Shop", { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByText("1 of 1 to sort", { exact: true }),
+  ).toBeVisible();
   await dialog.getByRole("button", { name: "Skip", exact: true }).click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".transaction-list .transaction-row")).toHaveCount(
@@ -216,6 +250,68 @@ test("mobile queue advances after a suggestion and Skip defers the remaining pay
   await expect(
     page.getByRole("button", { name: "Uncategorized 1", exact: true }),
   ).toBeVisible();
+  expect(await manualRuleCount(page)).toBe(1);
+});
+
+test("mobile Undo restores all seven pending cards and the progress denominator", async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await seedSortingQueue(
+    page,
+    Array.from({ length: 5 }, (_, index) =>
+      transaction({
+        id: `sort-additional-${index}`,
+        date: `2026-09-0${3 - Math.min(index, 2)}`,
+        merchant: `TEST SHOP ${index + 1}`,
+        description: `TEST SHOP ${index + 1}`,
+        isReviewed: false,
+      }),
+    ),
+  );
+  await page
+    .getByRole("button", { name: "Start sorting", exact: true })
+    .click();
+  let dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("1 of 7 to sort", { exact: true }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Categorize as Groceries", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("1 of 6 to sort", { exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByText("Corner Shop", { exact: true })).toBeVisible();
+  await dialog.getByRole("button", { name: "Undo", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await expect(dialog.getByText("Waitrose", { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByText("1 of 7 to sort", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Uncategorized 7", exact: true }),
+  ).toHaveCount(1);
+  expect(await manualRuleCount(page)).toBe(0);
+  await dialog
+    .getByRole("button", { name: "Categorize as Groceries", exact: true })
+    .click();
+  dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("1 of 6 to sort", { exact: true }),
+  ).toBeVisible();
+  await dialog.getByRole("button", { name: "Skip", exact: true }).click();
+  dialog = page.getByRole("dialog");
+  await expect(
+    dialog.getByText("1 of 5 to sort", { exact: true }),
+  ).toBeVisible();
+  await dialog
+    .getByRole("button", { name: "Close categorization", exact: true })
+    .click();
+  await expect(page.locator(".transaction-list .transaction-row")).toHaveCount(
+    6,
+  );
   expect(await manualRuleCount(page)).toBe(1);
 });
 

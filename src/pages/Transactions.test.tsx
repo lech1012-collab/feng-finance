@@ -181,6 +181,20 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
       /Waitrose on Barclays.*Future matching payments will follow/,
     ),
   ).toBeVisible();
+  expect(
+    within(screen.getByRole("dialog")).getByText("1 of 1 to sort"),
+  ).toBeVisible();
+  const categorySearch = within(screen.getByRole("dialog")).getByRole(
+    "searchbox",
+    {
+      name: "Find a category",
+    },
+  );
+  fireEvent.change(categorySearch, { target: { value: "club" } });
+  fireEvent.keyDown(categorySearch, { key: "z", ctrlKey: true });
+  expect(undoCategory).not.toHaveBeenCalled();
+  expect((await db.transactions.get(first.id))?.categoryId).toBe("groceries");
+  fireEvent.change(categorySearch, { target: { value: "" } });
   await act(async () => {
     fireEvent.keyDown(screen.getByRole("dialog"), { key: "z", metaKey: true });
     expect(undoCategory).toHaveBeenCalledOnce();
@@ -188,6 +202,17 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
   });
   expect(await db.transactions.get(first.id)).toEqual(first);
   expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("1 of 2 to sort"),
+    ).toBeVisible(),
+  );
+  expect(
+    within(screen.getByRole("dialog")).getByText("Waitrose"),
+  ).toBeVisible();
+  expect(
+    await screen.findByRole("button", { name: "Uncategorized 2" }),
+  ).toBeVisible();
 }, 15000);
 
 it("lets the user skip in the queue without learning or changing any transaction", async () => {
@@ -218,6 +243,9 @@ it("lets the user skip in the queue without learning or changing any transaction
       within(screen.getByRole("dialog")).getByText("Second Shop"),
     ).toBeVisible(),
   );
+  expect(
+    within(screen.getByRole("dialog")).getByText("1 of 1 to sort"),
+  ).toBeVisible();
   fireEvent.click(
     within(screen.getByRole("dialog")).getByRole("button", { name: "Skip" }),
   );
@@ -227,4 +255,200 @@ it("lets the user skip in the queue without learning or changing any transaction
     second,
   ]);
   expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
+}, 15000);
+
+it("restores all backfilled queue entries on Undo and can sort them again", async () => {
+  const saveCategory = vi.spyOn(categoryStorage, "categorizeCards");
+  const undoCategory = vi.spyOn(categoryStorage, "undoCategory");
+  const first = transaction({ id: "waitrose", date: "2026-09-05" });
+  const matching = transaction({ id: "matching", date: "2026-09-04" });
+  const last = transaction({
+    id: "remaining",
+    date: "2026-09-03",
+    merchant: "CITY CLUB",
+    description: "CITY CLUB",
+  });
+  await db.transactions.bulkPut([first, matching, last]);
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+  expect(within(dialog).getByText("1 of 3 to sort")).toBeVisible();
+  await act(async () => {
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Categorize as Groceries" }),
+    );
+    await saveCategory.mock.results[0].value;
+  });
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("1 of 1 to sort"),
+    ).toBeVisible(),
+  );
+  await act(async () => {
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "z", metaKey: true });
+    await undoCategory.mock.results[0].value;
+  });
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("1 of 3 to sort"),
+    ).toBeVisible(),
+  );
+  expect(
+    await db.transactions.bulkGet([first.id, matching.id, last.id]),
+  ).toEqual([first, matching, last]);
+  expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
+  await act(async () => {
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Categorize as Groceries",
+      }),
+    );
+    await saveCategory.mock.results[1].value;
+  });
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("1 of 1 to sort"),
+    ).toBeVisible(),
+  );
+  expect((await db.transactions.get(matching.id))?.categoryId).toBe(
+    "groceries",
+  );
+  expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(1);
+}, 15000);
+
+it("refreshes a live queue when records are deleted or categorized elsewhere", async () => {
+  const first = transaction({ id: "first", date: "2026-09-05" });
+  const second = transaction({
+    id: "second",
+    date: "2026-09-04",
+    merchant: "CITY CLUB",
+  });
+  const third = transaction({
+    id: "third",
+    date: "2026-09-03",
+    merchant: "LAST SHOP",
+  });
+  await db.transactions.bulkPut([first, second, third]);
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+  expect(within(dialog).getByText("1 of 3 to sort")).toBeVisible();
+  await db.transactions.delete(second.id);
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("1 of 2 to sort"),
+    ).toBeVisible(),
+  );
+  await db.transactions.update(first.id, { categoryId: "groceries" });
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("Last Shop"),
+    ).toBeVisible(),
+  );
+  expect(
+    within(screen.getByRole("dialog")).getByText("1 of 1 to sort"),
+  ).toBeVisible();
+  expect((await db.transactions.get(first.id))?.categoryId).toBe("groceries");
+  expect(await db.transactions.get(second.id)).toBeUndefined();
+  expect(await db.transactions.get(third.id)).toEqual(third);
+  expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
+}, 15000);
+
+it("keeps skipped cards deferred when Undo reopens a completed sorting queue", async () => {
+  const saveCategory = vi.spyOn(categoryStorage, "categorizeCards");
+  const undoCategory = vi.spyOn(categoryStorage, "undoCategory");
+  const first = transaction({
+    id: "skip-first",
+    date: "2026-09-05",
+    merchant: "FIRST SHOP",
+    description: "FIRST SHOP",
+  });
+  const second = transaction({ id: "save-second", date: "2026-09-04" });
+  await db.transactions.bulkPut([first, second]);
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+  fireEvent.click(within(dialog).getByRole("button", { name: "Skip" }));
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("Waitrose"),
+    ).toBeVisible(),
+  );
+  await act(async () => {
+    fireEvent.click(
+      within(screen.getByRole("dialog")).getByRole("button", {
+        name: "Categorize as Groceries",
+      }),
+    );
+    await saveCategory.mock.results[0].value;
+  });
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  await act(async () => {
+    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    await undoCategory.mock.results[0].value;
+  });
+  await waitFor(() =>
+    expect(
+      within(screen.getByRole("dialog")).getByText("1 of 1 to sort"),
+    ).toBeVisible(),
+  );
+  expect(
+    within(screen.getByRole("dialog")).getByText("Waitrose"),
+  ).toBeVisible();
+  expect(await db.transactions.bulkGet([first.id, second.id])).toEqual([
+    first,
+    second,
+  ]);
+  expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
+}, 15000);
+
+it("keeps transaction detail navigation inside the board until a category save completes", async () => {
+  await db.transactions.put(transaction());
+  let rejectSave: (reason: Error) => void = () => undefined;
+  vi.spyOn(categoryStorage, "categorizeCards").mockImplementation(
+    () =>
+      new Promise((_, reject) => {
+        rejectSave = reject;
+      }),
+  );
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+  fireEvent.click(
+    within(dialog).getByRole("button", { name: "Categorize as Groceries" }),
+  );
+  const details = within(dialog).getByRole("link", {
+    name: "View transaction details",
+  });
+  expect(details).toHaveAttribute("aria-disabled", "true");
+  expect(fireEvent.click(details)).toBe(false);
+  expect(screen.getByRole("dialog")).toBe(dialog);
+  await act(async () =>
+    rejectSave(new Error("Storage temporarily unavailable.")),
+  );
+  expect(await within(dialog).findByRole("alert")).toHaveTextContent(
+    "Storage temporarily unavailable.",
+  );
+  expect(details).not.toHaveAttribute("aria-disabled");
+  expect(await db.transactions.get("t1")).toEqual(transaction());
 }, 15000);

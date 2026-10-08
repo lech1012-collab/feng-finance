@@ -43,6 +43,20 @@ export default function Transactions({
   const selectionAnchor = useRef<string | undefined>(undefined);
   const [queueIds, setQueueIds] = useState<string[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
+  const queueScope = useRef<string[]>([]);
+  const skippedQueueIds = useRef(new Set<string>());
+  const [queueBusy, setQueueBusy] = useState(false);
+  const movingQueue = useRef(false);
+  const queueKey = JSON.stringify(queueIds);
+  const queueRecords = useLiveQuery(
+    async () => ({
+      key: queueKey,
+      rows: (await db.transactions.bulkGet(queueIds)).filter(
+        (row): row is Transaction => !!row && needsCategory(row),
+      ),
+    }),
+    [queueKey],
+  );
   const [railDrag, setRailDrag] = useState<{
     ids: string[];
     pointerId: number;
@@ -203,6 +217,9 @@ export default function Transactions({
   ) => {
     setUndoError("");
     if (start && window.matchMedia("(min-width: 1100px)").matches) {
+      queueScope.current = [];
+      skippedQueueIds.current.clear();
+      setQueueIds([]);
       railCursor.current = { x: start.x, y: start.y };
       activeRailDrag.current = true;
       setRailDrag({
@@ -214,6 +231,8 @@ export default function Transactions({
     setDragStart(start);
     const pool =
       !start && needsCategory(t) ? filtered.filter(needsCategory) : [];
+    queueScope.current = pool.map((p) => p.id);
+    skippedQueueIds.current.clear();
     setQueueIds(pool.map((p) => p.id));
     setQueueIndex(
       Math.max(
@@ -223,28 +242,74 @@ export default function Transactions({
     );
     setSorting(t);
   };
-  const moveQueue = (direction: -1 | 1, removedIds: string[] = []) => {
-    const pool = queueIds.filter((id) => !removedIds.includes(id));
-    const current = pool.indexOf(sorting?.id ?? "");
-    for (let step = 1; step <= pool.length; step++) {
-      const index =
-        ((current < 0 ? queueIndex - 1 : current) +
-          direction * step +
-          pool.length * 2) %
-        pool.length;
-      const next = data?.items.find(
-        (p) => p.id === pool[index] && needsCategory(p),
+  const moveQueue = async (direction: -1 | 1, removedIds: string[] = []) => {
+    if (movingQueue.current) return;
+    movingQueue.current = true;
+    setQueueBusy(true);
+    try {
+      // A completed save can precede Dexie's list refresh. Read committed
+      // records so backfilled, deleted or externally categorized rows do not
+      // remain in the progress denominator or reappear as the next card.
+      const pending = (await db.transactions.bulkGet(queueIds)).filter(
+        (p): p is Transaction =>
+          !!p && needsCategory(p) && !removedIds.includes(p.id),
       );
-      if (next) {
-        setQueueIds(pool);
-        setQueueIndex(index);
-        setSorting(next);
-        return;
+      const current = Math.max(0, queueIds.indexOf(sorting?.id ?? ""));
+      for (let step = 1; step <= queueIds.length; step++) {
+        const id =
+          queueIds[
+            (current + direction * step + queueIds.length * 2) % queueIds.length
+          ];
+        const next = pending.find((p) => p.id === id);
+        if (next) {
+          setQueueIds(pending.map((p) => p.id));
+          setQueueIndex(pending.findIndex((p) => p.id === id));
+          setSorting(next);
+          return;
+        }
       }
+      setSorting(undefined);
+      setQueueIds([]);
+    } catch (err) {
+      setUndoError(
+        err instanceof Error ? err.message : "Queue could not be refreshed.",
+      );
+    } finally {
+      movingQueue.current = false;
+      setQueueBusy(false);
     }
-    setSorting(undefined);
-    setQueueIds([]);
   };
+  useEffect(() => {
+    if (
+      !sorting ||
+      !queueIds.length ||
+      queueBusy ||
+      undoBusy ||
+      queueRecords?.key !== queueKey
+    )
+      return;
+    const pending = queueRecords.rows;
+    const ids = pending.map((p) => p.id);
+    if (JSON.stringify(ids) !== queueKey) setQueueIds(ids);
+    if (!pending.length) {
+      setSorting(undefined);
+      return;
+    }
+    const index = pending.findIndex((p) => p.id === sorting.id);
+    const nextIndex =
+      index < 0 ? Math.min(queueIndex, pending.length - 1) : index;
+    setQueueIndex(nextIndex);
+    if (JSON.stringify(sorting) !== JSON.stringify(pending[nextIndex]))
+      setSorting(pending[nextIndex]);
+  }, [
+    queueRecords,
+    queueKey,
+    sorting,
+    queueIds.length,
+    queueIndex,
+    queueBusy,
+    undoBusy,
+  ]);
   const applyToSelection = async (ids: string[], categoryId: string) => {
     if (!data || railSaving.current) return;
     railSaving.current = true;
@@ -261,6 +326,9 @@ export default function Transactions({
         categoryId,
         { allowMultipleMerchants: true, backfill: true },
       );
+      queueScope.current = [];
+      skippedQueueIds.current.clear();
+      setQueueIds([]);
       setReceipt(result);
       setSelectedIds([]);
       setSorting(undefined);
@@ -280,7 +348,23 @@ export default function Transactions({
     setUndoError("");
     try {
       await undoCategory(receipt);
-      setSorting(receipt.before[0]);
+      // Restore the queue from the same committed records as the atomic Undo,
+      // including any matching payments removed by the previous backfill.
+      // Skipped cards remain deferred for this sorting session.
+      const scope = queueScope.current.length
+        ? queueScope.current
+        : receipt.before.filter(needsCategory).map((t) => t.id);
+      const pending = (await db.transactions.bulkGet(scope)).filter(
+        (t): t is Transaction =>
+          !!t && needsCategory(t) && !skippedQueueIds.current.has(t.id),
+      );
+      const restored =
+        pending.find((t) => t.id === receipt.before[0].id) ?? pending[0];
+      setQueueIds(pending.map((t) => t.id));
+      setQueueIndex(
+        restored ? pending.findIndex((t) => t.id === restored.id) : 0,
+      );
+      setSorting(restored ?? receipt.before[0]);
       setReceipt(undefined);
     } catch (err) {
       setUndoError(err instanceof Error ? err.message : "Undo failed.");
@@ -825,6 +909,8 @@ export default function Transactions({
             onClick={() => {
               const first = data?.items.find((t) => t.id === selectedIds[0]);
               if (first) {
+                queueScope.current = [];
+                skippedQueueIds.current.clear();
                 setQueueIds([]);
                 setSorting(first);
               }
@@ -848,6 +934,7 @@ export default function Transactions({
           returnTo={returnTo}
           categories={data.categories}
           feedback={feedback}
+          navigationBusy={queueBusy || undoBusy}
           selection={
             selectedIds.includes(sorting.id)
               ? data.items.filter((t) => selectedIds.includes(t.id))
@@ -858,21 +945,30 @@ export default function Transactions({
               ? { position: queueIndex + 1, total: queueIds.length }
               : undefined
           }
-          onSkip={() => moveQueue(1, [sorting.id])}
-          onMove={(direction) => moveQueue(direction)}
+          onSkip={() => {
+            skippedQueueIds.current.add(sorting.id);
+            void moveQueue(1, [sorting.id]);
+          }}
+          onMove={
+            queueIds.length
+              ? (direction) => void moveQueue(direction)
+              : undefined
+          }
           onUndo={() => void undo()}
           onClose={() => {
             setSorting(undefined);
             setDragStart(undefined);
             setQueueIds([]);
+            queueScope.current = [];
+            skippedQueueIds.current.clear();
           }}
-          onSaved={(result) => {
+          onSaved={async (result) => {
             setDragStart(undefined);
             setReceipt(result);
             setUndoError("");
             setSelectedIds([]);
             if (queueIds.length)
-              moveQueue(
+              await moveQueue(
                 1,
                 result.after.map((t) => t.id),
               );

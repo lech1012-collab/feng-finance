@@ -23,6 +23,50 @@ export interface CashChartPoint {
   property?: number | null;
   coverage?: MonthCoverage;
 }
+
+function CashBar({
+  x,
+  y,
+  width,
+  height,
+  payload,
+  series,
+}: {
+  x?: number;
+  y?: number;
+  width?: number;
+  height?: number;
+  payload?: { opacity?: number };
+  series: "income" | "expenses";
+}) {
+  if (
+    typeof x !== "number" ||
+    typeof y !== "number" ||
+    typeof width !== "number" ||
+    typeof height !== "number" ||
+    ![x, y, width, height].every(Number.isFinite) ||
+    width === 0 ||
+    height === 0
+  )
+    return null;
+  // Recharts starts a negative bar at its value and supplies a negative height
+  // back to zero. SVG rects require positive dimensions, unlike its default path.
+  return (
+    <rect
+      data-series={series}
+      x={width < 0 ? x + width : x}
+      y={height < 0 ? y + height : y}
+      width={Math.abs(width)}
+      height={Math.abs(height)}
+      fill={
+        series === "income" ? "var(--chart-income)" : "var(--chart-expense)"
+      }
+      rx={3}
+      opacity={payload?.opacity ?? 1}
+    />
+  );
+}
+
 export function CashChart({
   data,
   currency,
@@ -116,6 +160,8 @@ export function CashChart({
             ))}
             <XAxis
               dataKey="label"
+              interval="preserveStartEnd"
+              minTickGap={12}
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 13, fill: "var(--muted)" }}
@@ -172,7 +218,11 @@ export function CashChart({
                 );
               }}
             />
-            <ReferenceLine y={0} stroke="var(--muted)" />
+            <ReferenceLine
+              y={0}
+              stroke="var(--muted)"
+              ifOverflow="extendDomain"
+            />
             {property ? (
               <Line
                 isAnimationActive={false}
@@ -196,17 +246,7 @@ export function CashChart({
                   fill="var(--chart-income)"
                   radius={[3, 3, 0, 0]}
                   maxBarSize={16}
-                  shape={(props) => (
-                    <rect
-                      x={props.x}
-                      y={props.y}
-                      width={props.width}
-                      height={props.height}
-                      fill="var(--chart-income)"
-                      rx={3}
-                      opacity={props.payload?.opacity ?? 1}
-                    />
-                  )}
+                  shape={(props) => <CashBar {...props} series="income" />}
                 />
                 <Bar
                   isAnimationActive={false}
@@ -215,17 +255,7 @@ export function CashChart({
                   fill="var(--chart-expense)"
                   radius={[0, 0, 3, 3]}
                   maxBarSize={16}
-                  shape={(props) => (
-                    <rect
-                      x={props.x}
-                      y={props.y}
-                      width={props.width}
-                      height={props.height}
-                      fill="var(--chart-expense)"
-                      rx={3}
-                      opacity={props.payload?.opacity ?? 1}
-                    />
-                  )}
+                  shape={(props) => <CashBar {...props} series="expenses" />}
                 />
                 <Line
                   isAnimationActive={false}

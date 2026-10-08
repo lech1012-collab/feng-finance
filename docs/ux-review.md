@@ -37,6 +37,35 @@ a physical device.
 
 ## Learning and financial safeguards
 
+### Remaining review fixes in 1.9.2
+
+The attachment supplied again on 8 October 2026 is byte-for-byte identical to the
+original review, which describes v1.8.3. The 24 recommendations above already
+guide v1.9.1; this release corrects remaining observable gaps rather than treating
+the older screenshots as a new design.
+
+Cash-flow charts now render spending below zero with valid SVG rectangles and a
+visible zero baseline, including expense-only histories. Missing observations
+still have no bar or joined net line, and dense month labels retain spacing.
+Restore previews separate account, transaction, statement and personal-rule
+counts on narrow screens and at enlarged text sizes. Unsupported or inconsistent
+backups produce short recovery instructions instead of raw schema dumps; their
+validation and atomic replacement are unchanged.
+
+Sorting Undo restores the pending queue and its progress together with the
+assignment, scoped backfill and learned rules. Native text Undo remains available
+inside search fields. Desktop hover actions occupy space beside the transaction
+instead of covering its amount, and do not interfere with active dragging.
+Import cards use the same blocker list as confirmation: changed parser options,
+invalid fields, retained duplicates and batch rechecks cannot leave a falsely
+reassuring Reconciled header. Arithmetic reconciliation remains separately visible
+while outstanding review work blocks import.
+
+No financial amounts, extraction rules or database schema are changed. The
+automatic learning requirement still takes precedence over the designer's
+proposed extra rule-conflict confirmation. OCR and extraction uncertainty remain
+subject to required financial review rather than becoming silently deferrable.
+
 The closing balance and complete monthly history have separate evidence checks.
 Finding 1 requires a known card debt to remain visible even when a statement does
 not establish a complete month. Issue-date-only Barclaycard statements and Amex
