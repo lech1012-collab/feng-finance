@@ -28,6 +28,11 @@ invalid dates/amounts, kept duplicate acknowledgements and batch rechecks. The
 header and confirmation use the same blocker source. No schema migration or
 financial-record rewrite is introduced.
 
+The keyboard sorting check waits for an enabled suggested category and focuses
+the current rendered target before sending its shortcut. This prevents a stale
+dialog or unfinished React update from being mistaken for a failed save; the
+check still dispatches once and awaits the real atomic database write.
+
 Version 1.9.1 corrects the distinction between a proven closing balance and
 complete monthly history. Issue-date-only Barclaycard periods and older Amex
 purchase dates no longer hide a reconciled closing debt. A known unverified

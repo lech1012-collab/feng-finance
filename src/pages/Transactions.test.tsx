@@ -156,10 +156,26 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
       { timeout: 8000 },
     ),
   ).toBeVisible();
+  const groceriesShortcut = () =>
+    within(
+      within(screen.getByRole("dialog")).getByRole("region", {
+        name: "Suggested categories",
+      }),
+    ).getByRole("button", { name: "Categorize as Groceries" });
+  // The explanation can appear before the asynchronous queue/evidence refresh
+  // settles. Wait for the actual enabled shortcut, use the current board, and
+  // focus its button before sending a keyboard event through the live DOM.
+  await waitFor(() => {
+    expect(groceriesShortcut()).toBeEnabled();
+    expect(within(groceriesShortcut()).getByText("1")).toBeVisible();
+  });
+  await act(async () => groceriesShortcut().focus());
   // Wait for the real atomic write, rather than racing IndexedDB with
   // waitFor's one-second default when the suite runs under CI load.
   await act(async () => {
-    fireEvent.keyDown(dialog, { key: "1" });
+    const target = groceriesShortcut();
+    expect(target).toHaveFocus();
+    fireEvent.keyDown(target, { key: "1" });
     expect(saveCategory).toHaveBeenCalledOnce();
     await saveCategory.mock.results[0].value;
   });
