@@ -164,7 +164,7 @@ export function CashChart({
                     {point.coverage?.status === "Partial" && (
                       <small>
                         {point.coverage.hasUnverifiedStatements
-                          ? "Includes unverified statement amounts; comparisons are withheld."
+                          ? "Includes statements with incomplete date or balance verification; comparisons are withheld."
                           : "From imported accounts only"}
                       </small>
                     )}
@@ -312,8 +312,9 @@ export function CashChart({
           )}
           {data.some((point) => point.coverage?.hasUnverifiedStatements) && (
             <p className="chart-coverage-note">
-              Unverified statement amounts are included in partial months.
-              Comparisons are withheld until all statements reconcile.
+              Statements with incomplete date or balance verification are
+              included in partial months. Comparisons need verified dates and
+              balances.
             </p>
           )}
         </>
@@ -344,7 +345,7 @@ export function CashChart({
                       {d.coverage?.status ?? "—"}
                       {d.coverage?.hasUnverifiedStatements &&
                         d.coverage.status === "Partial" &&
-                        " · includes unverified amounts"}
+                        " · verification incomplete"}
                     </td>
                   )}
                   <td>{value(property ? d.property : d.income, d)}</td>

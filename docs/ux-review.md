@@ -37,6 +37,22 @@ a physical device.
 
 ## Learning and financial safeguards
 
+The closing balance and complete monthly history have separate evidence checks.
+Finding 1 requires a known card debt to remain visible even when a statement does
+not establish a complete month. Issue-date-only Barclaycard statements and Amex
+statements containing older purchase dates can prove their closing sum from all
+stored rows. They do not gain verified calendar coverage from that proof. Known
+unverified closing amounts remain visible with their date and reason, and cannot
+enter net position or verified history. Older proven snapshots are labeled and do
+not establish a current net position. A future closing balance is never backdated
+to a purchase month. Initial Home selection and completed imports use the latest
+closing or activity month so a newly imported card's dated balance is accessible.
+
+Finding 7 counts distinct verified statement closing dates, rather than counting
+multiple reconstructed days from one PDF as multiple imported statements. One
+statement therefore does not activate comparison ranges. Closing-only statements
+add verified chart points without filling the intervening daily gaps.
+
 The user's requirement takes precedence over the proposed conflict question:
 every manual category change automatically becomes the new default, without a
 Remember control or an extra confirmation. Learned rules are narrowly scoped to

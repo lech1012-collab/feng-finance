@@ -89,7 +89,7 @@ Add another bank by implementing `StatementParser`, registering it in `src/parse
 
 Settings → **Categorization & transfer rules** → **Advanced: import personal rules** accepts a local JSON file with format `feng-finance-rules`, version `1`, `categories` and `rules` arrays. Category entries contain `id`, `name`, `kind`. Rule entries contain `name`, `match` (`contains`, `starts-with`, `exact`), `pattern`, `direction`, and either `categoryId` or `type: "transfer"`. Preview the matching record count, then **Apply corrections & remember rules**. This is an atomic local update: printed dates/amounts and statement balances are preserved; demo rows are excluded. Conflicting outcomes, unavailable categories, linked transfers and stale previews are rejected. Reapplying the same rules is idempotent. Keep files containing personal names or references out of the repository. The deployed site cannot change another device's records remotely.
 
-Dark is the default theme. Appearance is stored in IndexedDB and included in backups; a localStorage copy of the theme name prevents a light-mode reload flash. No financial data is stored in localStorage. Import opens on uncertain/duplicate/date-exception rows; **All transactions** exposes every extracted row and optional categorization. After import Home opens on the latest imported activity month, or statement month for a balance-only document. Account balances are dated statement snapshots, not live bank balances; card liabilities display as positive **Card debt**.
+Dark is the default theme. Appearance is stored in IndexedDB and included in backups; a localStorage copy of the theme name prevents a light-mode reload flash. No financial data is stored in localStorage. Import opens on uncertain/duplicate/date-exception rows; **All transactions** exposes every extracted row and optional categorization. After import and initial launch, Home uses the latest available statement balance or activity month. An October card statement containing September purchases therefore opens October without backdating its closing balance. Account balances are dated statement snapshots, not live bank balances; card liabilities display as positive **Card debt**.
 
 ### Backup and schema migrations
 
@@ -255,15 +255,25 @@ Home separates Cash and positive Card debt. Net position appears only when all
 accounts in the selected currency have verified current balances and a current
 or savings account is available. Missing accounts have dashed rows and a direct
 Import action. Card-only imports do not imply zero income or a total cash balance.
-Balances use the latest eligible statement ending on or before the selected
-month end. Percentage comparisons require current,
+Balances use the latest eligible statement closing on or before the selected
+month end and never use a future closing date. Known reported balances remain
+visible even when verification is incomplete, with a dated **Unverified reported
+balance** label and a reason. Older verified balances remain visible with their
+dates, while current net position remains unavailable. Only balances whose stored
+row count, account, currency and amounts reconcile enter the cash/debt aggregates.
+A Barclaycard statement without a printed period start, or an Amex statement with
+an older purchase date, can still prove its printed closing balance. This does
+not establish complete calendar history. Percentage comparisons require current,
 reliable statements for all the same accounts at both endpoints and a nonzero
 prior total. Change is `(current - previous) / abs(previous) × 100`, so debt
 repayment produces a positive change. Failed validation and inferred periods
-withhold comparisons. The Home 1/3/6/12-month selector also controls balance history.
+withhold comparisons. The Home 1/3/6/12-month selector appears after two distinct
+reconciled closing dates are available for an account and also controls balance history.
 The range ends at the latest eligible closing balance. Daily balances are reconstructed
 from the opening balance and all transactions, including transfers, only when the
-stored row count and amounts reconcile with the reported closing balance. Partial
+stored row count and amounts reconcile with the reported closing balance, and the
+printed date coverage can be verified. Issue-date-only or date-exception statements
+provide a closing point rather than invented daily movement. Partial
 extraction, conflicting overlap and missing coverage leave gaps. A dashed line shows
 the total; totals and percentage comparisons require all accounts at both dated
 endpoints. Currency totals remain separate.

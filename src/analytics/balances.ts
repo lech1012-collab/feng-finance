@@ -1,6 +1,7 @@
 import type { Account, Statement, Transaction } from "../domain/models";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { safeSum } from "../domain/money";
+import { statementBalanceDate } from "./statement-balances";
 export function accountSnapshot(
   account: Account,
   statements: Statement[],
@@ -12,21 +13,22 @@ export function accountSnapshot(
       (s) =>
         s.accountId === account.id &&
         s.currency === account.currency &&
-        s.statementPeriodEnd < cutoff,
+        statementBalanceDate(s) < cutoff &&
+        statementBalanceDate(s) <= new Date().toISOString().slice(0, 10),
     )
     .sort(
       (a, b) =>
-        b.statementPeriodEnd.localeCompare(a.statementPeriodEnd) ||
+        statementBalanceDate(b).localeCompare(statementBalanceDate(a)) ||
         b.importedAt.localeCompare(a.importedAt),
     )[0];
   const balance = statement?.closingBalance;
-  const current = statement?.statementPeriodEnd.startsWith(month) ?? false;
+  const asOfDate = statement ? statementBalanceDate(statement) : undefined;
+  const current = asOfDate?.startsWith(month) ?? false;
   const reliable =
     balance !== undefined &&
     current &&
-    statement?.periodSource !== "transaction-coverage" &&
-    !["warning", "cannot-reconcile"].includes(statement!.validationStatus);
-  return { account, statement, balance, current, reliable };
+    statement?.validationStatus === "reconciled";
+  return { account, statement, balance, asOfDate, current, reliable };
 }
 export function balancePercent(current: number, previous: number) {
   return previous === 0
@@ -167,13 +169,13 @@ export function datedBalanceHistory(
     (s) =>
       accountIds.has(s.accountId) &&
       s.currency === currency &&
-      s.statementPeriodEnd < monthBounds(month)[1] &&
+      statementBalanceDate(s) < monthBounds(month)[1] &&
+      statementBalanceDate(s) <= new Date().toISOString().slice(0, 10) &&
       s.closingBalance !== undefined &&
-      s.periodSource !== "transaction-coverage" &&
-      !["warning", "cannot-reconcile"].includes(s.validationStatus),
+      s.validationStatus === "reconciled",
   );
   const end = documents.length
-    ? Math.max(...documents.map((s) => dateStamp(s.statementPeriodEnd)))
+    ? Math.max(...documents.map((s) => dateStamp(statementBalanceDate(s))))
     : dateStamp(monthBounds(month)[1]) - dayMilliseconds;
   const endDate = new Date(end);
   const startMonth = new Date(
@@ -212,11 +214,13 @@ export function datedBalanceHistory(
     const statementRows = rows.get(s.id) ?? [];
     const canReconstruct =
       s.validationStatus === "reconciled" &&
+      s.periodSource !== "transaction-coverage" &&
       s.openingBalance !== undefined &&
       statementRows.length === s.transactionCount &&
       statementRows.every(
         (t) =>
           t.accountId === s.accountId &&
+          t.currency === s.currency &&
           t.date >= s.statementPeriodStart &&
           t.date <= s.statementPeriodEnd,
       ) &&
@@ -247,7 +251,11 @@ export function datedBalanceHistory(
         );
       }
     } else {
-      record(s.accountId, dateStamp(s.statementPeriodEnd), s.closingBalance!);
+      record(
+        s.accountId,
+        dateStamp(statementBalanceDate(s)),
+        s.closingBalance!,
+      );
     }
   }
   const data = [];

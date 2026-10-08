@@ -187,7 +187,7 @@ it("warns about mixed unverified imports and plots the same recorded outflow as 
     </MemoryRouter>,
   );
   expect(screen.getByRole("status")).toHaveTextContent(
-    "Unverified statement amounts are included",
+    "Statements with incomplete date or balance verification are included",
   );
   const points = JSON.parse(screen.getByTestId("cash-series").textContent!);
   expect(points.at(-1)).toMatchObject({

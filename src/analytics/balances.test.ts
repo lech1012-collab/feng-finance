@@ -81,10 +81,9 @@ describe("verified daily balance history", () => {
     expect(overview.items[0].changes[0].percent).toBe(-10);
     expect(overview.comparisons[1].percent).toBeUndefined();
   });
-  it("withholds failed, inferred and future statement history", () => {
+  it("withholds failed and future statement history", () => {
     for (const patch of [
       { validationStatus: "warning" as const },
-      { periodSource: "transaction-coverage" as const },
       { statementPeriodEnd: "2026-10-01" },
     ]) {
       expect(
@@ -98,6 +97,37 @@ describe("verified daily balance history", () => {
         ).data.every((p) => p.total === null),
       ).toBe(true);
     }
+  });
+  it("plots an issue-date-only card closing point without inventing daily coverage", () => {
+    const cardDocument = {
+      ...doc,
+      periodSource: "transaction-coverage" as const,
+      statementDate: "2026-10-04",
+      statementPeriodEnd: "2026-10-04",
+    };
+    const history = datedBalanceHistory(
+      [a],
+      [cardDocument],
+      tx,
+      "2026-10",
+      "GBP",
+      1,
+    );
+    expect(history.data.filter((point) => point.total !== null)).toHaveLength(
+      1,
+    );
+    expect(history.data.at(-1)).toMatchObject({
+      date: "2026-10-04",
+      total: 9000,
+    });
+    expect(
+      accountSnapshot(a, [cardDocument], "2026-09").balance,
+    ).toBeUndefined();
+    expect(accountSnapshot(a, [cardDocument], "2026-10")).toMatchObject({
+      balance: 9000,
+      asOfDate: "2026-10-04",
+      reliable: true,
+    });
   });
   it("does not combine conflicting overlapping balances or incomplete account totals", () => {
     const conflicting = {

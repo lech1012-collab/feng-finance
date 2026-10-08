@@ -16,7 +16,7 @@ import { db } from "../storage/database";
 import { monthBounds } from "../domain/dates";
 import { money, parseMoney } from "../domain/money";
 import { accountSnapshot } from "../analytics/balances";
-import { verifiedStatements } from "../analytics/coverage";
+import { statementBalanceEvidence } from "../analytics/statement-balances";
 import {
   displayDate,
   displayDateRange,
@@ -132,10 +132,12 @@ export default function Transactions({
       categories: await db.categories.toArray(),
       rules: await db.rules.toArray(),
       statements,
-      verifiedBalanceIds: verifiedStatements(
-        candidateStatements,
-        balanceRows,
-      ).map((s) => s.id),
+      balanceEvidence: Object.fromEntries(
+        candidateStatements.map((statement) => [
+          statement.id,
+          statementBalanceEvidence(statement, balanceRows),
+        ]),
+      ),
       uncategorizedCount: await db.transactions
         .where("[currency+date]")
         .between([currency, "0000"], [currency, "9999"], true, true)
@@ -529,10 +531,25 @@ export default function Transactions({
           </button>
           {data.accounts.map((a) => {
             const snapshot = accountSnapshot(a, data.statements, selectedMonth);
-            const reliable =
-              snapshot.reliable &&
-              !!snapshot.statement &&
-              data.verifiedBalanceIds.includes(snapshot.statement.id);
+            const evidence = snapshot.statement
+              ? data.balanceEvidence[snapshot.statement.id]
+              : undefined;
+            const reported = Number.isSafeInteger(snapshot.balance);
+            const card = a.accountType === "credit";
+            const value = reported
+              ? money(
+                  card ? Math.abs(snapshot.balance!) : snapshot.balance!,
+                  currency,
+                )
+              : "Unknown";
+            const kind =
+              card && reported
+                ? snapshot.balance! < 0
+                  ? " debt"
+                  : snapshot.balance! > 0
+                    ? " credit"
+                    : " balance"
+                : "";
             return (
               <button
                 key={a.id}
@@ -547,9 +564,7 @@ export default function Transactions({
                   {a.institution} · {a.maskedAccountIdentifier}
                 </strong>
                 <span>
-                  {snapshot.balance === undefined
-                    ? "Unknown · No statement"
-                    : `${reliable ? money(snapshot.balance, currency) : "Unknown"} · ${displayDate(snapshot.statement!.statementPeriodEnd)}${!reliable ? " · Unverified" : ""}`}
+                  {`${value}${kind}${snapshot.asOfDate ? ` · ${displayDate(snapshot.asOfDate)}` : " · No statement"}${reported && evidence?.status !== "reconciled" ? " · Reported · Unverified" : reported && !snapshot.current ? " · Older statement" : ""}`}
                 </span>
               </button>
             );

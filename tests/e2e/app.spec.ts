@@ -1767,16 +1767,12 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
     page.getByText("Browse all categories", { exact: true }),
   ).toHaveCount(0);
   const balanceCard = page.locator(".balance-summary");
-  await balanceCard.getByRole("button", { name: "3m", exact: true }).click();
   await expect(
-    page.getByRole("img", {
-      name: "3 month total and individual account balance history",
-    }),
-  ).toBeVisible();
-  await expect(page.locator(".balance-chart .section-heading")).toContainText(
-    "3 months",
+    balanceCard.getByRole("group", { name: "Balance comparison period" }),
+  ).toHaveCount(0);
+  await expect(balanceCard).toContainText(
+    "Import another reconciled statement to compare balances.",
   );
-  await balanceCard.getByRole("button", { name: "1m", exact: true }).click();
   await expect(
     page.locator(".balance-chart .recharts-line-curve").first(),
   ).toHaveAttribute("d", /L/);

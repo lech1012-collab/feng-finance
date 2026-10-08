@@ -37,7 +37,8 @@ Only after those checks, test private real statements from ignored `private-fixt
 - [ ] Import is reachable from the bottom navigation; confirmation remains above the home indicator and the last editable field can scroll fully into view.
 - [ ] The review starts with extraction exceptions; All transactions reveals editable rows without obscuring the confirmation button.
 - [ ] A private personal-rules JSON can be selected from Files, previewed and applied; the expected categories/transfers appear in existing transactions and after the next import.
-- [ ] After importing statements, Home selects their latest activity month. Account balances are clearly dated statement snapshots.
+- [ ] After importing statements, Home selects their latest closing-balance or activity month. Import an October card statement containing only September purchases: Home shows its October closing debt, while September spending remains available through the month selector.
+- [ ] Check Barclaycard issue-date-only and Amex date-exception statements: reconciled card debt stays visible and dated, monthly history stays incomplete, and charts show only verified closing points where daily coverage cannot be established. Older statement balances are labeled; a known unverified balance shows its reported amount and reason.
 
 ## Direct sorting gestures
 

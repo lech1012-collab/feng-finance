@@ -370,9 +370,9 @@ export default function Analysis({
       )}
       {coverage.some((c) => c.hasUnverifiedStatements) && (
         <p className="notice warning" role="status">
-          Unverified statement amounts are included in these recorded totals.
-          Balances or extracted rows could not be confirmed; verified
-          comparisons are withheld.
+          Statements with incomplete date or balance verification are included
+          in these recorded totals. Balances or extracted rows could not be
+          confirmed; verified comparisons are withheld.
         </p>
       )}
       {!property && (

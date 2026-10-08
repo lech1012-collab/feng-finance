@@ -14,6 +14,7 @@ import { ImportStatementReview } from "../components/ImportStatementReview";
 import { validatePeriod } from "../parsers/period";
 import { id } from "../domain/normalize";
 import type { ImportDraft } from "../domain/models";
+import { statementBalanceDate } from "../analytics/statement-balances";
 
 export default function ImportPage({
   onImported,
@@ -372,13 +373,10 @@ export default function ImportPage({
       const updatedStatements = allOutcomes.filter(
         (outcome) => !outcome.statementSkipped,
       );
-      const balanceUpdates = updatedStatements.filter(
-        (outcome) => outcome.draft.transactions.length === 0,
-      );
       const latest = [
         ...importedRows.map((t) => t.date),
-        ...balanceUpdates.map(
-          (outcome) => outcome.draft.statement.statementPeriodEnd,
+        ...updatedStatements.map((outcome) =>
+          statementBalanceDate(outcome.draft.statement),
         ),
       ]
         .sort()
@@ -386,8 +384,9 @@ export default function ImportPage({
       if (latest) {
         const currency =
           importedRows.find((t) => t.date === latest)?.currency ??
-          balanceUpdates.find(
-            (outcome) => outcome.draft.statement.statementPeriodEnd === latest,
+          updatedStatements.find(
+            (outcome) =>
+              statementBalanceDate(outcome.draft.statement) === latest,
           )!.draft.statement.currency;
         onImported(latest.slice(0, 7), currency);
       }

@@ -266,8 +266,9 @@ export default function CategoryPage({
       </section>
       {coverage.hasUnverifiedStatements && (
         <p className="notice warning" role="status">
-          Unverified statement amounts are included in recorded totals;
-          comparisons with usual spending are withheld for this month.
+          Statements with incomplete date or balance verification are included
+          in recorded totals; comparisons with usual spending are withheld for
+          this month.
         </p>
       )}
       {stats.aboveUsual && (

@@ -36,6 +36,7 @@ import {
 import { useLiveQuery } from "dexie-react-hooks";
 import { registerSW } from "virtual:pwa-register";
 import { db, initializeDatabase } from "./storage/database";
+import { statementBalanceDate } from "./analytics/statement-balances";
 import Home from "./pages/Home";
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Category = lazy(() => import("./pages/Category"));
@@ -55,10 +56,20 @@ function Shell() {
   const openImportPicker = () => fileInput.current?.click();
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
   const [monthChosen, setMonthChosen] = useState(false);
-  const latestDate = useLiveQuery(
-    async () => (await db.transactions.orderBy("date").last())?.date,
-    [],
-  );
+  const latestDate = useLiveQuery(async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const [latestTransaction, statements] = await Promise.all([
+      db.transactions.orderBy("date").last(),
+      db.statements.toArray(),
+    ]);
+    return [
+      ...(latestTransaction ? [latestTransaction.date] : []),
+      ...statements.map(statementBalanceDate),
+    ]
+      .filter((date) => date <= today)
+      .sort()
+      .at(-1);
+  }, []);
   useEffect(() => {
     if (!monthChosen && latestDate) setMonth(latestDate.slice(0, 7));
   }, [latestDate, monthChosen]);

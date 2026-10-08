@@ -80,8 +80,11 @@ it("verifies account chips against complete indexed statement rows beyond the tr
   );
   expect(await within(chips).findByText(/£980.00/)).toBeVisible();
   await db.transactions.delete("first");
-  await waitFor(() => expect(within(chips).queryByText(/£980.00/)).toBeNull());
-  expect(within(chips).getByText(/Unknown.*Unverified/)).toBeVisible();
+  await waitFor(() =>
+    expect(
+      within(chips).getByText(/£980.00.*Reported.*Unverified/),
+    ).toBeVisible(),
+  );
 }, 15000);
 
 it("keeps category save errors outside the desktop-only rail so mobile users see them", async () => {

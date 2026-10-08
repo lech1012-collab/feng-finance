@@ -12,7 +12,7 @@ import {
 import { useId, useState } from "react";
 import type { Account, Statement, Transaction } from "../domain/models";
 import { datedBalanceHistory } from "../analytics/balances";
-import { verifiedStatements } from "../analytics/coverage";
+import { reconciledStatementBalances } from "../analytics/statement-balances";
 import { currencyPrecision, money } from "../domain/money";
 import { ImportButton } from "./ImportPicker";
 const accountColors = [
@@ -43,7 +43,24 @@ export function BalanceChart({
   const hatchId = `balance-gap-${useId().replaceAll(":", "")}`;
   const [selectedGap, setSelectedGap] = useState<string>();
   const scoped = accounts.filter((a) => a.currency === currency);
-  const verified = verifiedStatements(statements, transactions);
+  const accountIds = new Set(scoped.map((account) => account.id));
+  const verified = reconciledStatementBalances(
+    statements.filter(
+      (statement) =>
+        accountIds.has(statement.accountId) && statement.currency === currency,
+    ),
+    transactions,
+  );
+  const closingOnly = verified.some(
+    (statement) =>
+      statement.periodSource === "transaction-coverage" ||
+      transactions.some(
+        (row) =>
+          row.statementId === statement.id &&
+          (row.date < statement.statementPeriodStart ||
+            row.date > statement.statementPeriodEnd),
+      ),
+  );
   const history = datedBalanceHistory(
     scoped,
     verified,
@@ -61,7 +78,7 @@ export function BalanceChart({
       ? "Complete"
       : Object.values(point.balances).some((balance) => balance !== null)
         ? "Partial"
-        : "No statements";
+        : "No verified balance";
   const segments: { start: number; end: number; status: string }[] = [];
   for (const point of data) {
     const previous = segments.at(-1);
@@ -117,7 +134,7 @@ export function BalanceChart({
             </defs>
             <CartesianGrid vertical={false} stroke="var(--line)" />
             {segments
-              .filter((segment) => segment.status === "No statements")
+              .filter((segment) => segment.status === "No verified balance")
               .map((segment) => (
                 <ReferenceArea
                   key={segment.start}
@@ -155,8 +172,8 @@ export function BalanceChart({
                     <strong>
                       {formatDate(point.stamp)} · {status(point)}
                     </strong>
-                    {status(point) === "No statements" ? (
-                      <p>No statements</p>
+                    {status(point) === "No verified balance" ? (
+                      <p>No verified balance</p>
                     ) : (
                       <>
                         {scoped.map((account, index) => (
@@ -242,22 +259,29 @@ export function BalanceChart({
         ))}
         {hasCashAccount && <span>┄ Net position</span>}
       </div>
-      {segments.some((segment) => segment.status === "No statements") && (
+      {closingOnly && (
+        <p className="coverage-note">
+          Some statements verify only their closing balance. Daily history
+          remains unavailable where dates or the statement period cannot be
+          verified.
+        </p>
+      )}
+      {segments.some((segment) => segment.status === "No verified balance") && (
         <div className="chart-coverage" aria-label="Missing balance history">
           {segments
-            .filter((segment) => segment.status === "No statements")
+            .filter((segment) => segment.status === "No verified balance")
             .map((segment) => (
               <button
                 className="chart-month-gap"
                 key={segment.start}
                 onClick={() =>
                   setSelectedGap(
-                    `${formatDate(segment.start)} – ${formatDate(segment.end)}: No statements`,
+                    `${formatDate(segment.start)} – ${formatDate(segment.end)}: No verified balance`,
                   )
                 }
               >
                 {formatDate(segment.start)} – {formatDate(segment.end)} · No
-                statements
+                verified balance
               </button>
             ))}
         </div>
@@ -290,7 +314,7 @@ export function BalanceChart({
                   {scoped.map((account, index) => (
                     <td key={account.id}>
                       {point.balances[`account${index}`] === null
-                        ? "No statements"
+                        ? "No verified balance"
                         : money(point.balances[`account${index}`]!, currency)}
                     </td>
                   ))}

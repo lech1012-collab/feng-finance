@@ -112,11 +112,11 @@ it("identifies unverified contributions while showing the same partial totals as
     />,
   );
   const row = screen.getAllByRole("row")[1];
-  expect(row).toHaveTextContent("Partial · includes unverified amounts");
+  expect(row).toHaveTextContent("Partial · verification incomplete");
   expect(row).toHaveTextContent("-£70.00");
   expect(
     screen.getByText(
-      "Unverified statement amounts are included in partial months. Comparisons are withheld until all statements reconcile.",
+      "Statements with incomplete date or balance verification are included in partial months. Comparisons need verified dates and balances.",
     ),
   ).toBeInTheDocument();
 });

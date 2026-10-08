@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.9.0";
+export const APP_VERSION = "1.9.1";
 export const SCHEMA_VERSION = 2;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";

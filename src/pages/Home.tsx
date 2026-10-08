@@ -30,6 +30,7 @@ import { deeperInsights } from "../analytics/deeper";
 import { localToday } from "../analytics/reminders";
 import { detectSubscriptions } from "../analytics/subscriptions";
 import { money } from "../domain/money";
+import { accountSnapshot } from "../analytics/balances";
 
 export default function Home({
   month,
@@ -45,7 +46,10 @@ export default function Home({
   const [balancePeriod, setBalancePeriod] = useState(1);
   const today = localToday();
   const data = useLiveQuery(async () => {
-    const statements = await db.statements.toArray();
+    const [statements, accounts] = await Promise.all([
+      db.statements.toArray(),
+      db.accounts.where("currency").equals(currency).toArray(),
+    ]);
     let from = [
       monthBounds(monthOffset(month, -12))[0],
       `${Number(today.slice(0, 4)) - 3}${today.slice(4)}`,
@@ -65,10 +69,31 @@ export default function Home({
       .where("[currency+date]")
       .between([currency, from], [currency, to], true, true)
       .toArray();
+    // A latest dated account balance may be older than the analysis window, or
+    // a card may contain purchases before its printed period. Check its complete
+    // source rows by index, rather than mistaking an unloaded row for deletion.
+    const snapshots = accounts.map((account) =>
+      accountSnapshot(account, statements, month),
+    );
+    const sourceRows = (
+      await Promise.all(
+        [
+          ...new Set(
+            snapshots.flatMap((snapshot) =>
+              snapshot.statement ? [snapshot.statement.id] : [],
+            ),
+          ),
+        ].map((statementId) =>
+          db.transactions.where("statementId").equals(statementId).toArray(),
+        ),
+      )
+    ).flat();
+    const indexedRows = new Map(transactions.map((row) => [row.id, row]));
+    for (const row of sourceRows) indexedRows.set(row.id, row);
     return {
-      transactions,
+      transactions: [...indexedRows.values()],
       categories: await db.categories.toArray(),
-      accounts: await db.accounts.where("currency").equals(currency).toArray(),
+      accounts,
       statements,
       settings: await db.settings.toArray(),
       count: await db.transactions.count(),
@@ -274,8 +299,8 @@ export default function Home({
         )}
         {coverage.hasUnverifiedStatements && (
           <p className="coverage-note">
-            Unverified amounts: one or more imported statements have not
-            reconciled.
+            Monthly history is not fully verified. Statement dates or balances
+            prevent a reliable comparison.
           </p>
         )}
         <p className="hero-comparison">
