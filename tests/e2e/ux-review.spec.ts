@@ -217,11 +217,19 @@ test("UX mobile: Home and transaction controls stay usable at narrow widths and 
   await seedPartialAccounts(page);
   for (const width of [320, 375, 390, 1440]) {
     await page.setViewportSize({ width, height: 844 });
-    for (const scale of ["100%", "200%"]) {
+    for (const { scale, font } of [
+      { scale: "100%", font: "" },
+      { scale: "200%", font: "sans-serif" },
+      { scale: "200%", font: "DejaVu Serif, serif" },
+    ]) {
       await page.goto("/#/");
-      await page.evaluate((size) => {
-        document.documentElement.style.fontSize = size;
-      }, scale);
+      await page.evaluate(
+        ({ size, family }) => {
+          document.documentElement.style.fontSize = size;
+          document.documentElement.style.fontFamily = family;
+        },
+        { size: scale, family: font },
+      );
       await expect(
         page.getByRole("heading", { name: "Home", exact: true }),
       ).toBeVisible();
@@ -242,20 +250,49 @@ test("UX mobile: Home and transaction controls stay usable at narrow widths and 
         expect(box!.width).toBeGreaterThanOrEqual(44);
         expect(box!.height).toBeGreaterThanOrEqual(44);
       }
-      await page.goto("/#/transactions");
-      await page.evaluate((size) => {
-        document.documentElement.style.fontSize = size;
-      }, scale);
+      await page.goto("/#/transactions?allDates=1");
       await expect(
         page.getByRole("heading", { name: "Transactions", exact: true }),
       ).toBeVisible();
+      await expect(page.locator(".count-chip")).toHaveText("2 results · GBP");
+      await page.evaluate(
+        ({ size, family }) => {
+          document.documentElement.style.fontSize = size;
+          document.documentElement.style.fontFamily = family;
+        },
+        { size: scale, family: font },
+      );
       await expect
-        .poll(() =>
-          page.evaluate(
-            () => document.documentElement.scrollWidth <= innerWidth + 1,
-          ),
+        .poll(
+          () =>
+            page.evaluate(() => ({
+              overflow: Math.max(
+                0,
+                document.documentElement.scrollWidth - innerWidth,
+              ),
+              outside: [
+                ...document.querySelectorAll("main *, .mobile-header *"),
+              ]
+                .filter((element) => {
+                  const rect = element.getBoundingClientRect();
+                  return (
+                    rect.width > 0 &&
+                    rect.right > innerWidth &&
+                    !element.closest(".chart-data, .table-scroll")
+                  );
+                })
+                .slice(0, 8)
+                .map((element) => ({
+                  tag: element.tagName,
+                  class: String(element.className),
+                  right: element.getBoundingClientRect().right,
+                })),
+            })),
+          {
+            message: `Transactions at ${width}px / ${scale} text / ${font || "default font"}`,
+          },
         )
-        .toBe(true);
+        .toMatchObject({ overflow: 0 });
     }
   }
 });

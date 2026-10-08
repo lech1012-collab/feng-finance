@@ -1258,15 +1258,21 @@ test("dark default, persistent appearance and mobile layouts without overlapping
   // A wider fallback font reproduces the long-title overflow seen on CI WebKit.
   await gotoRoute(page, "/transactions");
   await expect(page.locator("h1")).toHaveText("Transactions");
-  await page.evaluate(() => {
-    document.documentElement.style.fontSize = "230%";
-    document.documentElement.style.fontFamily = "serif";
-  });
-  await expect
-    .poll(() =>
-      page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
-    )
-    .toBe(0);
+  for (const font of ["serif", "DejaVu Serif, serif"]) {
+    await page.evaluate((family) => {
+      document.documentElement.style.fontSize = "230%";
+      document.documentElement.style.fontFamily = family;
+    }, font);
+    await expect
+      .poll(
+        () =>
+          page.evaluate(
+            () => document.documentElement.scrollWidth - innerWidth,
+          ),
+        { message: `Transactions at 230% with ${font}` },
+      )
+      .toBe(0);
+  }
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "";
     document.documentElement.style.fontFamily = "";

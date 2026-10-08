@@ -2557,7 +2557,14 @@ h3 {
   overflow-wrap: anywhere;
 }
 .page-heading > div {
+  min-width: 0;
   max-width: 100%;
+}
+.page-heading .count-chip {
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .pagination {
   flex-wrap: wrap;
@@ -3823,6 +3830,13 @@ h3 {
   font-weight: 400;
   color: var(--muted);
   font-size: 0.8125rem;
+}
+.account-filter-chip > strong,
+.account-filter-chip > span {
+  align-self: stretch;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
 }
 .uncategorized-primary {
   border-style: dashed;
