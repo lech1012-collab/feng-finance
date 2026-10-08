@@ -383,6 +383,38 @@ test("verified deeper insights, statement reminders and private calendar export"
       exact: true,
     }),
   ).toBeDisabled();
+  // The checkbox responds optimistically; wait for the durable write before
+  // navigation can interrupt the page's in-flight IndexedDB transaction.
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<unknown>((resolve, reject) => {
+            const open = indexedDB.open("feng-finance");
+            open.onerror = () =>
+              reject(new Error("Could not read the test settings database."));
+            open.onsuccess = () => {
+              const database = open.result;
+              const transaction = database.transaction("settings", "readonly");
+              const stored = transaction
+                .objectStore("settings")
+                .get("reminders");
+              transaction.oncomplete = () => {
+                database.close();
+                const entry = stored.result as { value: string } | undefined;
+                resolve(entry ? JSON.parse(entry.value) : null);
+              };
+              transaction.onabort = () => {
+                database.close();
+                reject(
+                  new Error("Could not read stored reminder preferences."),
+                );
+              };
+            };
+          }),
+      ),
+    )
+    .toEqual({ enabled: false, day: 7 });
   await page.reload();
   await expect(
     page.getByLabel("Monthly statement review day", { exact: true }),
