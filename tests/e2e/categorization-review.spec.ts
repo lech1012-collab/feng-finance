@@ -149,6 +149,12 @@ test("desktop rail suggests categories and multi-selection learns and undoes bot
   await seedSortingQueue(page);
   const first = page.getByRole("link", { name: /^Waitrose,/ });
   const second = page.getByRole("link", { name: /^Corner Shop,/ });
+  // Hover controls overlay the row; they must not reserve an empty strip below it.
+  const rowLayout = await first.evaluate((row) => ({
+    row: row.getBoundingClientRect().height,
+    object: row.closest(".swipe-transaction")!.getBoundingClientRect().height,
+  }));
+  expect(rowLayout.object).toBeLessThanOrEqual(rowLayout.row + 1);
   await first.click({ modifiers: ["Meta"] });
   await second.click({ modifiers: ["Shift"] });
   await expect(page.locator(".swipe-transaction.selected")).toHaveCount(2);

@@ -462,7 +462,41 @@ test("desktop rows drag onto the persistent category rail, cancel safely and und
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     3,
   );
+  const transfer = rail.getByRole("button", {
+    name: "Transfer / card repayment",
+    exact: true,
+  });
+  // Position the destination before grabbing the source; its rail scrolls
+  // independently, and pointer moves cannot reach a tile below the viewport.
+  await transfer.evaluate((element) =>
+    element.scrollIntoView({ block: "center" }),
+  );
   await row.scrollIntoViewIfNeeded();
+  await expect(transfer).toBeInViewport({ ratio: 1 });
+  await expect
+    .poll(() =>
+      transfer.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.x + rect.width / 2,
+          rect.y + rect.height / 2,
+        );
+        return !!hit && element.contains(hit);
+      }),
+    )
+    .toBe(true);
+  await expect
+    .poll(() =>
+      row.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.x + 90,
+          rect.y + rect.height / 2,
+        );
+        return !!hit && element.contains(hit);
+      }),
+    )
+    .toBe(true);
   const transferRect = (await row.boundingBox())!;
   await page.mouse.move(
     transferRect.x + 90,
@@ -474,16 +508,15 @@ test("desktop rows drag onto the persistent category rail, cancel safely and und
     transferRect.y + transferRect.height / 2,
     { steps: 4 },
   );
-  const transfer = rail.getByRole("button", {
-    name: "Transfer / card repayment",
-    exact: true,
-  });
+  await expect(transfer).toBeEnabled();
+  await expect(transfer).toBeInViewport({ ratio: 1 });
   const transferTile = (await transfer.boundingBox())!;
   await page.mouse.move(
     transferTile.x + transferTile.width / 2,
     transferTile.y + transferTile.height / 2,
     { steps: 10 },
   );
+  await expect(transfer).toHaveClass(/drop-target/);
   await page.mouse.up();
   await expect(row).toHaveCount(0);
   await expect(page.locator(".category-feedback")).toContainText("Transfer");

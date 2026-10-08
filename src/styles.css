@@ -3903,6 +3903,10 @@ h3 {
   padding: 8px;
   min-width: 44px;
 }
+.row-hover-actions .row-selection {
+  width: auto;
+  min-width: 60px;
+}
 .drag-handle {
   color: var(--muted);
   cursor: grab;
@@ -4251,6 +4255,14 @@ summary {
     display: none;
   }
   .row-hover-actions {
+    position: absolute;
+    right: 8px;
+    top: 50%;
+    transform: translateY(-50%);
+    z-index: 2;
+    padding: 4px;
+    border-radius: 8px;
+    background: var(--surface);
     opacity: 0;
   }
   .swipe-transaction:hover .row-hover-actions,
