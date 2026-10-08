@@ -5,6 +5,7 @@ import {
   cleanup,
   waitFor,
   within,
+  act,
 } from "@testing-library/react";
 import { beforeEach, afterEach, it, expect, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
@@ -116,6 +117,8 @@ it("keeps category save errors outside the desktop-only rail so mobile users see
 }, 15000);
 
 it("sorts a counted queue with explanation, keyboard choice, next item and atomic Undo", async () => {
+  const saveCategory = vi.spyOn(categoryStorage, "categorizeCards");
+  const undoCategory = vi.spyOn(categoryStorage, "undoCategory");
   const first = transaction({
     id: "waitrose",
     date: "2026-09-05",
@@ -150,10 +153,14 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
       { timeout: 8000 },
     ),
   ).toBeVisible();
-  fireEvent.keyDown(dialog, { key: "1" });
-  await waitFor(async () =>
-    expect((await db.transactions.get(first.id))?.categoryId).toBe("groceries"),
-  );
+  // Wait for the real atomic write, rather than racing IndexedDB with
+  // waitFor's one-second default when the suite runs under CI load.
+  await act(async () => {
+    fireEvent.keyDown(dialog, { key: "1" });
+    expect(saveCategory).toHaveBeenCalledOnce();
+    await saveCategory.mock.results[0].value;
+  });
+  expect((await db.transactions.get(first.id))?.categoryId).toBe("groceries");
   await waitFor(() =>
     expect(
       within(screen.getByRole("dialog")).getByText("City Club"),
@@ -171,10 +178,12 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
       /Waitrose on Barclays.*Future matching payments will follow/,
     ),
   ).toBeVisible();
-  fireEvent.keyDown(screen.getByRole("dialog"), { key: "z", metaKey: true });
-  await waitFor(async () =>
-    expect(await db.transactions.get(first.id)).toEqual(first),
-  );
+  await act(async () => {
+    fireEvent.keyDown(screen.getByRole("dialog"), { key: "z", metaKey: true });
+    expect(undoCategory).toHaveBeenCalledOnce();
+    await undoCategory.mock.results[0].value;
+  });
+  expect(await db.transactions.get(first.id)).toEqual(first);
   expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
 }, 15000);
 

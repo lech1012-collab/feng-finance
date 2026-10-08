@@ -28,6 +28,22 @@ IndexedDB remains at schema version 2. Optional categorization provenance and ru
 usage fields preserve existing records and older backups. Processing and storage
 remain local; deployment contains static assets only.
 
+The GitHub Pages release was checked on 8 October 2026 using fictitious statements
+only. The published app opened the file picker directly, accepted Barclays, Amex
+and Revolut PDFs together, reconciled each statement, and returned to Home after
+one confirmation. Recorded income, expenses and net cash flow matched the fixture
+totals. The EUR account view hid GBP accounts instead of mixing currencies; mobile
+layout and the desktop category rail and bottom Settings navigation were checked.
+Import requests contained no uploads or external requests.
+
+A separate browser kept the previous live version 1.8.4 open with ten saved
+synthetic transactions. Its Update button installed version 1.9.0 and preserved
+every transaction field unchanged. These browser checks supplement the 311 unit
+and component tests, 76 Chromium/WebKit checks, production build and dependency
+audit. Physical iPhone checks remain in the manual checklist. A timing-sensitive
+keyboard test now awaits the real atomic IndexedDB save and Undo operations,
+rather than applying a one-second database polling limit under CI load.
+
 Version 1.8.4 separates statement money movement from personal cash-flow metrics.
 Import labels Money in/Money out sum every extracted row, including transfers and
 excluded duplicate rows. Synthetic tests verify card repayment inclusion, incoming
