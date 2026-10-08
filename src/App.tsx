@@ -1,5 +1,8 @@
 import { ImportPickerContext } from "./components/ImportPicker";
-import { useGlobalCurrency } from "./components/CurrencySetting";
+import {
+  useGlobalCurrency,
+  CurrencyViewNotice,
+} from "./components/CurrencySetting";
 import { sectionForPath } from "./navigation/section";
 import { ThemeSync } from "./components/Theme";
 import {
@@ -47,6 +50,7 @@ function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
+  const mobileNavigation = useRef<HTMLElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const openImportPicker = () => fileInput.current?.click();
   const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
@@ -69,6 +73,19 @@ function Shell() {
 
   const [online, setOnline] = useState(navigator.onLine);
   const [storageWarning, setStorageWarning] = useState("");
+  useEffect(() => {
+    const navigation = mobileNavigation.current;
+    if (!navigation) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const height = entry.target.getBoundingClientRect().height;
+      document.documentElement.style.setProperty(
+        "--mobile-nav-height",
+        `${height}px`,
+      );
+    });
+    observer.observe(navigation);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     void initializeDatabase()
       .then(() => setInitialized(true))
@@ -119,7 +136,29 @@ function Shell() {
   }, []);
   useEffect(() => {
     window.scrollTo(0, 0);
-  }, [location.pathname]);
+    const targetId = decodeURIComponent(location.hash.slice(1));
+    if (!targetId) return;
+    const reveal = () => {
+      const target = document.getElementById(targetId);
+      if (!target) return false;
+      target.scrollIntoView({ block: "center" });
+      return true;
+    };
+    if (reveal()) return;
+    // Settings is lazy loaded; keep its deep links reliable after rendering.
+    const observer = new MutationObserver(() => {
+      if (reveal()) observer.disconnect();
+    });
+    observer.observe(document.getElementById("main")!, {
+      childList: true,
+      subtree: true,
+    });
+    const timeout = window.setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      window.clearTimeout(timeout);
+    };
+  }, [location.pathname, location.hash]);
   const updateApp = async () => {
     const registration = await navigator.serviceWorker.getRegistration();
     if (!registration?.waiting) {
@@ -177,11 +216,22 @@ function Shell() {
               Feng<span className="brand-finance">Finance</span>
             </span>
           </NavLink>
+          <button
+            className="primary sidebar-import"
+            onClick={openImportPicker}
+            aria-current={
+              sectionForPath(location.pathname) === "import"
+                ? "page"
+                : undefined
+            }
+          >
+            <Plus size={20} />
+            Import statement
+          </button>
           <nav aria-label="Main navigation">
             {[
-              ["/import", "Import", Plus],
-              ["/transactions", "Transactions", List],
               ["/", "Home", HomeIcon],
+              ["/transactions", "Transactions", List],
               ["/analysis", "Analyse", ChartNoAxesCombined],
               ["/planning", "Planning", CalendarClock],
               ["/settings", "Settings", SettingsIcon],
@@ -217,6 +267,50 @@ function Shell() {
             })}
           </nav>
         </aside>
+        <nav
+          ref={mobileNavigation}
+          className="mobile-navigation"
+          aria-label="Main navigation"
+        >
+          {[
+            ["/import", "Import", Plus],
+            ["/transactions", "Transactions", List],
+            ["/", "Home", HomeIcon],
+            ["/analysis", "Analyse", ChartNoAxesCombined],
+            ["/planning", "Planning", CalendarClock],
+          ].map(([path, label, Icon]) => {
+            const I = Icon as typeof HomeIcon;
+            const active =
+              sectionForPath(location.pathname) ===
+              sectionForPath(String(path));
+            return (
+              <Link
+                key={String(path)}
+                to={String(path)}
+                className={active ? "active" : undefined}
+                aria-current={active ? "page" : undefined}
+                onClick={
+                  path === "/import"
+                    ? (event) => {
+                        if (
+                          event.metaKey ||
+                          event.ctrlKey ||
+                          event.shiftKey ||
+                          event.altKey
+                        )
+                          return;
+                        event.preventDefault();
+                        openImportPicker();
+                      }
+                    : undefined
+                }
+              >
+                <I size={21} />
+                <span>{String(label)}</span>
+              </Link>
+            );
+          })}
+        </nav>
         <div className="main-wrap">
           <header className="mobile-header">
             <NavLink className="brand" to="/">
@@ -226,14 +320,14 @@ function Shell() {
               Feng Finance
             </NavLink>
             <Link
-              to="/planning"
-              className="mobile-planning"
+              to="/settings"
+              className="mobile-settings"
+              aria-label="Settings"
               aria-current={
-                location.pathname === "/planning" ? "page" : undefined
+                location.pathname === "/settings" ? "page" : undefined
               }
             >
-              <CalendarClock size={18} />
-              Planning
+              <SettingsIcon size={22} />
             </Link>
             {!online && <span className="small-chip">Offline</span>}
           </header>
@@ -250,6 +344,9 @@ function Shell() {
             <div className="notice warning" role="status">
               {storageWarning}
             </div>
+          )}
+          {initialized && !initError && (
+            <CurrencyViewNotice currency={currency} />
           )}
           <main id="main" tabIndex={-1}>
             {initError ? (

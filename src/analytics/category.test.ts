@@ -56,6 +56,28 @@ const stats = (items = tx, docs = statements) =>
     "2026-05-01",
   );
 describe("category comparisons and coverage", () => {
+  it("lets stricter source eligibility exclude a mixed-source month from averages and overspending", () => {
+    const result = categoryOverview(
+      tx,
+      [accounts[0]],
+      statements,
+      defaultCategories,
+      "shopping",
+      "2026-04",
+      "GBP",
+      6,
+      "2026-05-01",
+      (month) => ["2026-01", "2026-03"].includes(month),
+    );
+    expect(result.baseline.map((point) => point.month)).toEqual([
+      "2026-01",
+      "2026-03",
+    ]);
+    expect(result.mean).toBe(20000);
+    expect(result.std).toBeUndefined();
+    expect(result.current.complete).toBe(false);
+    expect(result.aboveUsual).toBe(false);
+  });
   it("computes sample deviation from prior complete months and income share", () => {
     const s = stats();
     expect(s.baseline).toHaveLength(3);

@@ -7,10 +7,14 @@ import {
   Tooltip,
   CartesianGrid,
   ReferenceLine,
+  ReferenceArea,
 } from "recharts";
+import { useId, useState } from "react";
 import type { Account, Statement, Transaction } from "../domain/models";
 import { datedBalanceHistory } from "../analytics/balances";
+import { verifiedStatements } from "../analytics/coverage";
 import { currencyPrecision, money } from "../domain/money";
+import { ImportButton } from "./ImportPicker";
 const accountColors = [
   "#7ab8ff",
   "#ceabff",
@@ -26,6 +30,7 @@ export function BalanceChart({
   currency,
   period,
   transactions,
+  showValues = false,
 }: {
   accounts: Account[];
   statements: Statement[];
@@ -33,17 +38,41 @@ export function BalanceChart({
   currency: string;
   period: number;
   transactions: Transaction[];
+  showValues?: boolean;
 }) {
+  const hatchId = `balance-gap-${useId().replaceAll(":", "")}`;
+  const [selectedGap, setSelectedGap] = useState<string>();
   const scoped = accounts.filter((a) => a.currency === currency);
+  const verified = verifiedStatements(statements, transactions);
   const history = datedBalanceHistory(
     scoped,
-    statements,
+    verified,
     transactions,
     month,
     currency,
     period,
   );
   const data = history.data;
+  const hasCashAccount = scoped.some(
+    (account) => account.accountType !== "credit",
+  );
+  const status = (point: (typeof data)[number]) =>
+    point.total !== null
+      ? "Complete"
+      : Object.values(point.balances).some((balance) => balance !== null)
+        ? "Partial"
+        : "No statements";
+  const segments: { start: number; end: number; status: string }[] = [];
+  for (const point of data) {
+    const previous = segments.at(-1);
+    if (previous?.status === status(point)) previous.end = point.stamp;
+    else
+      segments.push({
+        start: point.stamp,
+        end: point.stamp,
+        status: status(point),
+      });
+  }
   const formatDate = (stamp: number) =>
     new Date(stamp).toLocaleDateString("en-GB", {
       day: "numeric",
@@ -68,7 +97,37 @@ export function BalanceChart({
             data={data}
             margin={{ top: 12, right: 8, left: -10, bottom: 0 }}
           >
+            <defs>
+              <pattern
+                id={hatchId}
+                width="8"
+                height="8"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
+              >
+                <line
+                  x1="0"
+                  y1="0"
+                  x2="0"
+                  y2="8"
+                  stroke="var(--muted)"
+                  strokeWidth="1"
+                />
+              </pattern>
+            </defs>
             <CartesianGrid vertical={false} stroke="var(--line)" />
+            {segments
+              .filter((segment) => segment.status === "No statements")
+              .map((segment) => (
+                <ReferenceArea
+                  key={segment.start}
+                  x1={segment.start}
+                  x2={segment.end}
+                  fill={`url(#${hatchId})`}
+                  fillOpacity={0.25}
+                  stroke="none"
+                />
+              ))}
             <XAxis
               dataKey="stamp"
               type="number"
@@ -76,23 +135,51 @@ export function BalanceChart({
               tickFormatter={formatDate}
               minTickGap={30}
               tickLine={false}
-              tick={{ fontSize: 12, fill: "var(--muted)" }}
+              tick={{ fontSize: 13, fill: "var(--muted)" }}
             />
             <YAxis
               tickLine={false}
-              tick={{ fontSize: 12, fill: "var(--muted)" }}
+              tick={{ fontSize: 13, fill: "var(--muted)" }}
               tickFormatter={(v) =>
                 `${+(Number(v) / factor / 1000).toFixed(1)}k`
               }
             />
             <ReferenceLine y={0} stroke="var(--muted)" />
             <Tooltip
-              labelFormatter={(value) => formatDate(Number(value))}
-              formatter={(value) => money(Number(value), currency)}
-              contentStyle={{
-                background: "var(--surface)",
-                border: "1px solid var(--line)",
-                color: "var(--ink)",
+              filterNull={false}
+              content={({ active, label }) => {
+                const point = data.find((item) => item.stamp === Number(label));
+                if (!active || !point) return null;
+                return (
+                  <div className="chart-tooltip">
+                    <strong>
+                      {formatDate(point.stamp)} · {status(point)}
+                    </strong>
+                    {status(point) === "No statements" ? (
+                      <p>No statements</p>
+                    ) : (
+                      <>
+                        {scoped.map((account, index) => (
+                          <p key={account.id}>
+                            {account.displayName}:{" "}
+                            {point.balances[`account${index}`] === null
+                              ? "Not imported"
+                              : money(
+                                  point.balances[`account${index}`]!,
+                                  currency,
+                                )}
+                          </p>
+                        ))}
+                        <p>
+                          Net position:{" "}
+                          {hasCashAccount && point.total !== null
+                            ? money(point.total, currency)
+                            : "Unavailable"}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                );
               }}
             />
             {scoped.map((a, i) => (
@@ -113,26 +200,29 @@ export function BalanceChart({
                 isAnimationActive={false}
               />
             ))}
-            <Line
-              name="Total balance"
-              dataKey="total"
-              stroke="var(--ink)"
-              strokeWidth={3}
-              strokeDasharray="6 3"
-              type="stepAfter"
-              dot={
-                data.filter((d) => d.total !== null).length < 3
-                  ? { r: 4 }
-                  : false
-              }
-              connectNulls={false}
-              isAnimationActive={false}
-            />
+            {hasCashAccount && (
+              <Line
+                name="Net position"
+                dataKey="total"
+                stroke="var(--ink)"
+                strokeWidth={3}
+                strokeDasharray="6 3"
+                type="stepAfter"
+                dot={
+                  data.filter((d) => d.total !== null).length < 3
+                    ? { r: 4 }
+                    : false
+                }
+                connectNulls={false}
+                isAnimationActive={false}
+              />
+            )}
           </ComposedChart>
         </ResponsiveContainer>
       </div>
       <p className="coverage-note">
-        {history.start} – {history.end}
+        {formatDate(Date.parse(history.start))} –{" "}
+        {formatDate(Date.parse(history.end))}
       </p>
       {data.filter((d) => Object.values(d.balances).some((v) => v !== null))
         .length < 2 && (
@@ -150,13 +240,83 @@ export function BalanceChart({
             {a.displayName}
           </span>
         ))}
-        <span>┄ Total balance</span>
+        {hasCashAccount && <span>┄ Net position</span>}
+      </div>
+      {segments.some((segment) => segment.status === "No statements") && (
+        <div className="chart-coverage" aria-label="Missing balance history">
+          {segments
+            .filter((segment) => segment.status === "No statements")
+            .map((segment) => (
+              <button
+                className="chart-month-gap"
+                key={segment.start}
+                onClick={() =>
+                  setSelectedGap(
+                    `${formatDate(segment.start)} – ${formatDate(segment.end)}: No statements`,
+                  )
+                }
+              >
+                {formatDate(segment.start)} – {formatDate(segment.end)} · No
+                statements
+              </button>
+            ))}
+        </div>
+      )}
+      {selectedGap && (
+        <p role="status" className="chart-coverage-note">
+          {selectedGap}
+        </p>
+      )}
+      <div className={showValues ? "chart-data" : "sr-only"}>
+        <details open={!showValues}>
+          <summary>View balance chart values</summary>
+          <table>
+            <caption>Statement-backed daily account balances</caption>
+            <thead>
+              <tr>
+                <th>Date</th>
+                <th>Coverage</th>
+                {scoped.map((account) => (
+                  <th key={account.id}>{account.displayName}</th>
+                ))}
+                {hasCashAccount && <th>Net position</th>}
+              </tr>
+            </thead>
+            <tbody>
+              {data.map((point) => (
+                <tr key={point.stamp}>
+                  <th>{formatDate(point.stamp)}</th>
+                  <td>{status(point)}</td>
+                  {scoped.map((account, index) => (
+                    <td key={account.id}>
+                      {point.balances[`account${index}`] === null
+                        ? "No statements"
+                        : money(point.balances[`account${index}`]!, currency)}
+                    </td>
+                  ))}
+                  {hasCashAccount && (
+                    <td>
+                      {point.total === null
+                        ? "Unavailable"
+                        : money(point.total, currency)}
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
       </div>
       {data.some((d) => d.total === null) && (
         <p className="coverage-note">
           Gaps indicate missing or unverified history. Daily movement includes
           transfers.
         </p>
+      )}
+      {!verified.length && (
+        <ImportButton className="button">
+          Import statements for a balance history
+        </ImportButton>
       )}
     </section>
   );

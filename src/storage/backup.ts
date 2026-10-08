@@ -72,6 +72,8 @@ const transaction = z.object({
   description: text,
   merchant: text,
   sourceMerchant: text.optional(),
+  categorySource: z.enum(["manual", "rule"]).optional(),
+  categoryRuleId: identifier.optional(),
   amount: minor,
   currency,
   balanceAfterTransaction: minor.optional(),
@@ -112,6 +114,7 @@ const rule = z.object({
   type: kind.optional(),
   priority: z.number().int(),
   builtIn: z.boolean(),
+  lastUsedAt: timestamp.optional(),
 });
 const link = z.object({
   id: identifier,
@@ -281,6 +284,30 @@ export function download(contents: string, type: string, filename: string) {
   a.download = filename;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 30000);
+}
+/** Records the download handoff, not whether the user saved the file in Files. */
+export async function exportBackupFile() {
+  const backup = await createBackup();
+  const metadata = [
+    { key: "backup:lastExportAt", value: backup.exportedAt },
+    {
+      key: "backup:lastExportCount",
+      value: String(backup.transactions.length),
+    },
+  ];
+  backup.settings = [
+    ...backup.settings.filter(
+      (setting) => !metadata.some((entry) => entry.key === setting.key),
+    ),
+    ...metadata,
+  ];
+  download(
+    JSON.stringify(backup, null, 2),
+    "application/json",
+    `feng-finance-backup-${backup.exportedAt.slice(0, 10)}.json`,
+  );
+  await db.settings.bulkPut(metadata);
+  return backup;
 }
 export async function exportCsv() {
   const transactions = await db.transactions.orderBy("date").toArray();

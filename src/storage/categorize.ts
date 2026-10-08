@@ -8,6 +8,9 @@ export interface CategoryReceipt {
   before: Transaction[];
   after: Transaction[];
   rule?: Rule;
+  rules?: Rule[];
+  selectedIds?: string[];
+  learning?: { merchant: string; accountId: string; count: number }[];
   categoryName: string;
 }
 export async function matchingUncategorized(t: Transaction) {
@@ -19,6 +22,7 @@ export async function matchingUncategorized(t: Transaction) {
     .filter(
       (p) =>
         !p.categoryId &&
+        !p.subcategoryId &&
         !p.isTransfer &&
         p.type !== "transfer" &&
         !p.transferPairId &&
@@ -32,6 +36,7 @@ export async function matchingUncategorized(t: Transaction) {
 export async function categorizeCards(
   expected: Transaction[],
   categoryId: string,
+  options: { allowMultipleMerchants?: boolean; backfill?: boolean } = {},
 ): Promise<CategoryReceipt> {
   if (
     !expected.length ||
@@ -68,7 +73,28 @@ export async function categorizeCards(
         throw new Error(
           "A transaction changed. Reopen it before categorizing.",
         );
-      const before = current as Transaction[];
+      const chosen = current as Transaction[];
+      const before = [...chosen];
+      if (options.backfill) {
+        const ids = new Set(before.map((t) => t.id));
+        const scopes = new Set<string>();
+        for (const t of chosen) {
+          const scope = JSON.stringify([
+            t.accountId,
+            t.currency,
+            Math.sign(t.amount),
+            normalizeMerchant(t.sourceMerchant ?? t.merchant),
+            !!t.isDemo,
+          ]);
+          if (scopes.has(scope)) continue;
+          scopes.add(scope);
+          for (const match of await matchingUncategorized(t))
+            if (!ids.has(match.id)) {
+              ids.add(match.id);
+              before.push(match);
+            }
+        }
+      }
       if (
         !transfer &&
         (parent ?? category)?.kind === "income" &&
@@ -85,6 +111,7 @@ export async function categorizeCards(
       )
         throw new Error("Transfers must be edited in transaction details.");
       if (
+        !options.allowMultipleMerchants &&
         before.some(
           (t) =>
             t.accountId !== first.accountId ||
@@ -98,7 +125,10 @@ export async function categorizeCards(
         throw new Error(
           "Only matching merchants in the same account can be grouped.",
         );
-      if (before.slice(1).some((t) => t.categoryId))
+      if (
+        !options.allowMultipleMerchants &&
+        before.slice(1).some((t) => t.categoryId)
+      )
         throw new Error("A matching transaction has already been categorized.");
       const updatedAt = new Date().toISOString();
       const after = before.map((t) => ({
@@ -108,11 +138,46 @@ export async function categorizeCards(
         type: transfer ? ("transfer" as const) : amountType(t.amount),
         isTransfer: transfer || t.isTransfer,
         isReviewed: true,
+        categorySource: chosen.some((p) => p.id === t.id)
+          ? ("manual" as const)
+          : ("rule" as const),
         updatedAt,
       }));
-      const rule = await rememberCategory(after[0]);
+      const rules: Rule[] = [];
+      const learning: NonNullable<CategoryReceipt["learning"]> = [];
+      const grouped = new Map<string, Transaction[]>();
+      for (const t of after) {
+        const key = JSON.stringify([
+          t.accountId,
+          t.currency,
+          Math.sign(t.amount),
+          normalizeMerchant(t.sourceMerchant ?? t.merchant),
+          !!t.isDemo,
+        ]);
+        const group = grouped.get(key) ?? [];
+        group.push(t);
+        grouped.set(key, group);
+      }
+      for (const group of grouped.values()) {
+        const rule = await rememberCategory(group[0]);
+        if (rule) rules.push(rule);
+        for (const t of group) t.categoryRuleId = rule?.id;
+        learning.push({
+          merchant: group[0].merchant || group[0].description,
+          accountId: group[0].accountId,
+          count: group.length,
+        });
+      }
       await db.transactions.bulkPut(after);
-      return { before, after, rule, categoryName: categoryName! };
+      return {
+        before,
+        after,
+        rule: rules[0],
+        rules,
+        learning,
+        selectedIds: chosen.map((t) => t.id),
+        categoryName: categoryName!,
+      };
     },
   );
 }
@@ -129,13 +194,13 @@ export async function undoCategory(receipt: CategoryReceipt) {
       throw new Error(
         "These transactions changed since categorization. Undo would overwrite newer changes.",
       );
-    if (
-      receipt.rule &&
-      JSON.stringify(await db.rules.get(receipt.rule.id)) !==
-        JSON.stringify(receipt.rule)
-    )
-      throw new Error("The learned rule changed. Undo is no longer available.");
+    const rules = receipt.rules ?? (receipt.rule ? [receipt.rule] : []);
+    for (const rule of rules)
+      if (JSON.stringify(await db.rules.get(rule.id)) !== JSON.stringify(rule))
+        throw new Error(
+          "The learned rule changed. Undo is no longer available.",
+        );
     await db.transactions.bulkPut(receipt.before);
-    if (receipt.rule) await db.rules.delete(receipt.rule.id);
+    await db.rules.bulkDelete(rules.map((r) => r.id));
   });
 }

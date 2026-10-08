@@ -11,6 +11,8 @@ import type {
 } from "../domain/models";
 import { editTransaction, linkTransfers } from "../storage/transactions";
 import { financialType, amountType } from "../domain/transaction-type";
+import { displayDate, displayMerchant } from "../domain/presentation";
+import type { Rule } from "../domain/models";
 export default function TransactionDetail() {
   const { id: tid } = useParams();
   const data = useLiveQuery(async () => {
@@ -20,6 +22,7 @@ export default function TransactionDetail() {
       t,
       account: await db.accounts.get(t.accountId),
       statement: await db.statements.get(t.statementId),
+      rule: t.categoryRuleId ? await db.rules.get(t.categoryRuleId) : undefined,
       categories: await db.categories.toArray(),
       possible: await db.transactions
         .where("[currency+date]")
@@ -67,9 +70,10 @@ function Editor({
     statement?: Statement;
     categories: Category[];
     possible: Transaction[];
+    rule?: Rule;
   };
 }) {
-  const { t, account, statement, categories, possible } = data;
+  const { t, account, statement, categories, possible, rule } = data;
   const navigate = useNavigate();
   const location = useLocation();
   const returnTo =
@@ -113,10 +117,30 @@ function Editor({
       </Link>
       <section className="card detail-card">
         <p className="eyebrow">
-          {t.date} · {account?.institution}
+          {displayDate(t.date)} · {account?.institution}
         </p>
         <h1 className="detail-amount">{money(t.amount, t.currency, true)}</h1>
+        <h2>{displayMerchant(t)}</h2>
         <p className="detail-description">{t.description}</p>
+        {(rule || t.categorySource) && (
+          <p className="category-origin-note">
+            {t.categorySource === "manual"
+              ? "Categorized by you"
+              : "Categorized by rule"}
+            {rule
+              ? `: ${rule.pattern} on ${account?.institution ?? "this account"} → ${rule.type === "transfer" ? "Transfer" : (categories.find((c) => c.id === rule.categoryId)?.name ?? "Category")}`
+              : ""}
+            {rule && (
+              <>
+                {" "}
+                ·{" "}
+                <Link to={`/settings?rule=${encodeURIComponent(rule.id)}`}>
+                  Edit rule
+                </Link>
+              </>
+            )}
+          </p>
+        )}
         <dl className="detail-meta">
           <div>
             <dt>Account</dt>
@@ -269,7 +293,7 @@ function Editor({
               <option value="">Select a transaction</option>
               {possible.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.date} · {p.description} ·{" "}
+                  {displayDate(p.date)} · {p.description} ·{" "}
                   {money(p.amount, p.currency, true)}
                 </option>
               ))}

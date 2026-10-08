@@ -103,10 +103,8 @@ export function Reminders({
             </select>
           </label>
           <p className="muted">
-            Feng remains a website and installable web app. In-app reminders
-            appear when you open it. For alerts while it is closed, import a
-            calendar file into your preferred calendar—no App Store or
-            notification server required.
+            Reminders appear in Feng; export to your calendar for alerts while
+            it is closed.
           </p>
           <button
             disabled={!config.enabled}
@@ -117,17 +115,21 @@ export function Reminders({
                 "feng-finance-reminders.ics",
               );
               setNotice(
-                "Calendar file downloaded. Import it into your calendar and check that alerts are enabled. It contains no merchant names, amounts or account details.",
+                "Calendar file prepared. Import it into your calendar and enable alerts.",
               );
             }}
           >
             Export calendar reminders
           </button>
-          <p className="coverage-note">
-            Calendar alerts depend on your calendar app. Re-export to refresh
-            estimated bill dates; disabling reminders in Feng does not remove
-            previously imported calendar events.
-          </p>
+          <details>
+            <summary>Learn more about calendar reminders</summary>
+            <p>
+              Calendar files contain no merchant names, amounts or account
+              details. Alerts depend on your calendar app. Re-export to refresh
+              estimated bill dates; disabling reminders here does not remove
+              calendar events already imported.
+            </p>
+          </details>
         </>
       )}
       {reminders.slice(0, settings ? 20 : 4).map((r) =>
@@ -148,8 +150,8 @@ export function Reminders({
       )}
       {!reminders.length && settings && (
         <p className="muted">
-          No reminders due. Upcoming bill dates need repeated imported payments;
-          predictions do not prove a bill is unpaid.
+          No reminders due. Expected bill dates need repeated payments in your
+          history.
         </p>
       )}
       {!settings && reminders.length > 4 && (

@@ -60,11 +60,15 @@ export async function editTransaction(
         transferPairId:
           patch.type === "transfer" ? current.transferPairId : undefined,
         isReviewed: true,
+        categorySource: "manual",
+        categoryRuleId: undefined,
         updatedAt: new Date().toISOString(),
       });
       if (!rule) {
         const saved = (await db.transactions.get(tid))!;
-        await rememberCategory(saved);
+        const learned = await rememberCategory(saved);
+        if (learned)
+          await db.transactions.update(tid, { categoryRuleId: learned.id });
       }
       if (rule) {
         const priority =
@@ -73,6 +77,7 @@ export async function editTransaction(
         if (!Number.isSafeInteger(priority))
           throw new Error("Rule priority is out of range.");
         await db.rules.add({ ...rule, priority });
+        await db.transactions.update(tid, { categoryRuleId: rule.id });
       }
     },
   );
@@ -116,9 +121,13 @@ export async function linkTransfers(aId: string, bId: string) {
           categoryId: undefined,
           subcategoryId: undefined,
           isReviewed: true,
+          categorySource: "manual",
+          categoryRuleId: undefined,
           updatedAt: link.createdAt,
         });
-        await rememberCategory((await db.transactions.get(t.id))!);
+        const rule = await rememberCategory((await db.transactions.get(t.id))!);
+        if (rule)
+          await db.transactions.update(t.id, { categoryRuleId: rule.id });
       }
     },
   );

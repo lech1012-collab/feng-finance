@@ -17,6 +17,41 @@ const rule: Rule = {
   builtIn: false,
 };
 describe("categorization order", () => {
+  it("never applies another account or currency's manual category history", () => {
+    const past = transaction({
+      categoryId: "household",
+      sourceMerchant: "WAITROSE",
+      merchant: "My weekly shop",
+    });
+    expect(categorize(transaction(), [], [past]).categoryId).toBe("household");
+    expect(
+      categorize(transaction({ accountId: "a2" }), [], [past]).categoryId,
+    ).toBeUndefined();
+    expect(
+      categorize(transaction({ currency: "EUR" }), [], [past]).categoryId,
+    ).toBeUndefined();
+  });
+  it("keeps learned rules tied to the original merchant and records their origin", () => {
+    const learned = {
+      ...rule,
+      match: "exact" as const,
+      pattern: "WAITROSE",
+      accountId: "a1",
+    };
+    const renamed = transaction({
+      merchant: "Weekly groceries",
+      sourceMerchant: "WAITROSE",
+    });
+    expect(categorize(renamed, [learned])).toMatchObject({
+      categoryId: "shopping",
+      categorySource: "rule",
+      categoryRuleId: "r",
+    });
+    expect(
+      categorize({ ...renamed, accountId: "a2" }, [learned]).categoryId,
+    ).toBeUndefined();
+    expect(renamed.merchant).toBe("Weekly groceries");
+  });
   it("uses built-in merchants with amount direction", () => {
     expect(categorize(transaction(), defaultRules).categoryId).toBe(
       "groceries",

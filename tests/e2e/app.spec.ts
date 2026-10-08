@@ -1,4 +1,9 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import {
+  test as base,
+  expect,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { startStaticHost, type LocalHost } from "./static-host";
@@ -19,6 +24,72 @@ async function gotoRoute(page: Page, path: string) {
   await page.goto(origin + "/#" + path);
 }
 const fixture = (name: string) => resolve(`tests/fixtures/${name}.pdf`);
+async function swipeTransactionLeft(page: Page, row: Locator) {
+  // Native visibility checks include the fixed navigation's covered area.
+  await row.evaluate((element) => element.scrollIntoView({ block: "center" }));
+  await expect
+    .poll(() =>
+      row.evaluate((element) => {
+        const rect = element.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          rect.x + rect.width * 0.75,
+          rect.y + rect.height / 2,
+        );
+        return !!hit && element.contains(hit);
+      }),
+    )
+    .toBe(true);
+  const rect = (await row.boundingBox())!;
+  await page.mouse.move(rect.x + rect.width * 0.75, rect.y + rect.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(rect.x + 30, rect.y + rect.height / 2, { steps: 12 });
+  await page.mouse.up();
+}
+async function expectTransactionCount(page: Page, count: number) {
+  await expect
+    .poll(() =>
+      page.evaluate(
+        () =>
+          new Promise<number>((resolve, reject) => {
+            const request = indexedDB.open("feng-finance");
+            request.onerror = () => reject(request.error);
+            request.onsuccess = () => {
+              const database = request.result;
+              const transaction = database.transaction(
+                "transactions",
+                "readonly",
+              );
+              const records = transaction.objectStore("transactions").count();
+              records.onsuccess = () => {
+                database.close();
+                resolve(records.result);
+              };
+              records.onerror = () => {
+                database.close();
+                reject(records.error);
+              };
+            };
+          }),
+      ),
+    )
+    .toBe(count);
+}
+async function closeCategorySheet(page: Page) {
+  const dialog = page.getByRole("dialog", { name: "Where does this belong?" });
+  if (await dialog.isVisible())
+    await dialog.getByRole("button", { name: "Close categorization" }).click();
+}
+async function openStatementCard(page: Page, bank: string) {
+  await expect(page.locator(".import-review-list")).toBeVisible({
+    timeout: 90000,
+  });
+  const card = page.locator(".import-statement-card").filter({
+    has: page.getByRole("heading", { name: `${bank} detected`, exact: true }),
+  });
+  if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
+    await card.locator(":scope > summary").click();
+  return card;
+}
 test("manual category memory survives deleting imports and reimporting the same PDF", async ({
   page,
 }) => {
@@ -26,17 +97,17 @@ test("manual category memory survives deleting imports and reimporting the same 
   await selectStatement(page, "barclays-memory");
   await confirmImport(page);
   await gotoRoute(page, "/transactions?uncategorized=true");
-  await page.getByRole("link", { name: /HAMM&FULH CTAX/ }).click();
+  await page.getByRole("link", { name: /HAMM&FULH CTAX/i }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   await dialog
     .getByRole("button", { name: "Categorize as Childcare", exact: true })
     .click();
-  await expect(page.getByText(/merchant remembered/)).toBeVisible();
-  await page
-    .getByRole("button", { name: "Uncategorized", exact: true })
-    .click();
-  const categorizedRow = page.getByRole("link", { name: /HAMM&FULH CTAX/ });
+  await expect(
+    page.getByText(/Future matching payments will follow/).first(),
+  ).toBeVisible();
+  await page.getByRole("button", { name: /^Uncategorized \d+$/ }).click();
+  const categorizedRow = page.getByRole("link", { name: /HAMM&FULH CTAX/i });
   await expect(categorizedRow.locator(".transaction-status")).toHaveText(
     "Childcare",
   );
@@ -91,37 +162,41 @@ test("Salary and Income filters agree with cash flow and verified balance", asyn
   await openImport(page);
   await selectStatement(page, "barclays-income");
   await confirmImport(page);
-  await expect(page.locator(".hero")).toContainText("+£4,126.00");
-  await expect(page.locator(".hero")).toContainText("£4,226.00");
+  await expect(page.locator(".month-summary")).toContainText("+£4,126.00");
+  await expect(page.locator(".month-summary")).toContainText("£4,226.00");
   await expect(page.locator(".balance-summary")).toContainText("£5,126.00");
   await page
     .getByRole("link", { name: /2 transactions need a category/ })
     .click();
-  await page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }).click();
+  await page.getByRole("link", { name: /FICTIONAL EMPLOYER/i }).click();
   await page
     .getByRole("dialog")
     .getByRole("button", { name: "Categorize as Salary", exact: true })
     .click();
+  await expect(page.getByRole("dialog").locator(".sorting-card")).toContainText(
+    "Fictional Income",
+  );
+  await closeCategorySheet(page);
   await page.getByRole("button", { name: "Income", exact: true }).click();
   await expect(
-    page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }),
+    page.getByRole("link", { name: /FICTIONAL EMPLOYER/i }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /FICTIONAL INCOME/ }),
+    page.getByRole("link", { name: /FICTIONAL INCOME/i }),
   ).toBeVisible();
-  await expect(page.getByRole("link", { name: /WAITROSE/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /WAITROSE/i })).toHaveCount(0);
   await page.getByRole("button", { name: "Salary", exact: true }).click();
   await expect(
     page
-      .getByRole("link", { name: /FICTIONAL EMPLOYER/ })
+      .getByRole("link", { name: /FICTIONAL EMPLOYER/i })
       .locator(".transaction-status"),
   ).toHaveText("Salary");
   await expect(page.locator(".transaction-icon")).toHaveCount(0);
   await expect(
-    page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }),
+    page.getByRole("link", { name: /FICTIONAL EMPLOYER/i }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /FICTIONAL INCOME/ }),
+    page.getByRole("link", { name: /FICTIONAL INCOME/i }),
   ).toHaveCount(0);
   // Reproduce a legacy label mismatch without changing source amounts/balances.
   await page.evaluate(
@@ -152,13 +227,17 @@ test("Salary and Income filters agree with cash flow and verified balance", asyn
   await page.reload();
   await page.getByRole("button", { name: "Income", exact: true }).click();
   await expect(
-    page.getByRole("link", { name: /FICTIONAL EMPLOYER/ }),
+    page.getByRole("link", { name: /FICTIONAL EMPLOYER/i }),
   ).toBeVisible();
   await expect(
-    page.getByRole("link", { name: /FICTIONAL INCOME/ }),
+    page.getByRole("link", { name: /FICTIONAL INCOME/i }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Home", exact: true }).click();
-  await expect(page.locator(".hero")).toContainText("+£4,126.00");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  await expect(page.locator(".month-summary")).toContainText("+£4,126.00");
   await expect(page.locator(".balance-summary")).toContainText("£5,126.00");
 });
 test("Planning budgets persist, recurring timeline and forecast horizons stay connected", async ({
@@ -170,19 +249,23 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
     await selectStatement(page, `barclays-planning-${month}`);
     await confirmImport(page);
   }
-  await page.getByRole("link", { name: /Plan ahead/ }).click();
+  await page
+    .locator(".mobile-navigation")
+    .getByRole("link", { name: "Planning", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Planning", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".app")).toHaveAttribute("data-page", "planning");
-  await expect(page.locator(".mobile-planning")).toHaveAttribute(
-    "aria-current",
-    "page",
-  );
+  await expect(
+    page
+      .locator(".mobile-navigation")
+      .getByRole("link", { name: "Planning", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await expect(page.locator(".forecast-card")).toContainText("£3,000.00");
-  await expect(page.locator(".payment-timeline")).toContainText("NETFLIX");
-  await expect(page.locator(".payment-timeline")).toContainText("2026-10-10");
-  await expect(page.locator(".forecast-card")).toContainText("2026-11-06");
+  await expect(page.locator(".payment-timeline")).toContainText("Netflix");
+  await expect(page.locator(".payment-timeline")).toContainText("10 Oct");
+  await expect(page.locator(".forecast-card")).toContainText("6 Nov");
   await page
     .getByRole("button", { name: "Set Groceries budget", exact: true })
     .click();
@@ -229,7 +312,7 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
   await page.getByRole("button", { name: "Next month", exact: true }).click();
   await expect(groceries).toContainText("£100.00 remaining");
   await page.getByLabel("Forecast horizon", { exact: true }).selectOption("90");
-  await expect(page.locator(".forecast-card")).toContainText("2027-01-05");
+  await expect(page.locator(".forecast-card")).toContainText("5 Jan 2027");
   await expect(page.locator(".forecast-card")).toContainText("£9,000.00");
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
@@ -239,13 +322,22 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
       )
       .toBe(true);
   }
-  await page.getByRole("link", { name: "Home", exact: true }).click();
-  await page.getByRole("link", { name: /Plan ahead/ }).click();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  await page
+    .locator(".mobile-navigation")
+    .getByRole("link", { name: "Planning", exact: true })
+    .click();
   await expect(
     page.getByLabel("Forecast horizon", { exact: true }),
   ).toHaveValue("30");
   await page.setViewportSize({ width: 1440, height: 900 });
-  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  const nav = page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true });
   await expect(
     nav.getByRole("link", { name: "Planning", exact: true }),
   ).toHaveAttribute("aria-current", "page");
@@ -259,22 +351,13 @@ test("verified deeper insights, statement reminders and private calendar export"
     await selectStatement(page, `barclays-deeper-${month}`);
     await confirmImport(page);
   }
+  await gotoRoute(page, "/analysis");
   await expect(page.locator(".deeper-insights")).toContainText(
     "Income is lower than usual",
   );
   await expect(page.locator(".deeper-insights")).toContainText(
     "Shopping +£400.00",
   );
-  await expect(page.locator(".finance-reminders")).toContainText(
-    "2026-09 or later",
-  );
-  const choose = page.waitForEvent("filechooser");
-  await page
-    .locator(".finance-reminders")
-    .getByRole("button", { name: /Update/ })
-    .click();
-  await (await choose).setFiles([]);
-  await gotoRoute(page, "/analysis");
   await expect(page.locator(".deeper-insights")).toContainText(
     "Larger payment to JOHN LEWIS",
   );
@@ -307,10 +390,14 @@ test("verified deeper insights, statement reminders and private calendar export"
   await expect(
     page.getByLabel("Show statement and bill reminders"),
   ).not.toBeChecked();
-  await gotoRoute(page, "/");
-  await expect(page.locator(".finance-reminders")).toHaveCount(0);
+  await expect(
+    page.getByRole("button", {
+      name: "Export calendar reminders",
+      exact: true,
+    }),
+  ).toBeDisabled();
 });
-test("desktop row drag opens suggested categories and drop saves without a second drag", async ({
+test("desktop rows drag onto the persistent category rail, cancel safely and undo learned changes", async ({
   page,
 }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -320,53 +407,58 @@ test("desktop row drag opens suggested categories and drop saves without a secon
   await page
     .getByRole("link", { name: /3 transactions need a category/ })
     .click();
-  const row = page.getByRole("link", { name: /FICTIONAL WATER/ });
+  const rail = page.getByRole("complementary", {
+    name: "Category drop targets",
+  });
+  await expect(rail).toBeVisible();
+  const row = page.getByRole("link", { name: /Fictional Water/i });
   await expect(row.locator(".transaction-icon")).toHaveCount(0);
   await row.scrollIntoViewIfNeeded();
   const rect = (await row.boundingBox())!;
   await page.mouse.move(rect.x + 90, rect.y + rect.height / 2);
   await page.mouse.down();
-  await page.mouse.move(rect.x + 94, rect.y + rect.height / 2);
-  const dialog = page.getByRole("dialog", { name: "Where does this belong?" });
-  await expect(dialog).toHaveCount(0);
   await page.mouse.move(rect.x + 120, rect.y + rect.height / 2, { steps: 4 });
-  await expect(dialog).toBeVisible();
-  const suggested = dialog.getByRole("region", {
-    name: "Suggested categories",
-  });
-  const target = suggested.getByRole("button", {
-    name: "Categorize as Utilities",
-    exact: true,
-  });
-  await expect(target).toBeVisible();
+  await expect(page.getByRole("dialog")).toHaveCount(0);
+  const target = rail
+    .getByRole("region", {
+      name: "Suggested categories for selection",
+      exact: true,
+    })
+    .getByRole("button", { name: "Suggested Utilities", exact: true });
   const tile = (await target.boundingBox())!;
   await page.mouse.move(tile.x + tile.width / 2, tile.y + tile.height / 2, {
     steps: 12,
   });
   await expect(target).toHaveClass(/drop-target/);
   await page.mouse.up();
-  await expect(dialog).toHaveCount(0);
   await expect(row).toHaveCount(0);
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     2,
   );
+  await expect(page.locator(".category-feedback")).toContainText("Utilities");
+  await expect(page.locator(".category-feedback")).toContainText(
+    "Future matching payments will follow",
+  );
   await page.getByRole("button", { name: "Undo", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Where does this belong?" });
   await expect(dialog).toBeVisible();
-  await dialog.getByRole("button", { name: "Close categorization" }).click();
+  await closeCategorySheet(page);
   await expect(row).toBeVisible();
-  const remaining = page.getByRole("link", { name: /UNKNOWN MERCHANT/ });
-  await remaining.scrollIntoViewIfNeeded();
-  const box = (await remaining.boundingBox())!;
-  await page.mouse.move(box.x + 90, box.y + box.height / 2);
+  const unknown = page.getByRole("link", { name: /Unknown Merchant/i });
+  await unknown.scrollIntoViewIfNeeded();
+  const unknownRect = (await unknown.boundingBox())!;
+  await page.mouse.move(
+    unknownRect.x + 90,
+    unknownRect.y + unknownRect.height / 2,
+  );
   await page.mouse.down();
-  await page.mouse.move(box.x + 120, box.y + box.height / 2, { steps: 4 });
-  await expect(dialog).toBeVisible();
-  await expect(
-    dialog.getByRole("region", { name: "Suggested categories" }),
-  ).toHaveCount(0);
+  await page.mouse.move(
+    unknownRect.x + 120,
+    unknownRect.y + unknownRect.height / 2,
+    { steps: 4 },
+  );
   await page.keyboard.press("Escape");
   await page.mouse.up();
-  await expect(dialog).toHaveCount(0);
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     3,
   );
@@ -382,11 +474,10 @@ test("desktop row drag opens suggested categories and drop saves without a secon
     transferRect.y + transferRect.height / 2,
     { steps: 4 },
   );
-  const transfer = dialog.getByRole("button", {
-    name: "Categorize as Transfer",
+  const transfer = rail.getByRole("button", {
+    name: "Transfer / card repayment",
     exact: true,
   });
-  await expect(transfer).toBeVisible();
   const transferTile = (await transfer.boundingBox())!;
   await page.mouse.move(
     transferTile.x + transferTile.width / 2,
@@ -394,14 +485,19 @@ test("desktop row drag opens suggested categories and drop saves without a secon
     { steps: 10 },
   );
   await page.mouse.up();
-  await expect(dialog).toHaveCount(0);
   await expect(row).toHaveCount(0);
-  await expect(page.getByRole("status")).toContainText(
-    "1 transaction → Transfer",
-  );
-  await page.getByRole("link", { name: "Home", exact: true }).click();
-  await expect(page.locator(".hero-number")).toHaveText("-£50.00");
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await expect(page.locator(".category-feedback")).toContainText("Transfer");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  await expect(page.locator(".month-net strong")).toHaveText("-£50.00");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Transactions", exact: true })
+    .click();
   await expect(row).toContainText("Transfer");
 });
 async function openImport(page: Page) {
@@ -412,6 +508,12 @@ async function openImport(page: Page) {
 }
 async function selectStatement(page: Page, name: string) {
   await page.getByLabel("Select PDF statements").setInputFiles(fixture(name));
+  await expect(page.locator(".import-review-list")).toBeVisible({
+    timeout: 90000,
+  });
+  const card = page.locator(".import-statement-card").first();
+  if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
+    await card.locator(":scope > summary").click();
 }
 async function confirmImport(page: Page) {
   await page
@@ -460,10 +562,8 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await page
     .getByRole("link", { name: "View all transactions", exact: true })
     .click();
-  await expect(
-    page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }),
-  ).toBeVisible();
-  await page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }).click();
+  await expect(page.getByRole("link", { name: /John Lewis/i })).toBeVisible();
+  await page.getByRole("link", { name: /John Lewis/i }).click();
   await expect(
     page.getByRole("button", { name: "Save changes", exact: true }),
   ).toBeVisible();
@@ -501,9 +601,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await selectStatement(page, "barclays");
   await confirmImport(page);
   await gotoRoute(page, "/transactions?category=household");
-  await expect(
-    page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /John Lewis/i })).toBeVisible();
   await openImport(page);
   await selectStatement(page, "barclays-october");
   await expect(
@@ -524,13 +622,17 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import" }),
-  ).toBeDisabled();
-  await selectStatement(page, "barclays-regenerated");
+  ).toHaveCount(0);
   await expect(
-    page.getByText(/A statement for this account and period already exists/),
+    page.getByRole("button", { name: "Back to Home", exact: true }),
   ).toBeVisible();
-  await expect(page.getByText("0 new transactions selected")).toBeVisible();
-  await confirmImport(page);
+  await selectStatement(page, "barclays-regenerated");
+  await expect(page.getByText(/Overlap:/)).toBeVisible();
+  await expect(page.locator(".import-outcome-footer")).toContainText(
+    "0 new · 10 duplicates skipped",
+  );
+  await page.getByRole("button", { name: "Back to Home", exact: true }).click();
+  await expectTransactionCount(page, 11);
 });
 test("multiple banks, transfer exclusion and currency isolation", async ({
   page,
@@ -539,31 +641,31 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   await page
     .getByLabel("Select PDF statements")
     .setInputFiles([fixture("barclays"), fixture("amex"), fixture("revolut")]);
+  await expect(page.locator(".import-statement-card")).toHaveCount(3);
+  await expect(page.locator(".import-outcome-footer")).toContainText("19 new");
   await expect(
     page.getByRole("heading", { name: "Barclays detected" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "Confirm import" }).click();
   await expect(
     page.getByRole("heading", { name: "American Express detected" }),
   ).toBeVisible();
   await expect(
-    page.getByText("✓ Statement reconciled", { exact: true }),
-  ).toBeVisible();
-  await page.getByRole("button", { name: "Confirm import" }).click();
-  await expect(
     page.getByRole("heading", { name: "Revolut detected" }),
   ).toBeVisible();
-  await expect(
-    page.getByText("✓ Statement reconciled", { exact: true }),
-  ).toBeVisible();
+  for (const bank of ["Barclays", "American Express", "Revolut"]) {
+    const card = await openStatementCard(page, bank);
+    await expect(
+      card.getByText("✓ Statement reconciled", { exact: true }),
+    ).toBeVisible();
+  }
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.getByText("+£5,588.65", { exact: true })).toBeVisible();
   await expect(
-    page.locator(".hero").getByText("£7,150.00", { exact: true }),
+    page.locator(".month-summary").getByText("£7,150.00", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(".hero").getByText("£1,561.35", { exact: true }),
+    page.locator(".month-summary").getByText("£1,561.35", { exact: true }),
   ).toBeVisible();
   await openImport(page);
   await selectStatement(page, "revolut-eur");
@@ -571,18 +673,20 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
-  await expect(page.locator(".hero-number")).toContainText("£");
+  await expect(page.locator(".month-net strong")).toContainText("£");
   await gotoRoute(page, "/settings");
-  await page.getByLabel("Global currency", { exact: true }).selectOption("EUR");
-  await expect(page.getByLabel("Global currency", { exact: true })).toHaveValue(
-    "EUR",
-  );
+  await page
+    .getByLabel("Show accounts in", { exact: true })
+    .selectOption("EUR");
+  await expect(
+    page.getByLabel("Show accounts in", { exact: true }),
+  ).toHaveValue("EUR");
   await gotoRoute(page, "/");
   await expect(
-    page.locator(".hero-number").getByText("-€22.22", { exact: true }),
+    page.locator(".month-net strong").getByText("-€22.22", { exact: true }),
   ).toBeVisible();
   await page.reload();
-  await expect(page.locator(".hero-number")).toHaveText("-€22.22");
+  await expect(page.locator(".month-net strong")).toHaveText("-€22.22");
   for (const route of [
     "/transactions",
     "/analysis",
@@ -592,16 +696,16 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   ]) {
     await gotoRoute(page, route);
     await expect(
-      page.getByLabel("Global currency", { exact: true }),
+      page.getByLabel("Show accounts in", { exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByLabel("Dashboard currency", { exact: true }),
     ).toHaveCount(0);
   }
   await gotoRoute(page, "/settings");
-  await expect(page.getByLabel("Global currency", { exact: true })).toHaveValue(
-    "EUR",
-  );
+  await expect(
+    page.getByLabel("Show accounts in", { exact: true }),
+  ).toHaveValue("EUR");
   const downloadPromise = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
@@ -611,9 +715,11 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   expect(backupPath).not.toBeNull();
   const backup = JSON.parse(await readFile(backupPath!, "utf8"));
   expect(backup.settings).toContainEqual({ key: "currency", value: "EUR" });
-  await page.getByLabel("Global currency", { exact: true }).selectOption("GBP");
+  await page
+    .getByLabel("Show accounts in", { exact: true })
+    .selectOption("GBP");
   await gotoRoute(page, "/");
-  await expect(page.locator(".hero-number")).toHaveText("+£5,588.65");
+  await expect(page.locator(".month-net strong")).toHaveText("+£5,588.65");
 });
 test("Barclaycard issue date, two reading columns and repayment exclusion", async ({
   page,
@@ -630,12 +736,12 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("Transaction coverage: 2026-09-02 to 2026-10-04", {
+    page.getByText("2 Sep to 4 Oct 2026 · transaction coverage", {
       exact: true,
     }),
   ).toBeVisible();
   await expect(
-    page.getByText("Statement issued: 2026-10-04", { exact: true }),
+    page.getByText("Statement issued 4 Oct", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
@@ -643,8 +749,12 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await page.getByLabel(/I compared the extracted rows with the PDF/).check();
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
-  await expect(page.locator(".hero-number")).toHaveText("-£109.68");
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await expect(page.locator(".month-net strong")).toHaveText("-£109.68");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Transactions", exact: true })
+    .click();
   await expect(page.getByRole("link", { name: /\+£900\.00/ })).toContainText(
     "Transfer",
   );
@@ -662,7 +772,7 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("2026-09-01 to 2026-09-30", { exact: true }),
+    page.getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   await selectStatement(page, "barclays-no-period");
   await expect(page.getByRole("alert")).toContainText(
@@ -683,7 +793,7 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await openImport(page);
   await selectStatement(page, "barclays-october");
   await expect(
-    page.getByText("2026-10-01 to 2026-10-31", { exact: true }),
+    page.getByText("1 to 31 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByLabel("Enter statement dates from PDF"),
@@ -695,7 +805,9 @@ test("reconciliation warning cannot be silently committed", async ({
   await openImport(page);
   await selectStatement(page, "barclays-warning");
   await expect(
-    page.getByText("⚠ Statement validation failed", { exact: true }),
+    page
+      .locator(".validation")
+      .getByText("Balances don't add up", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import" }),
@@ -710,7 +822,7 @@ test("reconciliation warning cannot be silently committed", async ({
     .filter({ hasText: "Statement history" })
     .click();
   await expect(
-    page.getByText(/Barclays · 2026-09-30 · 1 new transactions · warning/),
+    page.getByText(/Barclays · 30 Sep · 1 new transactions · warning/),
   ).toBeVisible();
 });
 test("backup, destructive confirmation, restore and demo deletion", async ({
@@ -720,9 +832,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await expect(
-    page.getByText("133 transactions stored on this device.", { exact: false }),
-  ).toBeVisible();
+  await expectTransactionCount(page, 133);
   const downloadEvent = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Export Feng Finance Backup" })
@@ -737,7 +847,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   await page
     .getByRole("button", { name: "Delete demo data", exact: true })
     .click();
-  await expect(page.getByText(/0 transactions stored/)).toBeVisible();
+  await expectTransactionCount(page, 0);
   await page
     .getByLabel("Restore Feng Finance Backup", { exact: true })
     .setInputFiles({
@@ -750,7 +860,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   ).toBeDisabled();
   await page.getByLabel(/I understand that this replaces/).check();
   await page.getByRole("button", { name: "Replace data with backup" }).click();
-  await expect(page.getByText(/133 transactions stored/)).toBeVisible();
+  await expectTransactionCount(page, 133);
   await expect(
     page
       .getByRole("status")
@@ -779,7 +889,7 @@ test("offline launch, local PDF import, backup and no financial upload", async (
   await offlineHost.stop();
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Overview", exact: true }),
+    page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await openImport(page);
   await selectStatement(page, "barclays");
@@ -810,7 +920,7 @@ test("scanned PDF uses bundled OCR and requires amount verification offline", as
   await expect(
     page.getByRole("heading", { name: "Barclays detected" }),
   ).toBeVisible({ timeout: 90000 });
-  await expect(page.getByText("OCR", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Local OCR/).first()).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import" }),
   ).toBeDisabled();
@@ -828,8 +938,12 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await page.getByRole("link", { name: "Home", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Overview" })).toBeVisible();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  await expect(page.getByRole("heading", { name: "Home" })).toBeVisible();
   expect(
     await page.evaluate(
       () => document.documentElement.scrollWidth <= innerWidth,
@@ -842,16 +956,24 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
   await expect(
     page.getByText("Mortgage / financing", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Analyse", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Analyse", exact: true })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Potential recurring costs" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Transactions", exact: true })
+    .click();
   const quick = page.getByRole("group", {
     name: "Transaction category filters",
   });
   await expect(quick.getByRole("button")).toHaveText([
-    "Uncategorized",
+    "Uncategorized 0",
     "Groceries",
     "Income",
     "Property",
@@ -883,7 +1005,7 @@ test("service worker update is explicit and preserves stored records", async ({
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await expect(page.getByText(/133 transactions stored/)).toBeVisible();
+  await expectTransactionCount(page, 133);
   offlineHost.advanceWorker();
   await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration();
@@ -896,7 +1018,7 @@ test("service worker update is explicit and preserves stored records", async ({
   const reload = page.waitForEvent("load");
   await page.getByRole("button", { name: "Update", exact: true }).click();
   await reload;
-  await expect(page.getByText(/133 transactions stored/)).toBeVisible();
+  await expectTransactionCount(page, 133);
   await expect(page.getByText(/Feng Finance update available/)).toHaveCount(0);
 });
 
@@ -909,28 +1031,31 @@ test("unsupported PDF is explicit and leaves the database empty", async ({
     mimeType: "application/pdf",
     buffer: Buffer.from("This is not a PDF"),
   });
-  await expect(page.getByRole("alert")).toHaveText(
+  await expect(page.getByRole("alert")).toContainText(
     "This file is not a valid PDF.",
   );
   await gotoRoute(page, "/settings");
-  await expect(page.getByText(/0 transactions stored/)).toBeVisible();
+  await expectTransactionCount(page, 0);
 });
 
-test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and import sequentially", async ({
+test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share one import review", async ({
   page,
 }) => {
   await openImport(page);
   await page
     .getByLabel("Select PDF statements")
     .setInputFiles([fixture("amex-uk-layout"), fixture("revolut-uk-layout")]);
+  await expect(page.locator(".import-statement-card")).toHaveCount(2);
+  const amex = await openStatementCard(page, "American Express");
+  const revolut = await openStatementCard(page, "Revolut");
   await expect(
     page.getByRole("heading", { name: "American Express detected" }),
   ).toBeVisible();
   await expect(
-    page.getByText("✓ Statement reconciled", { exact: true }),
+    amex.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("2026-09-06 to 2026-10-05", { exact: true }),
+    amex.getByText("6 Sep to 5 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText(/1 transaction dates fall outside/),
@@ -938,32 +1063,31 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and impor
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
-  await page
-    .getByRole("button", { name: "Confirm import", exact: true })
-    .click();
+  await amex.getByLabel(/I compared the extracted rows with the PDF/).check();
   await expect(
     page.getByRole("heading", { name: "Revolut detected" }),
   ).toBeVisible();
   await expect(
-    page.getByText("✓ Statement reconciled", { exact: true }),
+    revolut.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("2026-09-01 to 2026-09-30", { exact: true }),
+    revolut.getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await revolut
+    .getByLabel(/I compared the extracted rows with the PDF/)
+    .check();
   await expect(
-    page.locator(".review-metrics > div").filter({ hasText: "Money in" }),
+    revolut.locator(".review-metrics > div").filter({ hasText: "Money in" }),
   ).toContainText("£950.00");
   await expect(
-    page.locator(".review-metrics > div").filter({ hasText: "Money out" }),
+    revolut.locator(".review-metrics > div").filter({ hasText: "Money out" }),
   ).toContainText("£510.00");
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
-  await expect(page.locator(".hero-number")).toHaveText("+£455.00");
+  await expect(page.locator(".month-net strong")).toHaveText("+£455.00");
   await openImport(page);
   await selectStatement(page, "revolut-uk-layout");
   await expect(
@@ -976,7 +1100,10 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and impor
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
-  ).toBeDisabled();
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Back to Home", exact: true }),
+  ).toBeVisible();
 });
 
 test("dark default, persistent appearance and mobile layouts without overlapping controls", async ({
@@ -988,7 +1115,7 @@ test("dark default, persistent appearance and mobile layouts without overlapping
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await expect(page.getByText(/133 transactions stored/)).toBeVisible();
+  await expectTransactionCount(page, 133);
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
@@ -1009,7 +1136,7 @@ test("dark default, persistent appearance and mobile layouts without overlapping
       await gotoRoute(page, route);
       await expect(page.locator("h1")).toHaveText(
         route === "/"
-          ? "Overview"
+          ? "Home"
           : route === "/analysis"
             ? "Analyse"
             : route === "/property"
@@ -1051,7 +1178,7 @@ test("dark default, persistent appearance and mobile layouts without overlapping
     await gotoRoute(page, route);
     await expect(page.locator("h1")).toHaveText(
       route === "/"
-        ? "Overview"
+        ? "Home"
         : route === "/analysis"
           ? "Analyse"
           : route === "/property"
@@ -1120,7 +1247,7 @@ test("dark default, persistent appearance and mobile layouts without overlapping
   await expect(page.getByText(/Choose a valid date range/)).toBeVisible();
   await page.getByLabel("From", { exact: true }).fill("2026-09-01");
   await page.getByLabel("To", { exact: true }).fill("2026-09-30");
-  await expect(page.getByText(/2026-09-01 to 2026-09-30/)).toBeVisible();
+  await expect(page.getByText(/1 to 30 Sep 2026/)).toBeVisible();
 });
 
 test("personal rule corrections update existing transactions and future imports locally", async ({
@@ -1136,6 +1263,14 @@ test("personal rule corrections update existing transactions and future imports 
   ).toBeVisible();
   await confirmImport(page);
   await gotoRoute(page, "/settings");
+  await page
+    .locator("summary")
+    .filter({ hasText: "Categorization & transfer rules" })
+    .click();
+  await page
+    .locator("summary")
+    .filter({ hasText: "Advanced: import personal rules" })
+    .click();
   await page
     .getByLabel("Import personal rules", { exact: true })
     .setInputFiles({
@@ -1170,9 +1305,7 @@ test("personal rule corrections update existing transactions and future imports 
   await gotoRoute(page, "/");
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-09");
   await page.getByRole("link", { name: /Household £1,200.00/ }).click();
-  await expect(
-    page.getByRole("link", { name: /JOHN LEWIS LONDON STORE/ }),
-  ).toBeVisible();
+  await expect(page.getByRole("link", { name: /John Lewis/i })).toBeVisible();
   await openImport(page);
   await selectStatement(page, "barclays-october");
   await expect(
@@ -1196,21 +1329,15 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
-  await expect(page.locator(".hero-number")).toHaveText("-£65.00");
+  await expect(page.locator(".month-net strong")).toHaveText("-£65.00");
   await page
     .getByRole("link", { name: /3 transactions need a category/ })
     .click();
-  const row = page.getByRole("link", { name: /CORNER SHOP/ }).first();
-  await row.scrollIntoViewIfNeeded();
-  const rect = (await row.boundingBox())!;
-  await page.mouse.move(rect.x + rect.width * 0.75, rect.y + rect.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(rect.x + 30, rect.y + rect.height / 2, { steps: 12 });
-  await page.mouse.up();
+  const row = page.getByRole("link", { name: /CORNER SHOP/i }).first();
+  await swipeTransactionLeft(page, row);
   const dialog = page.getByRole("dialog", { name: "Where does this belong?" });
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator(".sorting-card")).toContainText("CORNER SHOP");
-  await dialog.getByLabel(/Also sort 1 uncategorized/).check();
+  await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
   await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   const target = dialog.getByRole("button", {
     name: "Categorize as Groceries",
@@ -1225,20 +1352,19 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
     steps: 16,
   });
   await page.mouse.up();
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("status")).toContainText(
-    "2 transactions → Groceries",
+  await expect(dialog.locator(".sorting-card")).toContainText("Another Shop");
+  await expect(page.locator(".category-feedback")).toContainText("Groceries");
+  await expect(page.locator(".category-feedback")).toContainText(
+    /also applied to 1 matching payments?/,
   );
-  await expect(page.getByRole("link", { name: /CORNER SHOP/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /CORNER SHOP/i })).toHaveCount(0);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
-  await expect(dialog.locator(".sorting-card")).toContainText("CORNER SHOP");
-  await dialog.getByLabel(/Also sort 1 uncategorized/).check();
+  await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
   await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   await dialog
     .getByRole("button", { name: "Categorize as Cleaning", exact: true })
     .click();
-  await expect(dialog).toHaveCount(0);
-  await page.getByRole("link", { name: /ANOTHER SHOP/ }).click();
+  await expect(dialog.locator(".sorting-card")).toContainText("Another Shop");
   await dialog
     .getByRole("button", { name: "Categorize as Shopping", exact: true })
     .click();
@@ -1246,8 +1372,12 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
   await expect(
     page.getByRole("heading", { name: "No transactions found" }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Home", exact: true }).click();
-  await expect(page.locator(".hero-number")).toHaveText("-£65.00");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  await expect(page.locator(".month-net strong")).toHaveText("-£65.00");
   await expect(
     page.getByRole("link", { name: /Cleaning £50.00/ }),
   ).toBeVisible();
@@ -1273,7 +1403,7 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
   ).toBeVisible();
   await confirmImport(page);
   await gotoRoute(page, "/transactions?uncategorized=1&month=2026-09");
-  await page.getByRole("link", { name: /ANOTHER SHOP/ }).click();
+  await page.getByRole("link", { name: /ANOTHER SHOP/i }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const card = (await dialog.locator(".sorting-card").boundingBox())!;
@@ -1281,9 +1411,9 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
   await page.mouse.down();
   await page.mouse.move(5, 5, { steps: 12 });
   await page.mouse.up();
-  await expect(dialog.locator(".sorting-card")).toContainText("ANOTHER SHOP");
+  await expect(dialog.locator(".sorting-card")).toContainText("Another Shop");
   await dialog.getByRole("button", { name: "Close categorization" }).click();
-  const row = page.getByRole("link", { name: /ANOTHER SHOP/ });
+  const row = page.getByRole("link", { name: /ANOTHER SHOP/i });
   await row.focus();
   await page.keyboard.press("c");
   await expect(dialog).toBeVisible();
@@ -1293,11 +1423,14 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
   });
   await category.focus();
   await page.keyboard.press("Enter");
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("status")).toContainText(
-    "1 transaction → Shopping",
-  );
-  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
+  await closeCategorySheet(page);
+  await expect(page.locator(".category-feedback")).toContainText("Shopping");
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-09");
   const picker = (await page.locator(".month-picker").boundingBox())!;
   await page.mouse.move(
@@ -1317,7 +1450,10 @@ test("subscription notification centre supports review, cancellation plans and p
 }) => {
   await page.goto("/");
   await page.getByRole("button", { name: /Try fictitious demo data/ }).click();
-  await page.getByRole("link", { name: /Subscription review/ }).click();
+  await page
+    .locator(".home-todos")
+    .getByRole("link", { name: /recurring charges? to review/ })
+    .click();
   await expect(
     page.getByRole("heading", { name: "Subscription review", exact: true }),
   ).toBeVisible();
@@ -1429,10 +1565,14 @@ test("category overview, income shares, central Home navigation and page palette
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
   await expect(
     page.locator('nav[aria-label="Main navigation"] a:visible'),
-  ).toHaveText(["Import", "Transactions", "Home", "Analyse", "Settings"]);
+  ).toHaveText(["Import", "Transactions", "Home", "Analyse", "Planning"]);
   await expect(page.locator(".property-card")).toHaveCount(0);
   const palette = () =>
     page
@@ -1486,9 +1626,13 @@ test("category overview, income shares, central Home navigation and page palette
   ).toBeVisible();
   await expect(page.locator(".app")).toHaveAttribute("data-page", "import");
   expect(await palette()).not.toBe(transactions);
-  await page.getByRole("link", { name: "Home", exact: true }).click();
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
   await expect(
-    page.getByRole("heading", { name: "Overview", exact: true }),
+    page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await expect(page.locator(".app")).toHaveAttribute("data-page", "home");
   expect(await palette()).toBe(home);
@@ -1500,14 +1644,16 @@ test("navigation consistently selects the owning section for every route", async
   await page.goto("/");
   await page.getByRole("button", { name: "Try fictitious demo data" }).click();
   await page.locator(".category-row").filter({ hasText: "Shopping" }).click();
-  const nav = page.getByRole("navigation", { name: "Main navigation" });
+  const nav = page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true });
   await expect(
     page.getByRole("heading", { name: "Shopping", exact: true }),
   ).toBeVisible();
   await expect(nav.locator('[aria-current="page"]')).toHaveText("Analyse");
   await page.goBack();
   await expect(
-    page.getByRole("heading", { name: "Overview", exact: true }),
+    page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await expect(nav.locator('[aria-current="page"]')).toHaveText("Home");
   await page.goForward();
@@ -1529,8 +1675,16 @@ test("navigation consistently selects the owning section for every route", async
     ["/unknown", "Home", "home"],
   ]) {
     await gotoRoute(page, path);
-    await expect(nav.locator('[aria-current="page"]')).toHaveText(label);
-    await expect(nav.locator(".active")).toHaveCount(1);
+    if (label === "Settings") {
+      await expect(page.locator(".mobile-settings")).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
+      await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
+    } else {
+      await expect(nav.locator('[aria-current="page"]')).toHaveText(label);
+      await expect(nav.locator(".active")).toHaveCount(1);
+    }
     await expect(page.locator(".app")).toHaveAttribute("data-page", palette);
   }
   await expect(page).toHaveURL(/#\/$/);
@@ -1556,10 +1710,13 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   ).toBeVisible();
   await confirmImport(page);
   await expect(
-    page.getByRole("heading", { name: "Overview", exact: true }),
+    page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("navigation").locator('[aria-current="page"]'),
+    page
+      .getByRole("navigation")
+      .filter({ visible: true })
+      .locator('[aria-current="page"]'),
   ).toHaveText("Home");
   await expect(page.locator(".balance-total")).toHaveText("£935.00");
   await expect(
@@ -1586,7 +1743,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   ).toHaveAttribute("d", /L/);
   await page.setViewportSize({ width: 1440, height: 900 });
   const settingsPosition = await page
-    .getByRole("navigation")
+    .locator(".sidebar nav")
     .getByRole("link", { name: "Settings", exact: true })
     .boundingBox();
   expect(settingsPosition!.y).toBeGreaterThan(750);
@@ -1609,12 +1766,15 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("heading", { name: "Your accounts", exact: true }),
+    page.getByRole("group", { name: "Filter by account", exact: true }),
   ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Your accounts", exact: true }),
+  ).toHaveCount(0);
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     3,
   );
-  await page.getByRole("link", { name: /ANOTHER SHOP/ }).click();
+  await page.getByRole("link", { name: /ANOTHER SHOP/i }).click();
   const dialog = page.getByRole("dialog");
   await expect(
     dialog.getByRole("button", {
@@ -1625,8 +1785,11 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   await dialog
     .getByRole("button", { name: "Categorize as Property", exact: true })
     .click();
-  await expect(dialog).toHaveCount(0);
-  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toHaveCount(0);
+  await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
+  await closeCategorySheet(page);
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/i })).toHaveCount(
+    0,
+  );
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     2,
   );
@@ -1634,13 +1797,17 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
     name: "Transaction category filters",
   });
   await filters.getByRole("button", { name: "Property", exact: true }).click();
-  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toBeVisible();
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/i })).toBeVisible();
   await expect(page.locator(".transaction-status.categorized")).toHaveCount(1);
-  await filters
-    .getByRole("button", { name: "Uncategorized", exact: true })
+  await filters.getByRole("button", { name: /^Uncategorized \d+$/ }).click();
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/i })).toHaveCount(
+    0,
+  );
+  await page
+    .getByRole("navigation", { name: "Main navigation" })
+    .filter({ visible: true })
+    .getByRole("link", { name: "Analyse", exact: true })
     .click();
-  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toHaveCount(0);
-  await page.getByRole("link", { name: "Analyse", exact: true }).click();
   await expect(
     page.getByRole("link", { name: "Property analysis", exact: true }),
   ).toHaveCount(0);
@@ -1670,7 +1837,7 @@ test("Uncategorized queue spans imported months and saves immediately disappear"
   await gotoRoute(page, "/transactions");
   await page
     .getByRole("group", { name: "Transaction category filters" })
-    .getByRole("button", { name: "Uncategorized", exact: true })
+    .getByRole("button", { name: /^Uncategorized \d+$/ })
     .click();
   await expect(
     page.getByRole("button", { name: "All dates", exact: true }),
@@ -1678,7 +1845,7 @@ test("Uncategorized queue spans imported months and saves immediately disappear"
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     4,
   );
-  const row = page.getByRole("link", { name: /ANOTHER SHOP/ });
+  const row = page.getByRole("link", { name: /ANOTHER SHOP/i });
   await row.click();
   await page
     .getByRole("dialog")
@@ -1691,7 +1858,9 @@ test("Uncategorized queue spans imported months and saves immediately disappear"
   ).toBeVisible();
   await expect(page).toHaveURL(/uncategorized=1/);
   await expect(page).toHaveURL(/allDates=1/);
-  await expect(page.getByRole("link", { name: /ANOTHER SHOP/ })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: /ANOTHER SHOP/i })).toHaveCount(
+    0,
+  );
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     3,
   );

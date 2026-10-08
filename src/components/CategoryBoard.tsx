@@ -7,7 +7,11 @@ import type { Transaction, Category } from "../domain/models";
 import { money } from "../domain/money";
 import { db } from "../storage/database";
 import { normalizeMerchant } from "../domain/normalize";
-import { categorySuggestions } from "../categorization/suggestions";
+import {
+  categorySuggestions,
+  categorySuggestionReason,
+} from "../categorization/suggestions";
+import { displayDate, displayMerchant } from "../domain/presentation";
 import {
   categorizeCards,
   matchingUncategorized,
@@ -22,6 +26,11 @@ export function CategoryBoard({
   onSaved,
   feedback,
   dragStart,
+  selection,
+  queue,
+  onSkip,
+  onMove,
+  onUndo,
 }: {
   transaction: Transaction;
   returnTo?: string;
@@ -30,6 +39,11 @@ export function CategoryBoard({
   onSaved: (receipt: CategoryReceipt) => void;
   feedback?: ReactNode;
   dragStart?: { x: number; y: number; pointerId: number };
+  selection?: Transaction[];
+  queue?: { position: number; total: number };
+  onSkip?: () => void;
+  onMove?: (direction: -1 | 1) => void;
+  onUndo?: () => void;
 }) {
   const location = useLocation();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -37,7 +51,6 @@ export function CategoryBoard({
   const [position, setPosition] = useState({ x: 0, y: 0 });
   const [target, setTarget] = useState("");
   const [search, setSearch] = useState("");
-  const [group, setGroup] = useState(false);
   const [busy, setBusy] = useState(false);
   const saving = useRef(false);
   const [error, setError] = useState("");
@@ -49,12 +62,14 @@ export function CategoryBoard({
   const evidence = useLiveQuery(
     async () => ({
       rules: await db.rules.toArray(),
+      account: await db.accounts.get(t.accountId),
       history: await db.transactions
         .where("accountId")
         .equals(t.accountId)
         .filter(
           (p) =>
-            normalizeMerchant(p.merchant) === normalizeMerchant(t.merchant) &&
+            normalizeMerchant(p.sourceMerchant ?? p.merchant) ===
+              normalizeMerchant(t.sourceMerchant ?? t.merchant) &&
             p.isReviewed &&
             !!p.categoryId,
         )
@@ -97,8 +112,9 @@ export function CategoryBoard({
     setError("");
     try {
       const receipt = await categorizeCards(
-        [t, ...(group ? others : [])],
+        selection?.length ? selection : [t],
         categoryId,
+        { allowMultipleMerchants: true, backfill: true },
       );
       onSaved(receipt);
     } catch (err) {
@@ -127,6 +143,44 @@ export function CategoryBoard({
         evidence?.rules ?? [],
         evidence?.history ?? [],
       );
+  const suggestionReason = (c: Category) =>
+    categorySuggestionReason(
+      t,
+      c,
+      evidence?.rules ?? [],
+      evidence?.history ?? [],
+    );
+  useEffect(() => {
+    const keyboard = (event: KeyboardEvent) => {
+      if (busy) return;
+      const editing =
+        event.target instanceof HTMLElement &&
+        !!event.target.closest("input,select,textarea");
+      if (
+        (event.metaKey || event.ctrlKey) &&
+        event.key.toLowerCase() === "z" &&
+        onUndo
+      ) {
+        event.preventDefault();
+        onUndo();
+        return;
+      }
+      if (editing || event.metaKey || event.ctrlKey || event.altKey) return;
+      if (/^[123]$/.test(event.key)) {
+        const category = suggested[Number(event.key) - 1];
+        if (category) {
+          event.preventDefault();
+          void choose(category.id);
+        }
+      }
+      if (event.key.toLowerCase() === "j" || event.key.toLowerCase() === "k") {
+        event.preventDefault();
+        onMove?.(event.key.toLowerCase() === "j" ? 1 : -1);
+      }
+    };
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
+  });
   useEffect(() => {
     if (!externalDragging || !dragStart) return;
     const move = (e: PointerEvent) => {
@@ -150,7 +204,7 @@ export function CategoryBoard({
       window.removeEventListener("pointercancel", release, true);
     };
   });
-  const tile = (c: Category) => (
+  const tile = (c: Category, index?: number) => (
     <button
       key={c.id}
       className={`category-tile ${target === c.id ? "drop-target" : ""}`}
@@ -170,6 +224,11 @@ export function CategoryBoard({
           <small>{categories.find((p) => p.id === c.parentId)?.name}</small>
         )}
         {c.name}
+        {index !== undefined && (
+          <small className="category-suggestion-reason">
+            {suggestionReason(c)} <kbd>{index + 1}</kbd>
+          </small>
+        )}
       </span>
     </button>
   );
@@ -197,13 +256,27 @@ export function CategoryBoard({
           <X size={22} />
         </button>
       </header>
+      {queue && (
+        <div className="queue-progress">
+          <span>
+            {queue.position} of {queue.total} to sort
+          </span>
+          <button onClick={onSkip} disabled={busy}>
+            Skip
+          </button>
+        </div>
+      )}
       <p className="muted" id="drag-help">
-        Drag the transaction onto a category, or tap a category tile. Changes
-        save immediately.
+        Choose a category. Matching payments in this account and future imports
+        follow your choice.
+      </p>
+      <p className="desktop-only keyboard-hints">
+        Keyboard: <kbd>1</kbd>–<kbd>3</kbd> suggestions · <kbd>J</kbd>/
+        <kbd>K</kbd> next/previous · <kbd>⌘Z</kbd> Undo
       </p>
       <article
         className={`sorting-card ${dragging || externalDragging ? "is-dragging" : ""}`}
-        aria-label={`Drag ${t.merchant} to a category`}
+        aria-label={`Drag ${displayMerchant(t)} to a category`}
         aria-describedby="drag-help"
         style={{
           ...(externalDragging
@@ -252,10 +325,15 @@ export function CategoryBoard({
       >
         <Grip size={20} />
         <div>
-          <strong>{t.merchant || t.description}</strong>
+          <strong>{displayMerchant(t)}</strong>
           <small>
-            {t.date}
-            {group ? ` · ${others.length + 1} transactions` : ""}
+            {displayDate(t.date)}
+            {evidence?.account ? ` · ${evidence.account.institution}` : ""}
+            {selection && selection.length > 1
+              ? ` · ${selection.length} selected transactions`
+              : others.length
+                ? ` · also applies to ${others.length} matching payment${others.length === 1 ? "" : "s"}`
+                : ""}
           </small>
         </div>
         <strong>{money(t.amount, t.currency, true)}</strong>
@@ -266,10 +344,13 @@ export function CategoryBoard({
           aria-label="Suggested categories"
         >
           <h3>Likely categories</h3>
-          <div className="category-tile-grid">{suggested.map(tile)}</div>
+          <div className="category-tile-grid">
+            {suggested.map((c, index) => tile(c, index))}
+          </div>
         </section>
       )}
       {feedback}
+      <h3>Not spending</h3>
       <button
         className={`transfer-tile ${target === TRANSFER_TARGET ? "drop-target" : ""}`}
         data-category-target={TRANSFER_TARGET}
@@ -280,23 +361,32 @@ export function CategoryBoard({
         <span aria-hidden="true">↔</span>
         <span>
           <strong>Transfer</strong>
-          <small>Between your own accounts or paying your credit card</small>
+          <small>Between your own accounts</small>
         </span>
       </button>
-      <div className="sort-options">
-        {others.length > 0 && (
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={group}
-              disabled={busy}
-              onChange={(e) => setGroup(e.target.checked)}
-            />
-            Also sort {others.length} uncategorized transactions from this
-            merchant in this account
-          </label>
-        )}
-      </div>
+      <button
+        className={`transfer-tile ${target === TRANSFER_TARGET ? "drop-target" : ""}`}
+        data-category-target={TRANSFER_TARGET}
+        disabled={busy}
+        onClick={() => void choose(TRANSFER_TARGET)}
+        aria-label="Categorize as Card repayment"
+      >
+        <span>
+          <strong>Card repayment</strong>
+          <small>Payment to your own credit card; excluded from spending</small>
+        </span>
+      </button>
+      {t.amount > 0 && available.some((c) => c.id === "refund") && (
+        <button
+          className={`transfer-tile ${target === "refund" ? "drop-target" : ""}`}
+          data-category-target="refund"
+          disabled={busy}
+          onClick={() => void choose("refund")}
+        >
+          Refund
+        </button>
+      )}
+      <h3>All categories</h3>
       <input
         aria-label="Find a category"
         type="search"
@@ -311,7 +401,7 @@ export function CategoryBoard({
       >
         {available
           .filter((c) => !suggested.some((s) => s.id === c.id))
-          .map(tile)}
+          .map((c) => tile(c))}
         {!available.length && <p>No matching categories.</p>}
       </div>
       {error && (

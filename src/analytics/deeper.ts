@@ -10,7 +10,7 @@ import { money, currencyPrecision } from "../domain/money";
 import { normalizeMerchant } from "../domain/normalize";
 import { cashFlow } from "./calculations";
 import { completeMonth } from "./category";
-import { detectSubscriptions } from "./subscriptions";
+import { detectSubscriptions, readReview } from "./subscriptions";
 
 export interface FinancialInsight {
   id: string;
@@ -35,6 +35,7 @@ export function deeperInsights(
   month: string,
   currency: string,
   today: string,
+  isComplete?: (month: string) => boolean,
 ) {
   const scopedAccounts = accounts.filter((a) => a.currency === currency);
   const eligible = transactions.filter(
@@ -49,9 +50,15 @@ export function deeperInsights(
   const floor = 25 * 10 ** currencyPrecision(currency);
   const history = Array.from({ length: 6 }, (_, i) =>
     monthOffset(month, -i - 1),
-  ).filter((m) => completeMonth(m, scopedAccounts, statements, today));
+  ).filter((m) =>
+    isComplete
+      ? isComplete(m)
+      : completeMonth(m, scopedAccounts, statements, today),
+  );
   const insights: FinancialInsight[] = [];
-  const complete = completeMonth(month, scopedAccounts, statements, today);
+  const complete = isComplete
+    ? isComplete(month)
+    : completeMonth(month, scopedAccounts, statements, today);
   if (complete && history.length >= 3) {
     const flows = history.map((m) =>
       cashFlow(
@@ -149,6 +156,12 @@ export function deeperInsights(
       });
   }
   const seen = new Set<string>();
+  const reviews = new Map(
+    settings.map((setting) => {
+      const review = readReview(setting.value);
+      return [review?.groupKey, review] as const;
+    }),
+  );
   for (const s of detectSubscriptions(eligible, settings, currency, today)) {
     if (s.status === "ignore") continue;
     if (s.increase && s.charges.at(-1)!.date.startsWith(month))
@@ -159,7 +172,15 @@ export function deeperInsights(
         href: "/subscriptions",
         priority: 100,
       });
-    if (s.afterCancellation)
+    const cancellationDate = reviews.get(s.key)?.date;
+    if (
+      s.afterCancellation &&
+      cancellationDate &&
+      s.charges.some(
+        (charge) =>
+          charge.date.startsWith(month) && charge.date > cancellationDate,
+      )
+    )
       insights.push({
         id: `cancel-${s.key}`,
         title: "Charge after a cancellation was recorded",

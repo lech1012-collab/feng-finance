@@ -28,7 +28,7 @@ npm run check              # Tests, build and browser tests (generate fixtures f
 
 ## Features
 
-- Monthly net cash flow, income, expenses, category bars, property summary, account freshness and deterministic comparisons.
+- Cash and card-debt position, monthly cash flow, category bars, account coverage and verified comparisons. Missing data stays unknown rather than appearing as zero.
 - Digital PDF extraction with positional row/column reconstruction, independent bank adapters, scanned-page local OCR and explicit validation review.
 - SHA-256 statement and transaction fingerprints, regenerated/overlapping-statement protection, occurrence handling for identical purchases, conservative transfer matching and manual pairing.
 - Search and indexed date/currency filters, accounts/categories/type/amount/property filters, paginated lists, transaction source metadata, merchant/tag/category editing and learned rules.
@@ -39,9 +39,9 @@ npm run check              # Tests, build and browser tests (generate fixtures f
 
 ## Categorizing with gestures
 
-On Home, tap **transactions need a category**. Tap an uncategorized transaction or swipe a purchase sideways to open the sorting sheet. Drag its card onto a category tile, or tap the tile: the category saves immediately. The sheet closes after saving and those transactions immediately leave the uncategorized queue. **Undo** restores the last assignment, including an optional group and newly learned rule, unless another edit has since changed those records.
+On Home, tap **Sort transactions** or **transactions need a category**. Tap an uncategorized transaction to open the sorting queue. Choose a suggested category, drag its card onto a tile, or swipe left to reveal a suggested category and **More**. Saving advances to the next transaction; **Skip** keeps the current transaction uncategorized. Categorized records immediately leave the queue. **Undo** restores the assignment, matching records and learned defaults unless a later edit has changed those records.
 
-The sheet can apply your choice to matching uncategorized transactions from the same merchant, account, currency and amount direction. Grouping and learning a future rule are separate, explicit choices. Already categorized transactions and transfers are protected. Property has one tile in the sorting sheet; existing subcategory data remains available in detailed records. Press **C** on a focused transaction for keyboard access; category tiles support Enter. Tap **View transaction details** for tags, transfer controls and source information.
+Every manual choice automatically becomes the default for the same original merchant, account and amount direction. Matching uncategorized records can be filled together; reviewed categories are preserved. Desktop has a persistent category rail: drag rows or use Shift/⌘ selection to categorize a batch. **C** opens categorization, **1–3** choose suggestions, **J/K** move through the queue and **⌘/Ctrl Z** undoes the last change. Property has one tile; existing subcategory data remains available in details. Rule-origin badges link to the editable rule in Settings.
 
 Swipe the month selector left/right to change month. Desktop users can drop PDFs directly onto the Import card. Touch sorting uses Pointer Events rather than relying on desktop-only HTML drag events; vertical list scrolling and cancelled drags do not save changes.
 
@@ -61,7 +61,7 @@ src/tests/            Synthetic row helpers and test setup
 scripts/              Local runtime assets, icons and synthetic PDF generators
 ```
 
-Routing uses hash URLs so static hosting requires no server rewrites. Pages and parsing libraries load as separate chunks. Queries use compound `[currency+date]` and `[accountId+date]` indexes. The explorer renders at most 60 transactions at once; analytics load only relevant time windows. Full-history loading is reserved for explicit backup/export and account-local duplicate/history analysis during import. No original PDF is persisted.
+Routing uses hash URLs so static hosting requires no server rewrites. Pages and parsing libraries load as separate chunks. Queries use compound `[currency+date]` and `[accountId+date]` indexes. The explorer renders at most 60 transactions at once; analytics load only relevant time windows. Full-history loading is reserved for explicit backup/export, matching-count review when Settings rules are opened, and account-local duplicate/history analysis during import. No original PDF is persisted.
 
 ### Money and credit cards
 
@@ -87,9 +87,9 @@ Add another bank by implementing `StatementParser`, registering it in `src/parse
 
 ### Personal corrections and appearance
 
-Settings → **Import personal rules** accepts a local JSON file with format `feng-finance-rules`, version `1`, `categories` and `rules` arrays. Category entries contain `id`, `name`, `kind`. Rule entries contain `name`, `match` (`contains`, `starts-with`, `exact`), `pattern`, `direction`, and either `categoryId` or `type: "transfer"`. Preview the matching record count, then **Apply corrections & remember rules**. This is an atomic local update: printed dates/amounts and statement balances are preserved; demo rows are excluded. Conflicting outcomes, unavailable categories, linked transfers and stale previews are rejected. Reapplying the same rules is idempotent. Keep files containing personal names or references out of the repository. The deployed site cannot change another device's records remotely.
+Settings → **Categorization & transfer rules** → **Advanced: import personal rules** accepts a local JSON file with format `feng-finance-rules`, version `1`, `categories` and `rules` arrays. Category entries contain `id`, `name`, `kind`. Rule entries contain `name`, `match` (`contains`, `starts-with`, `exact`), `pattern`, `direction`, and either `categoryId` or `type: "transfer"`. Preview the matching record count, then **Apply corrections & remember rules**. This is an atomic local update: printed dates/amounts and statement balances are preserved; demo rows are excluded. Conflicting outcomes, unavailable categories, linked transfers and stale previews are rejected. Reapplying the same rules is idempotent. Keep files containing personal names or references out of the repository. The deployed site cannot change another device's records remotely.
 
-Dark is the default theme. Appearance is stored in IndexedDB and included in backups; a localStorage copy of the theme name prevents a light-mode reload flash. No financial data is stored in localStorage. Import opens on uncertain/duplicate/date-exception rows; **All transactions** exposes every extracted row and optional categorization. After import the overview opens on the latest imported transaction month. Account balances are dated statement snapshots, not inferred current balances; card liabilities display as **amount owed**.
+Dark is the default theme. Appearance is stored in IndexedDB and included in backups; a localStorage copy of the theme name prevents a light-mode reload flash. No financial data is stored in localStorage. Import opens on uncertain/duplicate/date-exception rows; **All transactions** exposes every extracted row and optional categorization. After import Home opens on the latest imported activity month, or statement month for a balance-only document. Account balances are dated statement snapshots, not live bank balances; card liabilities display as positive **Card debt**.
 
 ### Backup and schema migrations
 
@@ -114,10 +114,11 @@ Place real files only in `private-fixtures/` (ignored) and select them using the
 ## Known limitations
 
 - Adapters are verified against generated English-layout fixtures, not every historical bank PDF variation. Real statements may need adapter-specific layout work; warnings/manual bank-account selection and explicit reconciliation prevent silent acceptance. No claim of universal bank-layout compatibility is made.
+- The current bank adapters reject PDFs with no extracted transaction rows. A printed zero-activity layout needs a dedicated fixture before support can be claimed; empty extraction is never assumed to mean zero spending. The storage/review boundary accepts a genuinely reconciled balance-only statement.
 - Native iPhone Safari file picking, installation, storage persistence and update behavior require the documented manual device checks. Playwright WebKit is useful but is not an actual iPhone.
 - English embedded text and English OCR; password-protected PDFs must be unlocked locally first. Statements with multiple accounts/currencies must be exported separately. 30 MB / 100 pages maximum. OCR can be slow and consume memory on a phone.
 - No exchange-rate conversion, encrypted database, multi-device sync or statement PDF retention. A device passcode and regular backups are essential. The app host cannot recover lost browser data.
-- Comparisons require matching sets of accounts with transactions in both months. This is a conservative coverage check, not proof that every statement or every day is covered; totals and averages may still be incomplete. Account freshness makes this visible. Recurrence needs at least three approximately monthly, similarly priced payments and remains a suggestion.
+- Comparisons require continuous full-period coverage for all accounts in the selected currency, with reconciled stored rows and printed or manually verified statement dates. Partial and unverified observations are labelled and excluded from baselines. Reconciliation cannot prove a parser extracted every offsetting movement correctly; real layouts still require source review. Recurrence needs repeated payment evidence and remains a suggestion.
 - Property means cash flow only, with the configured Property and Property income categories; this is not tax, accrual accounting, depreciation or investment profitability.
 
 ### Subscription review centre
@@ -132,11 +133,11 @@ Version 1.3.1 (parser 1.0.3) fixes Barclays statements that print a date only on
 
 ### Category overviews and spending context
 
-Tap any Home spending category to open its monthly KPIs, trend, subcategories and source transactions. Browse all categories also includes income and zero-spend categories. Property has its rent/cost/net metrics within this overview; the duplicate Home tile is removed. Tap chart bars or month tiles to drill down. Home can switch category percentages between share of spending and share of recorded income (unavailable with no income; values may exceed 100%).
+Tap a Home spending category to open its monthly KPIs, trend, subcategories and source transactions. Analyse's category selector also includes income and zero-spend categories. Property has its rent/cost/net metrics within this overview; the duplicate Home tile is removed. Tap chart bars or month tiles to drill down. Home can switch category percentages between share of spending and share of recorded income (unavailable without an imported income source; values may exceed 100%).
 
 Compare against the preceding six or twelve calendar months. Only months covered continuously by statements for every account in the selected currency enter the baseline. Inferred transaction-coverage periods and failed reconciliations are excluded. Covered months with no category spending count as zero; missing months do not. Sample standard deviation uses n−1 and requires at least three complete months. The mean ± one standard deviation band is descriptive, not a budget or prediction. The current month is excluded from the baseline, and partial current coverage prevents an overspending alert. Transfers are excluded throughout. Property cash flow includes rental income; category spending remains gross outflows, with refunds shown in the transaction evidence and recorded income.
 
-Navigation is Import · Transactions · Home · Analyse · Settings, with Home central on mobile. Page accents are blue, violet, amber, coral and slate on neutral dark/light surfaces; the former green branding, charts and category colors are replaced. Existing financial records and category assignments are unchanged.
+Mobile navigation is Import · Transactions · Home · Analyse · Planning, with Home central and Settings in the header. Desktop begins with Home, places a primary Import action above navigation and keeps Settings at the bottom. Page accents distinguish sections; income, spending, net and category data colors remain consistent across pages. No green is used.
 
 ## Home balances and simplified workflow
 
@@ -152,9 +153,9 @@ retain the reported statement balance. No existing amounts or balances are rewri
 
 ### Planning
 
-Planning is a separate page, accessible from Home's Plan ahead card, Analyse,
-the desktop sidebar and the mobile header. The five mobile bottom tabs retain
-their positions. Planning has its own rose palette and remains entirely local.
+Planning is a separate page, accessible from the mobile bottom navigation,
+the desktop sidebar and Home's upcoming payments. It has its own rose palette
+and remains entirely local.
 
 Monthly category budgets use currency-scoped settings included in JSON backups,
 without a database migration. Tap a category's limit to edit it; an empty value
@@ -220,7 +221,7 @@ assignment and its learned rule. Rules remain configurable in Settings.
 For repeat-import testing: categorize the transaction, then Settings → **Delete
 imported records**, check the warning and delete. Reimport the PDF. This removes
 statements, transactions and transfer links while preserving accounts (including
-their IDs), categories, rules and preferences. **Clear local data** deliberately
+their IDs), categories, rules and preferences. **Erase everything** deliberately
 removes all of those, including categorization memory. Choices saved in older
 versions without Remember must be categorized again before history is deleted.
 Already erased choices require a prior backup to recover. Transaction rows show
@@ -246,14 +247,16 @@ this action does not invent a matching transaction or link an ambiguous pair.
 
 Home's Import statement control opens the native PDF picker directly. The Import
 navigation tab does the same. PDFs process locally, with reconciliation and
-exception review before committing. A multi-file queue stays in review until its
-last statement is confirmed, then returns to Home automatically.
+exception review before committing. Every selected file appears in one combined
+review, with blocking issues first and clean files collapsed. One confirmation
+saves the batch sequentially with fresh duplicate checks, then returns Home.
 
-Home shows net cash flow, total balance and each account's signed statement
-balance, with 1/3/6/12-month percentage comparisons. Credit-card debt reduces
-the total. Balances use the latest statement ending on or before the selected
-month end; older snapshots are dated and the total is labelled partial when any
-account is stale, unverified or missing. Percentage comparisons require current,
+Home separates Cash and positive Card debt. Net position appears only when all
+accounts in the selected currency have verified current balances and a current
+or savings account is available. Missing accounts have dashed rows and a direct
+Import action. Card-only imports do not imply zero income or a total cash balance.
+Balances use the latest eligible statement ending on or before the selected
+month end. Percentage comparisons require current,
 reliable statements for all the same accounts at both endpoints and a nonzero
 prior total. Change is `(current - previous) / abs(previous) × 100`, so debt
 repayment produces a positive change. Failed validation and inferred periods
@@ -276,11 +279,18 @@ spending breakdown.
 
 Expenses plot below zero, income above zero, and net cash flow uses a distinct
 line. Home charts have tooltips and legends; detailed value tables remain in
-Analyse. Account freshness and identifiers are shown at the top of Transactions.
+Analyse. Compact account-filter chips show balance dates and identifiers in Transactions.
+
+Settings → **Show accounts in** controls the global account currency without
+conversion. A persistent scope notice identifies accounts hidden by that choice.
+Analyse uses one selected date range for cards, charts, tables and comparisons.
+Unknown months have gaps and hatched placeholders. Comparisons require complete
+verified coverage for both periods. See [the implemented UX review](docs/ux-review.md)
+for the design decisions and real-device checklist.
 
 Uncategorized on Home opens an all-dates transaction queue. Main category
-buttons, including Uncategorized, select filters. Rows explicitly say Needs
-category, Categorized or Transfer. Saving through either the sorting sheet or
+buttons, including Uncategorized, select filters. Row badges show Needs category,
+the assigned category name or Transfer. Saving through either the sorting sheet or
 transaction editor removes categorized rows from that queue. Analyse's category
 selector opens the category's charts, complete-month average/sample deviation
 and same-month income percentage.

@@ -42,15 +42,16 @@ export function categorySuggestions(
     if (mainId && available.some((c) => c.id === mainId))
       scores.set(mainId, Math.max(scores.get(mainId) ?? 0, score));
   };
+  const maximumPriority = Math.max(1, ...rules.map((r) => r.priority));
   for (const r of rules)
     if (r.type !== "transfer" && matches(r, t))
       add(
         r.categoryId,
         (r.builtIn ? 70 : 100) +
           (r.match === "exact" ? 10 : 0) +
-          Math.min(9, Math.max(0, r.priority / 100)),
+          Math.min(9, Math.max(0, (r.priority / maximumPriority) * 9)),
       );
-  const merchant = normalizeMerchant(t.merchant);
+  const merchant = normalizeMerchant(t.sourceMerchant ?? t.merchant);
   for (const p of history)
     if (
       merchant &&
@@ -62,7 +63,7 @@ export function categorySuggestions(
       p.currency === t.currency &&
       p.accountId === t.accountId &&
       Math.sign(p.amount) === Math.sign(t.amount) &&
-      normalizeMerchant(p.merchant) === merchant
+      normalizeMerchant(p.sourceMerchant ?? p.merchant) === merchant
     )
       add(p.categoryId, 85);
   const text = normalizeDescription(t.description);
@@ -81,4 +82,47 @@ export function categorySuggestions(
         scores.get(b.id)! - scores.get(a.id)! || a.name.localeCompare(b.name),
     )
     .slice(0, 3);
+}
+
+export function categorySuggestionReason(
+  t: Transaction,
+  category: Category,
+  rules: Rule[],
+  history: Transaction[],
+) {
+  const savedRule = rules.some(
+    (r) =>
+      !r.builtIn &&
+      r.type !== "transfer" &&
+      r.categoryId === category.id &&
+      matches(r, t),
+  );
+  if (savedRule) return "Your saved rule for this merchant and account";
+  const previous = history.filter(
+    (p) =>
+      p.id !== t.id &&
+      p.isReviewed &&
+      !p.isTransfer &&
+      p.type !== "transfer" &&
+      !p.transferPairId &&
+      p.currency === t.currency &&
+      p.accountId === t.accountId &&
+      Math.sign(p.amount) === Math.sign(t.amount) &&
+      p.categoryId === category.id &&
+      normalizeMerchant(p.sourceMerchant ?? p.merchant) ===
+        normalizeMerchant(t.sourceMerchant ?? t.merchant),
+  ).length;
+  if (previous)
+    return `You chose this for ${previous} matching payment${previous === 1 ? "" : "s"}`;
+  if (
+    rules.some(
+      (r) =>
+        r.builtIn &&
+        r.type !== "transfer" &&
+        r.categoryId === category.id &&
+        matches(r, t),
+    )
+  )
+    return "Known merchant match";
+  return "Suggested from the transaction description";
 }

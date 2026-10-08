@@ -22,7 +22,12 @@ export function useSwipe(onSwipe: (direction: "left" | "right") => void) {
     bind: {
       onPointerDown: (e: PointerEvent<HTMLElement>) => {
         suppress.current = false;
-        if (!e.isPrimary || e.button !== 0) return;
+        if (
+          !e.isPrimary ||
+          e.button !== 0 ||
+          (e.pointerType === "touch" && e.clientX < 20)
+        )
+          return;
         start.current = {
           x: e.clientX,
           y: e.clientY,

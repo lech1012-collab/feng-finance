@@ -3,7 +3,8 @@ import { Reminders } from "../components/Reminders";
 import { useGlobalCurrency } from "../components/CurrencySetting";
 import { ThemeSetting } from "../components/Theme";
 import { PersonalRules } from "../components/PersonalRules";
-import { useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   Download,
@@ -12,10 +13,11 @@ import {
   Plus,
   Upload,
   Trash2,
+  Pencil,
 } from "lucide-react";
 import { db } from "../storage/database";
 import {
-  createBackup,
+  exportBackupFile,
   restoreBackup,
   validateBackup,
   download,
@@ -32,16 +34,24 @@ import {
   type Institution,
   type Category,
   type Rule,
+  type Account,
 } from "../domain/models";
-import { parseMoney } from "../domain/money";
+import { parseMoney, decimalMoney } from "../domain/money";
+import { matches } from "../categorization/engine";
+import { saveRule, deleteRule } from "../storage/rules";
+import { formatUkDate } from "../domain/dates";
 export default function Settings() {
   const currency = useGlobalCurrency();
+  const [searchParams] = useSearchParams();
+  const requestedRule = searchParams.get("rule");
   const data = useLiveQuery(
     async () => ({
       accounts: await db.accounts.toArray(),
       categories: await db.categories.toArray(),
       rules: await db.rules.orderBy("priority").reverse().toArray(),
       count: await db.transactions.count(),
+      backupAt: (await db.settings.get("backup:lastExportAt"))?.value,
+      backupCount: (await db.settings.get("backup:lastExportCount"))?.value,
       statements: await db.statements
         .orderBy("statementPeriodEnd")
         .reverse()
@@ -53,7 +63,14 @@ export default function Settings() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Backup>();
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
-  const [clearConfirmed, setClearConfirmed] = useState(false);
+  const [erasePhrase, setErasePhrase] = useState("");
+  const [showRules, setShowRules] = useState(!!requestedRule);
+  useEffect(() => {
+    if (requestedRule) {
+      setShowRules(true);
+      document.getElementById("rules")?.scrollIntoView?.({ block: "start" });
+    }
+  }, [requestedRule]);
   const [deleteImportsConfirmed, setDeleteImportsConfirmed] = useState(false);
   const [busy, setBusy] = useState(false);
   const [categoryName, setCategoryName] = useState("");
@@ -83,18 +100,21 @@ export default function Settings() {
     }
   };
   const backup = async () => {
-    const b = await createBackup();
-    download(
-      JSON.stringify(b, null, 2),
-      "application/json",
-      `feng-finance-backup-${new Date().toISOString().slice(0, 10)}.json`,
-    );
+    await exportBackupFile();
   };
+  const backupTime = data?.backupAt ? Date.parse(data.backupAt) : NaN;
+  const backupOverdue =
+    (data?.count ?? 0) > 0 &&
+    (!Number.isFinite(backupTime) || Date.now() - backupTime > 30 * 86400000);
+  const exportBackup = () =>
+    void run(
+      backup,
+      "Backup prepared for download. Save it in Files or iCloud Drive.",
+    );
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">YOUR DATA, YOUR DEVICE</p>
           <h1>Settings</h1>
         </div>
         <span className="small-chip">v{APP_VERSION}</span>
@@ -102,7 +122,6 @@ export default function Settings() {
       <ThemeSetting />
       <CurrencySetting />
       <Reminders currency={currency} settings />
-      <PersonalRules />
       {notice && (
         <div className="notice success" role="status">
           {notice}
@@ -113,27 +132,31 @@ export default function Settings() {
           {error}
         </div>
       )}
-      <section className="card">
+      <section className="card" id="backup">
         <h2>
           <Database size={19} />
-          Backup & portability
+          Backup
         </h2>
-        <p>
-          {data?.count ?? 0} transactions stored on this device. Browser data
-          can be removed by the operating system or when you clear site data.
-          Save a backup regularly.
+        <p className="muted">
+          Save your {data?.count ?? 0} transactions to Files or iCloud Drive.
+        </p>
+        <p
+          className={`backup-status ${backupOverdue ? "backup-status--overdue" : ""}`}
+        >
+          {Number.isFinite(backupTime)
+            ? `Last backup export: ${formatUkDate(data!.backupAt!.slice(0, 10))} · ${Number(data?.backupCount) || 0} transactions`
+            : "No backup exported yet."}
+          {backupOverdue && (
+            <strong>
+              {" "}
+              {Number.isFinite(backupTime)
+                ? "Over 30 days ago—save a fresh backup."
+                : "Save your first backup."}
+            </strong>
+          )}
         </p>
         <div className="actions">
-          <button
-            className="primary"
-            disabled={busy}
-            onClick={() =>
-              void run(
-                backup,
-                "Backup downloaded. Save it in Files or iCloud Drive.",
-              )
-            }
-          >
+          <button className="primary" disabled={busy} onClick={exportBackup}>
             <Download size={17} />
             Export Feng Finance Backup
           </button>
@@ -155,6 +178,40 @@ export default function Settings() {
             Export transactions CSV
           </button>
         </div>
+        <details>
+          <summary>Learn more about local storage</summary>
+          <p>
+            Browser data can be removed by the operating system or when you
+            clear site data. Feng can record a backup download, but cannot
+            verify that you saved the file.
+          </p>
+          <button
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                if (!navigator.storage?.persist)
+                  throw new Error(
+                    "Persistent storage requests are not supported by this browser. Keep backups in Files.",
+                  );
+                if (!(await navigator.storage.persist()))
+                  throw new Error(
+                    "The browser did not grant persistent storage. Keep backups in Files.",
+                  );
+              }, "Persistent storage is enabled on this browser.")
+            }
+          >
+            Request persistent storage
+          </button>
+        </details>
+      </section>
+      <section className="card">
+        <h2>
+          <Upload size={19} />
+          Restore
+        </h2>
+        <p className="muted">
+          Restoring a backup replaces the data on this device.
+        </p>
         <label className="button file-button">
           <Upload size={17} />
           Restore Feng Finance Backup
@@ -166,11 +223,12 @@ export default function Settings() {
             onChange={async (e) => {
               const file = e.target.files?.[0];
               if (!file) return;
+              setPending(undefined);
+              setReplaceConfirmed(false);
               await run(async () => {
                 if (file.size > 50 * 1024 * 1024)
                   throw new Error("Backup exceeds the 50 MB limit.");
                 setPending(validateBackup(JSON.parse(await file.text())));
-                setReplaceConfirmed(false);
               }, "Backup validated. Review the replacement warning below.");
               e.target.value = "";
             }}
@@ -179,13 +237,35 @@ export default function Settings() {
         {pending && (
           <div className="restore-warning">
             <h3>Replace all local financial data?</h3>
-            <p>
-              This backup contains {pending.accounts.length} accounts,{" "}
-              {pending.statements.length} statements and{" "}
-              {pending.transactions.length} transactions. Export your current
-              backup first. Replacing is atomic and cannot be undone without
-              another backup.
+            <div className="settings-preview" aria-label="Backup contents">
+              <span>
+                <strong>{pending.accounts.length}</strong> accounts
+              </span>
+              <span>
+                <strong>{pending.transactions.length}</strong> transactions
+              </span>
+              <span>
+                <strong>{pending.statements.length}</strong> statements
+              </span>
+              <span>
+                <strong>
+                  {pending.rules.filter((r) => !r.builtIn).length}
+                </strong>{" "}
+                personal rules
+              </span>
+            </div>
+            <p className="muted">
+              Exported {formatUkDate(pending.exportedAt.slice(0, 10))} · Backup
+              version {pending.version} · Database version{" "}
+              {pending.schemaVersion}
             </p>
+            <p>
+              Current accounts, transactions, categories, rules and settings
+              will be replaced. You need a backup to undo this.
+            </p>
+            <button disabled={busy} onClick={exportBackup}>
+              Back up current data first
+            </button>
             <label className="check">
               <input
                 type="checkbox"
@@ -213,24 +293,6 @@ export default function Settings() {
             </div>
           </div>
         )}
-        <button
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              if (!navigator.storage?.persist)
-                throw new Error(
-                  "Persistent storage requests are not supported by this browser. Keep backups in Files.",
-                );
-              const granted = await navigator.storage.persist();
-              if (!granted)
-                throw new Error(
-                  "The browser did not grant persistent storage. Keep backups in Files.",
-                );
-            }, "Persistent storage is enabled on this browser.")
-          }
-        >
-          Request persistent storage
-        </button>
       </section>
       <section className="card">
         <h2>Accounts</h2>
@@ -443,34 +505,27 @@ export default function Settings() {
           Add {categoryParent ? "subcategory" : "category"}
         </button>
       </details>
-      <details className="card settings-disclosure">
+      <details
+        className="card settings-disclosure"
+        id="rules"
+        open={showRules}
+        onToggle={(e) => setShowRules(e.currentTarget.open)}
+      >
         <summary>Categorization & transfer rules</summary>
         <p className="muted">
-          User exact rules run first, then user text rules, then built-in
-          mappings. Changes apply to future imports.
+          Your category choices are learned automatically. Changes here apply to
+          future imports.
         </p>
-        {data?.rules
-          .filter((r) => !r.builtIn)
-          .map((r) => (
-            <div className="settings-row" key={r.id}>
-              <div>
-                <strong>{r.name}</strong>
-                <p>
-                  {r.match} · {r.direction} · priority {r.priority}
-                </p>
-              </div>
-              <button
-                disabled={busy}
-                aria-label={`Delete rule ${r.name}`}
-                onClick={() =>
-                  void run(() => db.rules.delete(r.id), "Rule deleted.")
-                }
-              >
-                <Trash2 size={16} />
-                Delete
-              </button>
-            </div>
-          ))}
+        {showRules && (
+          <RuleList
+            rules={data?.rules ?? []}
+            categories={data?.categories ?? []}
+            accounts={data?.accounts ?? []}
+            run={run}
+            busy={busy}
+            requestedRule={requestedRule ?? undefined}
+          />
+        )}
         <RuleForm
           categories={data?.categories ?? []}
           accounts={data?.accounts ?? []}
@@ -488,19 +543,22 @@ export default function Settings() {
               <p key={r.id}>{r.name}</p>
             ))}
         </details>
+        <details>
+          <summary>Advanced: import personal rules</summary>
+          <PersonalRules />
+        </details>
       </details>
       <details className="card settings-disclosure">
         <summary>Statement history</summary>
         <p className="muted">
-          Source PDFs are not stored. Filenames, parser version, review warnings
-          and balance differences remain available for traceability.
+          Import checks are retained; original PDFs are not stored.
         </p>
         <div className="statement-history">
           {data?.statements.slice(0, 50).map((s) => (
             <details key={s.id}>
               <summary>
-                {s.institution} · {s.statementPeriodEnd} · {s.transactionCount}{" "}
-                new transactions · {s.validationStatus}
+                {s.institution} · {formatUkDate(s.statementPeriodEnd)} ·{" "}
+                {s.transactionCount} new transactions · {s.validationStatus}
               </summary>
               <p>
                 {s.sourceFilename} · parser {s.parserVersion} ·{" "}
@@ -526,9 +584,8 @@ export default function Settings() {
       </details>
       <section className="card">
         <h2>Demo data</h2>
-        <p>
-          Fictitious transactions help you explore the dashboard. Your imported
-          data is preserved when demo data is deleted.
+        <p className="muted">
+          Explore with fictitious data; deleting it keeps your imported records.
         </p>
         <div className="actions">
           <button
@@ -550,21 +607,22 @@ export default function Settings() {
           <ShieldCheck size={20} />
           Privacy & installation
         </h2>
-        <p>
-          Statements are parsed in your browser with PDF.js and local OCR.
-          Transactions, descriptions, accounts and categories stay in IndexedDB
-          on this device. There are no analytics, external AI calls, API keys or
-          cloud sync.
+        <p className="muted">
+          Statements and financial data stay on this device.
         </p>
-        <p>
-          The host serves only static app assets. On first installation it also
-          downloads the PDF worker and OCR language files. After the offline
-          cache is ready, imports require no network access.
-        </p>
-        <p>
-          On iPhone: open the HTTPS address in Safari, tap Share, then Add to
-          Home Screen, enable Open as Web App and tap Add.
-        </p>
+        <details>
+          <summary>Learn more about privacy and installation</summary>
+          <p>
+            Statements are parsed locally using PDF.js and OCR. There are no
+            analytics, external AI calls, API keys or cloud sync. The host
+            serves static app assets; after the offline cache is ready, imports
+            need no network access.
+          </p>
+          <p>
+            On iPhone, open Feng in Safari → Share → Add to Home Screen → Open
+            as Web App → Add.
+          </p>
+        </details>
         <p>
           This application does not encrypt its local database. Protect your
           device with a passcode; anyone using this browser profile can access
@@ -576,59 +634,69 @@ export default function Settings() {
         </p>
       </section>
       <section className="card danger-zone">
-        <h2>Delete imported records</h2>
-        <p>
-          Deletes all statements, transactions (including demo transactions) and
-          transfer links. Keeps accounts, categories, saved categorization rules
-          and settings so you can reimport your PDFs. Download a backup first.
-        </p>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={deleteImportsConfirmed}
-            onChange={(e) => setDeleteImportsConfirmed(e.target.checked)}
-          />
-          I understand my imported transaction history will be deleted.
-        </label>
-        <button
-          className="danger"
-          disabled={busy || !deleteImportsConfirmed}
-          onClick={() =>
-            void run(async () => {
-              await deleteImportedRecords();
-              setDeleteImportsConfirmed(false);
-            }, "Imported records deleted. Accounts and saved categorization rules kept.")
-          }
-        >
-          Delete imported records
+        <h2>Danger zone</h2>
+        <button disabled={busy} onClick={exportBackup}>
+          <Download size={17} />
+          Back up before deleting
         </button>
-      </section>
-      <section className="card danger-zone">
-        <h2>Clear local data</h2>
-        <p>
-          This removes every account, statement, transaction, custom category
-          and rule from this browser. Download a backup first.
-        </p>
-        <label className="check">
-          <input
-            type="checkbox"
-            checked={clearConfirmed}
-            onChange={(e) => setClearConfirmed(e.target.checked)}
-          />
-          I understand this permanently deletes my local financial data.
-        </label>
-        <button
-          className="danger"
-          disabled={!clearConfirmed || busy}
-          onClick={() =>
-            void run(async () => {
-              await clearLocalData();
-              setClearConfirmed(false);
-            }, "All local financial data was cleared.")
-          }
-        >
-          Clear all local data
-        </button>
+        <div className="danger-section">
+          <h3>Delete transactions, keep accounts and rules</h3>
+          <p className="muted">
+            Removes statements, transactions and transfer links. Keeps accounts,
+            categories, rules and settings for reimporting.
+          </p>
+          <label className="check">
+            <input
+              type="checkbox"
+              checked={deleteImportsConfirmed}
+              onChange={(e) => setDeleteImportsConfirmed(e.target.checked)}
+            />
+            I understand my imported transaction history will be deleted.
+          </label>
+          <button
+            className="danger"
+            disabled={busy || !deleteImportsConfirmed}
+            onClick={() =>
+              void run(async () => {
+                await deleteImportedRecords();
+                setDeleteImportsConfirmed(false);
+              }, "Imported records deleted. Accounts and saved categorization rules kept.")
+            }
+          >
+            Delete imported records
+          </button>
+        </div>
+        <div className="danger-section">
+          <h3>Erase everything</h3>
+          <p className="muted">
+            Removes all accounts, statements, transactions, personal categories,
+            learned rules and settings. Default categories are restored.
+          </p>
+          <label className="erase-confirm">
+            Type ERASE to confirm permanent deletion
+            <input
+              value={erasePhrase}
+              autoComplete="off"
+              spellCheck={false}
+              onChange={(e) => setErasePhrase(e.target.value)}
+              aria-label="Type ERASE to confirm permanent deletion"
+            />
+          </label>
+          <button
+            className="danger"
+            disabled={erasePhrase !== "ERASE" || busy}
+            onClick={() =>
+              void run(async () => {
+                if (erasePhrase !== "ERASE")
+                  throw new Error("Type ERASE before deleting all data.");
+                await clearLocalData();
+                setErasePhrase("");
+              }, "All local financial data was cleared.")
+            }
+          >
+            Erase everything
+          </button>
+        </div>
       </section>
     </>
   );
@@ -683,29 +751,188 @@ function CategoryEditor({
     </>
   );
 }
+function RuleList({
+  rules,
+  categories,
+  accounts,
+  run,
+  busy,
+  requestedRule,
+}: {
+  rules: Rule[];
+  categories: Category[];
+  accounts: Account[];
+  run: (fn: () => Promise<unknown>, message: string) => Promise<void>;
+  busy: boolean;
+  requestedRule?: string;
+}) {
+  const [editing, setEditing] = useState<Rule>();
+  const openedRule = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    const selected = rules.find(
+      (rule) => rule.id === requestedRule && !rule.builtIn,
+    );
+    if (selected && openedRule.current !== selected.id) {
+      openedRule.current = selected.id;
+      setEditing(selected);
+    }
+  }, [requestedRule, rules]);
+  const transactions = useLiveQuery(() => db.transactions.toArray(), []);
+  const stats = useMemo(
+    () =>
+      new Map(
+        rules
+          .filter((r) => !r.builtIn)
+          .map((rule) => {
+            const matching = transactions?.filter((t) => matches(rule, t));
+            const lastUsedAt = transactions
+              ?.filter((t) => t.categoryRuleId === rule.id)
+              .reduce<string | undefined>(
+                (last, t) => (!last || t.updatedAt > last ? t.updatedAt : last),
+                rule.lastUsedAt,
+              );
+            return [
+              rule.id,
+              {
+                count: matching?.length,
+                lastUsedAt: lastUsedAt ?? rule.lastUsedAt,
+              },
+            ];
+          }),
+      ),
+    [rules, transactions],
+  );
+  const personal = rules.filter((r) => !r.builtIn);
+  return (
+    <div className="rule-list">
+      {!personal.length && (
+        <p className="muted">
+          No personal rules yet. Categorize a transaction to create one
+          automatically.
+        </p>
+      )}
+      {personal.map((rule) => (
+        <div className="rule-item" key={rule.id}>
+          <div className="rule-details">
+            <strong>
+              {rule.pattern} →{" "}
+              {rule.type === "transfer"
+                ? "Transfer"
+                : (categories.find(
+                    (c) => c.id === (rule.subcategoryId ?? rule.categoryId),
+                  )?.name ?? "Unavailable category")}
+            </strong>
+            <p>
+              {rule.accountId
+                ? accountLabel(accounts.find((a) => a.id === rule.accountId))
+                : "All accounts"}{" "}
+              ·{" "}
+              {rule.match === "exact"
+                ? "Exact merchant"
+                : rule.match === "starts-with"
+                  ? "Starts with"
+                  : "Contains text"}{" "}
+              ·{" "}
+              {rule.direction === "positive"
+                ? "Money in"
+                : rule.direction === "negative"
+                  ? "Money out"
+                  : "Either direction"}
+            </p>
+            <p className="muted">
+              {stats.get(rule.id)?.count === undefined
+                ? "Checking matches…"
+                : `${stats.get(rule.id)!.count} matching transactions`}{" "}
+              · Last used:{" "}
+              {stats.get(rule.id)?.lastUsedAt
+                ? formatUkDate(stats.get(rule.id)!.lastUsedAt!.slice(0, 10))
+                : "not recorded"}
+            </p>
+          </div>
+          <div className="actions">
+            <button
+              disabled={busy}
+              aria-label={`Edit rule ${rule.name}`}
+              onClick={() => setEditing(rule)}
+            >
+              <Pencil size={16} />
+              Edit
+            </button>
+            <button
+              disabled={busy}
+              aria-label={`Delete rule ${rule.name}`}
+              onClick={() =>
+                void run(async () => {
+                  await deleteRule(rule);
+                  if (editing?.id === rule.id) setEditing(undefined);
+                }, "Rule deleted. Existing transactions kept.")
+              }
+            >
+              <Trash2 size={16} />
+              Delete
+            </button>
+          </div>
+          {editing?.id === rule.id && (
+            <RuleForm
+              key={rule.id}
+              rule={editing}
+              categories={categories}
+              accounts={accounts}
+              run={run}
+              busy={busy}
+              onClose={() => setEditing(undefined)}
+            />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
 function RuleForm({
   categories,
   accounts,
   run,
   busy,
+  rule,
+  onClose,
 }: {
   categories: Category[];
-  accounts: { id: string; displayName: string; currency: string }[];
+  accounts: Account[];
   run: (fn: () => Promise<unknown>, message: string) => Promise<void>;
   busy: boolean;
+  rule?: Rule;
+  onClose?: () => void;
 }) {
-  const [pattern, setPattern] = useState("");
-  const [category, setCategory] = useState("");
-  const [match, setMatch] = useState<Rule["match"]>("contains");
-  const [direction, setDirection] = useState<Rule["direction"]>("any");
-  const [transfer, setTransfer] = useState(false);
-  const [account, setAccount] = useState("");
-  const [priority, setPriority] = useState(100);
-  const [min, setMin] = useState("");
-  const [max, setMax] = useState("");
+  const [pattern, setPattern] = useState(rule?.pattern ?? "");
+  const [category, setCategory] = useState(rule?.categoryId ?? "");
+  const [subcategory, setSubcategory] = useState(rule?.subcategoryId ?? "");
+  const [match, setMatch] = useState<Rule["match"]>(rule?.match ?? "contains");
+  const [direction, setDirection] = useState<Rule["direction"]>(
+    rule?.direction ?? "any",
+  );
+  const [transfer, setTransfer] = useState(rule?.type === "transfer");
+  const [account, setAccount] = useState(rule?.accountId ?? "");
+  const [priority, setPriority] = useState(rule?.priority ?? 100);
+  const initialCurrency = accounts.find(
+    (a) => a.id === rule?.accountId,
+  )?.currency;
+  const [min, setMin] = useState(
+    rule?.minAmount === undefined
+      ? ""
+      : decimalMoney(rule.minAmount, initialCurrency),
+  );
+  const [max, setMax] = useState(
+    rule?.maxAmount === undefined
+      ? ""
+      : decimalMoney(rule.maxAmount, initialCurrency),
+  );
   return (
-    <details>
-      <summary>Create a categorization or transfer rule</summary>
+    <details className="rule-editor" open={rule ? true : undefined}>
+      <summary>
+        {rule
+          ? "Edit categorization rule"
+          : "Create a categorization or transfer rule"}
+      </summary>
       <div className="form-grid">
         <label>
           Text pattern
@@ -744,12 +971,16 @@ function RuleForm({
           <select
             aria-label="Account"
             value={account}
-            onChange={(e) => setAccount(e.target.value)}
+            onChange={(e) => {
+              setAccount(e.target.value);
+              setMin("");
+              setMax("");
+            }}
           >
             <option value="">All accounts</option>
             {accounts.map((a) => (
               <option key={a.id} value={a.id}>
-                {a.displayName} · {a.currency}
+                {accountLabel(a)} · {a.currency}
               </option>
             ))}
           </select>
@@ -760,7 +991,10 @@ function RuleForm({
             aria-label="Category"
             disabled={transfer}
             value={category}
-            onChange={(e) => setCategory(e.target.value)}
+            onChange={(e) => {
+              setCategory(e.target.value);
+              setSubcategory("");
+            }}
           >
             <option value="">Choose a category</option>
             {categories
@@ -772,6 +1006,27 @@ function RuleForm({
               ))}
           </select>
         </label>
+        {!!categories.filter((c) => c.parentId === category && !c.archived)
+          .length &&
+          !transfer && (
+            <label>
+              Subcategory
+              <select
+                aria-label="Rule subcategory"
+                value={subcategory}
+                onChange={(e) => setSubcategory(e.target.value)}
+              >
+                <option value="">No subcategory</option>
+                {categories
+                  .filter((c) => c.parentId === category && !c.archived)
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
         <label>
           Priority
           <input
@@ -813,43 +1068,66 @@ function RuleForm({
       <button
         disabled={!pattern.trim() || (!transfer && !category) || busy}
         onClick={() =>
-          void run(async () => {
-            const currency = accounts.find((a) => a.id === account)?.currency;
-            const minAmount =
-              account && min ? parseMoney(min, currency) : undefined;
-            const maxAmount =
-              account && max ? parseMoney(max, currency) : undefined;
-            if (
-              (minAmount !== undefined && minAmount < 0) ||
-              (maxAmount !== undefined && maxAmount < 0) ||
-              (minAmount !== undefined &&
-                maxAmount !== undefined &&
-                minAmount > maxAmount) ||
-              !Number.isSafeInteger(priority)
-            )
-              throw new Error(
-                "Enter a valid priority and positive amount range.",
+          void run(
+            async () => {
+              const currency = accounts.find((a) => a.id === account)?.currency;
+              const minAmount =
+                account && min ? parseMoney(min, currency) : undefined;
+              const maxAmount =
+                account && max ? parseMoney(max, currency) : undefined;
+              if (
+                (minAmount !== undefined && minAmount < 0) ||
+                (maxAmount !== undefined && maxAmount < 0) ||
+                (minAmount !== undefined &&
+                  maxAmount !== undefined &&
+                  minAmount > maxAmount) ||
+                !Number.isSafeInteger(priority)
+              )
+                throw new Error(
+                  "Enter a valid priority and positive amount range.",
+                );
+              await saveRule(
+                {
+                  ...rule,
+                  id: rule?.id ?? id(),
+                  name: `${pattern} → ${transfer ? "Transfer" : categories.find((c) => c.id === category)?.name}`,
+                  match,
+                  pattern: pattern.trim(),
+                  direction,
+                  accountId: account || undefined,
+                  priority,
+                  categoryId: transfer ? undefined : category,
+                  subcategoryId: transfer
+                    ? undefined
+                    : subcategory || undefined,
+                  type: transfer ? "transfer" : undefined,
+                  minAmount,
+                  maxAmount,
+                  builtIn: false,
+                },
+                rule,
               );
-            await db.rules.add({
-              id: id(),
-              name: `${pattern} → ${transfer ? "Transfer" : categories.find((c) => c.id === category)?.name}`,
-              match,
-              pattern: pattern.trim(),
-              direction,
-              accountId: account || undefined,
-              priority,
-              categoryId: transfer ? undefined : category,
-              type: transfer ? "transfer" : undefined,
-              minAmount,
-              maxAmount,
-              builtIn: false,
-            });
-            setPattern("");
-          }, "Rule created.")
+              setPattern("");
+              onClose?.();
+            },
+            rule
+              ? "Rule updated. Changes apply to future imports."
+              : "Rule created.",
+          )
         }
       >
-        Create rule
+        {rule ? "Save rule" : "Create rule"}
       </button>
+      {rule && (
+        <button disabled={busy} onClick={onClose}>
+          Cancel edit
+        </button>
+      )}
     </details>
   );
+}
+function accountLabel(account?: Account) {
+  return account
+    ? `${account.institution} · ${account.displayName} · ${account.maskedAccountIdentifier}`
+    : "Unavailable account";
 }

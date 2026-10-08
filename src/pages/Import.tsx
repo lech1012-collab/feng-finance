@@ -1,25 +1,20 @@
-import { useState, useRef, useEffect } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import {
-  Upload,
-  FileText,
-  CheckCircle2,
-  AlertTriangle,
-  ChevronDown,
-} from "lucide-react";
-import type { ImportDraft, Institution } from "../domain/models";
+import { AlertTriangle, CheckCircle2, Upload, X } from "lucide-react";
 import { db } from "../storage/database";
 import {
   extractFile,
   prepareDraft,
-  commitDraft,
   draftReconciliation,
-  type ExtractedFile,
 } from "../import/pipeline";
-import { money, decimalMoney, parseMoney } from "../domain/money";
-import { statementMovements } from "../import/movements";
+import { commitReviewedBatch, type BatchOutcome } from "../import/batch";
+import { importBlockers, type FileReview } from "../import/review-model";
+import { ImportStatementReview } from "../components/ImportStatementReview";
 import { validatePeriod } from "../parsers/period";
+import { id } from "../domain/normalize";
+import type { ImportDraft } from "../domain/models";
+
 export default function ImportPage({
   onImported,
   selectedFiles,
@@ -29,24 +24,13 @@ export default function ImportPage({
   onFilesStarted?: () => void;
   onImported: (month: string, currency: string) => void;
 }) {
-  const [files, setFiles] = useState<File[]>([]);
-  const [index, setIndex] = useState(0);
-  const [extracted, setExtracted] = useState<ExtractedFile>();
-  const [draft, setDraft] = useState<ImportDraft>();
-  const [status, setStatus] = useState("");
-  const [error, setError] = useState("");
+  const [entries, setEntries] = useState<FileReview[]>([]);
   const [busy, setBusy] = useState(false);
-  const [bank, setBank] = useState<Institution | "">("");
-  const [accountId, setAccountId] = useState("");
-  const [override, setOverride] = useState(false);
-  const [success, setSuccess] = useState("");
-  const [manualPeriod, setManualPeriod] = useState(false);
-  const [periodStart, setPeriodStart] = useState("");
-  const [periodEnd, setPeriodEnd] = useState("");
-  const amountErrors = useRef(new Set<string>());
-  const [showAll, setShowAll] = useState(false);
-  const [importedCount, setImportedCount] = useState(0);
-  const latestImported = useRef("");
+  const [phase, setPhase] = useState<"pick" | "check" | "review" | "done">(
+    "pick",
+  );
+  const [error, setError] = useState("");
+  const [commitStatus, setCommitStatus] = useState("");
   const navigate = useNavigate();
   const accounts = useLiveQuery(
     () => db.accounts.filter((a) => !a.isDemo).toArray(),
@@ -56,61 +40,188 @@ export default function ImportPage({
     () => db.categories.filter((c) => !c.archived && !c.parentId).toArray(),
     [],
   );
-  const resetPeriod = () => {
-    setManualPeriod(false);
-    setPeriodStart("");
-    setPeriodEnd("");
+  const history = useLiveQuery(
+    () => db.statements.filter((s) => !s.isDemo).toArray(),
+    [],
+  );
+  const operation = useRef(0);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      operation.current++;
+    };
+  }, []);
+  const patchEntry = (entryId: string, patch: Partial<FileReview>) => {
+    if (alive.current)
+      setEntries((current) =>
+        current.map((entry) =>
+          entry.id === entryId ? { ...entry, ...patch } : entry,
+        ),
+      );
   };
-  const process = async (
-    file: File,
+  const patchReviewEntry = (entryId: string, patch: Partial<FileReview>) => {
+    setEntries((current) => {
+      const previous = current.find((entry) => entry.id === entryId);
+      if (!previous) return current;
+      const rowIdentity = (draft: ImportDraft) =>
+        JSON.stringify(
+          draft.transactions.map((t) => [
+            t.date,
+            t.amount,
+            t.include,
+            t.balanceAfterTransaction,
+          ]),
+        );
+      const changedSelection =
+        (patch.skip !== undefined && patch.skip !== previous.skip) ||
+        (patch.draft &&
+          previous.draft &&
+          rowIdentity(patch.draft) !== rowIdentity(previous.draft));
+      return current.map((entry) => {
+        if (entry.id === entryId) return { ...entry, ...patch };
+        if (
+          !changedSelection ||
+          !previous.draft ||
+          !entry.draft ||
+          entry.state === "saved" ||
+          entry.skip
+        )
+          return entry;
+        const a = previous.draft.account;
+        const b = entry.draft.account;
+        const sameAccount =
+          a.institution === b.institution &&
+          a.currency === b.currency &&
+          a.accountType === b.accountType &&
+          a.maskedAccountIdentifier === b.maskedAccountIdentifier;
+        const overlap =
+          previous.draft.statement.statementPeriodStart <=
+            entry.draft.statement.statementPeriodEnd &&
+          previous.draft.statement.statementPeriodEnd >=
+            entry.draft.statement.statementPeriodStart;
+        return sameAccount && overlap
+          ? { ...entry, requiresBatchRecheck: true, open: true }
+          : entry;
+      });
+    });
+  };
+  const processEntry = async (
+    entry: FileReview,
+    token: number,
     ocr = false,
-    existing?: ExtractedFile,
-    useEnteredDates = true,
+    reuse = false,
+    pendingDrafts: ImportDraft[] = [],
   ) => {
-    setBusy(true);
-    window.scrollTo({ top: 0 });
-    setError("");
-    setDraft(undefined);
-    setOverride(false);
-    amountErrors.current.clear();
+    patchEntry(entry.id, {
+      state: "checking",
+      error: "",
+      progress: "Checking this PDF…",
+    });
+    let extracted = entry.extracted;
     try {
-      const period =
-        useEnteredDates && manualPeriod
-          ? validatePeriod({ start: periodStart, end: periodEnd })
-          : undefined;
-      const result = existing ?? (await extractFile(file, setStatus, ocr));
-      setExtracted(result);
-      const d = await prepareDraft(
-        result,
-        useEnteredDates ? bank || undefined : undefined,
-        useEnteredDates ? accounts?.find((a) => a.id === accountId) : undefined,
+      const period = entry.manualPeriod
+        ? validatePeriod({ start: entry.periodStart, end: entry.periodEnd })
+        : undefined;
+      extracted =
+        reuse && extracted
+          ? extracted
+          : await extractFile(
+              entry.file,
+              (progress) => patchEntry(entry.id, { progress }),
+              ocr,
+            );
+      if (!alive.current || token !== operation.current) return;
+      patchEntry(entry.id, { extracted });
+      const draft = await prepareDraft(
+        extracted,
+        entry.bank || undefined,
+        accounts?.find((a) => a.id === entry.accountId),
         period,
+        pendingDrafts,
       );
-      setDraft(d);
-      setShowAll(false);
-      setStatus("Ready to review");
+      if (!alive.current || token !== operation.current) return;
+      const needsReview =
+        !draft.exactDuplicate &&
+        (draftReconciliation(draft).status === "warning" ||
+          draft.warnings.length > 0 ||
+          draft.transactions.some(
+            (t) => t.include && t.extractionConfidence < 0.8,
+          ));
+      patchEntry(entry.id, {
+        draft,
+        extracted,
+        state: "review",
+        progress: "Ready to review",
+        open: needsReview,
+        override: false,
+        optionsChanged: false,
+        invalidAmounts: [],
+        showAll: false,
+        duplicateInBatch: pendingDrafts.some(
+          (pending) =>
+            pending.statement.sourceFileHash === draft.statement.sourceFileHash,
+        ),
+        requiresBatchRecheck: false,
+      });
+      return draft;
     } catch (e) {
-      setError(
-        e instanceof Error
-          ? e.message
-          : "The statement could not be read. No financial data was saved.",
-      );
-    } finally {
-      setBusy(false);
+      if (!alive.current || token !== operation.current) return;
+      patchEntry(entry.id, {
+        state: "error",
+        draft: undefined,
+        extracted,
+        error:
+          e instanceof Error
+            ? e.message
+            : "The statement could not be read. No financial data was saved.",
+        open: true,
+        progress: "Couldn't read this PDF",
+      });
     }
   };
-  const selectFiles = async (selected: File[]) => {
-    if (!selected.length) return;
-    setFiles(selected);
-    setBank("");
-    setAccountId("");
-    setImportedCount(0);
-    latestImported.current = "";
-    setIndex(0);
-    setSuccess("");
-    setExtracted(undefined);
-    resetPeriod();
-    await process(selected[0], false, undefined, false);
+  const selectFiles = async (files: File[]) => {
+    if (!files.length || busy) return;
+    const token = ++operation.current;
+    const selected: FileReview[] = files.map((file) => ({
+      id: id(),
+      file,
+      state: "queued",
+      progress: "Waiting to check",
+      error: "",
+      bank: "",
+      accountId: "",
+      manualPeriod: false,
+      periodStart: "",
+      periodEnd: "",
+      optionsChanged: false,
+      override: false,
+      skip: false,
+      open: false,
+      showAll: false,
+      invalidAmounts: [],
+    }));
+    setEntries(selected);
+    setError("");
+    setBusy(true);
+    setPhase("check");
+    const pendingDrafts: ImportDraft[] = [];
+    for (const entry of selected) {
+      if (!alive.current || token !== operation.current) return;
+      const draft = await processEntry(
+        entry,
+        token,
+        false,
+        false,
+        pendingDrafts,
+      );
+      if (draft && !draft.exactDuplicate) pendingDrafts.push(draft);
+    }
+    if (alive.current && token === operation.current) {
+      setBusy(false);
+      setPhase("review");
+    }
   };
   const startedFiles = useRef<File[] | undefined>(undefined);
   useEffect(() => {
@@ -120,656 +231,399 @@ export default function ImportPage({
       onFilesStarted?.();
     }
   }, [selectedFiles]);
-  const updateRow = (
-    tid: string,
-    patch: Partial<ImportDraft["transactions"][number]>,
-  ) =>
-    setDraft((d) =>
-      d
-        ? {
-            ...d,
-            transactions: d.transactions.map((t) =>
-              t.id === tid ? { ...t, ...patch } : t,
-            ),
-          }
-        : d,
-    );
-  const save = async () => {
-    if (!draft) return;
-    if (amountErrors.current.size) {
-      setError("Correct the highlighted invalid amounts before importing.");
-      return;
-    }
+  const reparse = async (entry: FileReview, ocr: boolean) => {
+    const token = ++operation.current;
     setBusy(true);
     setError("");
+    setPhase("check");
+    const pendingDrafts = entries
+      .filter(
+        (other) =>
+          other.id !== entry.id &&
+          !other.skip &&
+          other.state !== "saved" &&
+          other.draft &&
+          !other.draft.exactDuplicate,
+      )
+      .map((other) => other.draft!);
+    await processEntry(entry, token, ocr, !ocr, pendingDrafts);
+    if (alive.current && token === operation.current) {
+      setBusy(false);
+      setPhase("review");
+    }
+  };
+  const active = entries.filter(
+    (entry) => !entry.skip && entry.state !== "saved",
+  );
+  const blocking = active.filter((entry) => importBlockers(entry).length > 0);
+  const newCount = active.reduce(
+    (n, entry) =>
+      n +
+      (!entry.draft ||
+      (entry.draft.exactDuplicate && !entry.draft.duplicateOverride)
+        ? 0
+        : entry.draft.transactions.filter((t) => t.include).length),
+    0,
+  );
+  const duplicateCount = active.reduce(
+    (n, entry) =>
+      n +
+      (!entry.draft
+        ? 0
+        : entry.draft.exactDuplicate && !entry.draft.duplicateOverride
+          ? entry.draft.transactions.length
+          : entry.draft.transactions.filter(
+              (t) => !t.include && t.duplicate !== "none",
+            ).length),
+    0,
+  );
+  const excludedCount = active.reduce(
+    (n, entry) =>
+      n +
+      (!entry.draft ||
+      (entry.draft.exactDuplicate && !entry.draft.duplicateOverride)
+        ? 0
+        : entry.draft.transactions.filter(
+            (t) => !t.include && t.duplicate === "none",
+          ).length),
+    0,
+  );
+  const skippedFileCount = entries.filter((entry) => entry.skip).length;
+  const balanceStatements = active.filter(
+    (entry) =>
+      entry.draft &&
+      entry.draft.transactions.length === 0 &&
+      !(entry.draft.exactDuplicate && !entry.draft.duplicateOverride) &&
+      draftReconciliation(entry.draft).status === "reconciled",
+  );
+  const hasChanges = newCount > 0 || balanceStatements.length > 0;
+  const sorted = [...entries].sort(
+    (a, b) =>
+      Number(importBlockers(b).length > 0) -
+      Number(importBlockers(a).length > 0),
+  );
+  const save = async () => {
+    if (busy || blocking.length || !hasChanges) return;
+    const selected = active
+      .filter((entry) => entry.draft)
+      .map((entry) => ({
+        id: entry.id,
+        draft: entry.draft!,
+        overrideValidation: entry.override,
+      }));
+    setBusy(true);
+    setError("");
+    let pendingId = "";
+    const outcomes: BatchOutcome[] = [];
     try {
-      const n = await commitDraft(draft, override);
-      const latest = draft.transactions
-        .filter((t) => t.include)
-        .map((t) => t.date)
+      await commitReviewedBatch(
+        selected,
+        (outcome) => {
+          outcomes.push(outcome);
+          patchEntry(outcome.id, {
+            state: "saved",
+            draft: outcome.draft,
+            imported: outcome.imported,
+            skipped: outcome.skipped,
+            duplicatesSkipped: outcome.duplicatesSkipped,
+            excludedUnique: outcome.excludedUnique,
+            statementSkipped: outcome.statementSkipped,
+            error: "",
+            open: false,
+          });
+        },
+        (entryId) => {
+          pendingId = entryId;
+          const entry = entries.find((entry) => entry.id === entryId);
+          setCommitStatus(`Saving ${entry?.file.name ?? "statement"}…`);
+        },
+      );
+      const allOutcomes = [
+        ...entries
+          .filter((entry) => entry.state === "saved" && entry.draft)
+          .map((entry) => ({
+            id: entry.id,
+            draft: entry.draft!,
+            imported: entry.imported ?? 0,
+            skipped: entry.skipped ?? 0,
+            duplicatesSkipped: entry.duplicatesSkipped ?? 0,
+            excludedUnique: entry.excludedUnique ?? 0,
+            statementSkipped: entry.statementSkipped ?? false,
+          })),
+        ...outcomes,
+      ];
+      const imported = allOutcomes.reduce(
+        (n, outcome) => n + outcome.imported,
+        0,
+      );
+      const skipped = allOutcomes.reduce(
+        (n, outcome) => n + outcome.duplicatesSkipped,
+        0,
+      );
+      const excluded = allOutcomes.reduce(
+        (n, outcome) => n + outcome.excludedUnique,
+        0,
+      );
+      const importedRows = allOutcomes.flatMap((outcome) =>
+        outcome.imported
+          ? outcome.draft.transactions.filter((t) => t.include)
+          : [],
+      );
+      const updatedStatements = allOutcomes.filter(
+        (outcome) => !outcome.statementSkipped,
+      );
+      const balanceUpdates = updatedStatements.filter(
+        (outcome) => outcome.draft.transactions.length === 0,
+      );
+      const latest = [
+        ...importedRows.map((t) => t.date),
+        ...balanceUpdates.map(
+          (outcome) => outcome.draft.statement.statementPeriodEnd,
+        ),
+      ]
         .sort()
         .at(-1);
       if (latest) {
-        latestImported.current =
-          latest > latestImported.current ? latest : latestImported.current;
-        onImported(latestImported.current.slice(0, 7), draft.account.currency);
+        const currency =
+          importedRows.find((t) => t.date === latest)?.currency ??
+          balanceUpdates.find(
+            (outcome) => outcome.draft.statement.statementPeriodEnd === latest,
+          )!.draft.statement.currency;
+        onImported(latest.slice(0, 7), currency);
       }
-      setImportedCount((count) => count + n);
-      setSuccess(
-        `Imported ${n} new transactions from ${draft.statement.institution}.`,
-      );
-      setDraft(undefined);
-      resetPeriod();
-      if (index + 1 < files.length) {
-        setIndex(index + 1);
-        setExtracted(undefined);
-        await process(files[index + 1], false, undefined, false);
-      } else {
-        setFiles([]);
-        setStatus("Import complete");
-        navigate("/", {
-          replace: true,
-          state: { importedCount: importedCount + n },
-        });
-      }
+      const toSort = await db.transactions
+        .filter(
+          (t) =>
+            !t.isDemo &&
+            !t.categoryId &&
+            !t.isTransfer &&
+            t.type !== "transfer",
+        )
+        .count();
+      setPhase("done");
+      navigate("/", {
+        replace: true,
+        state: {
+          importedCount: imported,
+          duplicateCount: skipped,
+          excludedCount: excluded,
+          skippedFileCount,
+          updatedStatementCount: updatedStatements.length,
+          sortCount: toSort,
+        },
+      });
     } catch (e) {
-      setError(
+      const reason =
         e instanceof Error
           ? e.message
-          : "Import failed. Your existing data is safe.",
+          : "Import failed. Your existing data is safe.";
+      const saved = outcomes.reduce((n, outcome) => n + outcome.imported, 0);
+      const priorSaved = entries.reduce(
+        (n, entry) => n + (entry.imported ?? 0),
+        0,
       );
+      setError(
+        `${saved + priorSaved ? `${saved + priorSaved} transactions were safely saved. ` : "No transactions were saved. "}${reason} Review the remaining files and retry; saved statements will not be imported twice.`,
+      );
+      patchEntry(pendingId, { error: reason, open: true });
     } finally {
-      setBusy(false);
+      if (alive.current) {
+        setBusy(false);
+        setCommitStatus("");
+      }
     }
   };
-  const validation = draft && draftReconciliation(draft);
-  const flow =
-    draft && statementMovements(draft.transactions, draft.statement.currency);
-  const issues =
-    draft?.transactions.filter(
-      (t) =>
-        t.extractionConfidence < 0.8 ||
-        (!t.categoryId && !t.isTransfer) ||
-        t.duplicate !== "none",
-    ) ?? [];
-  const needsCheck = (t: ImportDraft["transactions"][number]) =>
-    t.extractionConfidence < 0.8 ||
-    t.duplicate !== "none" ||
-    (draft &&
-      (t.date < draft.statement.statementPeriodStart ||
-        t.date > draft.statement.statementPeriodEnd));
-  const checks = draft?.transactions.filter(needsCheck) ?? [];
   return (
     <>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">ADD YOUR LATEST ACTIVITY</p>
-          <h1>Import statements</h1>
+          <h1>
+            {entries.length
+              ? `Review ${entries.length} statement${entries.length === 1 ? "" : "s"}`
+              : "Import statements"}
+          </h1>
         </div>
+        {entries.length > 0 && (
+          <Link className="icon-button" to="/" aria-label="Close import review">
+            <X size={20} />
+          </Link>
+        )}
       </div>
-      <section
-        className={`card upload-card ${draft || busy || success ? "compact-upload" : ""}`}
-        onDragOver={(e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = busy ? "none" : "copy";
-        }}
-        onDrop={(e) => {
-          e.preventDefault();
-          if (!busy) void selectFiles(Array.from(e.dataTransfer.files));
-        }}
-      >
-        <Upload size={28} />
-        <h2>Add your statements</h2>
-        <p>
-          Select or drop monthly PDFs from Barclays, American Express or
-          Revolut. We’ll check the numbers and highlight anything that needs
-          you.
-        </p>
-        <label
-          className={`button primary file-button ${busy ? "disabled" : ""}`}
+      <ol className="import-steps" aria-label="Import progress">
+        {(["pick", "check", "review", "done"] as const).map((step, index) => (
+          <li key={step} aria-current={phase === step ? "step" : undefined}>
+            <span>{index + 1}</span>
+            {step === "pick"
+              ? "Pick"
+              : step === "check"
+                ? "Check"
+                : step === "review"
+                  ? "Review"
+                  : "Done"}
+          </li>
+        ))}
+      </ol>
+      {entries.length === 0 && (
+        <section
+          className="card upload-card"
+          onDragOver={(e) => {
+            e.preventDefault();
+            e.dataTransfer.dropEffect = busy ? "none" : "copy";
+          }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (!busy) void selectFiles(Array.from(e.dataTransfer.files));
+          }}
         >
-          <Upload size={18} />
-          Select PDF statements
-          <input
-            aria-label="Select PDF statements"
-            type="file"
-            accept="application/pdf,.pdf"
-            multiple
-            disabled={busy}
-            onChange={(e) => {
-              const selected = Array.from(e.target.files ?? []);
-              e.target.value = "";
-              void selectFiles(selected);
-            }}
-          />
-        </label>
-        <p className="muted">
-          Digital PDFs work best. Scanned pages use local OCR. Up to 30 MB / 100
-          pages per PDF.
-        </p>
-      </section>
-      {files.length > 1 && (
-        <p className="queue-progress">
-          Statement {index + 1} of {files.length} · {importedCount} transactions
-          saved
-        </p>
+          <Upload size={28} />
+          <h2>Add your statements</h2>
+          <p>
+            Select or drop monthly PDFs from Barclays, American Express or
+            Revolut. We’ll check the numbers and highlight anything that needs
+            you.
+          </p>
+          <label
+            className={`button primary file-button ${busy ? "disabled" : ""}`}
+          >
+            <Upload size={18} />
+            Select PDF statements
+            <input
+              aria-label="Select PDF statements"
+              type="file"
+              accept="application/pdf,.pdf"
+              multiple
+              disabled={busy}
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                void selectFiles(files);
+              }}
+            />
+          </label>
+          <p className="muted">
+            Digital PDFs work best. Scanned pages use local OCR. Up to 30 MB /
+            100 pages per PDF.
+          </p>
+        </section>
       )}
-      {busy && (
-        <div className="notice" role="status">
-          <span className="spinner" />
-          {status}
-          {files.length > 1 && ` · Statement ${index + 1} of ${files.length}`}
+      {entries.length > 0 && (
+        <div className="import-change-files">
+          <label className={`button file-button ${busy ? "disabled" : ""}`}>
+            Choose different PDFs
+            <input
+              aria-label="Select PDF statements"
+              type="file"
+              accept="application/pdf,.pdf"
+              multiple
+              disabled={busy}
+              onChange={(e) => {
+                const files = Array.from(e.target.files ?? []);
+                e.target.value = "";
+                void selectFiles(files);
+              }}
+            />
+          </label>
+          <span className="muted">Nothing is saved until you confirm.</span>
         </div>
+      )}
+      {phase === "check" && (
+        <section
+          className="card import-processing-list"
+          aria-label="Checking statements"
+        >
+          <h2>Checking your statements</h2>
+          {entries.map((entry) => (
+            <div key={entry.id} className="import-processing-file">
+              <span>
+                {entry.state === "checking" ? (
+                  <span className="spinner" />
+                ) : entry.state === "review" ? (
+                  <CheckCircle2 size={18} />
+                ) : entry.state === "error" ? (
+                  <AlertTriangle size={18} />
+                ) : null}
+                <strong>{entry.file.name}</strong>
+              </span>
+              <p role={entry.state === "checking" ? "status" : undefined}>
+                {entry.draft
+                  ? `Detected ${entry.draft.statement.institution} ${entry.draft.account.maskedAccountIdentifier} · ready`
+                  : entry.progress}
+              </p>
+            </div>
+          ))}
+        </section>
       )}
       {error && (
-        <div className="notice warning" role="alert">
+        <div className="notice import-blocking-warning" role="alert">
           <AlertTriangle size={18} />
           <span>{error}</span>
         </div>
       )}
-      {(error || draft || extracted) && files[index] && (
-        <details className="card parse-options" open={!!error}>
-          <summary>
-            Bank, account and statement dates <ChevronDown size={16} />
-          </summary>
-          <div className="form-grid">
-            <label>
-              Bank
-              <select
-                aria-label="Bank"
-                value={bank}
-                onChange={(e) => setBank(e.target.value as Institution | "")}
-              >
-                <option value="">Detect automatically</option>
-                {["Barclays", "American Express", "Revolut"].map((b) => (
-                  <option key={b}>{b}</option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Account
-              <select
-                aria-label="Account"
-                value={accountId}
-                onChange={(e) => setAccountId(e.target.value)}
-              >
-                <option value="">Detect automatically</option>
-                {accounts?.map((a) => (
-                  <option key={a.id} value={a.id}>
-                    {a.institution} · {a.displayName} ·{" "}
-                    {a.maskedAccountIdentifier} · {a.currency}
-                  </option>
-                ))}
-              </select>
-            </label>
-          </div>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={manualPeriod}
-              onChange={(e) => {
-                setManualPeriod(e.target.checked);
-                setDraft(undefined);
-              }}
+      {phase !== "check" && entries.length > 0 && (
+        <div className="import-review-list">
+          {sorted.map((entry) => (
+            <ImportStatementReview
+              key={entry.id}
+              entry={entry}
+              accounts={accounts ?? []}
+              categories={categories ?? []}
+              history={[
+                ...(history ?? []),
+                ...entries
+                  .filter(
+                    (other) =>
+                      other.id !== entry.id &&
+                      !other.skip &&
+                      other.draft &&
+                      !other.draft.exactDuplicate &&
+                      other.state !== "saved",
+                  )
+                  .map((other) => other.draft!.statement),
+              ]}
+              busy={busy}
+              patch={(patch) => patchReviewEntry(entry.id, patch)}
+              reparse={(ocr) => void reparse(entry, ocr)}
             />
-            Enter statement dates from PDF
-          </label>
-          {manualPeriod && (
-            <>
-              <p className="muted">
-                Copy both dates from the statement header. These dates apply
-                only to this file; balance validation still runs.
-              </p>
-              <div className="form-grid">
-                <label>
-                  Statement start date
-                  <input
-                    type="date"
-                    value={periodStart}
-                    onChange={(e) => {
-                      setPeriodStart(e.target.value);
-                      setDraft(undefined);
-                    }}
-                  />
-                </label>
-                <label>
-                  Statement end date
-                  <input
-                    type="date"
-                    value={periodEnd}
-                    onChange={(e) => {
-                      setPeriodEnd(e.target.value);
-                      setDraft(undefined);
-                    }}
-                  />
-                </label>
-              </div>
-            </>
-          )}
-          <div className="actions">
-            <button
-              disabled={busy}
-              onClick={() => void process(files[index], false, extracted)}
-            >
-              Parse again
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => void process(files[index], true)}
-            >
-              Try local OCR
-            </button>
-            <Link to="/settings">Create an account</Link>
-          </div>
-          {error && index + 1 < files.length && (
-            <button
-              disabled={busy}
-              onClick={() => {
-                setIndex(index + 1);
-                setExtracted(undefined);
-                resetPeriod();
-                void process(files[index + 1], false, undefined, false);
-              }}
-            >
-              Skip this file and review next
-            </button>
-          )}
-        </details>
+          ))}
+        </div>
       )}
-      {draft && flow && validation && (
-        <>
-          <section className="card review-summary">
-            <div className="section-heading">
-              <h2>
-                <FileText size={20} />
-                {draft.statement.institution} detected
-              </h2>
-              <span className="small-chip">
-                {draft.statement.extractionMethod === "OCR"
-                  ? "OCR"
-                  : "Digital PDF"}
-              </span>
-            </div>
-            <p>
-              {draft.account.displayName} ·{" "}
-              {draft.account.maskedAccountIdentifier} ·{" "}
-              {draft.statement.currency}
-            </p>
-            <p>
-              {draft.statement.periodSource === "transaction-coverage" &&
-                "Transaction coverage: "}
-              {draft.statement.statementPeriodStart} to{" "}
-              {draft.statement.statementPeriodEnd}
-            </p>
-            {draft.statement.statementDate && (
-              <p>Statement issued: {draft.statement.statementDate}</p>
-            )}
-            <div className="review-metrics">
-              <div>
-                <span>Transactions extracted</span>
-                <strong>{draft.transactions.length}</strong>
-              </div>
-              <div>
-                <span>Money in</span>
-                <strong>{money(flow.moneyIn, draft.statement.currency)}</strong>
-              </div>
-              <div>
-                <span>Money out</span>
-                <strong>
-                  {money(flow.moneyOut, draft.statement.currency)}
-                </strong>
-              </div>
-            </div>
-            <p className="coverage-note">
-              Statement totals include transfers. Only selected rows are
-              imported.
-            </p>
-            <div
-              className={`validation ${validation.status === "reconciled" ? "valid" : "warn"}`}
-            >
-              <strong>
-                {validation.status === "reconciled"
-                  ? "✓ Statement reconciled"
-                  : validation.status === "warning"
-                    ? "⚠ Statement validation failed"
-                    : "Balance validation unavailable"}
-              </strong>
-              {draft.account.accountType === "credit" && (
-                <p className="muted">
-                  Credit card balances below use a minus sign for money owed.
-                </p>
-              )}
-              <dl className="totals">
-                <div>
-                  <dt>Opening balance</dt>
-                  <dd>
-                    {draft.statement.openingBalance === undefined
-                      ? "Not available"
-                      : money(
-                          draft.statement.openingBalance,
-                          draft.statement.currency,
-                        )}
-                  </dd>
-                </div>
-                <div>
-                  <dt>Reported closing balance</dt>
-                  <dd>
-                    {draft.statement.closingBalance === undefined
-                      ? "Not available"
-                      : money(
-                          draft.statement.closingBalance,
-                          draft.statement.currency,
-                        )}
-                  </dd>
-                </div>
-                {validation.calculated !== undefined && (
-                  <>
-                    <div>
-                      <dt>Calculated closing balance</dt>
-                      <dd>
-                        {money(validation.calculated, draft.statement.currency)}
-                      </dd>
-                    </div>
-                    <div>
-                      <dt>Difference</dt>
-                      <dd>
-                        {money(
-                          validation.difference ?? 0,
-                          draft.statement.currency,
-                        )}
-                      </dd>
-                    </div>
-                  </>
-                )}
-              </dl>
-              {validation.status === "warning" && (
-                <label className="check">
-                  <input
-                    type="checkbox"
-                    checked={override}
-                    onChange={(e) => setOverride(e.target.checked)}
-                  />
-                  I reviewed the source PDF and explicitly accept this balance
-                  difference.
-                </label>
-              )}
-            </div>
-            {draft.exactDuplicate && (
-              <div className="notice warning">
-                <div>
-                  <strong>This statement has already been imported.</strong>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={draft.duplicateOverride}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          duplicateOverride: e.target.checked,
-                        })
-                      }
-                    />
-                    Override the exact statement duplicate. Choose which
-                    transactions to keep below.
-                  </label>
-                </div>
-              </div>
-            )}
-            <p>
-              {draft.regenerated
-                ? "A statement for this account and period already exists. "
-                : ""}
-              {draft.transactions.filter((t) => t.duplicate !== "none").length}{" "}
-              possible or confirmed duplicate transactions; excluded by default.
-            </p>
-            {draft.warnings.length > 0 && (
-              <div className="notice warning">
-                <div>
-                  <strong>Extraction requires review</strong>
-                  <ul>
-                    {draft.warnings.map((w, i) => (
-                      <li key={i}>{w}</li>
-                    ))}
-                  </ul>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={draft.reviewedWarnings}
-                      onChange={(e) =>
-                        setDraft({
-                          ...draft,
-                          reviewedWarnings: e.target.checked,
-                        })
-                      }
-                    />
-                    I compared the extracted rows with the PDF, corrected errors
-                    and accept any partial extraction.
-                  </label>
-                </div>
-              </div>
-            )}
-            <p>
-              <strong>{checks.length} transactions to check.</strong>{" "}
-              {issues.filter((t) => !t.categoryId && !t.isTransfer).length} can
-              be categorized later.
-            </p>
-          </section>
-          <section className="card review-transactions">
-            <h2>Review transactions</h2>
-            <div
-              className="review-tabs"
-              role="group"
-              aria-label="Transaction review"
-            >
-              <button aria-pressed={!showAll} onClick={() => setShowAll(false)}>
-                To check ({checks.length})
-              </button>
-              <button aria-pressed={showAll} onClick={() => setShowAll(true)}>
-                All transactions ({draft.transactions.length})
-              </button>
-            </div>
-            {!showAll && !checks.length && (
-              <div className="review-clear">
-                <CheckCircle2 size={24} />
-                <p>
-                  Amounts and dates look good. Confirm the summary above, or
-                  open all transactions to make changes.
-                </p>
-              </div>
-            )}
-            {(showAll ? [...draft.transactions] : [...checks])
-              .sort(
-                (a, b) =>
-                  Number(a.extractionConfidence >= 0.8) -
-                    Number(b.extractionConfidence >= 0.8) ||
-                  Number(a.duplicate === "none") -
-                    Number(b.duplicate === "none"),
-              )
-              .map((t) => (
-                <details
-                  open={!!needsCheck(t)}
-                  className={`review-row ${t.extractionConfidence < 0.8 ? "uncertain" : ""}`}
-                  key={t.id}
-                >
-                  <summary className="review-compact">
-                    <span>
-                      <strong>{t.merchant || t.description}</strong>
-                      <small>
-                        {t.date} ·{" "}
-                        {t.isTransfer
-                          ? "Transfer"
-                          : (categories?.find((c) => c.id === t.categoryId)
-                              ?.name ?? "Uncategorized")}
-                      </small>
-                    </span>
-                    <strong>{money(t.amount, t.currency, true)}</strong>
-                    <ChevronDown size={16} />
-                  </summary>
-                  <div className="review-row-title">
-                    <label className="check">
-                      <input
-                        type="checkbox"
-                        checked={t.include}
-                        onChange={(e) =>
-                          updateRow(t.id, {
-                            include: e.target.checked,
-                            acknowledged:
-                              t.duplicate === "none" ? t.acknowledged : false,
-                          })
-                        }
-                      />
-                      <strong>{t.description}</strong>
-                    </label>
-                    <span className="small-chip">
-                      Page {t.sourcePage} ·{" "}
-                      {Math.round(t.extractionConfidence * 100)}%
-                    </span>
-                  </div>
-                  {t.duplicate !== "none" && (
-                    <p className="warning-text">
-                      {t.duplicate === "certain"
-                        ? "Known duplicate"
-                        : "Possible duplicate — identical purchases can be legitimate"}{" "}
-                      · {t.include ? "will be imported" : "excluded"}
-                    </p>
-                  )}
-                  <div className="form-grid">
-                    <label>
-                      Date
-                      <input
-                        type="date"
-                        value={t.date}
-                        onChange={(e) =>
-                          updateRow(t.id, {
-                            date: e.target.value,
-                            acknowledged: true,
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      Amount ({t.currency})
-                      <input
-                        aria-label={`Amount for ${t.description}`}
-                        type="text"
-                        inputMode="decimal"
-                        defaultValue={decimalMoney(t.amount, t.currency)}
-                        onBlur={(e) => {
-                          try {
-                            const amount = parseMoney(
-                              e.target.value,
-                              t.currency,
-                            );
-                            amountErrors.current.delete(t.id);
-                            e.target.setCustomValidity("");
-                            updateRow(t.id, {
-                              amount,
-                              type: t.isTransfer
-                                ? "transfer"
-                                : amount >= 0
-                                  ? "income"
-                                  : "expense",
-                              acknowledged: true,
-                            });
-                          } catch {
-                            amountErrors.current.add(t.id);
-                            e.target.setCustomValidity(
-                              "Enter a valid amount, such as -82.45.",
-                            );
-                            e.target.reportValidity();
-                          }
-                        }}
-                      />
-                    </label>
-                    <label>
-                      Category
-                      <select
-                        aria-label="Category"
-                        disabled={t.isTransfer}
-                        value={t.categoryId ?? ""}
-                        onChange={(e) =>
-                          updateRow(t.id, {
-                            manualCategory: true,
-                            categoryId: e.target.value || undefined,
-                            subcategoryId: undefined,
-                          })
-                        }
-                      >
-                        <option value="">Uncategorized</option>
-                        {categories?.map((c) => (
-                          <option key={c.id} value={c.id}>
-                            {c.name}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                    <label>
-                      Type
-                      <select
-                        aria-label="Type"
-                        value={t.type}
-                        onChange={(e) =>
-                          updateRow(t.id, {
-                            manualCategory: true,
-                            type: e.target.value as typeof t.type,
-                            isTransfer: e.target.value === "transfer",
-                            categoryId:
-                              e.target.value === "transfer"
-                                ? undefined
-                                : t.categoryId,
-                          })
-                        }
-                      >
-                        {["income", "expense", "transfer"].map((v) => (
-                          <option key={v}>{v}</option>
-                        ))}
-                      </select>
-                    </label>
-                  </div>
-                  {t.include &&
-                    (t.extractionConfidence < 0.8 ||
-                      t.duplicate !== "none") && (
-                      <label className="check">
-                        <input
-                          type="checkbox"
-                          checked={t.acknowledged}
-                          onChange={(e) =>
-                            updateRow(t.id, { acknowledged: e.target.checked })
-                          }
-                        />
-                        I verified this transaction{" "}
-                        {t.duplicate !== "none" ? "and want to keep it" : ""}.
-                      </label>
-                    )}
-                </details>
-              ))}
-          </section>
-          <div className="import-footer">
+      {entries.length > 0 && (
+        <div className="import-footer import-outcome-footer">
+          <div aria-live="polite">
+            <strong>
+              {newCount} new · {duplicateCount} duplicates skipped
+              {balanceStatements.length > 0 &&
+                ` · ${balanceStatements.length} balance update${balanceStatements.length === 1 ? "" : "s"}`}
+              {excludedCount > 0 && ` · ${excludedCount} excluded`}
+              {skippedFileCount > 0 &&
+                ` · ${skippedFileCount} file${skippedFileCount === 1 ? "" : "s"} skipped`}
+            </strong>
             <span>
-              {draft.transactions.filter((t) => t.include).length} new
-              transactions selected
-              {files.length > 1 && ` · File ${index + 1}/${files.length}`}
+              {phase === "check"
+                ? "Checking every selected file before review"
+                : blocking.length
+                  ? `${blocking.length} statement${blocking.length === 1 ? "" : "s"} need${blocking.length === 1 ? "s" : ""} attention`
+                  : "Ready to import selected rows"}
             </span>
+            {commitStatus && <span role="status">{commitStatus}</span>}
+          </div>
+          {!hasChanges && !blocking.length && phase === "review" ? (
+            <button
+              disabled={busy}
+              onClick={() => navigate("/", { replace: true })}
+            >
+              Back to Home
+            </button>
+          ) : (
             <button
               className="primary"
-              disabled={
-                busy ||
-                (draft.exactDuplicate && !draft.duplicateOverride) ||
-                (validation.status === "warning" && !override) ||
-                (draft.warnings.length > 0 && !draft.reviewedWarnings) ||
-                draft.transactions.some(
-                  (t) =>
-                    t.include &&
-                    (t.extractionConfidence < 0.8 || t.duplicate !== "none") &&
-                    !t.acknowledged,
-                )
-              }
+              disabled={busy || !!blocking.length || !hasChanges}
               onClick={() => void save()}
             >
               Confirm import
             </button>
-          </div>
-        </>
+          )}
+        </div>
       )}
     </>
   );

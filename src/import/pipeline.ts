@@ -20,6 +20,18 @@ import { categorize } from "../categorization/engine";
 import { matchTransfers } from "../transfers/engine";
 import { reconcile } from "../domain/reconcile";
 import { rememberCategory } from "../storage/category-memory";
+function applyCategory(
+  transaction: Transaction,
+  rules: import("../domain/models").Rule[],
+  history: Transaction[],
+  categories: import("../domain/models").Category[],
+) {
+  return {
+    categorySource: undefined,
+    categoryRuleId: undefined,
+    ...categorize(transaction, rules, history, categories),
+  };
+}
 export interface ExtractedFile {
   rows: TextRow[];
   hash: string;
@@ -68,6 +80,7 @@ export async function prepareDraft(
   selectedBank?: Institution,
   selectedAccount?: Account,
   periodOverride?: StatementPeriod,
+  pendingDrafts: ImportDraft[] = [],
 ): Promise<ImportDraft> {
   const detection = detectBank(extracted.rows);
   if (
@@ -86,6 +99,9 @@ export async function prepareDraft(
   const parsed = parser.parse(extracted.rows, periodOverride);
   const now = new Date().toISOString();
   const accounts = await db.accounts.toArray();
+  for (const pending of pendingDrafts)
+    if (!accounts.some((a) => a.id === pending.account.id))
+      accounts.push(pending.account);
   const existingAccounts = accounts.filter(
     (a) =>
       !a.isDemo &&
@@ -133,6 +149,12 @@ export async function prepareDraft(
     .where("accountId")
     .equals(account.id)
     .toArray();
+  for (const pending of pendingDrafts.filter(
+    (d) => d.account.id === account.id,
+  )) {
+    statements.push(pending.statement);
+    existing.push(...pending.transactions.filter((t) => t.include));
+  }
   const rules = await db.rules.toArray();
   const categories = await db.categories.toArray();
   const regenerated = statements.some(
@@ -160,7 +182,7 @@ export async function prepareDraft(
     t.occurrence = counts.get(key) ?? 0;
     counts.set(key, t.occurrence + 1);
     t.transactionFingerprint = await fingerprint(t);
-    Object.assign(t, categorize(t, rules, existing, categories));
+    Object.assign(t, applyCategory(t, rules, existing, categories));
     const duplicate = duplicateStatus(t, existing, regenerated);
     transactions.push({
       ...t,
@@ -198,7 +220,8 @@ export async function prepareDraft(
       (await db.statements
         .where("sourceFileHash")
         .equals(extracted.hash)
-        .count()) > 0,
+        .count()) > 0 ||
+      pendingDrafts.some((d) => d.statement.sourceFileHash === extracted.hash),
     regenerated,
     detectionConfidence: detection.confidence,
     warnings,
@@ -212,6 +235,81 @@ export function draftReconciliation(draft: ImportDraft) {
     draft.statement.closingBalance,
     draft.transactions.map((t) => t.amount),
   );
+}
+/** Keep reviewed corrections while refreshing account identities and duplicate checks.
+ * Each statement in a multi-file import must see the statements committed before it.
+ */
+export async function refreshReviewedDraft(
+  reviewed: ImportDraft,
+): Promise<ImportDraft> {
+  const storedAccount = await db.accounts.get(reviewed.account.id);
+  const matching = storedAccount
+    ? [storedAccount]
+    : await db.accounts
+        .where("institution")
+        .equals(reviewed.account.institution)
+        .filter(
+          (a) =>
+            !a.isDemo &&
+            a.currency === reviewed.account.currency &&
+            a.accountType === reviewed.account.accountType &&
+            a.maskedAccountIdentifier ===
+              reviewed.account.maskedAccountIdentifier,
+        )
+        .toArray();
+  if (matching.length > 1)
+    throw new Error(
+      "More than one matching account exists. Select the account and parse again.",
+    );
+  const account = matching[0] ?? reviewed.account;
+  const [statements, existing, rules, categories] = await Promise.all([
+    db.statements.where("accountId").equals(account.id).toArray(),
+    db.transactions.where("accountId").equals(account.id).toArray(),
+    db.rules.toArray(),
+    db.categories.toArray(),
+  ]);
+  const regenerated = statements.some(
+    (s) =>
+      s.statementPeriodStart === reviewed.statement.statementPeriodStart &&
+      s.statementPeriodEnd === reviewed.statement.statementPeriodEnd,
+  );
+  const transactions: ImportDraft["transactions"] = [];
+  const occurrences = new Map<string, number>();
+  for (const row of reviewed.transactions) {
+    const next = { ...row, accountId: account.id };
+    const key = transactionKey(next);
+    next.occurrence = occurrences.get(key) ?? 0;
+    occurrences.set(key, next.occurrence + 1);
+    next.transactionFingerprint = await fingerprint(next);
+    const duplicate = duplicateStatus(next, existing, regenerated);
+    // Retain explicit duplicate decisions. Newly found duplicates are skipped safely.
+    const newlyDuplicate = row.duplicate === "none" && duplicate !== "none";
+    next.duplicate = duplicate;
+    if (newlyDuplicate) {
+      next.include = false;
+      next.acknowledged = false;
+    }
+    if (!next.manualCategory) {
+      if (next.categorySource === "rule") {
+        next.isTransfer = false;
+        next.type = next.amount >= 0 ? "income" : "expense";
+      }
+      Object.assign(next, applyCategory(next, rules, existing, categories));
+    }
+    transactions.push(next);
+  }
+  return {
+    ...reviewed,
+    account,
+    statement: { ...reviewed.statement, accountId: account.id },
+    transactions,
+    regenerated,
+    exactDuplicate:
+      (await db.statements
+        .where("sourceFileHash")
+        .equals(reviewed.statement.sourceFileHash)
+        .count()) > 0,
+  };
 }
 export function validateDraft(draft: ImportDraft, overrideValidation: boolean) {
   const validation = draftReconciliation(draft);
@@ -384,7 +482,17 @@ export async function commitDraft(
       });
       await db.transactions.bulkAdd(incoming);
       for (const t of incoming) {
-        if (manuallyCategorized.has(t.id)) await rememberCategory(t);
+        if (manuallyCategorized.has(t.id)) {
+          const rule = await rememberCategory(t);
+          await db.transactions.update(t.id, {
+            categorySource: "manual",
+            categoryRuleId: rule?.id,
+          });
+        } else if (t.categoryRuleId) {
+          await db.rules.update(t.categoryRuleId, {
+            lastUsedAt: new Date().toISOString(),
+          });
+        }
       }
       const updates = [...changed.values()].filter(
         (t) => !incoming.some((i) => i.id === t.id),

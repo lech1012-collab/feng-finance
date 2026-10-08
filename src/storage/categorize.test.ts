@@ -207,6 +207,8 @@ it("categorizes a group and learns an account-specific rule without changing fin
         subcategoryId: _s,
         isReviewed: _r,
         updatedAt: _u,
+        categorySource: _source,
+        categoryRuleId: _rule,
         ...t
       }) => t,
     ),
@@ -217,6 +219,8 @@ it("categorizes a group and learns an account-specific rule without changing fin
         subcategoryId: _s,
         isReviewed: _r,
         updatedAt: _u,
+        categorySource: _source,
+        categoryRuleId: _rule,
         ...t
       }) => t,
     ),
@@ -281,4 +285,73 @@ it("never groups different merchants, directions or previously categorized rows"
     await expect(categorizeCards([a, b], "groceries")).rejects.toThrow();
     expect((await db.transactions.get(a.id))?.categoryId).toBeUndefined();
   }
+});
+it("backfills only exact uncategorized account and direction matches and undoes the entire change", async () => {
+  const original = transaction({ merchant: "TESCO", description: "TESCO" });
+  const matching = transaction({
+    ...original,
+    id: "matching",
+    date: "2026-09-04",
+  });
+  const excluded = [
+    transaction({ ...original, id: "other-account", accountId: "a2" }),
+    transaction({ ...original, id: "refund", amount: 1000, type: "income" }),
+    transaction({
+      ...original,
+      id: "already-reviewed",
+      categoryId: "shopping",
+      isReviewed: true,
+    }),
+  ];
+  await db.transactions.bulkPut([original, matching, ...excluded]);
+  const receipt = await categorizeCards([original], "groceries", {
+    backfill: true,
+    allowMultipleMerchants: true,
+  });
+  expect(receipt.selectedIds).toEqual([original.id]);
+  expect(receipt.after.map((t) => t.id)).toEqual([original.id, matching.id]);
+  expect(receipt.after[0].categorySource).toBe("manual");
+  expect(receipt.after[1].categorySource).toBe("rule");
+  expect(
+    receipt.after.every((t) => t.categoryRuleId === receipt.rule?.id),
+  ).toBe(true);
+  for (const t of excluded) expect(await db.transactions.get(t.id)).toEqual(t);
+  await undoCategory(receipt);
+  expect(await db.transactions.get(original.id)).toEqual(original);
+  expect(await db.transactions.get(matching.id)).toEqual(matching);
+  expect(await db.rules.get(receipt.rule!.id)).toBeUndefined();
+});
+it("categorizes several selected merchants atomically with separate account rules and one Undo", async () => {
+  const a = transaction({ merchant: "TESCO", description: "TESCO" });
+  const b = transaction({
+    id: "b",
+    merchant: "CORNER MARKET",
+    description: "CORNER MARKET",
+    accountId: "a2",
+  });
+  await db.transactions.bulkPut([a, b]);
+  const receipt = await categorizeCards([a, b], "groceries", {
+    allowMultipleMerchants: true,
+    backfill: true,
+  });
+  expect(receipt.rules).toHaveLength(2);
+  expect(receipt.after.every((t) => t.categoryId === "groceries")).toBe(true);
+  expect(categorize(a, receipt.rules!).categoryId).toBe("groceries");
+  expect(categorize(b, receipt.rules!).categoryId).toBe("groceries");
+  await undoCategory(receipt);
+  expect(await db.transactions.bulkGet([a.id, b.id])).toEqual([a, b]);
+  expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
+});
+it("rolls back a multi-selection when any selected row would wrongly become Salary", async () => {
+  const a = transaction({ amount: 2000, type: "income", merchant: "PAYROLL" });
+  const b = transaction({ id: "b", merchant: "SHOP" });
+  await db.transactions.bulkPut([a, b]);
+  await expect(
+    categorizeCards([a, b], "salary", {
+      allowMultipleMerchants: true,
+      backfill: true,
+    }),
+  ).rejects.toThrow("money out");
+  expect(await db.transactions.bulkGet([a.id, b.id])).toEqual([a, b]);
+  expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
 });

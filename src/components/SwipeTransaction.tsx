@@ -1,13 +1,20 @@
-import { useRef, type ReactNode } from "react";
+import { useRef, useState, type ReactNode, type MouseEvent } from "react";
+import { GripVertical } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
 import type { Transaction } from "../domain/models";
 import { useSwipe } from "./useSwipe";
+import { displayMerchant } from "../domain/presentation";
 export function SwipeTransaction({
   transaction: t,
   returnTo,
   onCategorize,
   children,
   onDragCategorize,
+  selected,
+  onSelect,
+  suggestion,
+  onQuickCategorize,
+  accessibleLabel,
 }: {
   transaction: Transaction;
   returnTo?: string;
@@ -18,16 +25,48 @@ export function SwipeTransaction({
     y: number;
     pointerId: number;
   }) => void;
+  selected?: boolean;
+  onSelect?: (event: MouseEvent<HTMLElement>) => void;
+  suggestion?: { id: string; name: string };
+  onQuickCategorize?: (categoryId: string) => void;
+  accessibleLabel?: string;
 }) {
   const location = useLocation();
   const drag = useRef<{ x: number; y: number; pointerId: number } | null>(null);
   const dragged = useRef(false);
+  const [revealed, setRevealed] = useState(false);
   const enabled = !t.isTransfer && t.type !== "transfer" && !t.transferPairId;
-  const swipe = useSwipe(() => {
-    if (enabled) onCategorize();
+  const swipe = useSwipe((direction) => {
+    if (!enabled) return;
+    if (direction === "left" && suggestion && onQuickCategorize)
+      setRevealed(true);
+    else onCategorize();
   });
   return (
-    <div className="swipe-transaction">
+    <div
+      className={`swipe-transaction ${selected ? "selected" : ""} ${revealed ? "revealed" : ""}`}
+    >
+      {enabled && revealed && (
+        <div className="swipe-actions">
+          <button
+            onClick={() => {
+              setRevealed(false);
+              if (suggestion) onQuickCategorize?.(suggestion.id);
+            }}
+            aria-label={`Categorize as ${suggestion?.name}`}
+          >
+            {suggestion?.name}
+          </button>
+          <button
+            onClick={() => {
+              setRevealed(false);
+              onCategorize();
+            }}
+          >
+            More
+          </button>
+        </div>
+      )}
       {enabled && (
         <span className="swipe-reveal" aria-hidden="true">
           Choose a category
@@ -35,6 +74,7 @@ export function SwipeTransaction({
       )}
       <Link
         className="transaction-row"
+        aria-label={accessibleLabel}
         draggable={false}
         onDragStart={(e) => e.preventDefault()}
         to={`/transactions/${t.id}`}
@@ -80,7 +120,7 @@ export function SwipeTransaction({
           drag.current = null;
           swipe.bind.onPointerCancel();
         }}
-        style={{ transform: `translateX(${swipe.offset}px)` }}
+        style={{ transform: `translateX(${revealed ? -160 : swipe.offset}px)` }}
         aria-haspopup={enabled && !t.categoryId ? "dialog" : undefined}
         aria-keyshortcuts={enabled ? "C" : undefined}
         onClick={(e) => {
@@ -91,6 +131,16 @@ export function SwipeTransaction({
           }
           if (swipe.consumeClick()) {
             e.preventDefault();
+            return;
+          }
+          if (revealed) {
+            e.preventDefault();
+            setRevealed(false);
+            return;
+          }
+          if (enabled && onSelect && (e.metaKey || e.ctrlKey || e.shiftKey)) {
+            e.preventDefault();
+            onSelect(e);
             return;
           }
           if (
@@ -118,8 +168,28 @@ export function SwipeTransaction({
           }
         }}
       >
+        {enabled && (
+          <span className="drag-handle desktop-only" aria-hidden="true">
+            <GripVertical size={16} />
+          </span>
+        )}
         {children}
       </Link>
+      {enabled && (
+        <div className="row-hover-actions desktop-only">
+          <button
+            className="row-selection"
+            aria-label={`Select ${displayMerchant(t)}`}
+            aria-pressed={!!selected}
+            onClick={onSelect}
+          >
+            Select
+          </button>
+          <button title="Categorize (C)" onClick={onCategorize}>
+            Categorize
+          </button>
+        </div>
+      )}
     </div>
   );
 }

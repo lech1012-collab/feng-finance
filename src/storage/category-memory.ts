@@ -38,6 +38,7 @@ export async function rememberCategory(
     type: transfer ? "transfer" : undefined,
     priority,
     builtIn: false,
+    lastUsedAt: new Date().toISOString(),
   };
   await db.rules.add(rule);
   return rule;

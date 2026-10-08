@@ -74,3 +74,39 @@ export function dayDistance(a: string, b: string) {
     86400000
   );
 }
+export function formatUkDate(iso: string, includeWeekday = false) {
+  const date = new Date(`${iso.slice(0, 10)}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime())) return "Date unavailable";
+  return date
+    .toLocaleDateString("en-GB", {
+      ...(includeWeekday ? { weekday: "short" as const } : {}),
+      day: "numeric",
+      month: "short",
+      ...(date.getUTCFullYear() !== new Date().getFullYear()
+        ? { year: "numeric" as const }
+        : {}),
+      timeZone: "UTC",
+    })
+    .replace(/\bSept\b/g, "Sep");
+}
+export function formatDateRange(from: string, to: string) {
+  const start = new Date(`${from.slice(0, 10)}T12:00:00Z`);
+  const end = new Date(`${to.slice(0, 10)}T12:00:00Z`);
+  if (![start, end].every((d) => Number.isFinite(d.getTime())))
+    return "Dates unavailable";
+  const sameYear = start.getUTCFullYear() === end.getUTCFullYear();
+  const sameMonth = sameYear && start.getUTCMonth() === end.getUTCMonth();
+  const first = start.toLocaleDateString("en-GB", {
+    day: "numeric",
+    ...(sameMonth ? {} : { month: "short" as const }),
+    ...(sameYear ? {} : { year: "numeric" as const }),
+    timeZone: "UTC",
+  });
+  const last = end.toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  return `${first} to ${last}`.replace(/\bSept\b/g, "Sep");
+}

@@ -77,6 +77,26 @@ it("does not issue monthly alerts from incomplete, failed or insufficient statem
       ),
     ).toBe(false);
 });
+it("honours strict source eligibility when otherwise-complete statements overlap unverified imports", () => {
+  const result = deeperInsights(
+    rows,
+    [accounts[0]],
+    docs,
+    defaultCategories,
+    [],
+    "2026-07",
+    "GBP",
+    "2026-08-02",
+    (month) => ["2026-04", "2026-06"].includes(month),
+  );
+  expect(result.baselineCount).toBe(2);
+  expect(result.complete).toBe(false);
+  expect(
+    result.items.some((item) =>
+      ["spending-drivers", "income-fall", "unusual-spending"].includes(item.id),
+    ),
+  ).toBe(false);
+});
 it("excludes other currencies, future dates and all transfer representations", () => {
   const extra = [
     transaction({
@@ -141,4 +161,55 @@ it("finds recurring price rises and labels cross-account overlaps as possible", 
   expect(result.items.filter((i) => i.id.startsWith("overlap-"))).toHaveLength(
     1,
   );
+});
+
+it("only shows a cancellation alert for a selected month containing a later charge", () => {
+  const payments = [
+    "2026-05-01",
+    "2026-06-01",
+    "2026-07-01",
+    "2026-08-01",
+    "2026-09-01",
+  ].map((date, index) =>
+    transaction({
+      id: `cancel-${index}`,
+      date,
+      merchant: "NETFLIX",
+      description: "NETFLIX",
+      amount: -1000,
+      categoryId: "subscriptions",
+    }),
+  );
+  const groupKey = JSON.stringify(["a1", "GBP", "NETFLIX", false]);
+  const settings = [
+    {
+      key: "subscription:test",
+      value: JSON.stringify({
+        groupKey,
+        status: "cancelled",
+        date: "2026-06-15",
+        amount: 1000,
+      }),
+    },
+  ];
+  const cancellationAlert = (month: string) =>
+    deeperInsights(
+      payments,
+      [accounts[0]],
+      [],
+      defaultCategories,
+      settings,
+      month,
+      "GBP",
+      "2026-10-04",
+    ).items.filter((item) => item.id.startsWith("cancel-"));
+  // Existing charges before cancellation, or no charges in a month, do not
+  // inherit an alert from the later September payment.
+  expect(cancellationAlert("2026-05")).toHaveLength(0);
+  expect(cancellationAlert("2026-06")).toHaveLength(0);
+  expect(cancellationAlert("2026-10")).toHaveLength(0);
+  expect(cancellationAlert("2026-09")).toHaveLength(1);
+  // An earlier affected month still has its own evidence even if a later
+  // recurring charge exists elsewhere in the imported history.
+  expect(cancellationAlert("2026-07")).toHaveLength(1);
 });

@@ -1,8 +1,19 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import type { Account, Statement, Transaction } from "../domain/models";
-import { balanceOverview } from "../analytics/balances";
-import { money } from "../domain/money";
+import { balanceOverview, datedBalanceHistory } from "../analytics/balances";
+import { verifiedStatements } from "../analytics/coverage";
+import { money, safeSum } from "../domain/money";
+import { ImportButton } from "./ImportPicker";
+
+const dateLabel = (date: string) =>
+  new Date(`${date}T12:00:00Z`).toLocaleDateString("en-GB", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+
 export function AccountBalances({
   accounts,
   statements,
@@ -11,7 +22,7 @@ export function AccountBalances({
   detailed = false,
   period,
   onPeriodChange,
-  transactions,
+  transactions = [],
 }: {
   accounts: Account[];
   statements: Statement[];
@@ -25,110 +36,218 @@ export function AccountBalances({
   const [localPeriod, setLocalPeriod] = useState(1);
   const window = period ?? localPeriod;
   const setWindow = onPeriodChange ?? setLocalPeriod;
-  const summary = balanceOverview(
+  const verified = verifiedStatements(statements, transactions);
+  const verifiedIds = new Set(verified.map((statement) => statement.id));
+  const summary = balanceOverview(accounts, statements, month, currency);
+  const verifiedSummary = balanceOverview(
     accounts,
-    statements,
+    verified,
     month,
     currency,
     transactions,
   );
-  const change = summary.comparisons.find((c) => c.months === window)?.percent;
+  const items = summary.items.map((item) => ({
+    ...item,
+    reliable:
+      item.reliable && !!item.statement && verifiedIds.has(item.statement.id),
+    changes:
+      verifiedSummary.items.find(
+        (verifiedItem) => verifiedItem.account.id === item.account.id,
+      )?.changes ?? [],
+  }));
+  const covered = items.filter((item) => item.reliable).length;
+  const complete = items.length > 0 && covered === items.length;
+  const cashItems = items.filter(
+    (item) => item.account.accountType !== "credit",
+  );
+  const cardItems = items.filter(
+    (item) => item.account.accountType === "credit",
+  );
+  const cash =
+    cashItems.length && cashItems.every((item) => item.reliable)
+      ? safeSum(cashItems.map((item) => item.balance!))
+      : undefined;
+  const debt =
+    cardItems.length && cardItems.every((item) => item.reliable)
+      ? safeSum(cardItems.map((item) => Math.max(0, -item.balance!)))
+      : cardItems.length
+        ? undefined
+        : 0;
+  const cardCredit = safeSum(
+    cardItems
+      .filter((item) => item.reliable)
+      .map((item) => Math.max(0, item.balance!)),
+  );
+  const total =
+    complete && cash !== undefined
+      ? safeSum(items.map((item) => item.balance!))
+      : undefined;
+  const history = datedBalanceHistory(
+    accounts,
+    verified,
+    transactions,
+    month,
+    currency,
+    12,
+  );
+  const meaningfulHistory = accounts
+    .filter((account) => account.currency === currency)
+    .some(
+      (_, index) =>
+        history.data.filter(
+          (point) => point.balances[`account${index}`] !== null,
+        ).length >= 2,
+    );
+  const change =
+    total === undefined
+      ? undefined
+      : verifiedSummary.comparisons.find(
+          (comparison) => comparison.months === window,
+        )?.percent;
   const percent = (n: number | undefined) =>
-    n === undefined
-      ? "History unavailable"
-      : `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
+    n === undefined ? undefined : `${n >= 0 ? "+" : ""}${n.toFixed(1)}%`;
   return (
     <section className="card balance-summary">
       <div className="section-heading">
-        <h2>{detailed ? "Your accounts" : "Total balance"}</h2>
+        <h2>{detailed ? "Your accounts" : "Where you stand"}</h2>
         <Link to={detailed ? "/settings" : "/transactions"}>
           {detailed ? "Manage" : "Accounts"}
         </Link>
       </div>
-      <strong className="balance-total">
-        {summary.total === undefined
-          ? "Unavailable"
-          : money(summary.total, currency)}
-      </strong>
-      <div
-        className="balance-periods"
-        role="group"
-        aria-label="Balance comparison period"
+      <p
+        className={`position-coverage coverage-chip ${complete ? "coverage-complete" : "coverage-partial"}`}
       >
-        {[1, 3, 6, 12].map((n) => (
-          <button
-            key={n}
-            aria-pressed={window === n}
-            onClick={() => setWindow(n)}
-          >
-            {n}m
-          </button>
-        ))}
-      </div>
-      <p className="balance-change">
-        {percent(change)}{" "}
-        <span className="muted">
-          vs {window === 1 ? "last month" : `${window} months ago`}
-        </span>
+        {covered} of {items.length} accounts ·{" "}
+        {complete ? "Reconciled" : "Incomplete"}
       </p>
-      {!summary.complete && (
+      <div className="position-metrics">
+        <div>
+          <span>Cash</span>
+          <strong>
+            {cash === undefined ? "Unknown" : money(cash, currency)}
+          </strong>
+        </div>
+        <div>
+          <span>Card debt</span>
+          <strong>
+            {debt === undefined ? "Unknown" : money(debt, currency)}
+          </strong>
+        </div>
+        <div>
+          <span>Net position</span>
+          <strong className="balance-total">
+            {total === undefined ? "Unavailable" : money(total, currency)}
+          </strong>
+        </div>
+      </div>
+      {cardCredit > 0 && (
         <p className="coverage-note">
-          {summary.total === undefined
-            ? "Import statements to see balances."
-            : "Partial total: some accounts have missing, older or unverified statements."}
+          Net position includes {money(cardCredit, currency)} card credit.
+        </p>
+      )}
+      {!complete || cash === undefined ? (
+        <p className="coverage-note">
+          {cashItems.length
+            ? "Net position appears once all accounts have reconciled balances for this month."
+            : "Import a current or savings account statement to see your cash and net position."}
+        </p>
+      ) : null}
+      {meaningfulHistory ? (
+        <>
+          <div
+            className="balance-periods"
+            role="group"
+            aria-label="Balance comparison period"
+          >
+            {[1, 3, 6, 12].map((n) => (
+              <button
+                key={n}
+                aria-pressed={window === n}
+                onClick={() => setWindow(n)}
+              >
+                {n}m
+              </button>
+            ))}
+          </div>
+          <p className="balance-change">
+            {change === undefined
+              ? "No comparable balances for this range"
+              : `${percent(change)} vs ${window === 1 ? "last month" : `${window} months ago`}`}
+          </p>
+        </>
+      ) : (
+        <p className="balance-range-note muted">
+          Import reconciled history to compare balances.
         </p>
       )}
       <div className="balance-accounts">
-        {summary.items.map((item) => (
-          <Link
-            className="balance-account"
+        {items.map((item) => (
+          <div
+            className={`balance-account ${item.reliable ? "" : "balance-account-missing"}`}
             key={item.account.id}
-            to={`/transactions?account=${item.account.id}&month=${month}`}
           >
-            <span>
-              <strong>{item.account.displayName}</strong>
-              <small>
-                {item.account.institution}
-                {detailed && ` · ${item.account.maskedAccountIdentifier}`}
-              </small>
-              {detailed && (
+            <Link
+              className="balance-account-main"
+              to={`/transactions?account=${item.account.id}&month=${month}`}
+            >
+              <span>
+                <strong>{item.account.displayName}</strong>
                 <small>
-                  {item.statement
-                    ? `Statement to ${item.statement.statementPeriodEnd}`
-                    : "No statement imported"}
+                  {item.account.institution} ·{" "}
+                  {item.account.maskedAccountIdentifier}
                 </small>
-              )}
-            </span>
-            <span className="balance-account-value">
-              <strong>
-                {item.balance === undefined
-                  ? "Unavailable"
-                  : money(item.balance, currency)}
-              </strong>
-              <small>
-                {percent(
-                  item.changes.find((c) => c.months === window)?.percent,
+                <small>
+                  {item.reliable && item.statement
+                    ? `As of ${dateLabel(item.statement.statementPeriodEnd)}`
+                    : item.statement
+                      ? `No reconciled balance for ${new Date(`${month}-01T12:00:00Z`).toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" })}`
+                      : "No statement yet"}
+                </small>
+              </span>
+              <span className="balance-account-value">
+                <strong>
+                  {item.reliable
+                    ? money(
+                        item.account.accountType === "credit" &&
+                          item.balance! < 0
+                          ? -item.balance!
+                          : item.balance!,
+                        currency,
+                      )
+                    : "Unknown"}
+                </strong>
+                {item.account.accountType === "credit" && item.reliable && (
+                  <small>
+                    {item.balance! < 0 ? "Card debt" : "Card credit"}
+                  </small>
                 )}
-              </small>
-              {!detailed && item.statement && (
-                <small>As of {item.statement.statementPeriodEnd}</small>
-              )}
-              {item.current && !item.reliable && (
-                <small>Unverified balance</small>
-              )}
-              {item.account.accountType === "credit" && (
-                <small>
-                  {(item.balance ?? 0) < 0 ? "Card debt" : "Card credit"}
-                </small>
-              )}
-            </span>
-          </Link>
+                {meaningfulHistory &&
+                  item.reliable &&
+                  percent(
+                    item.changes.find(
+                      (comparison) => comparison.months === window,
+                    )?.percent,
+                  ) && (
+                    <small>
+                      {percent(
+                        item.changes.find(
+                          (comparison) => comparison.months === window,
+                        )?.percent,
+                      )}
+                    </small>
+                  )}
+              </span>
+            </Link>
+            {!item.reliable && (
+              <ImportButton className="button small">Import</ImportButton>
+            )}
+          </div>
         ))}
       </div>
-      {summary.items.some((i) => i.account.accountType === "credit") && (
-        <p className="coverage-note">
-          Total includes cash and card balances. Card debt reduces the total.
-        </p>
+      {!items.length && (
+        <ImportButton className="button">
+          Import an account statement
+        </ImportButton>
       )}
     </section>
   );

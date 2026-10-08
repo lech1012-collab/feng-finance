@@ -22,7 +22,8 @@ export function matches(rule: Rule, t: Transaction) {
   const text = normalizeDescription(t.description);
   const pattern = normalizeDescription(rule.pattern);
   return rule.match === "exact"
-    ? normalizeMerchant(t.merchant) === normalizeMerchant(pattern)
+    ? normalizeMerchant(t.sourceMerchant ?? t.merchant) ===
+        normalizeMerchant(pattern)
     : rule.match === "starts-with"
       ? text.startsWith(pattern)
       : text.includes(pattern);
@@ -32,13 +33,23 @@ export function categorize(
   rules: Rule[],
   history: Transaction[] = [],
   categories?: Category[],
-): Pick<Transaction, "categoryId" | "subcategoryId" | "type" | "isTransfer"> {
+): Pick<
+  Transaction,
+  | "categoryId"
+  | "subcategoryId"
+  | "type"
+  | "isTransfer"
+  | "categorySource"
+  | "categoryRuleId"
+> {
   if (financialType(t) === "transfer")
     return {
       categoryId: undefined,
       subcategoryId: undefined,
       type: "transfer",
       isTransfer: true,
+      categorySource: t.categorySource,
+      categoryRuleId: t.categoryRuleId,
     };
   const active = rules.filter(
     (r) =>
@@ -59,13 +70,18 @@ export function categorize(
       subcategoryId: rule.subcategoryId,
       type: rule.type === "transfer" ? "transfer" : amountType(t.amount),
       isTransfer: rule.type === "transfer",
+      categorySource: "rule",
+      categoryRuleId: rule.id,
     };
   const previous = history.filter(
     (p) =>
       p.isReviewed &&
       !p.isTransfer &&
       p.categoryId &&
-      normalizeMerchant(p.merchant) === normalizeMerchant(t.merchant) &&
+      p.accountId === t.accountId &&
+      p.currency === t.currency &&
+      normalizeMerchant(p.sourceMerchant ?? p.merchant) ===
+        normalizeMerchant(t.sourceMerchant ?? t.merchant) &&
       Math.sign(p.amount) === Math.sign(t.amount),
   );
   const unique = new Set(

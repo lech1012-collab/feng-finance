@@ -1,4 +1,4 @@
-export const APP_VERSION = "1.8.4";
+export const APP_VERSION = "1.9.0";
 export const SCHEMA_VERSION = 2;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";
@@ -48,6 +48,8 @@ export interface Transaction {
   description: string;
   merchant: string;
   sourceMerchant?: string;
+  categorySource?: "manual" | "rule";
+  categoryRuleId?: string;
   amount: number;
   currency: string;
   balanceAfterTransaction?: number;
@@ -88,6 +90,7 @@ export interface Rule {
   type?: TransactionType;
   priority: number;
   builtIn: boolean;
+  lastUsedAt?: string;
 }
 export interface TransferLink {
   id: string;

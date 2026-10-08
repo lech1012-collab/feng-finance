@@ -1,5 +1,4 @@
-import { AccountBalances } from "../components/AccountBalances";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect, type MouseEvent } from "react";
 import { financialType } from "../domain/transaction-type";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -7,10 +6,30 @@ import { Search, SlidersHorizontal } from "lucide-react";
 import { CategoryBoard } from "../components/CategoryBoard";
 import { SwipeTransaction } from "../components/SwipeTransaction";
 import type { Transaction } from "../domain/models";
-import { undoCategory, type CategoryReceipt } from "../storage/categorize";
+import {
+  undoCategory,
+  categorizeCards,
+  TRANSFER_TARGET,
+  type CategoryReceipt,
+} from "../storage/categorize";
 import { db } from "../storage/database";
 import { monthBounds } from "../domain/dates";
 import { money, parseMoney } from "../domain/money";
+import { accountSnapshot } from "../analytics/balances";
+import { verifiedStatements } from "../analytics/coverage";
+import {
+  displayDate,
+  displayDateRange,
+  displayMerchant,
+} from "../domain/presentation";
+import { categoryColor } from "../domain/palette";
+import { transferKind } from "../analytics/home-summary";
+import {
+  categorySuggestions,
+  categorySuggestionReason,
+} from "../categorization/suggestions";
+const needsCategory = (t: Transaction) =>
+  !t.categoryId && !t.subcategoryId && financialType(t) !== "transfer";
 export default function Transactions({
   month,
   currency,
@@ -20,6 +39,24 @@ export default function Transactions({
 }) {
   const [params] = useSearchParams();
   const [sorting, setSorting] = useState<Transaction>();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const selectionAnchor = useRef<string | undefined>(undefined);
+  const [queueIds, setQueueIds] = useState<string[]>([]);
+  const [queueIndex, setQueueIndex] = useState(0);
+  const [railDrag, setRailDrag] = useState<{
+    ids: string[];
+    pointerId: number;
+    x: number;
+    y: number;
+  }>();
+  const [railTarget, setRailTarget] = useState("");
+  const categoryRail = useRef<HTMLElement>(null);
+  const railCursor = useRef({ x: 0, y: 0 });
+  const activeRailDrag = useRef(false);
+  const [railBusy, setRailBusy] = useState(false);
+  const [railError, setRailError] = useState("");
+  const railSaving = useRef(false);
+  const autoQueueStarted = useRef(false);
   const [dragStart, setDragStart] = useState<{
     x: number;
     y: number;
@@ -58,8 +95,26 @@ export default function Transactions({
   const [max, setMax] = useState(params.get("max") ?? "");
   const [page, setPage] = useState(0);
   const [advanced, setAdvanced] = useState(params.get("advanced") === "1");
-  const data = useLiveQuery(
-    async () => ({
+  const data = useLiveQuery(async () => {
+    const accounts = await db.accounts
+      .where("currency")
+      .equals(currency)
+      .toArray();
+    const statements = await db.statements.toArray();
+    const candidateStatements = accounts
+      .map((a) => accountSnapshot(a, statements, selectedMonth).statement)
+      .filter((s) => !!s);
+    const statementIds = Array.from(
+      new Set(candidateStatements.map((s) => s.id)),
+    );
+    const balanceRows = (
+      await Promise.all(
+        statementIds.map((id) =>
+          db.transactions.where("statementId").equals(id).toArray(),
+        ),
+      )
+    ).flat();
+    return {
       items:
         allDates || (from && to && from <= to)
           ? await db.transactions
@@ -73,12 +128,21 @@ export default function Transactions({
               .reverse()
               .toArray()
           : [],
-      accounts: await db.accounts.where("currency").equals(currency).toArray(),
+      accounts,
       categories: await db.categories.toArray(),
-      statements: await db.statements.toArray(),
-    }),
-    [from, to, currency, allDates],
-  );
+      rules: await db.rules.toArray(),
+      statements,
+      verifiedBalanceIds: verifiedStatements(
+        candidateStatements,
+        balanceRows,
+      ).map((s) => s.id),
+      uncategorizedCount: await db.transactions
+        .where("[currency+date]")
+        .between([currency, "0000"], [currency, "9999"], true, true)
+        .filter(needsCategory)
+        .count(),
+    };
+  }, [from, to, currency, allDates, selectedMonth]);
   const filtered = useMemo(() => {
     if (!data) return [];
     let minAmount: number | undefined, maxAmount: number | undefined;
@@ -100,6 +164,11 @@ export default function Transactions({
           t.categoryId === category ||
           t.subcategoryId === category) &&
         (!type || financialType(t) === type) &&
+        (!params.get("transferKind") ||
+          transferKind(t, data.accounts, data.items) ===
+            (params.get("transferKind") === "card-payment"
+              ? "card"
+              : params.get("transferKind"))) &&
         (!uncategorized ||
           (!t.categoryId &&
             !t.subcategoryId &&
@@ -123,11 +192,258 @@ export default function Transactions({
     min,
     max,
     currency,
+    params,
   ]);
   const reset = () => setPage(0);
+  const beginSort = (
+    t: Transaction,
+    start?: { x: number; y: number; pointerId: number },
+  ) => {
+    setUndoError("");
+    if (start && window.matchMedia("(min-width: 1100px)").matches) {
+      railCursor.current = { x: start.x, y: start.y };
+      activeRailDrag.current = true;
+      setRailDrag({
+        ...start,
+        ids: selectedIds.includes(t.id) ? selectedIds : [t.id],
+      });
+      return;
+    }
+    setDragStart(start);
+    const pool =
+      !start && needsCategory(t) ? filtered.filter(needsCategory) : [];
+    setQueueIds(pool.map((p) => p.id));
+    setQueueIndex(
+      Math.max(
+        0,
+        pool.findIndex((p) => p.id === t.id),
+      ),
+    );
+    setSorting(t);
+  };
+  const moveQueue = (direction: -1 | 1, removedIds: string[] = []) => {
+    const pool = queueIds.filter((id) => !removedIds.includes(id));
+    const current = pool.indexOf(sorting?.id ?? "");
+    for (let step = 1; step <= pool.length; step++) {
+      const index =
+        ((current < 0 ? queueIndex - 1 : current) +
+          direction * step +
+          pool.length * 2) %
+        pool.length;
+      const next = data?.items.find(
+        (p) => p.id === pool[index] && needsCategory(p),
+      );
+      if (next) {
+        setQueueIds(pool);
+        setQueueIndex(index);
+        setSorting(next);
+        return;
+      }
+    }
+    setSorting(undefined);
+    setQueueIds([]);
+  };
+  const applyToSelection = async (ids: string[], categoryId: string) => {
+    if (!data || railSaving.current) return;
+    railSaving.current = true;
+    setRailBusy(true);
+    setRailError("");
+    try {
+      const chosen = ids.map((id) => data.items.find((t) => t.id === id));
+      if (chosen.some((t) => !t))
+        throw new Error(
+          "A selected transaction is no longer shown. Select it again.",
+        );
+      const result = await categorizeCards(
+        chosen as Transaction[],
+        categoryId,
+        { allowMultipleMerchants: true, backfill: true },
+      );
+      setReceipt(result);
+      setSelectedIds([]);
+      setSorting(undefined);
+      setDragStart(undefined);
+    } catch (err) {
+      setRailError(
+        err instanceof Error ? err.message : "Category could not be saved.",
+      );
+    } finally {
+      railSaving.current = false;
+      setRailBusy(false);
+    }
+  };
+  const undo = async () => {
+    if (!receipt || undoBusy) return;
+    setUndoBusy(true);
+    setUndoError("");
+    try {
+      await undoCategory(receipt);
+      setSorting(receipt.before[0]);
+      setReceipt(undefined);
+    } catch (err) {
+      setUndoError(err instanceof Error ? err.message : "Undo failed.");
+    } finally {
+      setUndoBusy(false);
+    }
+  };
+  useEffect(() => {
+    if (!data || autoQueueStarted.current || params.get("sort") !== "1") return;
+    autoQueueStarted.current = true;
+    const first = filtered.find(needsCategory);
+    if (first) beginSort(first);
+  });
+  useEffect(() => {
+    if (!railDrag) return;
+    const hit = (x: number, y: number) => {
+      const target = document
+        .elementFromPoint(x, y)
+        ?.closest<HTMLButtonElement>("[data-rail-category]");
+      return target && !target.disabled
+        ? (target.dataset.railCategory ?? "")
+        : "";
+    };
+    const move = (e: PointerEvent) => {
+      if (e.pointerId === railDrag.pointerId) {
+        railCursor.current = { x: e.clientX, y: e.clientY };
+        setRailTarget(hit(e.clientX, e.clientY));
+        setRailDrag((p) =>
+          p ? { ...p, x: e.clientX, y: e.clientY } : undefined,
+        );
+      }
+    };
+    const release = (e: PointerEvent) => {
+      if (e.pointerId !== railDrag.pointerId) return;
+      activeRailDrag.current = false;
+      const target = e.type === "pointerup" ? hit(e.clientX, e.clientY) : "";
+      setRailDrag(undefined);
+      setRailTarget("");
+      if (target) void applyToSelection(railDrag.ids, target);
+    };
+    const cancel = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        activeRailDrag.current = false;
+        setRailDrag(undefined);
+        setRailTarget("");
+      }
+    };
+    window.addEventListener("pointermove", move, true);
+    window.addEventListener("pointerup", release, true);
+    window.addEventListener("pointercancel", release, true);
+    window.addEventListener("keydown", cancel);
+    return () => {
+      window.removeEventListener("pointermove", move, true);
+      window.removeEventListener("pointerup", release, true);
+      window.removeEventListener("pointercancel", release, true);
+      window.removeEventListener("keydown", cancel);
+    };
+  });
+  useEffect(() => {
+    if (railDrag?.pointerId === undefined) return;
+    let frame = 0;
+    const scroll = () => {
+      if (!activeRailDrag.current) return;
+      const rail = categoryRail.current;
+      if (rail) {
+        const rect = rail.getBoundingClientRect();
+        const { x, y } = railCursor.current;
+        const top = Math.max(0, rect.top);
+        const bottom = Math.min(window.innerHeight, rect.bottom);
+        const withinRail =
+          x >= rect.left &&
+          x <= rect.right &&
+          bottom > top &&
+          y >= top - 12 &&
+          y <= bottom + 12;
+        if (withinRail) {
+          const edge = Math.min(64, (bottom - top) / 3);
+          const distance =
+            y < top + edge
+              ? y - (top + edge)
+              : y > bottom - edge
+                ? y - (bottom - edge)
+                : 0;
+          const step = Math.max(-14, Math.min(14, distance / 4));
+          const previous = rail.scrollTop;
+          rail.scrollTop = Math.max(
+            0,
+            Math.min(rail.scrollHeight - rail.clientHeight, previous + step),
+          );
+          if (rail.scrollTop !== previous) {
+            const target = document
+              .elementFromPoint(x, y)
+              ?.closest<HTMLButtonElement>("[data-rail-category]");
+            setRailTarget(
+              target && !target.disabled
+                ? (target.dataset.railCategory ?? "")
+                : "",
+            );
+          }
+        }
+      }
+      frame = requestAnimationFrame(scroll);
+    };
+    frame = requestAnimationFrame(scroll);
+    return () => cancelAnimationFrame(frame);
+  }, [railDrag?.pointerId]);
+  useEffect(() => {
+    const keyboard = (e: KeyboardEvent) => {
+      if (
+        sorting ||
+        !(e.metaKey || e.ctrlKey) ||
+        e.key.toLowerCase() !== "z" ||
+        (e.target instanceof HTMLElement &&
+          e.target.closest("input,textarea,select"))
+      )
+        return;
+      e.preventDefault();
+      void undo();
+    };
+    window.addEventListener("keydown", keyboard);
+    return () => window.removeEventListener("keydown", keyboard);
+  });
+  const selectRow = (t: Transaction, event: MouseEvent<HTMLElement>) => {
+    if (event.shiftKey && selectionAnchor.current) {
+      const start = filtered.findIndex((p) => p.id === selectionAnchor.current);
+      const end = filtered.findIndex((p) => p.id === t.id);
+      if (start >= 0) {
+        setSelectedIds(
+          Array.from(
+            new Set([
+              ...selectedIds,
+              ...filtered
+                .slice(Math.min(start, end), Math.max(start, end) + 1)
+                .filter((p) => financialType(p) !== "transfer")
+                .map((p) => p.id),
+            ]),
+          ),
+        );
+        return;
+      }
+    }
+    selectionAnchor.current = t.id;
+    setSelectedIds((ids) =>
+      ids.includes(t.id) ? ids.filter((id) => id !== t.id) : [...ids, t.id],
+    );
+  };
   const totalPages = Math.max(1, Math.ceil(filtered.length / 60));
   const currentPage = Math.min(page, totalPages - 1);
   const items = filtered.slice(currentPage * 60, (currentPage + 1) * 60);
+  const railSelection = (railDrag?.ids ?? selectedIds)
+    .map((id) => data?.items.find((t) => t.id === id))
+    .filter((t): t is Transaction => !!t);
+  const railSubject = railSelection[0];
+  const railSuggestions =
+    railSubject && data
+      ? categorySuggestions(
+          railSubject,
+          data.categories,
+          data.rules,
+          data.items,
+        ).filter(
+          (c) =>
+            c.kind !== "income" || railSelection.every((t) => t.amount >= 0),
+        )
+      : [];
   const returnParams = new URLSearchParams({
     month: selectedMonth,
     allDates: allDates ? "1" : "0",
@@ -144,6 +460,7 @@ export default function Transactions({
     uncategorized: uncategorized ? "1" : "",
     property: property ? "1" : "",
     advanced: advanced ? "1" : "",
+    transferKind: params.get("transferKind") ?? "",
   }))
     if (value) returnParams.set(key, value);
   const returnTo = `/transactions?${returnParams}`;
@@ -159,28 +476,18 @@ export default function Transactions({
       {receipt && (
         <div className="category-feedback" role="status">
           <span>
-            {receipt.after.length} transaction
-            {receipt.after.length === 1 ? "" : "s"} → {receipt.categoryName}
-            {receipt.rule ? " · merchant remembered" : ""}
+            {receipt.categoryName} ·{" "}
+            {receipt.learning?.length === 1
+              ? `${displayMerchant({ merchant: receipt.learning[0].merchant, description: receipt.learning[0].merchant })} on ${data?.accounts.find((a) => a.id === receipt.learning![0].accountId)?.institution ?? "this account"}`
+              : `${receipt.learning?.length ?? 1} merchants`}
+            {receipt.after.length > (receipt.selectedIds?.length ?? 1)
+              ? ` · also applied to ${receipt.after.length - (receipt.selectedIds?.length ?? 1)} matching payment${receipt.after.length - (receipt.selectedIds?.length ?? 1) === 1 ? "" : "s"}`
+              : ""}
+            {receipt.rule
+              ? ". Future matching payments will follow."
+              : ". Saved on this device."}
           </span>
-          <button
-            disabled={undoBusy}
-            onClick={async () => {
-              setUndoBusy(true);
-              setUndoError("");
-              try {
-                await undoCategory(receipt);
-                setSorting(receipt.before[0]);
-                setReceipt(undefined);
-              } catch (err) {
-                setUndoError(
-                  err instanceof Error ? err.message : "Undo failed.",
-                );
-              } finally {
-                setUndoBusy(false);
-              }
-            }}
-          >
+          <button disabled={undoBusy} onClick={() => void undo()}>
             Undo
           </button>
         </div>
@@ -199,17 +506,55 @@ export default function Transactions({
           <h1>Transactions</h1>
         </div>
         <span className="count-chip">
-          {filtered.length} results · {currency}
+          {data
+            ? `${filtered.length} results · ${currency}`
+            : "Loading transactions…"}
         </span>
       </div>
       {data && (
-        <AccountBalances
-          accounts={data.accounts}
-          statements={data.statements}
-          month={selectedMonth}
-          currency={currency}
-          detailed
-        />
+        <div
+          className="account-filter-chips"
+          role="group"
+          aria-label="Filter by account"
+        >
+          <button
+            className="account-filter-chip"
+            aria-pressed={!account}
+            onClick={() => {
+              setAccount("");
+              reset();
+            }}
+          >
+            All accounts
+          </button>
+          {data.accounts.map((a) => {
+            const snapshot = accountSnapshot(a, data.statements, selectedMonth);
+            const reliable =
+              snapshot.reliable &&
+              !!snapshot.statement &&
+              data.verifiedBalanceIds.includes(snapshot.statement.id);
+            return (
+              <button
+                key={a.id}
+                className="account-filter-chip"
+                aria-pressed={account === a.id}
+                onClick={() => {
+                  setAccount(account === a.id ? "" : a.id);
+                  reset();
+                }}
+              >
+                <strong>
+                  {a.institution} · {a.maskedAccountIdentifier}
+                </strong>
+                <span>
+                  {snapshot.balance === undefined
+                    ? "Unknown · No statement"
+                    : `${reliable ? money(snapshot.balance, currency) : "Unknown"} · ${displayDate(snapshot.statement!.statementPeriodEnd)}${!reliable ? " · Unverified" : ""}`}
+                </span>
+              </button>
+            );
+          })}
+        </div>
       )}
       <section className="card filters">
         <div className="search-line">
@@ -249,6 +594,9 @@ export default function Transactions({
             <button
               key={c.id}
               aria-pressed={quickFilterSelected(c.id)}
+              className={
+                c.id === "uncategorized" ? "uncategorized-primary" : undefined
+              }
               onClick={() => {
                 const clear = quickFilterSelected(c.id);
                 setCategory(
@@ -268,6 +616,9 @@ export default function Transactions({
               }}
             >
               {c.name}
+              {c.id === "uncategorized"
+                ? ` ${data?.uncategorizedCount ?? "…"}`
+                : ""}
             </button>
           ))}
         </div>
@@ -296,7 +647,7 @@ export default function Transactions({
           </button>
         </div>
         <p className="filter-context">
-          {allDates ? "All imported dates" : `${from} — ${to}`}
+          {allDates ? "All imported dates" : displayDateRange(from, to)}
           {category && category !== "uncategorized"
             ? ` · ${data?.categories.find((c) => c.id === category)?.name ?? ""}`
             : ""}
@@ -443,11 +794,37 @@ export default function Transactions({
           </>
         )}
       </section>
-      <p className="gesture-hint">
-        Drag a transaction onto a category on desktop. On mobile, tap to sort or
-        swipe to change its category. Keyboard: press C.
-      </p>
+      {uncategorized && filtered.length > 0 && (
+        <div className="sorting-queue">
+          <span>{filtered.length} transactions to sort</span>
+          <button className="primary" onClick={() => beginSort(filtered[0])}>
+            Start sorting
+          </button>
+        </div>
+      )}
+      {selectedIds.length > 0 && (
+        <div className="selection-summary">
+          <span>{selectedIds.length} selected</span>
+          <button onClick={() => setSelectedIds([])}>Clear selection</button>
+          <button
+            onClick={() => {
+              const first = data?.items.find((t) => t.id === selectedIds[0]);
+              if (first) {
+                setQueueIds([]);
+                setSorting(first);
+              }
+            }}
+          >
+            Categorize selected
+          </button>
+        </div>
+      )}
       {!sorting && feedback}
+      {railError && (
+        <p role="alert" className="notice warning">
+          {railError}
+        </p>
+      )}
       {sorting && data && (
         <CategoryBoard
           key={sorting.id}
@@ -456,65 +833,244 @@ export default function Transactions({
           returnTo={returnTo}
           categories={data.categories}
           feedback={feedback}
+          selection={
+            selectedIds.includes(sorting.id)
+              ? data.items.filter((t) => selectedIds.includes(t.id))
+              : undefined
+          }
+          queue={
+            queueIds.length
+              ? { position: queueIndex + 1, total: queueIds.length }
+              : undefined
+          }
+          onSkip={() => moveQueue(1, [sorting.id])}
+          onMove={(direction) => moveQueue(direction)}
+          onUndo={() => void undo()}
           onClose={() => {
             setSorting(undefined);
             setDragStart(undefined);
+            setQueueIds([]);
           }}
           onSaved={(result) => {
             setDragStart(undefined);
             setReceipt(result);
             setUndoError("");
-            setSorting(undefined);
+            setSelectedIds([]);
+            if (queueIds.length)
+              moveQueue(
+                1,
+                result.after.map((t) => t.id),
+              );
+            else setSorting(undefined);
           }}
         />
       )}
-      <section className="card transaction-list">
-        {items.map((t) => (
-          <SwipeTransaction
-            key={t.id}
-            transaction={t}
-            returnTo={returnTo}
-            onCategorize={() => {
-              setDragStart(undefined);
-              setSorting(t);
-              setUndoError("");
-            }}
-            onDragCategorize={(start) => {
-              setDragStart(start);
-              setSorting(t);
-              setUndoError("");
-            }}
-          >
-            <div className="transaction-description">
-              <strong>{t.merchant || t.description}</strong>
-              <span
-                className={`transaction-status ${t.isTransfer || t.type === "transfer" || t.transferPairId ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+      <div className="transactions-workspace">
+        <section className="card transaction-list">
+          {items.map((t) => (
+            <SwipeTransaction
+              key={t.id}
+              transaction={t}
+              accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId)?.institution ?? "Account"}, ${money(t.amount, t.currency, true)}`}
+              returnTo={returnTo}
+              selected={selectedIds.includes(t.id)}
+              onSelect={(event) => selectRow(t, event)}
+              suggestion={
+                data
+                  ? categorySuggestions(t, data.categories, data.rules, [])[0]
+                  : undefined
+              }
+              onQuickCategorize={(categoryId) =>
+                void applyToSelection([t.id], categoryId)
+              }
+              onCategorize={() => beginSort(t)}
+              onDragCategorize={(start) => beginSort(t, start)}
+            >
+              <div className="transaction-description">
+                <strong>{displayMerchant(t)}</strong>
+                <span
+                  className={`transaction-status ${t.isTransfer || t.type === "transfer" || t.transferPairId ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+                >
+                  <span
+                    className="category-dot"
+                    style={{
+                      backgroundColor:
+                        financialType(t) === "transfer"
+                          ? "var(--chart-transfer)"
+                          : t.categoryId
+                            ? categoryColor(t.categoryId)
+                            : "transparent",
+                    }}
+                    aria-hidden="true"
+                  />
+                  {t.isTransfer || t.type === "transfer" || t.transferPairId
+                    ? "Transfer"
+                    : t.categoryId || t.subcategoryId
+                      ? (data?.categories.find(
+                          (c) => c.id === (t.categoryId ?? t.subcategoryId),
+                        )?.name ?? "Category unavailable")
+                      : "Needs category"}
+                </span>
+                {t.categorySource && (
+                  <small className="transaction-origin">
+                    {t.categorySource === "manual" ? "you" : "rule"}
+                  </small>
+                )}
+                <span>
+                  {displayDate(t.date)} ·{" "}
+                  {
+                    data?.accounts.find((a) => a.id === t.accountId)
+                      ?.institution
+                  }
+                </span>
+              </div>
+              <strong
+                className={
+                  t.amount > 0 && financialType(t) !== "transfer"
+                    ? "positive"
+                    : financialType(t) === "transfer"
+                      ? "transfer-amount"
+                      : "spending-amount"
+                }
               >
-                {t.isTransfer || t.type === "transfer" || t.transferPairId
-                  ? "Transfer"
-                  : t.categoryId || t.subcategoryId
-                    ? (data?.categories.find(
-                        (c) => c.id === (t.categoryId ?? t.subcategoryId),
-                      )?.name ?? "Category unavailable")
-                    : "Needs category"}
-              </span>
-              <span>
-                {t.date} ·{" "}
-                {data?.accounts.find((a) => a.id === t.accountId)?.institution}
-              </span>
+                {money(t.amount, t.currency, true)}
+              </strong>
+            </SwipeTransaction>
+          ))}
+          {data && !items.length && (
+            <div className="empty">
+              <h2>No transactions found</h2>
+              <p>Adjust the filters or import a statement for this period.</p>
             </div>
-            <strong className={t.amount > 0 && !t.isTransfer ? "positive" : ""}>
-              {money(t.amount, t.currency, true)}
-            </strong>
-          </SwipeTransaction>
-        ))}
-        {!items.length && (
-          <div className="empty">
-            <h2>No transactions found</h2>
-            <p>Adjust the filters or import a statement for this period.</p>
-          </div>
+          )}
+        </section>
+        {data && (
+          <aside
+            ref={categoryRail}
+            className="category-rail card"
+            aria-label="Category drop targets"
+          >
+            <h2>Categories</h2>
+            <p className="muted">
+              Drag a transaction here. Select several with Shift or ⌘ click.
+            </p>
+            {selectedIds.length > 0 && <p>{selectedIds.length} selected</p>}
+            <section
+              className="rail-suggestions"
+              aria-label="Suggested categories for selection"
+            >
+              <h3>Likely categories</h3>
+              {railSubject ? (
+                <p className="muted">
+                  For {displayMerchant(railSubject)}
+                  {railSelection.length > 1
+                    ? " · first selected transaction"
+                    : ""}
+                </p>
+              ) : (
+                <p className="muted">
+                  Select or drag a transaction to see suggestions.
+                </p>
+              )}
+              {railSubject &&
+                railSuggestions.map((c) => (
+                  <button
+                    key={c.id}
+                    className={`rail-tile rail-suggestion ${railTarget === c.id ? "drop-target" : ""}`}
+                    data-rail-category={c.id}
+                    aria-label={`Suggested ${c.name}`}
+                    disabled={railBusy}
+                    onClick={() => void applyToSelection(selectedIds, c.id)}
+                  >
+                    <span
+                      className="category-dot"
+                      style={{ backgroundColor: categoryColor(c.id) }}
+                      aria-hidden="true"
+                    />
+                    <span>
+                      {c.name}
+                      <small>
+                        {categorySuggestionReason(
+                          railSubject,
+                          c,
+                          data.rules,
+                          data.items,
+                        )}
+                      </small>
+                    </span>
+                  </button>
+                ))}
+              {railSubject && !railSuggestions.length && (
+                <p className="muted">
+                  No strong match. Choose a category below.
+                </p>
+              )}
+            </section>
+            <h3>All categories</h3>
+            <button
+              className={`rail-tile ${railTarget === TRANSFER_TARGET ? "drop-target" : ""}`}
+              data-rail-category={TRANSFER_TARGET}
+              disabled={railBusy || (!railDrag && !selectedIds.length)}
+              onClick={() =>
+                void applyToSelection(selectedIds, TRANSFER_TARGET)
+              }
+            >
+              Transfer / card repayment
+            </button>
+            {data.categories
+              .filter((c) => !c.archived && !c.parentId)
+              .map((c) => (
+                <button
+                  key={c.id}
+                  className={`rail-tile ${railTarget === c.id ? "drop-target" : ""}`}
+                  data-rail-category={c.id}
+                  disabled={
+                    railBusy ||
+                    (!railDrag && !selectedIds.length) ||
+                    (c.kind === "income" &&
+                      railSelection.some((t) => t.amount < 0))
+                  }
+                  title={
+                    c.kind === "income" &&
+                    railSelection.some((t) => t.amount < 0)
+                      ? "Income categories require money in. This selection includes money out."
+                      : undefined
+                  }
+                  onClick={() => void applyToSelection(selectedIds, c.id)}
+                >
+                  <span
+                    className="category-dot"
+                    style={{ backgroundColor: categoryColor(c.id) }}
+                    aria-hidden="true"
+                  />
+                  {c.name}
+                </button>
+              ))}
+          </aside>
         )}
-      </section>
+      </div>
+      {railDrag && (
+        <div
+          className="sorting-card is-dragging rail-drag-preview"
+          style={{
+            position: "fixed",
+            left: railDrag.x + 12,
+            top: railDrag.y + 12,
+            pointerEvents: "none",
+            zIndex: 1000,
+          }}
+          aria-hidden="true"
+        >
+          {railDrag.ids.length > 1
+            ? `${railDrag.ids.length} transactions`
+            : displayMerchant(
+                data?.items.find((t) => t.id === railDrag.ids[0]) ?? {
+                  merchant: "Transaction",
+                  description: "",
+                },
+              )}
+        </div>
+      )}
       <div className="pagination">
         <button
           disabled={currentPage === 0}

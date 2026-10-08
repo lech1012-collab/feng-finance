@@ -2,7 +2,7 @@
 
 Record iOS version, device, deployment origin and app version. These checks must be done on an actual device; automated WebKit is not a substitute. Use synthetic data first.
 
-- [ ] Open Planning through the header/Home card, confirm centred Home navigation, edit a budget with the decimal keyboard, save/reload, switch budget months and forecast horizons, inspect projected dates/assumptions and open a payment's source transactions. Confirm incomplete history withholds balance estimates.
+- [ ] Open Planning through the main navigation, confirm centred Home navigation, edit a budget with the decimal keyboard, save/reload, switch budget months and forecast horizons, inspect projected dates/assumptions and open a payment's source transactions. Confirm incomplete history withholds balance estimates.
 
 - [ ] Settings → Reminders: change review day, disable/re-enable, reload and verify persistence. Export the generic calendar file; import into the device's calendar, verify 09:00 local time and alert permissions, and test an alert with Feng closed. Check desktop calendar import too. Remove test events afterwards; Feng does not synchronize or remove exported events.
 
@@ -10,18 +10,18 @@ Record iOS version, device, deployment origin and app version. These checks must
 - [ ] Share → Add to Home Screen → Open as Web App → Add; icon/name appear correctly.
 - [ ] Launch icon; app is standalone, correct theme and safe-area top/bottom padding; navigation and import confirmation clear the home indicator.
 - [ ] Select a PDF in Files (On My iPhone and iCloud Drive); handle an iCloud file that first needs to download.
-- [ ] Select multiple PDFs where the picker supports it; review/commit sequentially; one failed file can be retried/skipped without losing completed imports.
+- [ ] Select multiple PDFs where the picker supports it; review together and confirm once; one failed file can be retried/skipped without losing completed imports.
 - [ ] Import generated Barclays, Amex and Revolut PDFs; compare all rows, signs, counts and balances.
 - [ ] Verify a multiline/page-break transaction, two identical purchases, a refund, a foreign currency reference and credit-card payment.
 - [ ] Validation-warning fixture requires explicit override; exact duplicate requires separate override; unchecked possible duplicates remain visible.
 - [ ] Scan fixture starts local OCR, keeps scrolling responsive, requires amount verification and reconciles.
 - [ ] Portrait and landscape, scrolling, large text/200% zoom, keyboard, date/select controls, touch targets and VoiceOver labels remain usable.
-- [ ] Dashboard month navigation, categories → transactions, search/filters, transaction edits/rules, manual transfers and Property analysis work.
+- [ ] Dashboard month navigation, categories → Analyse, Uncategorized → Transactions, search/filters, transaction edits/rules, manual transfers and Property analysis work.
 - [ ] Wait for Offline ready; enable airplane mode; force-close and relaunch; historical dashboard/transactions/edits/analysis work.
 - [ ] Import a digital PDF and scanned PDF in airplane mode (files must already be local).
 - [ ] Export backup in airplane mode; save to Files; reopen JSON; export CSV and inspect decimal amounts.
 - [ ] Restore valid backup after explicit replace warning; counts/categories/rules/transfer links survive. Invalid/future backup leaves data intact.
-- [ ] Delete demo preserves real synthetic imports; clearing all local data needs explicit acknowledgement.
+- [ ] Delete demo preserves separate synthetic imports; erasing all local data requires the exact text ERASE.
 - [ ] Load a previous app release, deploy an updated release; update banner appears; ignore safely, then finish review and tap Update; database contents persist.
 - [ ] Import a large statement and inspect responsiveness/memory; measure typical digital monthly workflow against the one-minute goal.
 - [ ] Restore a 20,000-row synthetic backup; search/filter monthly pages, analysis and backup remain responsive. Record timings rather than assuming simulator results apply.
@@ -44,7 +44,7 @@ Only after those checks, test private real statements from ignored `private-fixt
 - [ ] Swiping a transaction sideways opens category choices; scrolling the list vertically does not.
 - [ ] Dragging the transaction card onto a visible tile saves once; dropping elsewhere or interrupting the touch saves nothing.
 - [ ] Category tiles can also be tapped, including after searching, with no separate Save action.
-- [ ] Grouping and remembering merchants are opt-in; Undo restores the chosen records and rule.
+- [ ] Every manual choice becomes a default automatically; matching uncategorized records use the same account and amount direction. Undo restores the records and learned rule.
 - [ ] The next uncategorized card appears after a choice; completing the queue returns to the list.
 - [ ] Month-selector swipes work without triggering Safari navigation from the middle of the screen.
 - [ ] VoiceOver can open the sheet, choose a tile, Undo and close it; focus remains within the modal while open.
@@ -53,15 +53,26 @@ Only after those checks, test private real statements from ignored `private-fixt
 - Open All detected to reverse a decision. Mark a fictitious service cancelled, reload, and confirm its state persists under Cancellation plans.
 - Inspect source charges and check category/amounts are unchanged. Confirm the provider separately before marking a real cancellation.
 
-- Confirm Import · Transactions · Home · Analyse · Settings, with Home central and page-specific accents in both dark and light modes.
+- Confirm Import · Transactions · Home · Analyse · Planning, with Home central and Settings in the header. Data colors remain consistent across section accents in dark and light modes.
 - Tap a Home category, swipe its month selector, switch six/twelve-month history, and tap a chart bar or month tile to inspect matching transactions.
 - Verify partial coverage is labelled, income ratios identify their denominator, and unavailable historical statistics do not show a misleading zero.
 - Check Shopping and Property overviews at enlarged text size, including subcategories, standard deviation and the source transaction links.
 
 - [ ] Home Import statement and the Import tab each open Files in one tap; cancelling keeps the current screen.
-- [ ] Selecting multiple PDFs processes all statements, then the final confirmation returns directly to Home.
-- [ ] Compare each displayed account balance and total to source statements, including negative card debt. Check 1/3/6/12 month changes and unavailable history.
+- [ ] Selecting multiple PDFs processes every statement into one review, with issues first, duplicates skipped and one confirmation returning Home.
+- [ ] Compare Cash and positive Card debt to source statements. A missing account leaves Net position unavailable; no income source leaves income unknown. Check balance-range changes and historical gaps.
 - [ ] Tap Uncategorized on Home, sort one row, then confirm it disappears from the all-dates queue. Repeat via the detailed editor; Undo returns it.
 - [ ] Main category filter buttons work comfortably by touch and every transaction has a readable status label.
 - [ ] Home balance and cash-flow chart tooltips work by touch. Expense bars are below zero. Missing balance months show gaps.
 - [ ] Analyse category selection shows category plots, average/deviation and percentage of income.
+
+## UX review release
+
+- [ ] Check 320px and 375px widths, portrait/landscape, and 150–200% text size. The sticky import footer stays above the bottom navigation and home indicator.
+- [ ] Tap a missing-month placeholder: it says No statements, without presenting zero income or spending.
+- [ ] Change Analyse between 1/3/6/12 months, YTD and custom. Cards, charts and transaction evidence share the displayed dates.
+- [ ] Skip a sorting item; it stays uncategorized and is deferred until the next sorting session. The last Skip closes the sheet.
+- [ ] Swipes beginning inside the leftmost 20px preserve the Safari back gesture. Vertical scrolling does not categorize a transaction.
+- [ ] Generate a backup, save the download in Files, inspect the restore preview, then cancel without changing records. Full erasure stays disabled until ERASE is typed.
+- [ ] Switch account currency in Settings. If other accounts are hidden, their currency and count remain visible in the scope notice.
+- [ ] On desktop, drag a selected batch to a suggested category, scroll the category rail during a drag, cancel with Escape, and verify Undo restores all changed records/defaults.

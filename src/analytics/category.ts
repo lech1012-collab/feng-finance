@@ -54,6 +54,7 @@ export function categoryOverview(
   currency: string,
   window = 6,
   today = new Date().toISOString().slice(0, 10),
+  isComplete?: (month: string) => boolean,
 ) {
   const incomeCategory = categories.find((c) => c.id === id)?.kind === "income";
   const eligible = transactions.filter(
@@ -79,12 +80,14 @@ export function categoryOverview(
       amount,
       income: flow.income,
       incomePercent: flow.income > 0 ? (amount / flow.income) * 100 : undefined,
-      complete: completeMonth(
-        m,
-        accounts.filter((a) => a.currency === currency),
-        statements,
-        today,
-      ),
+      complete: isComplete
+        ? isComplete(m)
+        : completeMonth(
+            m,
+            accounts.filter((a) => a.currency === currency),
+            statements,
+            today,
+          ),
     };
   };
   const history = Array.from({ length: window }, (_, i) =>

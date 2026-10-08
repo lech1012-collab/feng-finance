@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
 import { currencyPrecision } from "../domain/money";
+import { Link } from "react-router-dom";
 
 export function useGlobalCurrency() {
   const setting = useLiveQuery(() => db.settings.get("currency"), []);
@@ -28,8 +29,8 @@ export function CurrencySetting() {
   ];
   return (
     <section className="card">
-      <h2>Currency</h2>
-      <label htmlFor="global-currency">Global currency</label>
+      <h2>Account currency</h2>
+      <label htmlFor="global-currency">Show accounts in</label>
       <select
         id="global-currency"
         aria-describedby="currency-help"
@@ -59,11 +60,35 @@ export function CurrencySetting() {
         ))}
       </select>
       <p className="muted" id="currency-help">
-        Applies across Home, Transactions and Analyse. Shows transactions in the
-        selected currency; amounts are not converted. Saved on this device and
-        included in backups.
+        Totals use only accounts in this currency. Amounts aren’t converted.
       </p>
       {error && <p role="alert">{error}</p>}
     </section>
+  );
+}
+
+/** Keep the scope visible whenever the global currency hides other accounts. */
+export function CurrencyViewNotice({ currency }: { currency: string }) {
+  const accounts = useLiveQuery(() => db.accounts.toArray(), []);
+  const hidden = (accounts ?? []).filter(
+    (account) => account.currency !== currency,
+  );
+  if (!hidden.length) return null;
+  const groups = new Map<string, number>();
+  for (const account of hidden)
+    groups.set(account.currency, (groups.get(account.currency) ?? 0) + 1);
+  return (
+    <aside className="currency-view-notice" aria-label="Account currency scope">
+      <span>
+        {currency} view ·{" "}
+        {[...groups]
+          .map(
+            ([code, count]) =>
+              `${count} ${code} ${count === 1 ? "account" : "accounts"} hidden`,
+          )
+          .join(" · ")}
+      </span>
+      <Link to="/settings#global-currency">Change</Link>
+    </aside>
   );
 }

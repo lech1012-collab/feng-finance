@@ -23,7 +23,9 @@ import {
 } from "../domain/money";
 import { MonthPicker } from "../components/common";
 import { ImportButton } from "../components/ImportPicker";
-import { monthOffset } from "../domain/dates";
+import { monthOffset, monthLabel, formatUkDate } from "../domain/dates";
+import { monthCoverage, verifiedStatements } from "../analytics/coverage";
+import { displayMerchant } from "../domain/presentation";
 
 function BudgetLimit({
   categoryId,
@@ -188,6 +190,32 @@ export default function Planning({
   const end = forecast.points.at(-1);
   const factor = 10 ** currencyPrecision(currency);
   const accounts = new Map(data.accounts.map((a) => [a.id, a.displayName]));
+  const documents = verifiedStatements(
+    data.statements,
+    data.transactions,
+    today,
+  );
+  const coverage = monthCoverage(
+    data.accounts,
+    data.statements,
+    data.transactions,
+    month,
+    currency,
+    today,
+  );
+  const recentCutoff = new Date(
+    Date.parse(`${today}T00:00:00Z`) - 35 * 86400000,
+  )
+    .toISOString()
+    .slice(0, 10);
+  const missingAccounts = data.accounts.filter(
+    (account) =>
+      !documents.some(
+        (statement) =>
+          statement.accountId === account.id &&
+          statement.statementPeriodEnd >= recentCutoff,
+      ),
+  );
   const shortage = forecast.points.find(
     (p) => p.date >= today && p.balance < 0,
   );
@@ -211,6 +239,9 @@ export default function Planning({
           <h2>Monthly budgets</h2>
         </div>
         <MonthPicker month={month} onChange={setMonth} />
+        <p className="coverage-note">
+          {monthLabel(month)} · {coverage.status}
+        </p>
         <div className="planning-kpis">
           <div>
             <span>Planned limit</span>
@@ -325,10 +356,23 @@ export default function Planning({
           </select>
         </div>
         <p className="coverage-note">
-          Forecast from today ({today}); the budget month above does not change
-          it. Cash and savings minus card debt—not available cash or a spending
-          allowance.
+          From {formatUkDate(today)} · next {horizon} days. Cash and savings
+          minus card debt; this is an estimate of your financial position.
         </p>
+        <p className="forecast-inputs">
+          Based on {forecast.baselineMonths} complete previous month
+          {forecast.baselineMonths === 1 ? "" : "s"} ·{" "}
+          {data.accounts.length - missingAccounts.length} of{" "}
+          {data.accounts.length} accounts have recent verified balances.
+        </p>
+        {missingAccounts.length > 0 && (
+          <p className="coverage-note">
+            Missing or stale balances:{" "}
+            {missingAccounts.map((account) => account.displayName).join(", ")}.
+            No total forecast is shown until all accounts have a shared verified
+            balance.
+          </p>
+        )}
         {forecast.reason ? (
           <div className="notice">
             <p>{forecast.reason}</p>
@@ -339,7 +383,7 @@ export default function Planning({
             <>
               <div className="planning-kpis">
                 <div>
-                  <span>Estimated on {end.date}</span>
+                  <span>Estimated on {formatUkDate(end.date)}</span>
                   <strong>{money(end.balance, currency)}</strong>
                 </div>
                 <div>
@@ -365,16 +409,17 @@ export default function Planning({
                     <XAxis
                       dataKey="date"
                       minTickGap={40}
-                      tickFormatter={(v) => String(v).slice(5)}
-                      tick={{ fill: "var(--muted)", fontSize: 12 }}
+                      tickFormatter={(v) => formatUkDate(String(v))}
+                      tick={{ fill: "var(--muted)", fontSize: 13 }}
                     />
                     <YAxis
                       tickFormatter={(v) =>
                         `${+(Number(v) / factor / 1000).toFixed(1)}k`
                       }
-                      tick={{ fill: "var(--muted)", fontSize: 12 }}
+                      tick={{ fill: "var(--muted)", fontSize: 13 }}
                     />
                     <Tooltip
+                      labelFormatter={(value) => formatUkDate(String(value))}
                       formatter={(v) => money(Number(v), currency)}
                       contentStyle={{
                         background: "var(--surface)",
@@ -386,7 +431,7 @@ export default function Planning({
                     <Line
                       name="Usual spending"
                       dataKey="balance"
-                      stroke="var(--accent)"
+                      stroke="var(--chart-balance)"
                       strokeWidth={3}
                       dot={false}
                       isAnimationActive={false}
@@ -416,20 +461,33 @@ export default function Planning({
               </div>
               {shortage && (
                 <p className="notice warning">
-                  The model drops below zero around {shortage.date}. Check
-                  payment timing and recent balances before making spending
-                  decisions.
+                  The model drops below zero around{" "}
+                  {formatUkDate(shortage.date)}. Check payment timing and recent
+                  balances before making spending decisions.
                 </p>
               )}
               <details>
-                <summary>Forecast assumptions</summary>
+                <summary>Forecast inputs and assumptions</summary>
                 <p>
                   Starting point: {money(forecast.anchor!.total!, currency)}{" "}
-                  verified on {forecast.anchor!.date}. Movements since that date
-                  use imported transactions and estimated missing recurring
+                  verified on {formatUkDate(forecast.anchor!.date)} across{" "}
+                  {data.accounts.length} accounts. Movements since that date use
+                  imported transactions and estimated missing recurring
                   payments. Unobserved day-to-day spending is estimated from{" "}
                   {forecast.baselineMonths} complete months.
                 </p>
+                <ul>
+                  {data.accounts.map((account, index) => (
+                    <li key={account.id}>
+                      {account.displayName}:{" "}
+                      {money(
+                        forecast.anchor!.balances[`account${index}`]!,
+                        currency,
+                      )}{" "}
+                      on {formatUkDate(forecast.anchor!.date)}
+                    </li>
+                  ))}
+                </ul>
                 <p>
                   Usual variable spending: approximately{" "}
                   {money(Math.round(forecast.dailyVariable!), currency)} per
@@ -472,9 +530,15 @@ export default function Planning({
                   to={`/transactions?allDates=1&account=${p.accountId}&search=${encodeURIComponent(p.merchant)}`}
                 >
                   <div>
-                    <strong>{p.merchant}</strong>
+                    <strong>
+                      {displayMerchant({
+                        merchant: p.merchant,
+                        description: p.merchant,
+                      })}
+                    </strong>
                     <span>
-                      {p.date} · {accounts.get(p.accountId)} · {p.cadence}
+                      {formatUkDate(p.date)} · {accounts.get(p.accountId)} ·{" "}
+                      {p.cadence}
                     </span>
                     <small>{p.evidence} payments support this estimate</small>
                   </div>
