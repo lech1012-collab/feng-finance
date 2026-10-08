@@ -3655,6 +3655,11 @@ h3 {
 .position-metrics .balance-total {
   margin: 0;
 }
+.position-metrics small {
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
 .balance-account-main {
   display: flex;
   justify-content: space-between;

@@ -100,6 +100,38 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   );
   await assertSingleClosingPoint(page, "4 Oct", "-£109.68");
 
+  await page.setViewportSize({ width: 375, height: 844 });
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  const overlappingText = await page
+    .locator(".position-metrics > div")
+    .evaluateAll((columns) =>
+      columns.flatMap((column) => {
+        const bounds = column.getBoundingClientRect();
+        const walker = document.createTreeWalker(column, NodeFilter.SHOW_TEXT);
+        const overflow: string[] = [];
+        while (walker.nextNode()) {
+          if (!walker.currentNode.textContent?.trim()) continue;
+          const range = document.createRange();
+          range.selectNodeContents(walker.currentNode);
+          if (
+            [...range.getClientRects()].some(
+              (rect) =>
+                rect.left < bounds.left - 2 || rect.right > bounds.right + 2,
+            )
+          )
+            overflow.push(walker.currentNode.textContent);
+        }
+        return overflow;
+      }),
+    );
+  expect(overlappingText).toEqual([]);
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "";
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+
   await page.getByLabel("Selected month").fill("2026-09");
   await expect(positionMetric(page, "Card debt")).toContainText("Unknown");
   await expect(page.locator(".balance-account-value")).toContainText("Unknown");
