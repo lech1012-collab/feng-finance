@@ -1,3 +1,4 @@
+import { auditedMutation } from "../storage/audit";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
@@ -56,7 +57,7 @@ export function Reminders({
   const save = async (patch: Partial<ReminderConfig>) => {
     setLocalConfig((current) => ({ ...(current ?? data.config), ...patch }));
     try {
-      await db.transaction("rw", db.settings, async () => {
+      await auditedMutation("Change reminders", ["settings"], async () => {
         const current = readReminderConfig(
           (await db.settings.get(REMINDER_KEY))?.value,
         );
@@ -156,7 +157,8 @@ export function Reminders({
       )}
       {!settings && reminders.length > 4 && (
         <Link to="/settings#reminders">
-          {reminders.length - 4} more reminders
+          {reminders.length - 4} more reminder
+          {reminders.length - 4 === 1 ? "" : "s"}
         </Link>
       )}
       {notice && <p role="status">{notice}</p>}

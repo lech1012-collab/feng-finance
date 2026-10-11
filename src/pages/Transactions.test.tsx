@@ -38,6 +38,145 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+it("keeps quick-category counts aligned with account/date/search filters and refreshes after categorization", async () => {
+  const uncategorized = transaction({
+    id: "uncategorized",
+    merchant: "LOCAL BAKERY",
+    description: "LOCAL BAKERY",
+  });
+  await db.transactions.bulkPut([
+    uncategorized,
+    transaction({
+      id: "grocery",
+      categoryId: "groceries",
+      merchant: "ONLY GROCERY",
+      description: "ONLY GROCERY",
+    }),
+    transaction({
+      id: "salary",
+      categoryId: "salary",
+      amount: 500000,
+      merchant: "ONLY PAYROLL",
+      description: "ONLY PAYROLL",
+    }),
+    transaction({
+      id: "property",
+      categoryId: "property",
+      merchant: "BUILDING COST",
+      description: "BUILDING COST",
+    }),
+    transaction({
+      id: "refund",
+      categoryId: "refund",
+      kind: "refund",
+      amount: 2000,
+    }),
+    transaction({
+      id: "transfer",
+      type: "transfer",
+      isTransfer: true,
+      amount: 7000,
+    }),
+    transaction({
+      id: "split",
+      kind: "split_parent",
+      amount: -500,
+      merchant: "MIXED PURCHASE",
+      description: "MIXED PURCHASE",
+    }),
+    transaction({
+      id: "split-grocery",
+      parentId: "split",
+      categoryId: "groceries",
+      amount: -300,
+    }),
+    transaction({
+      id: "split-shopping",
+      parentId: "split",
+      categoryId: "shopping",
+      amount: -200,
+    }),
+    transaction({
+      id: "other-account",
+      accountId: "a2",
+      categoryId: "groceries",
+    }),
+    transaction({
+      id: "other-month",
+      date: "2026-08-01",
+      categoryId: "groceries",
+    }),
+  ]);
+  render(
+    <MemoryRouter
+      initialEntries={[
+        "/transactions?allDates=0&from=2026-09-01&to=2026-09-30&account=a1&min=5",
+      ]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const filters = await screen.findByRole("group", {
+    name: "Transaction category filters",
+  });
+  const filter = (name: string) =>
+    within(filters).getByRole("button", { name });
+  await waitFor(
+    () =>
+      expect(filter("Groceries")).toHaveAccessibleDescription(
+        "2 matching transactions",
+      ),
+    { timeout: 8000 },
+  );
+  expect(filter("Income")).toHaveAccessibleDescription(
+    "1 matching transaction",
+  );
+  expect(filter("Property")).toHaveAccessibleDescription(
+    "1 matching transaction",
+  );
+  expect(filter("Salary")).toHaveAccessibleDescription(
+    "1 matching transaction",
+  );
+  fireEvent.click(filter("Groceries"));
+  expect(
+    await screen.findByRole("link", { name: /Mixed Purchase,/i }),
+  ).toBeVisible();
+  expect(filter("Income")).toHaveAccessibleDescription(
+    "1 matching transaction",
+  );
+  await act(async () => {
+    await categoryStorage.categorizeCards([uncategorized], "groceries");
+  });
+  await waitFor(
+    () =>
+      expect(filter("Groceries")).toHaveAccessibleDescription(
+        "3 matching transactions",
+      ),
+    { timeout: 8000 },
+  );
+  expect(
+    await screen.findByRole("link", { name: /Local Bakery,/i }),
+  ).toBeVisible();
+  fireEvent.change(
+    screen.getByRole("searchbox", { name: "Search transactions" }),
+    { target: { value: "ONLY GROCERY" } },
+  );
+  await waitFor(() =>
+    expect(filter("Groceries")).toHaveAccessibleDescription(
+      "1 matching transaction",
+    ),
+  );
+  expect(filter("Income")).toHaveAccessibleDescription(
+    "0 matching transactions",
+  );
+  expect(filter("Property")).toHaveAccessibleDescription(
+    "0 matching transactions",
+  );
+  expect(filter("Salary")).toHaveAccessibleDescription(
+    "0 matching transactions",
+  );
+}, 15000);
+
 it("verifies account chips against complete indexed statement rows beyond the transaction date filter", async () => {
   const rows = [
     transaction({ id: "first", date: "2026-09-01" }),
@@ -176,7 +315,7 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
     const target = groceriesShortcut();
     expect(target).toHaveFocus();
     fireEvent.keyDown(target, { key: "1" });
-    expect(saveCategory).toHaveBeenCalledOnce();
+    await waitFor(() => expect(saveCategory).toHaveBeenCalledOnce());
     await saveCategory.mock.results[0].value;
   });
   expect((await db.transactions.get(first.id))?.categoryId).toBe("groceries");
@@ -298,6 +437,7 @@ it("restores all backfilled queue entries on Undo and can sort them again", asyn
     fireEvent.click(
       within(dialog).getByRole("button", { name: "Categorize as Groceries" }),
     );
+    await waitFor(() => expect(saveCategory).toHaveBeenCalledTimes(1));
     await saveCategory.mock.results[0].value;
   });
   await waitFor(() =>
@@ -324,6 +464,7 @@ it("restores all backfilled queue entries on Undo and can sort them again", asyn
         name: "Categorize as Groceries",
       }),
     );
+    await waitFor(() => expect(saveCategory).toHaveBeenCalledTimes(2));
     await saveCategory.mock.results[1].value;
   });
   await waitFor(() =>
@@ -411,6 +552,7 @@ it("keeps skipped cards deferred when Undo reopens a completed sorting queue", a
         name: "Categorize as Groceries",
       }),
     );
+    await waitFor(() => expect(saveCategory).toHaveBeenCalledTimes(1));
     await saveCategory.mock.results[0].value;
   });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
@@ -436,12 +578,14 @@ it("keeps skipped cards deferred when Undo reopens a completed sorting queue", a
 it("keeps transaction detail navigation inside the board until a category save completes", async () => {
   await db.transactions.put(transaction());
   let rejectSave: (reason: Error) => void = () => undefined;
-  vi.spyOn(categoryStorage, "categorizeCards").mockImplementation(
-    () =>
-      new Promise((_, reject) => {
-        rejectSave = reject;
-      }),
-  );
+  const saveCategory = vi
+    .spyOn(categoryStorage, "categorizeCards")
+    .mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectSave = reject;
+        }),
+    );
   render(
     <MemoryRouter
       initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
@@ -459,6 +603,7 @@ it("keeps transaction detail navigation inside the board until a category save c
   expect(details).toHaveAttribute("aria-disabled", "true");
   expect(fireEvent.click(details)).toBe(false);
   expect(screen.getByRole("dialog")).toBe(dialog);
+  await waitFor(() => expect(saveCategory).toHaveBeenCalledOnce());
   await act(async () =>
     rejectSave(new Error("Storage temporarily unavailable.")),
   );
@@ -467,4 +612,110 @@ it("keeps transaction detail navigation inside the board until a category save c
   );
   expect(details).not.toHaveAttribute("aria-disabled");
   expect(await db.transactions.get("t1")).toEqual(transaction());
+}, 15000);
+
+it("asks once about a learned rule conflict and can categorize just this payment", async () => {
+  const first = transaction({
+    id: "learned",
+    merchant: "CITY SHOP",
+    description: "CITY SHOP",
+    date: "2026-09-04",
+  });
+  const next = transaction({
+    id: "exception",
+    merchant: "CITY SHOP",
+    description: "CITY SHOP",
+    date: "2026-09-05",
+  });
+  await db.transactions.bulkPut([first, next]);
+  await categoryStorage.categorizeCards([first], "groceries");
+  const rulesBefore = await db.rules.filter((rule) => !!rule.auto).toArray();
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+  // The rule evidence is loaded separately from the visible queue.
+  await within(dialog).findByText(
+    /Your saved rule for this merchant and account/,
+    {},
+    { timeout: 8000 },
+  );
+  fireEvent.click(
+    within(dialog).getByRole("button", { name: "Categorize as Shopping" }),
+  );
+  const conflict = await within(dialog).findByRole("region", {
+    name: "Saved rule conflict",
+  });
+  expect(await db.transactions.get(next.id)).toEqual(next);
+  fireEvent.click(
+    within(conflict).getByRole("button", { name: "Just this payment" }),
+  );
+  await waitFor(
+    async () =>
+      expect((await db.transactions.get(next.id))?.categoryId).toBe("shopping"),
+    { timeout: 8000 },
+  );
+  expect(await db.rules.filter((rule) => !!rule.auto).toArray()).toEqual(
+    rulesBefore,
+  );
+  expect((await db.transactions.get(first.id))?.categoryId).toBe("groceries");
+}, 15000);
+
+it("updating the conflicting auto rule changes its default and Undo restores the prior rule", async () => {
+  const first = transaction({
+    id: "learned",
+    merchant: "CITY SHOP",
+    description: "CITY SHOP",
+    date: "2026-09-04",
+  });
+  const next = transaction({
+    id: "changed",
+    merchant: "CITY SHOP",
+    description: "CITY SHOP",
+    date: "2026-09-05",
+  });
+  await db.transactions.bulkPut([first, next]);
+  await categoryStorage.categorizeCards([first], "groceries");
+  const rulesBefore = await db.rules.filter((rule) => !!rule.auto).toArray();
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
+  await within(dialog).findByText(
+    /Your saved rule for this merchant and account/,
+    {},
+    { timeout: 8000 },
+  );
+  fireEvent.click(
+    within(dialog).getByRole("button", { name: "Categorize as Shopping" }),
+  );
+  const conflict = await within(dialog).findByRole("region", {
+    name: "Saved rule conflict",
+  });
+  fireEvent.click(
+    within(conflict).getByRole("button", { name: "Update rule" }),
+  );
+  await waitFor(
+    async () =>
+      expect((await db.transactions.get(next.id))?.categoryId).toBe("shopping"),
+    { timeout: 8000 },
+  );
+  expect(await db.rules.filter((rule) => !!rule.auto).count()).toBe(1);
+  expect((await db.rules.get(rulesBefore[0].id))?.categoryId).toBe("shopping");
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  await waitFor(
+    async () =>
+      expect(await db.rules.get(rulesBefore[0].id)).toEqual(rulesBefore[0]),
+    { timeout: 8000 },
+  );
+  expect(await db.transactions.get(next.id)).toEqual(next);
 }, 15000);

@@ -121,7 +121,7 @@ describe("storage and backup integrity", () => {
     expect(preserved?.description).toBe("WAITROSE");
     expect(preserved?.occurrence).toBe(0);
     expect(preserved?.tags).toEqual([]);
-    expect(current.verno).toBe(2);
+    expect(current.verno).toBe(3);
     await current.delete();
   });
 });
@@ -319,7 +319,7 @@ describe("atomic import and editing", () => {
   }, 20000);
 });
 
-it("excludes an unpaired Amex card repayment from income before counterpart import", async () => {
+it("requires explicit confirmation before excluding an unpaired Amex card repayment", async () => {
   const statementRows = rows([
     [[30, "American Express Statement of Account"]],
     [[30, "Statement period: 01 Sep 2026 to 30 Sep 2026"]],
@@ -351,7 +351,10 @@ it("excludes an unpaired Amex card repayment from income before counterpart impo
     method: "embedded-text",
     warnings: [],
   });
-  expect(draft.transactions[0].isTransfer).toBe(true);
+  expect(draft.transactions[0].isTransfer).toBe(false);
+  draft.transactions[0].type = "transfer";
+  draft.transactions[0].isTransfer = true;
+  draft.transactions[0].manualCategory = true;
   await commitDraft(draft);
   expect(cashFlow(await db.transactions.toArray(), "GBP")).toEqual({
     income: 0,

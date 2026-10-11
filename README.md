@@ -1,8 +1,22 @@
 # Feng Finance
 
-A client-only personal-finance PWA for importing monthly Barclays (including Barclaycard), American Express and Revolut PDF statements. Financial information stays in IndexedDB in the browser. The deployment contains only static assets; there is no backend, account login, external AI, telemetry or cloud sync.
+Feng Finance is a private, client-side personal-finance PWA. It turns Barclays,
+Barclaycard, American Express and Revolut statements into traceable cash flow,
+account balances and spending analysis. It runs as a website or installed web
+app, including on iPhone Safari. No App Store onboarding or backend is required.
 
-## Run locally
+Financial records, parsing, categorization, notes, attachments and backups stay
+on the device. The only external data feature is an approved download of public
+ECB exchange-rate tables. The request contains no financial records, account
+identifiers, cookies or request body. There is no external AI, telemetry,
+advertising, session replay, cloud synchronization or remotely accessible account.
+
+The [v2 implementation matrix](docs/v2-implementation.md) maps the developer
+specification to source code and verification. Read the
+[security notes](docs/security-v2.md), [privacy audit](docs/privacy.md) and
+[validation record](docs/validation.md) for limitations and current release checks.
+
+## Development
 
 Node 24 LTS and npm are recommended.
 
@@ -12,301 +26,324 @@ npm run fixtures
 npm run dev
 ```
 
-Open the printed development URL. Start empty, import one of the generated PDFs from `tests/fixtures`, or choose **Try fictitious demo data**. Delete demo data in Settings. Fixtures contain no real financial information and are generated, not committed. Development mode does not install a service worker; use the production preview for offline tests.
+Open the printed development URL. Start empty, select a generated synthetic PDF
+from `tests/fixtures`, or choose **Explore demo**. Demo records are fictitious and
+identified separately; **Delete demo data** preserves real records. Development
+mode does not install a service worker. Use a production build and preview to
+test offline installation.
 
 ```sh
-npm test                   # Domain, adapters, storage, migrations and components
-npm run build              # Strict TypeScript and static production PWA
-npm run preview            # Production preview, port 4173
+npm test                         # Domain, adapters, storage, migrations and UI
+npm run build                    # Strict TypeScript and static production PWA
+npm run preview                  # Production preview on port 4173
 npx playwright install --with-deps chromium webkit
-npm run test:e2e           # 390 × 844 workflows in Chromium and WebKit
-npm audit                  # Full dependency vulnerability check
-npm run check              # Tests, build and browser tests (generate fixtures first)
+npm run test:e2e                  # Browser workflows, including mobile viewport
+npm audit                        # Dependency vulnerability review
+npm run check                    # Unit tests, build and browser tests
 ```
 
-`npm ci` also copies the locally hosted OCR runtime, English language model, PDF font/CMap/decoder assets and generates PWA icons. All parsing assets are included in the service-worker precache. No CDN is needed. The first offline installation downloads approximately 22 MB; wait for **Offline ready** before disconnecting. The OCR model is English.
+Generate fixtures before running browser tests. `npm ci` copies the local PDF,
+OCR, English-language, font/CMap and decoder assets and generates PWA icons. No
+CDN or API key is needed for parsing. Wait for **Offline ready** after installation
+before disconnecting. Physical iPhone checks are documented separately in the
+[iPhone checklist](docs/iphone-checklist.md); Playwright WebKit is not an iPhone.
 
-## Features
+## Everyday workflow
 
-- Cash and card-debt position, monthly cash flow, category bars, account coverage and verified comparisons. Missing data stays unknown rather than appearing as zero.
-- Digital PDF extraction with positional row/column reconstruction, independent bank adapters, scanned-page local OCR and explicit validation review.
-- SHA-256 statement and transaction fingerprints, regenerated/overlapping-statement protection, occurrence handling for identical purchases, conservative transfer matching and manual pairing.
-- Search and indexed date/currency filters, accounts/categories/type/amount/property filters, paginated lists, transaction source metadata, merchant/tag/category editing and learned rules.
-- Period analysis, monthly/category/property trends, YTD/annual/custom periods, month comparisons, rolling totals and evidence-based recurring-cost suggestions.
-- Configurable accounts, categories/subcategories, archiving, deterministic priority rules, JSON backup/replace restore, CSV export, demo deletion and explicit local-data deletion.
-- Dark by default, optional persistent light mode, mobile Import navigation, exception-first review, statement balance snapshots, safe-area padding and user-controlled offline PWA updates.
-- Private personal-rules file import previews and applies classification corrections to existing records, then remembers rules for future statements.
+1. On Home or the Import tab, select one or several PDF, CSV, OFX/QFX or QIF files.
+   The file picker opens directly. Desktop also supports dropping files.
+2. Feng parses files locally and prepares one combined review. It shows the
+   detected account and period, gross **Money in/Money out**, balances,
+   reconciliation, possible duplicates and any uncertain extracted rows.
+3. Resolve highlighted issues. Confirm proposed transfers or card repayments.
+   Failed reconciliation, partial extraction and uncertain OCR require explicit
+   review; choosing a category cannot make an invalid statement reconciled.
+4. Confirm import. Feng returns Home. **To review** includes both uncategorized
+   and categorized-but-unreviewed transactions.
+5. Sort the remaining records, then use the four-step monthly review to inspect
+   changes, confirm pot contributions, review rules/backups and close the month.
 
-## Categorizing with gestures
+Unknown CSV layouts open a mapping preview. Map date, description and either a
+signed amount or separate debit/credit columns, choose the account and confirm.
+Mappings are remembered per account. Exports without opening/closing balances
+remain explicitly unverified; missing balance evidence is not invented.
 
-On Home, tap **Sort transactions** or **transactions need a category**. Tap an uncategorized transaction to open the sorting queue. Choose a suggested category, drag its card onto a tile, or swipe left to reveal a suggested category and **More**. Saving advances to the next transaction; **Skip** keeps the current transaction uncategorized. Categorized records immediately leave the queue. **Undo** restores the assignment, matching records and learned defaults unless a later edit has changed those records.
+### Sorting, rules and review status
 
-Every manual choice automatically becomes the default for the same original merchant, account and amount direction. Matching uncategorized records can be filled together; reviewed categories are preserved. Desktop has a persistent category rail: drag rows or use Shift/⌘ selection to categorize a batch. **C** opens categorization, **1–3** choose suggestions, **J/K** move through the queue and **⌘/Ctrl Z** undoes the last category change outside text fields; text inputs retain native Undo. Property has one tile; existing subcategory data remains available in details. Rule-origin badges link to the editable rule in Settings.
+Tap a transaction to open its sorting sheet. Suggested categories include a
+reason and are ranked from local rules, prior choices and description clues.
+There are also Transfer, Card repayment, Refund, Split and Tag actions. Saving
+advances the queue; Skip leaves the record to review. Uncategorized records leave
+that filter immediately after saving a category. The broader To review filter
+also includes records that have a category but still need confirmation.
 
-Swipe the month selector left/right to change month. Desktop users can drop PDFs directly onto the Import card. Touch sorting uses Pointer Events rather than relying on desktop-only HTML drag events; vertical list scrolling and cancelled drags do not save changes.
+On desktop, drag the transaction itself onto a category in the drop rail. Batch
+selection and sorting remain available. Keyboard shortcuts include **C** to sort,
+**1–3** for suggestions, **J/K** to navigate, **/** for search and **⌘/Ctrl Z** for
+category Undo outside text fields. Inputs retain their native Undo. Touch drag
+uses Pointer Events; scrolling or dropping outside a category does not save.
 
-## Architecture
+A manual category choice automatically creates or updates the default for that
+original merchant, account and money direction. No separate remembering button
+is needed. Rename actions retain the original bank identity for matching. Rules
+support all/any conditions, descriptions, accounts, directions, amounts, dates,
+currencies and advanced regular expressions. Actions include categorization,
+rename, tags, reviewed state, transaction kind, percentage splits and recurring
+series. Priority, stop-processing and single-use behavior are explicit. Preview
+matching records before applying a rule to history. Contradicting an existing
+rule provides an Update rule/Just this payment choice.
+
+New data operations record local changes and provide Undo. Bulk operations undo
+as one change. Undo refuses to overwrite newer edits or delete an account, tag,
+category or source record still used by later records. Recent changes are kept
+locally for 90 days. **Erase everything** removes the database, including its
+history; export a backup first because the host cannot recover erased data.
+
+### Money, transfers, credit cards, refunds and splits
+
+Every persisted monetary amount is a safe integer in its original currency's
+minor units. GBP `-8245` means **-£82.45**. Money entering an account is positive;
+money leaving is negative. Credit-card amounts owed are negative balances,
+presented as positive **Card debt**. Original amounts are never rewritten by
+categorization, conversion, refunds or planning. Statement reconciliation uses
+source ledger rows and accepts at most one minor-unit rounding difference.
+
+Import both the bank and card statements. Categorize individual card purchases;
+classify the repayment as **Card repayment**, so it does not count again as
+spending. A repayment alone cannot reveal its underlying purchase categories.
+Account-to-account top-ups use **Transfer**. Confirmed transfers and card
+repayments remain in account balances and statement Money in/Money out, but are
+excluded from income, spending and net cash flow.
+
+Transfer matching defaults to **Manual**. Candidates have opposite amounts,
+different accounts and compatible dates within the configurable 0–7-day window
+(default four). Pending proposals are shown for confirmation and make the period
+partial. Optional **Automatic** only confirms an unambiguous exact match within
+two days; cross-currency matches always require confirmation. Changing the
+setting does not reinterpret existing confirmed history. One-sided transfers can
+be marked explicitly when the other account is outside Feng. Undo or unlinking
+restores both sides consistently.
+
+A refund stays dated when it arrived but reduces the original purchase's month
+and category spending. It never becomes income. Link a credit to one or several
+earlier purchases, allocating its entire amount exactly; partial reimbursement
+of a purchase is supported. Total refunds cannot exceed the purchase. A refund
+of a split purchase reduces its category lines proportionately. Linking a refund
+to a closed month updates that snapshot with a notice, rather than silently
+changing its arrival date or requiring that original month to be reopened.
+
+Split a mixed purchase into 2–20 category lines. The lines must equal the original
+to the penny before saving. Analytics, budgets and reports use the children;
+statement counts, balances and reconciliation use the original parent once.
+Unsplit restores one transaction. No child can be mistaken for another movement
+on the source statement.
+
+## Screens and planning
+
+- **Home:** dated cash/card debt/net-worth position, monthly income/spending/net,
+  up to three To do items, category spending, pots, cash-flow history, upcoming
+  payments and data health. Figures distinguish complete, partial, unverified
+  and missing data. Missing history is a gap, not zero; comparisons require
+  verified evidence at both endpoints.
+- **Transactions:** account chips, To review/Uncategorized and the requested
+  category shortcuts, indexed date/account filters, advanced search, saved views,
+  bulk review, tags, manual entries, sorting and source detail. Notes are
+  searchable. Up to five local image/PDF attachments can be added; images are
+  resized to at most 1600 pixels before storage.
+- **Analyse:** one month/range drives cash flow, income/spending/category trends,
+  averages, sample deviation, income percentage, comparisons and evidence.
+  Category overviews include Property without a redundant Home property card.
+  Reports group by category, tag, account, merchant or month, with sums, counts,
+  averages, charts and CSV. UK tax-year/property presets are optional and are not
+  tax advice.
+- **Planning:** Budgets, Pots, Calendar and Debt, with temporary What-if scenarios.
+  Budgets support no rollover, surplus-only or both signs. Open-month carry is
+  provisional. Goals and sinking pots show targets, contributions, due dates and
+  monthly need. Earmarks do not subtract cash a second time.
+- **Settings:** appearance, reporting currency/rates, reporting-period rule,
+  transfers, categories/rules/tags, security, reminders, storage, backups, recent
+  changes and explicit data-deletion options. Mobile Home stays in the middle of
+  navigation; desktop Settings stays at the sidebar bottom.
+
+Manual property, vehicle, pension, investment, loan, mortgage and other assets or
+liabilities use dated valuations. Liabilities subtract their positive magnitude
+from net worth. Freshness reminders are configurable; estimates remain labelled
+Estimated until replaced by an actual valuation or statement. Charts use dated
+steps and preserve unknown periods. Editing a manual account cannot relabel old
+valuation history into another currency.
+
+Calendar entries distinguish expected recurring payments from actual imports.
+Recurrence depends on observed evidence and can be confirmed, edited, ended or
+ignored. Subscription review highlights a rise of at least 5% or one currency
+unit against the previous three-charge median and suppresses repeat alerts at
+that same price. Keep dismisses that change; Cancel planned creates a reminder.
+Feng cannot determine usage or cancel a service. Complete cancellation with its
+provider and check future imported charges.
+
+Debt planning compares avalanche, snowball and custom order using balances,
+APR, minimum payments and the available monthly amount. Assumptions, including
+monthly interest, are shown; provider fees, rate changes and exact daily-interest
+contracts can differ. What-if changes only a saved projection, never actual
+transactions or balances. Forecasts are conditional estimates with explicit
+missing-data limits, not available-cash guarantees.
+
+Choose a calendar month, fixed start day (1–28) or detected salary/payday period
+in Settings. Home, budgets, review and Analyse share those period bounds and show
+the actual dates. Closing creates a snapshot and guards subsequent edits with a
+Reopen choice. Complete, reviewed periods may optionally auto-close after 60
+days; incomplete periods do not qualify. Refunds use the explicit original-month
+exception. Changing a period rule handles existing closed snapshots explicitly.
+
+## Reporting currency and offline rates
+
+Settings → **Reporting currency** replaces the old account-currency filter.
+GBP, EUR and other supported account currencies can contribute to the same
+report. Original transaction, statement and account-detail amounts remain in
+native currency. Converted figures show **≈** and expose the rate/date.
+
+ECB rates are downloaded only from `www.ecb.europa.eu` with a fixed public GET.
+Daily transactions use that date's rate or the most recent prior available
+business-day rate. Cross rates go through EUR. Rates are cached in IndexedDB,
+backed up and used offline; dated manual overrides work without a download.
+Conversion uses exact decimal/rational arithmetic and rounds only at the final
+minor unit. Missing rates remain unknown; stale rates are labelled with their
+date and an Update action rather than claimed as current. Weekend/holiday
+fallback follows the actual calendar, not a hard-coded weekday example.
+
+## Architecture and persistence
 
 ```text
-src/domain/           Typed entities, exact money/date parsing, normalization, hashes, reconciliation
-src/storage/          Dexie schemas, atomic data operations, demo, backup/restore/export
-src/import/           File limits, PDF.js, coordinates, OCR, detection, duplicate review, commit
-src/parsers/          Parser contract, shared layout helpers, Barclays / Amex / Revolut adapters
-src/categorization/   User rules → built-ins → consistent reviewed merchant history
-src/transfers/        Conservative opposite-amount/date/account matching
-src/analytics/        Currency-separated calculations and deterministic insights
-src/components/       Shared controls and accessible chart tables
-src/pages/            Home, import review, transactions/detail, analysis/property, settings
-src/tests/            Synthetic row helpers and test setup
-scripts/              Local runtime assets, icons and synthetic PDF generators
+src/domain/           Typed models, integer money, dates/periods, fingerprints and queries
+src/storage/          Dexie, atomic services, local audit/Undo, backup/restore and demo
+src/import/           Validation, PDF/OCR and data-file pipelines, review and atomic commit
+src/parsers/          Independent Barclays/Barclaycard, Amex and Revolut adapters
+src/categorization/   Shared rule conditions/actions and local category suggestions
+src/transfers/        Matching proposals; manual confirmation is the default
+src/analytics/        Ledger projections, refunds/splits, coverage, FX, reports and planning
+src/security/         Local PIN/WebAuthn and encrypted backup cryptography
+src/components/       Accessible shared controls, editors and chart representations
+src/pages/            Home, Import, Transactions/detail, Analyse, Planning and Settings
+scripts/              Static runtime assets and generated synthetic PDF fixtures
 ```
 
-Routing uses hash URLs so static hosting requires no server rewrites. Pages and parsing libraries load as separate chunks. Queries use compound `[currency+date]` and `[accountId+date]` indexes. The explorer renders at most 60 transactions at once; analytics load only relevant time windows. Full-history loading is reserved for explicit backup/export, matching-count review when Settings rules are opened, and account-local duplicate/history analysis during import. No original PDF is persisted.
+Routing uses hash URLs, so static hosting needs no application server rewrite.
+PDF.js runs its own worker; OCR uses a local Tesseract worker and English model.
+Bank detection uses several signals. Text is reconstructed from positions into
+rows and columns before a bank-specific adapter parses it. Wrapped descriptions,
+repeated dates, signs, totals and statement periods have regression fixtures.
+OCR is a fallback and has lower confidence. Source text is rendered through React
+text nodes, never unsafe imported HTML. Original import PDFs are not retained.
 
-### Money and credit cards
+Statement SHA-256 hashes detect exact reimports. Transaction fingerprints and
+occurrence/balance evidence protect regenerated and overlapping imports without
+silently removing legitimate identical purchases. Cross-format matching also
+checks already imported PDF/data-file rows. Imports recheck current history in
+the write transaction and roll back as a group on failure. Manual entries remain
+separate from statement reconciliation and require explicit replacement review
+when a later statement may contain the same payment.
 
-**Every stored `amount`, balance, difference and rule amount range is an integer in that currency's minor units.** GBP `-8245` means **-£82.45**, not -£8,245.00. Backup format 1 explicitly declares `moneyUnit: "minor"`; CSV exports decimal major units. Supported precision: GBP/EUR/USD/CHF/AUD/CAD/NZD/HKD/SGD = 2, JPY = 0, KWD = 3. Ambiguous locale formats are rejected; numbers use English decimal points and comma thousands separators.
+Indexes cover dates/currencies/accounts, fingerprints, merchants, split parents,
+transaction kinds/tags, recurring due dates and dated valuations/rates. The
+explorer paginates rather than rendering the entire ledger. Whole-history
+analysis/backup/export still reads the relevant local dataset; do not claim an
+actual iPhone performance result from desktop test timings. Audit hooks capture
+touched records rather than copying all 20,000 transactions for a single edit.
 
-Money entering the finances is positive; money leaving is negative. Amex reported amounts owed are stored as negative balances. Purchases are negative, refunds/payments positive. All cash-flow and property totals exclude `isTransfer` or transfer-type rows. Different currencies are never summed or converted. Monetary summation checks safe integer precision. Reconciliation accepts at most one minor unit difference.
+### Backup, restore and schema versions
 
-A transfer match requires exact opposite amounts, different known accounts, the same currency, dates within five days and reciprocal institution/account evidence in the descriptions. Ambiguous matches remain unlinked. Mark or link a transfer manually when descriptions are insufficient. A partial card payment can pair with its actual opposite deposit; it never matches a purchase or a differently sized payment. Clearly labeled Amex card repayments are classified as transfers immediately, even before the bank-side statement is imported. Other ambiguous or unlinked payments require review so they do not inflate totals.
+Legacy JSON remains readable:
 
-### Bank parser architecture
+```json
+{
+  "format": "feng-finance",
+  "version": 1,
+  "schemaVersion": 3,
+  "moneyUnit": "minor",
+  "exportedAt": "2026-10-08T12:00:00.000Z"
+}
+```
 
-Pipeline: file type/size/magic validation → SHA-256 → PDF.js worker → embedded coordinates → Y-tolerant rows / X-based columns → header-based bank detection → bank adapter → normalized transactions → balance reconciliation → duplicate review → deterministic categorization → atomic import and transfer matching.
+The full file additionally contains accounts, statements, transactions,
+categories, rules, transfer links/settings, valuations, pots, monthly budgets,
+tags, recurring series, closed months, rates, proposals, saved views/reports,
+scenarios and local audit history. Attachments are portable base64 descriptors;
+export can omit them and removes their references from the exported copy.
+Local PIN hashes, salts, platform credential IDs and other `security:` settings
+are excluded, including audit snapshots. Restore keeps the current device's lock
+configuration; moving devices requires configuring that device's lock.
 
-The interface exposes `canParse`, account, period and currency identification, balances, transactions and validation. The bank adapters select their provider/credit-card semantics and share layout primitives. A dated row without an amount, unsupported dates, both debit/credit values, out-of-period dates and unrecognized transaction-like rows generate explicit review warnings. OCR is used for pages with effectively no embedded text, or explicitly retried when extraction fails. It renders one page at a time, uses Tesseract word bounding boxes and caps transaction confidence at 0.6. Uncertain rows need acknowledgement. Failed reconciliation requires a separate override, stored with the statement for audit.
+Use an encrypted **`.feng`** backup for a portable protected copy. It uses
+AES-GCM-256, PBKDF2-SHA256 with 600,000 iterations and fresh random salt/IV.
+The authenticated header carries format/version/date/encryption metadata, not
+financial records. Restore requests the password before preview. A wrong password
+writes nothing. Forgotten passwords cannot be recovered by Feng or its host.
+Plain JSON remains available for compatibility and is a sensitive unencrypted
+file; save it only to a protected location.
 
-Barclaycard GBP statements use a separate credit-card adapter within the Barclays institution. It separates the two reading columns before reconstructing rows, treats balances as liabilities, preserves refunds and foreign-currency references, and marks card repayments as transfers. When the PDF prints only an issue date, the review labels **transaction coverage** from the earliest extracted date to that issue date and requires acknowledgement. This does not assert an unprinted billing-period start. `periodSource` and `statementDate` preserve that distinction in the database and backups. Explicit header ranges, including wrapped dates and shared years/months, remain preferred. Missing or conflicting date ranges can be corrected using **Enter statement dates from PDF → Parse again**; manual dates require a source-review acknowledgement and never bypass reconciliation.
+Restore validates versions, identifiers, safe integer money, references,
+currencies, statement counts, exact split sums, refund allocations, transfer
+links and portable receipt bytes before replacing data. A newer schema is
+rejected with an Update instruction. Replace restore requires explicit UI
+confirmation, runs atomically and supports local Undo. Merge is not supported.
 
-UK Amex statements support the low-page explicit billing period, membership identifier, four-column account summary, transaction/process dates, separate-line credit markers, multiline descriptions, foreign-spend references, and transactions near the bottom of a page. A printed transaction date outside the period remains unchanged and requires review. UK Revolut statements skip migration cover pages, read the primary account number and balance-summary table, and stop at the actual footer. Both adapters check gross incoming/outgoing totals as well as net reconciliation. Explicit Revolut payments to an Amex recipient are proposed as transfers and require confirmation that the card belongs to you; change the transaction type during review if necessary. Other person-to-person payments require manual transfer review.
+IndexedDB schema 1 is preserved. Schema 2 added merchant/review metadata. Schema
+3 additively introduces v2 tables and optional fields, retaining legacy amounts,
+original descriptions, account IDs, rules and links. Existing confirmed transfers
+are not retrospectively unlinked by the new manual default. Migration tests open
+old databases and restore old-format backups without resetting financial data.
+No parser failure or version check automatically clears the database.
 
-Exact PDF duplicates require a separate override. Known transaction duplicates are excluded by default and remain visible; keeping one requires explicit review. Statement-period matches detect regenerated PDFs. Fingerprints include account, date, normalized description, exact amount, currency, running balance (if present) and repeated-row occurrence. Without balance evidence, overlapping identical rows are potential duplicates rather than silently removed. Import rechecks history inside a single IndexedDB write transaction, including account-creation races. Financial data never partially commits if the transaction fails.
+For repeat-import testing, export a backup, then Settings → **Delete imported
+records**. Accounts, categories, learned rules and plans remain; manual entries
+are retained. Reimport and compare every row against the source. **Erase
+everything** also removes categorization memory, plans, attachments and the local
+lock. The web host has no recovery copy. Browser/profile/origin changes have
+separate databases; use backup/restore to move records.
 
-Add another bank by implementing `StatementParser`, registering it in `src/parsers/index.ts`, adding independent header signals and generating a synthetic layout fixture. Add tests for signs, balances, multiline descriptions, page breaks, repeated purchases, currency references and invalid rows. Extend adapter-specific column identification when a real layout differs; do not relax reconciliation to make it pass.
+## Installation, reminders and deployment
 
-### Personal corrections and appearance
+The static deployment is [Feng Finance](https://lech1012-collab.github.io/feng-finance/).
+See [deployment instructions](docs/deployment.md). `dist/` is deployable through
+GitHub Pages, Cloudflare Pages or Vercel. GitHub Actions validates changes before
+Pages publishing. All production assets are static; no server secret is needed.
 
-Settings → **Categorization & transfer rules** → **Advanced: import personal rules** accepts a local JSON file with format `feng-finance-rules`, version `1`, `categories` and `rules` arrays. Category entries contain `id`, `name`, `kind`. Rule entries contain `name`, `match` (`contains`, `starts-with`, `exact`), `pattern`, `direction`, and either `categoryId` or `type: "transfer"`. Preview the matching record count, then **Apply corrections & remember rules**. This is an atomic local update: printed dates/amounts and statement balances are preserved; demo rows are excluded. Conflicting outcomes, unavailable categories, linked transfers and stale previews are rejected. Reapplying the same rules is idempotent. Keep files containing personal names or references out of the repository. The deployed site cannot change another device's records remotely.
+On iPhone: open the HTTPS URL in Safari → **Share** → **Add to Home Screen** →
+enable **Open as Web App** → **Add**. Launch from the icon. Wait for Offline ready,
+then test airplane mode. The service worker offers a user-controlled Update;
+it does not replace application code midway through import.
 
-Dark is the default theme. Appearance is stored in IndexedDB and included in backups; a localStorage copy of the theme name prevents a light-mode reload flash. No financial data is stored in localStorage. Import opens on uncertain/duplicate/date-exception rows; **All transactions** exposes every extracted row and optional categorization. After import and initial launch, Home uses the latest available statement balance or activity month. An October card statement containing September purchases therefore opens October without backdating its closing balance. Account balances are dated statement snapshots, not live bank balances; card liabilities display as positive **Card debt**.
+Settings reminders work while Feng is open. Exported `.ics` events let an existing
+calendar show review alerts while the web app is closed, without a notification
+server or native app. Events are generic and omit merchant names, amounts and
+account information. Calendar alert support varies; verify calendar permissions
+and remove old exported events there when preferences change. Feng does not
+promise background monitoring or push notifications while closed.
 
-### Backup and schema migrations
+## Private fixtures and limitations
 
-Format: `{format:"feng-finance", version:1, schemaVersion:2, moneyUnit:"minor", exportedAt, accounts, statements, transactions, categories, rules, transferLinks, settings}`. The original PDFs are not included. Zod validation checks primitive formats/versions, safe integer money, reference integrity, unique IDs, account/currency consistency, category hierarchy, statement counts and transfer pairing before any write. Replace restore runs atomically and requires an explicit UI acknowledgement. Merge restore is deliberately not implemented in V1. Backups are unencrypted sensitive files; save them to a protected location.
+Put real statements only in ignored `private-fixtures/` and select them locally.
+Never commit real PDFs, extracted text, backups, account identifiers, screenshots
+or traces containing financial records. Generated fixtures and demo data are
+fictitious. If a real layout exposes a bug, create a synthetic regression and
+change its bank adapter; do not weaken validation. To add a bank, implement the
+parser contract, bank-detection signals and synthetic sign/period/layout/balance
+tests, then register the adapter.
 
-IndexedDB starts at schema 1. Schema 2 adds the merchant index and fills missing review/occurrence/tag metadata without clearing data. A migration test opens a schema-1 database and verifies preserved amounts and descriptions. Future schemas must add versioned, non-destructive migrations and tests. Never reset a database automatically in response to a version or parsing error.
-
-## Deployment and installation
-
-The application is hosted at [Feng Finance](https://lech1012-collab.github.io/feng-finance/). See [static deployment instructions](docs/deployment.md). `dist/` is the complete deployable artifact for Vercel, Cloudflare Pages or GitHub Pages. No API keys are required. Verified pushes to `main` deploy automatically through GitHub Actions.
-
-On iPhone: open the HTTPS URL in Safari → **Share** → **Add to Home Screen** → enable **Open as Web App** → **Add**. Launch from the icon. Wait for the offline cache to complete before testing airplane mode. Each browser/profile/origin has a separate database; installing or changing the deployment URL does not move data. Export/restore when moving origins or devices.
-
-## Privacy and release verification
-
-See [privacy/security audit](docs/privacy.md), [real iPhone checklist](docs/iphone-checklist.md) and [implementation/validation notes](docs/validation.md). Browser tests exercise actual generated PDFs, multi-file import, local OCR, atomic review, learned rules, duplicates, currency separation, backup and offline import. The offline test stops its static origin before reloading, importing and exporting and rejects external requests/non-GET requests with payloads.
-
-### Testing private real statements
-
-Place real files only in `private-fixtures/` (ignored) and select them using the app's file picker. Never put real statements, extracted text, backups, account IDs or transaction history into committed tests, screenshots, traces, logs or issue descriptions. `*.pdf`, test reports and private fixtures are ignored. Make a synthetic equivalent when adding a regression. Compare every transaction and balance against the original locally. Export a backup before experimenting with parser changes.
-
-## Known limitations
-
-- Adapters are verified against generated English-layout fixtures, not every historical bank PDF variation. Real statements may need adapter-specific layout work; warnings/manual bank-account selection and explicit reconciliation prevent silent acceptance. No claim of universal bank-layout compatibility is made.
-- The current bank adapters reject PDFs with no extracted transaction rows. A printed zero-activity layout needs a dedicated fixture before support can be claimed; empty extraction is never assumed to mean zero spending. The storage/review boundary accepts a genuinely reconciled balance-only statement.
-- Native iPhone Safari file picking, installation, storage persistence and update behavior require the documented manual device checks. Playwright WebKit is useful but is not an actual iPhone.
-- English embedded text and English OCR; password-protected PDFs must be unlocked locally first. Statements with multiple accounts/currencies must be exported separately. 30 MB / 100 pages maximum. OCR can be slow and consume memory on a phone.
-- No exchange-rate conversion, encrypted database, multi-device sync or statement PDF retention. A device passcode and regular backups are essential. The app host cannot recover lost browser data.
-- Comparisons require continuous full-period coverage for all accounts in the selected currency, with reconciled stored rows and printed or manually verified statement dates. Partial and unverified observations are labelled and excluded from baselines. Reconciliation cannot prove a parser extracted every offsetting movement correctly; real layouts still require source review. Recurrence needs repeated payment evidence and remains a suggestion.
-- Property means cash flow only, with the configured Property and Property income categories; this is not tax, accrual accounting, depreciation or investment profitability.
-
-### Subscription review centre
-
-Open **Subscription review** on Home. The on-device detector examines up to three years of transactions, separated by account and currency. It looks for weekly (four charges), monthly/quarterly (three charges), and annual (two charges) patterns. Known service names and the Subscriptions category also surface one-off candidates, without inventing a billing frequency. Price changes and the same merchant on multiple accounts prompt review. Evidence links open the original transaction and statement details.
-
-Swipe a charge left to plan cancellation, or right to keep it. Status tiles provide touch/keyboard alternatives; **All detected** lets you reverse a decision. Complete cancellation through the provider or app store, then mark **I cancelled**. A subsequently imported charge dated after that decision returns to the review queue. Review states are backed up with settings; no transaction amount or category is modified. Annual projections use the latest observed rate and are not guaranteed savings. The app cannot determine usage, cancel a service, or monitor bank activity in the background. Sparse imports, changing merchant descriptors, missing periods and multiple plans billed under one merchant can limit detection; inspect the source charges before acting.
-
-### Rechecking an import after a parser update
-
-Version 1.3.1 (parser 1.0.3) fixes Barclays statements that print a date only once for several transactions. Previously imported records are not changed automatically. Back up before testing a fresh import; use an empty test browser profile or the documented Settings reset. Do not blindly override duplicate protection to repair an earlier incomplete import, because changed descriptions can also affect duplicate matching. Check every transaction and reconciliation before confirming.
-
-### Category overviews and spending context
-
-Tap a Home spending category to open its monthly KPIs, trend, subcategories and source transactions. Analyse's category selector also includes income and zero-spend categories. Property has its rent/cost/net metrics within this overview; the duplicate Home tile is removed. Tap chart bars or month tiles to drill down. Home can switch category percentages between share of spending and share of recorded income (unavailable without an imported income source; values may exceed 100%).
-
-Compare against the preceding six or twelve calendar months. Only months covered continuously by statements for every account in the selected currency enter the baseline. Inferred transaction-coverage periods and failed reconciliations are excluded. Covered months with no category spending count as zero; missing months do not. Sample standard deviation uses n−1 and requires at least three complete months. The mean ± one standard deviation band is descriptive, not a budget or prediction. The current month is excluded from the baseline, and partial current coverage prevents an overspending alert. Transfers are excluded throughout. Property cash flow includes rental income; category spending remains gross outflows, with refunds shown in the transaction evidence and recorded income.
-
-Mobile navigation is Import · Transactions · Home · Analyse · Planning, with Home central and Settings in the header. Desktop begins with Home, places a primary Import action above navigation and keeps Settings at the bottom. Page accents distinguish sections; income, spending, net and category data colors remain consistent across pages. No green is used.
-
-## Home balances and simplified workflow
-
-### Income and balances
-
-Income labels and filters follow the signed statement amount: a positive Salary
-payment is income, even when an older stored type label says expense. Categorizing
-or editing a credit as Salary saves its type as income. Categories never reverse
-amounts; negative Salary assignments require checking the source statement.
-Any transfer marker, including a linked pair, excludes the movement from income,
-expenses and net cash flow. Account balances include every signed movement and
-retain the reported statement balance. No existing amounts or balances are rewritten.
-
-### Planning
-
-Planning is a separate page, accessible from the mobile bottom navigation,
-the desktop sidebar and Home's upcoming payments. It has its own rose palette
-and remains entirely local.
-
-Monthly category budgets use currency-scoped settings included in JSON backups,
-without a database migration. Tap a category's limit to edit it; an empty value
-removes it. Limits repeat each month. Recorded negative spending is compared with
-the limit; transfers are excluded, refunds are not automatically matched against
-their original purchases, and incomplete imports can understate spending. Suggested
-limits require three complete prior months with verified rows and balances.
-
-Upcoming payments use repeated merchant/account/direction sequences and weekly,
-fortnightly, monthly, quarterly or annual cadence. Everyday shopping, refunds,
-transfers, stale patterns and recorded cancellations are excluded. Predictions
-are estimates, not confirmations. Payment rows link to their source transactions.
-
-The 30/60/90-day forecast always starts from today's local date, independently
-of the budget month. Its anchor is the latest shared verified balance across all
-accounts of the selected currency; credit-card debt reduces the total. Forecasts
-are withheld for missing/failed reconciliation, missing rows, anchors older than
-35 days or fewer than three complete historical months. Imported movement since
-the anchor is included, observed recurring payments are not duplicated, and missing
-recurring payments are estimated. Remaining variable spending uses its daily average
-across complete months. Income uses the lowest recent recurring payment; bills use
-their last amount. Cancelled services are excluded from future costs. Dashed lines
-show variable-spending scenarios ±25%, not statistical confidence limits. The
-forecast is a projected total financial position, not available cash or a safe
-spending allowance; budgets do not change its spending assumptions.
-
-### Local insights and reminders
-
-Feng is a website/PWA; no native app or App Store onboarding is required.
-Home shows a short insight list and Analyse shows the full evidence. Local,
-deterministic analysis highlights spending drivers, lower income, spending
-outside its usual range, unusually large merchant payments, subscription price
-rises, possible overlapping services and charges after a recorded cancellation.
-Monthly comparisons require a complete verified selected month and at least
-three complete months in the previous six. Transfers, future dates and other
-currencies are excluded. These are prompts to investigate, not proof of errors.
-
-Settings → Reminders enables reminders and sets a monthly statement-review day
-(1–28). Home flags missing recent statements and estimated recurring bills.
-Bill dates require observed monthly/quarterly/annual recurrence; an expected date
-does not prove a payment is unpaid. Reminders work locally whenever Feng is open.
-
-Export calendar reminders downloads a generic `.ics` file for your existing
-calendar. It contains a monthly review and upcoming bill-review events at 09:00
-local time with alarm requests, without merchant names, amounts or account details.
-Import the file and check your calendar's alert permissions. This provides alerts
-while Feng is closed without adding a notification server. Calendar support varies;
-the web app does not schedule reliable background alerts itself. Re-export to
-refresh predicted dates. Disabling reminders in Feng does not delete calendar events;
-remove them in the calendar if needed. Reminder preferences are included in backups.
-
-Every manual category or transfer assignment automatically saves an exact merchant
-rule scoped to the same account and incoming/outgoing direction. The latest manual
-choice becomes the default for future matching imports, including corrections made
-in import review. There is no remembering checkbox or second action. Rules live in
-IndexedDB separately from transaction history and are included in JSON backups.
-The original merchant identity is retained when you rename a transaction, so
-future PDF imports still receive your latest category. This optional metadata is
-included in backups; existing backups remain compatible. Demo transactions never
-create rules for real financial records. Undo reverses the
-assignment and its learned rule. Rules remain configurable in Settings.
-
-For repeat-import testing: categorize the transaction, then Settings → **Delete
-imported records**, check the warning and delete. Reimport the PDF. This removes
-statements, transactions and transfer links while preserving accounts (including
-their IDs), categories, rules and preferences. **Erase everything** deliberately
-removes all of those, including categorization memory. Choices saved in older
-versions without Remember must be categorized again before history is deleted.
-Already erased choices require a prior backup to recover. Transaction rows show
-the actual category in their status badge, without an arrow or duplicate category
-text in the date/account line.
-
-On desktop, press and drag a transaction row to open the category popup, then
-drop that same transaction directly onto a category tile. Uncategorized rows
-have no arrow icon. Up to three likely categories appear first, ranked from
-local user rules, reviewed merchant history in the same account, built-in rules
-and description clues. Suggestions require confirmation and never change
-financial amounts or classify transfers as spending. Unknown descriptions show
-the full category list. Mobile tap/swipe, keyboard C, tile selection, grouped
-sorting, remembered rules and Undo remain available. Dropping outside a tile
-does not save; Escape cancels desktop dragging.
-
-The popup also includes a **Transfer** tile for movements between your own
-accounts and card repayments. Dropping or tapping clears spending categories,
-sets the transaction type to transfer and excludes it from income/expenses.
-It works for incoming and outgoing amounts, supports grouping, automatic
-account-specific remembered rules and Undo. Mark both sides when necessary;
-this action does not invent a matching transaction or link an ambiguous pair.
-
-Home's Import statement control opens the native PDF picker directly. The Import
-navigation tab does the same. PDFs process locally, with reconciliation and
-exception review before committing. Every selected file appears in one combined
-review, with blocking issues first and clean files collapsed. One confirmation
-saves the batch sequentially with fresh duplicate checks, then returns Home.
-
-Home separates Cash and positive Card debt. Net position appears only when all
-accounts in the selected currency have verified current balances and a current
-or savings account is available. Missing accounts have dashed rows and a direct
-Import action. Card-only imports do not imply zero income or a total cash balance.
-Balances use the latest eligible statement closing on or before the selected
-month end and never use a future closing date. Known reported balances remain
-visible even when verification is incomplete, with a dated **Unverified reported
-balance** label and a reason. Older verified balances remain visible with their
-dates, while current net position remains unavailable. Only balances whose stored
-row count, account, currency and amounts reconcile enter the cash/debt aggregates.
-A Barclaycard statement without a printed period start, or an Amex statement with
-an older purchase date, can still prove its printed closing balance. This does
-not establish complete calendar history. Percentage comparisons require current,
-reliable statements for all the same accounts at both endpoints and a nonzero
-prior total. Change is `(current - previous) / abs(previous) × 100`, so debt
-repayment produces a positive change. Failed validation and inferred periods
-withhold comparisons. The Home 1/3/6/12-month selector appears after two distinct
-reconciled closing dates are available for an account and also controls balance history.
-The range ends at the latest eligible closing balance. Daily balances are reconstructed
-from the opening balance and all transactions, including transfers, only when the
-stored row count and amounts reconcile with the reported closing balance, and the
-printed date coverage can be verified. Issue-date-only or date-exception statements
-provide a closing point rather than invented daily movement. Partial
-extraction, conflicting overlap and missing coverage leave gaps. A dashed line shows
-the total; totals and percentage comparisons require all accounts at both dated
-endpoints. Currency totals remain separate.
-
-Import both the bank and Barclaycard statements: individual card purchases receive
-spending categories, while repayments are transfers. Explicit bank payments to
-Barclaycard are paired with a unique same-currency, equal-value card repayment
-within five days during import. Refunds and ambiguous matches are excluded.
-For previously imported, unpaired bank repayments, open the transaction, choose
-Transfer and save; optionally link the matching card repayment. A repayment alone
-cannot reveal its underlying purchases, so card statements are needed for a complete
-spending breakdown.
-
-Expenses plot below zero, income above zero, and net cash flow uses a distinct
-line. Home charts have tooltips and legends; detailed value tables remain in
-Analyse. Compact account-filter chips show balance dates and identifiers in Transactions.
-
-Settings → **Show accounts in** controls the global account currency without
-conversion. A persistent scope notice identifies accounts hidden by that choice.
-Analyse uses one selected date range for cards, charts, tables and comparisons.
-Unknown months have gaps and hatched placeholders. Comparisons require complete
-verified coverage for both periods. See [the implemented UX review](docs/ux-review.md)
-for the design decisions and real-device checklist.
-
-Uncategorized on Home opens an all-dates transaction queue. Main category
-buttons, including Uncategorized, select filters. Row badges show Needs category,
-the assigned category name or Transfer. Saving through either the sorting sheet or
-transaction editor removes categorized rows from that queue. Analyse's category
-selector opens the category's charts, complete-month average/sample deviation
-and same-month income percentage.
-
-Import review shows **Money in** and **Money out** for all extracted statement
-rows, including transfers and rows excluded from import as duplicates. These
-statement totals update when extracted amounts are corrected; only selected rows
-are saved. Dashboard income, expenses and net cash flow continue to exclude
-transfers, preventing card repayments from counting twice.
+- Synthetic adapters do not prove support for every historical bank layout.
+  Warnings and explicit source review remain essential; offsetting extraction
+  mistakes can still reconcile mathematically.
+- Current PDF adapters reject zero extracted rows. A genuinely reconciled
+  balance-only statement is valid at storage/review level, but unsupported empty
+  PDF layouts are never assumed to mean zero spending.
+- English digital/OCR statements; password-protected PDFs must be unlocked
+  locally. Multi-account/currency PDFs may need separate exports. PDF limits are
+  30 MB and 100 pages. OCR can take time and memory on phones.
+- Optional app lock deters casual access. PIN/WebAuthn and app-switcher cover do
+  **not** encrypt IndexedDB at rest. Optional database-at-rest encryption from
+  FR-7.4 is deferred; encrypted portable backups are implemented. Protect the
+  device/browser and maintain backups. Physical Face ID, VoiceOver, iOS Files,
+  camera, installation, large text and service-worker updates need real-device
+  testing.
+- No Open Banking, cloud sync, household sharing, AI assistant or automatic
+  movement/cancellation of money. Property reporting is cash flow, not accrual,
+  depreciation or a guaranteed tax treatment. Plans depend on imported evidence.

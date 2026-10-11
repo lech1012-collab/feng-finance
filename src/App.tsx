@@ -1,3 +1,4 @@
+import { autoCloseEligibleMonths } from "./storage/month-review";
 import { ImportPickerContext } from "./components/ImportPicker";
 import {
   useGlobalCurrency,
@@ -38,6 +39,10 @@ import { registerSW } from "virtual:pwa-register";
 import { db, initializeDatabase } from "./storage/database";
 import { statementBalanceDate } from "./analytics/statement-balances";
 import Home from "./pages/Home";
+import { AppLock } from "./components/AppLock";
+import { MonthReview } from "./components/MonthReview";
+import { deleteDemo } from "./storage/demo";
+import { useSearchParams } from "react-router-dom";
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Category = lazy(() => import("./pages/Category"));
 const Transactions = lazy(() => import("./pages/Transactions"));
@@ -47,6 +52,12 @@ const Settings = lazy(() => import("./pages/Settings"));
 const Import = lazy(() => import("./pages/Import"));
 const Planning = lazy(() => import("./pages/Planning"));
 let applyUpdate: (reload?: boolean) => Promise<void>;
+function ReviewRoute({ month, currency }: { month: string; currency: string }) {
+  const [params] = useSearchParams();
+  return (
+    <MonthReview month={params.get("month") ?? month} currency={currency} />
+  );
+}
 function Shell() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -82,8 +93,49 @@ function Shell() {
   const [initError, setInitError] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState(false);
 
+  const demoCount = useLiveQuery(
+    () => db.accounts.filter((a) => !!a.isDemo).count(),
+    [],
+  );
   const [online, setOnline] = useState(navigator.onLine);
   const [storageWarning, setStorageWarning] = useState("");
+  useEffect(() => {
+    const searchShortcut = (event: KeyboardEvent) => {
+      const target = event.target;
+      if (
+        event.key !== "/" ||
+        event.metaKey ||
+        event.ctrlKey ||
+        event.altKey ||
+        (target instanceof HTMLElement &&
+          (target.isContentEditable ||
+            /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName) ||
+            !!target.closest("dialog[open]")))
+      )
+        return;
+      event.preventDefault();
+      navigate("/transactions?allDates=1");
+      const focusSearch = () => {
+        const input = document.querySelector<HTMLInputElement>(
+          "#transaction-search",
+        );
+        if (!input) return false;
+        input.focus();
+        return true;
+      };
+      if (focusSearch()) return;
+      const observer = new MutationObserver(() => {
+        if (focusSearch()) observer.disconnect();
+      });
+      observer.observe(document.getElementById("main")!, {
+        childList: true,
+        subtree: true,
+      });
+      window.setTimeout(() => observer.disconnect(), 5000);
+    };
+    window.addEventListener("keydown", searchShortcut);
+    return () => window.removeEventListener("keydown", searchShortcut);
+  }, [navigate]);
   useEffect(() => {
     const navigation = mobileNavigation.current;
     if (!navigation) return;
@@ -99,7 +151,10 @@ function Shell() {
   }, []);
   useEffect(() => {
     void initializeDatabase()
-      .then(() => setInitialized(true))
+      .then(() => {
+        setInitialized(true);
+        void autoCloseEligibleMonths().catch(() => {});
+      })
       .catch(() =>
         setInitError(
           "Local storage could not be opened. Disable private browsing or allow website storage, then reload.",
@@ -133,6 +188,7 @@ function Shell() {
       off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
+    void navigator.storage?.persist?.().catch(() => {});
     if (navigator.storage?.estimate)
       void navigator.storage.estimate().then((s) => {
         if (s.quota && s.usage && s.usage / s.quota > 0.8)
@@ -195,9 +251,9 @@ function Shell() {
           className="sr-only"
           tabIndex={-1}
           type="file"
-          accept="application/pdf,.pdf"
+          accept="application/pdf,.pdf,text/csv,.csv,.ofx,.qfx,.qif"
           multiple
-          aria-label="Quick import PDFs"
+          aria-label="Quick import statements"
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
             e.target.value = "";
@@ -359,6 +415,12 @@ function Shell() {
           {initialized && !initError && (
             <CurrencyViewNotice currency={currency} />
           )}
+          {initialized && !!demoCount && (
+            <div className="notice demo-banner" role="status">
+              <span>Demo mode · fictitious financial data</span>
+              <button onClick={() => void deleteDemo()}>Clear demo</button>
+            </div>
+          )}
           <main id="main" tabIndex={-1}>
             {initError ? (
               <p role="alert">{initError}</p>
@@ -437,6 +499,10 @@ function Shell() {
                   />
                   <Route path="/settings" element={<Settings />} />
                   <Route
+                    path="/review"
+                    element={<ReviewRoute month={month} currency={currency} />}
+                  />
+                  <Route
                     path="/planning"
                     element={
                       <Planning
@@ -486,7 +552,9 @@ export default function App() {
   return (
     <ErrorBoundary>
       <HashRouter>
-        <Shell />
+        <AppLock>
+          <Shell />
+        </AppLock>
       </HashRouter>
     </ErrorBoundary>
   );

@@ -24,6 +24,7 @@ const state = vi.hoisted(() => ({
       },
 }));
 vi.mock("dexie-react-hooks", () => ({ useLiveQuery: () => state.data }));
+vi.mock("../components/ReportBuilder", () => ({ ReportBuilder: () => null }));
 vi.mock("../components/CategoryAnalysisPicker", () => ({
   CategoryAnalysisPicker: () => null,
 }));

@@ -134,26 +134,29 @@ it("flags larger merchant payments using same-account historical median without 
   ).toBe(false);
 });
 it("finds recurring price rises and labels cross-account overlaps as possible", () => {
-  const subscriptions = ["2026-05-01", "2026-06-01", "2026-07-01"].flatMap(
-    (date, i) => [
-      transaction({
-        id: `s${i}`,
-        merchant: "NETFLIX",
-        description: "NETFLIX",
-        date,
-        amount: i === 2 ? -2000 : -1500,
-        categoryId: "subscriptions",
-      }),
-      transaction({
-        id: `other${i}`,
-        accountId: "a2",
-        merchant: "NETFLIX",
-        date,
-        amount: -1500,
-        categoryId: "subscriptions",
-      }),
-    ],
-  );
+  const subscriptions = [
+    "2026-04-01",
+    "2026-05-01",
+    "2026-06-01",
+    "2026-07-01",
+  ].flatMap((date, i) => [
+    transaction({
+      id: `s${i}`,
+      merchant: "NETFLIX",
+      description: "NETFLIX",
+      date,
+      amount: i === 3 ? -2000 : -1500,
+      categoryId: "subscriptions",
+    }),
+    transaction({
+      id: `other${i}`,
+      accountId: "a2",
+      merchant: "NETFLIX",
+      date,
+      amount: -1500,
+      categoryId: "subscriptions",
+    }),
+  ]);
   const result = analyze(subscriptions);
   expect(result.items.some((i) => i.title.includes("price increase"))).toBe(
     true,
@@ -161,6 +164,12 @@ it("finds recurring price rises and labels cross-account overlaps as possible", 
   expect(result.items.filter((i) => i.id.startsWith("overlap-"))).toHaveLength(
     1,
   );
+  // Three charges establish recurrence, but cannot provide the required three-charge price baseline.
+  expect(
+    analyze(subscriptions.filter((t) => t.date !== "2026-04-01")).items.some(
+      (i) => i.title.includes("price increase"),
+    ),
+  ).toBe(false);
 });
 
 it("only shows a cancellation alert for a selected month containing a later charge", () => {

@@ -6,6 +6,7 @@ export function accountSnapshot(
   account: Account,
   statements: Statement[],
   month: string,
+  today = new Date().toISOString().slice(0, 10),
 ) {
   const cutoff = monthBounds(month)[1];
   const statement = statements
@@ -14,7 +15,7 @@ export function accountSnapshot(
         s.accountId === account.id &&
         s.currency === account.currency &&
         statementBalanceDate(s) < cutoff &&
-        statementBalanceDate(s) <= new Date().toISOString().slice(0, 10),
+        statementBalanceDate(s) <= today,
     )
     .sort(
       (a, b) =>
@@ -162,6 +163,7 @@ export function datedBalanceHistory(
   month: string,
   currency: string,
   period: number,
+  today = new Date().toISOString().slice(0, 10),
 ) {
   const scoped = accounts.filter((a) => a.currency === currency);
   const accountIds = new Set(scoped.map((a) => a.id));
@@ -170,7 +172,7 @@ export function datedBalanceHistory(
       accountIds.has(s.accountId) &&
       s.currency === currency &&
       statementBalanceDate(s) < monthBounds(month)[1] &&
-      statementBalanceDate(s) <= new Date().toISOString().slice(0, 10) &&
+      statementBalanceDate(s) <= today &&
       s.closingBalance !== undefined &&
       s.validationStatus === "reconciled",
   );

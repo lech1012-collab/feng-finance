@@ -3,7 +3,11 @@ import { db } from "./database";
 import { normalizeMerchant } from "../domain/normalize";
 import { amountType } from "../domain/transaction-type";
 import { rememberCategory } from "./category-memory";
+import { auditedMutation, undoChange } from "./audit";
+import { ensureMonthsOpen } from "./month-review";
+import { ensureRefundIntegrity } from "./accuracy";
 export const TRANSFER_TARGET = "__feng-transfer";
+export const CARD_REPAYMENT_TARGET = "__feng-card-repayment";
 export interface CategoryReceipt {
   before: Transaction[];
   after: Transaction[];
@@ -12,6 +16,8 @@ export interface CategoryReceipt {
   selectedIds?: string[];
   learning?: { merchant: string; accountId: string; count: number }[];
   categoryName: string;
+  changeId?: string;
+  splitRuleOffer?: { transaction: Transaction; lines: Transaction[] };
 }
 export async function matchingUncategorized(t: Transaction) {
   const merchant = normalizeMerchant(t.sourceMerchant ?? t.merchant);
@@ -26,6 +32,9 @@ export async function matchingUncategorized(t: Transaction) {
         !p.isTransfer &&
         p.type !== "transfer" &&
         !p.transferPairId &&
+        !p.parentId &&
+        p.kind !== "refund" &&
+        p.kind !== "split_parent" &&
         p.currency === t.currency &&
         !!p.isDemo === !!t.isDemo &&
         Math.sign(p.amount) === Math.sign(t.amount) &&
@@ -36,24 +45,32 @@ export async function matchingUncategorized(t: Transaction) {
 export async function categorizeCards(
   expected: Transaction[],
   categoryId: string,
-  options: { allowMultipleMerchants?: boolean; backfill?: boolean } = {},
+  options: {
+    allowMultipleMerchants?: boolean;
+    backfill?: boolean;
+    tags?: string[];
+    learn?: boolean;
+  } = {},
 ): Promise<CategoryReceipt> {
   if (
     !expected.length ||
     new Set(expected.map((t) => t.id)).size !== expected.length
   )
     throw new Error("Choose a transaction first.");
-  return db.transaction(
-    "rw",
-    db.transactions,
-    db.categories,
-    db.rules,
+  return auditedMutation(
+    "Categorize transactions",
+    ["transactions", "categories", "rules", "settings", "monthCloses"],
     async () => {
-      const transfer = categoryId === TRANSFER_TARGET;
+      const transfer =
+        categoryId === TRANSFER_TARGET || categoryId === CARD_REPAYMENT_TARGET;
       const category = transfer
         ? undefined
         : await db.categories.get(categoryId);
-      const categoryName = transfer ? "Transfer" : category?.name;
+      const categoryName = transfer
+        ? categoryId === CARD_REPAYMENT_TARGET
+          ? "Card repayment"
+          : "Transfer"
+        : category?.name;
       const parent = category?.parentId
         ? await db.categories.get(category.parentId)
         : undefined;
@@ -74,6 +91,24 @@ export async function categorizeCards(
           "A transaction changed. Reopen it before categorizing.",
         );
       const chosen = current as Transaction[];
+      if (
+        chosen.some(
+          (transaction) =>
+            transaction.kind === "split_parent" ||
+            (transaction.kind === "refund" &&
+              !!transaction.refundAllocations?.length),
+        )
+      )
+        throw new Error(
+          "Edit split lines or linked refunds in transaction details.",
+        );
+      if (
+        (transfer || categoryId === "refund") &&
+        chosen.some((transaction) => !!transaction.parentId)
+      )
+        throw new Error(
+          "Unsplit the parent before marking a split line as a transfer or refund.",
+        );
       const before = [...chosen];
       if (options.backfill) {
         const ids = new Set(before.map((t) => t.id));
@@ -103,6 +138,7 @@ export async function categorizeCards(
         throw new Error(
           "This is money out. Income and Salary require a positive payment. Check the source statement before correcting its amount.",
         );
+      await ensureMonthsOpen(before);
       const first = before[0];
       if (
         before.some(
@@ -137,12 +173,28 @@ export async function categorizeCards(
         subcategoryId: !transfer && parent ? category!.id : undefined,
         type: transfer ? ("transfer" as const) : amountType(t.amount),
         isTransfer: transfer || t.isTransfer,
-        isReviewed: true,
+        kind: transfer
+          ? categoryId === CARD_REPAYMENT_TARGET
+            ? ("card_repayment" as const)
+            : ("transfer" as const)
+          : categoryId === "refund"
+            ? ("refund" as const)
+            : t.kind === "refund"
+              ? ("normal" as const)
+              : t.kind,
+        isReviewed:
+          categoryId !== "refund" && chosen.some((p) => p.id === t.id),
+        tags:
+          options.tags && chosen.some((p) => p.id === t.id)
+            ? options.tags
+            : t.tags,
         categorySource: chosen.some((p) => p.id === t.id)
           ? ("manual" as const)
           : ("rule" as const),
         updatedAt,
       }));
+      for (let index = 0; index < before.length; index++)
+        await ensureRefundIntegrity(before[index], after[index]);
       const rules: Rule[] = [];
       const learning: NonNullable<CategoryReceipt["learning"]> = [];
       const grouped = new Map<string, Transaction[]>();
@@ -159,7 +211,13 @@ export async function categorizeCards(
         grouped.set(key, group);
       }
       for (const group of grouped.values()) {
-        const rule = await rememberCategory(group[0]);
+        const rule =
+          options.learn === false
+            ? undefined
+            : await rememberCategory(
+                group[0],
+                before.find((row) => row.id === group[0].id),
+              );
         if (rule) rules.push(rule);
         for (const t of group) t.categoryRuleId = rule?.id;
         learning.push({
@@ -179,9 +237,23 @@ export async function categorizeCards(
         categoryName: categoryName!,
       };
     },
-  );
+  ).then(({ result, changeId }) => ({ ...result, changeId }));
 }
 export async function undoCategory(receipt: CategoryReceipt) {
+  if (receipt.changeId) {
+    try {
+      return await undoChange(receipt.changeId);
+    } catch (error) {
+      if (
+        error instanceof Error &&
+        error.message.startsWith("A later edit affects")
+      )
+        throw new Error(
+          "These transactions changed since categorization. Undo would overwrite newer changes.",
+        );
+      throw error;
+    }
+  }
   await db.transaction("rw", db.transactions, db.rules, async () => {
     const current = await db.transactions.bulkGet(
       receipt.after.map((t) => t.id),

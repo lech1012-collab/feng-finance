@@ -1,11 +1,42 @@
+import { ManualTransactionEditor } from "../components/ManualTransactionEditor";
+import { AdvancedSearch, queryFromParams } from "../components/AdvancedSearch";
+import { BulkTagPicker } from "../components/TagManager";
+import { SplitRuleOffer } from "../components/SplitRuleOffer";
+import { TransferReview } from "../components/TransferReview";
+import {
+  needsReview,
+  effectiveTransactions,
+} from "../analytics/effective-transactions";
+import { liabilityTypes } from "../analytics/net-worth";
+import { projectedReportingTransactions } from "../analytics/fx";
+import {
+  refundCountedMonths,
+  refundMonthName,
+} from "../analytics/refund-impact";
+import { markTransactionsReviewed } from "../storage/accuracy";
+import { undoChange } from "../storage/audit";
 import { useState, useMemo, useRef, useEffect, type MouseEvent } from "react";
 import { financialType } from "../domain/transaction-type";
+import {
+  matchesTransactionCategory,
+  matchesTransactionIncome,
+  matchesQuickTransactionFilter,
+  quickTransactionFilterCounts,
+  transactionCategoryIndex,
+  type QuickTransactionFilter,
+} from "../domain/transaction-filters";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Search, SlidersHorizontal } from "lucide-react";
 import { CategoryBoard } from "../components/CategoryBoard";
 import { SwipeTransaction } from "../components/SwipeTransaction";
-import type { Transaction } from "../domain/models";
+import type { Transaction, Rule } from "../domain/models";
+import {
+  CategoryConflictDialog,
+  type CategoryConflictDecision,
+} from "../components/CategoryConflictDialog";
+import { conflictingCategoryRule } from "../categorization/rule-conflict";
+import { authorizeMonthEdit } from "../storage/month-review";
 import {
   undoCategory,
   categorizeCards,
@@ -28,8 +59,7 @@ import {
   categorySuggestions,
   categorySuggestionReason,
 } from "../categorization/suggestions";
-const needsCategory = (t: Transaction) =>
-  !t.categoryId && !t.subcategoryId && financialType(t) !== "transfer";
+const needsCategory = needsReview;
 export default function Transactions({
   month,
   currency,
@@ -38,6 +68,10 @@ export default function Transactions({
   currency: string;
 }) {
   const [params] = useSearchParams();
+  const [toReview, setToReview] = useState(params.get("review") === "1");
+  const [queryIds, setQueryIds] = useState<Set<string>>();
+  const [reviewChangeId, setReviewChangeId] = useState("");
+  const [reviewError, setReviewError] = useState("");
   const [sorting, setSorting] = useState<Transaction>();
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const selectionAnchor = useRef<string | undefined>(undefined);
@@ -67,8 +101,14 @@ export default function Transactions({
   const categoryRail = useRef<HTMLElement>(null);
   const railCursor = useRef({ x: 0, y: 0 });
   const activeRailDrag = useRef(false);
+  const railAnimationFrame = useRef<number | undefined>(undefined);
   const [railBusy, setRailBusy] = useState(false);
   const [railError, setRailError] = useState("");
+  const [railConflict, setRailConflict] = useState<{
+    ids: string[];
+    categoryId: string;
+    rule: Rule;
+  }>();
   const railSaving = useRef(false);
   const autoQueueStarted = useRef(false);
   const [dragStart, setDragStart] = useState<{
@@ -84,7 +124,8 @@ export default function Transactions({
   const [allDates, setAllDates] = useState(
     params.get("allDates") === "1" ||
       (!params.has("allDates") &&
-        (params.has("uncategorized") ||
+        (params.has("review") ||
+          params.has("uncategorized") ||
           params.get("category") === "uncategorized")),
   );
   const [from, setFrom] = useState(
@@ -110,10 +151,7 @@ export default function Transactions({
   const [page, setPage] = useState(0);
   const [advanced, setAdvanced] = useState(params.get("advanced") === "1");
   const data = useLiveQuery(async () => {
-    const accounts = await db.accounts
-      .where("currency")
-      .equals(currency)
-      .toArray();
+    const accounts = await db.accounts.toArray();
     const statements = await db.statements.toArray();
     const candidateStatements = accounts
       .map((a) => accountSnapshot(a, statements, selectedMonth).statement)
@@ -128,20 +166,40 @@ export default function Transactions({
         ),
       )
     ).flat();
+    const items = params.get("flow")
+      ? await db.transactions.toArray()
+      : allDates || (from && to && from <= to)
+        ? await db.transactions
+            .where("date")
+            .between(
+              allDates ? "0000" : from,
+              allDates ? "9999" : to,
+              true,
+              true,
+            )
+            .reverse()
+            .toArray()
+        : [];
+    const refundIds = [
+      ...new Set(
+        items.flatMap((row) =>
+          (row.refundAllocations ?? []).map(
+            (allocation) => allocation.transactionId,
+          ),
+        ),
+      ),
+    ];
+    const refundOriginals = (await db.transactions.bulkGet(refundIds)).filter(
+      (row): row is Transaction => !!row,
+    );
     return {
-      items:
-        allDates || (from && to && from <= to)
-          ? await db.transactions
-              .where("[currency+date]")
-              .between(
-                [currency, allDates ? "0000" : from],
-                [currency, allDates ? "9999" : to],
-                true,
-                true,
-              )
-              .reverse()
-              .toArray()
-          : [],
+      items,
+      refundOriginals,
+      periodRows: await db.transactions
+        .where("categoryId")
+        .equals("salary")
+        .toArray(),
+      settings: await db.settings.toArray(),
       accounts,
       categories: await db.categories.toArray(),
       rules: await db.rules.toArray(),
@@ -153,13 +211,38 @@ export default function Transactions({
         ]),
       ),
       uncategorizedCount: await db.transactions
-        .where("[currency+date]")
-        .between([currency, "0000"], [currency, "9999"], true, true)
-        .filter(needsCategory)
+        .filter(
+          (t) =>
+            !t.parentId &&
+            !t.categoryId &&
+            !t.isTransfer &&
+            t.kind !== "refund" &&
+            t.kind !== "split_parent",
+        )
         .count(),
+      reviewCount: await db.transactions.filter(needsReview).count(),
+      tags: await db.tags.toArray(),
+      rates: await db.fxRates.toArray(),
     };
-  }, [from, to, currency, allDates, selectedMonth]);
-  const filtered = useMemo(() => {
+  }, [from, to, currency, allDates, selectedMonth, params.get("flow")]);
+  const searchItems = useMemo(
+    () =>
+      data && params.get("reporting") === "1"
+        ? projectedReportingTransactions(
+            effectiveTransactions(data.items),
+            currency,
+            data.rates ?? [],
+          ).transactions
+        : (data?.items ?? []),
+    [data?.items, data?.rates, currency, params.get("reporting")],
+  );
+  const categoryIndex = useMemo(
+    () => transactionCategoryIndex(data?.items ?? []),
+    [data?.items],
+  );
+  // Counts and visible rows share the same account/search/amount/flow scope.
+  // A quick category changes only the second stage of this filtering pipeline.
+  const baseFiltered = useMemo(() => {
     if (!data) return [];
     let minAmount: number | undefined, maxAmount: number | undefined;
     try {
@@ -168,32 +251,46 @@ export default function Transactions({
     } catch {
       return [];
     }
+    const flow = params.get("flow");
+    const sourceIds = flow
+      ? new Set(
+          effectiveTransactions(data.items)
+            .filter(
+              (t) =>
+                (allDates || (t.date >= from && t.date <= to)) &&
+                financialType(t) !== "transfer" &&
+                (flow === "income"
+                  ? t.amount > 0
+                  : flow === "spending"
+                    ? t.amount < 0
+                    : true),
+            )
+            .map((t) => t.parentId ?? t.id),
+        )
+      : undefined;
     return data.items.filter(
       (t) =>
+        !t.parentId &&
+        (!sourceIds || sourceIds.has(t.id)) &&
+        (!params.get("accountScope") ||
+          data.accounts.some(
+            (a) =>
+              a.id === t.accountId &&
+              (params.get("accountScope") === "debt"
+                ? liabilityTypes.has(a.accountType)
+                : !liabilityTypes.has(a.accountType)),
+          )) &&
+        (!queryIds || queryIds.has(t.id)) &&
         (!search ||
-          `${t.description} ${t.merchant} ${t.tags.join(" ")}`
+          `${t.description} ${t.merchant} ${t.note ?? ""} ${t.tags.join(" ")}`
             .toLowerCase()
             .includes(search.toLowerCase())) &&
         (!account || t.accountId === account) &&
-        (!category ||
-          category === "uncategorized" ||
-          t.categoryId === category ||
-          t.subcategoryId === category) &&
-        (!type || financialType(t) === type) &&
         (!params.get("transferKind") ||
           transferKind(t, data.accounts, data.items) ===
             (params.get("transferKind") === "card-payment"
               ? "card"
               : params.get("transferKind"))) &&
-        (!uncategorized ||
-          (!t.categoryId &&
-            !t.subcategoryId &&
-            !t.isTransfer &&
-            t.type !== "transfer" &&
-            !t.transferPairId)) &&
-        (!property ||
-          t.categoryId === "property" ||
-          t.categoryId === "property-income") &&
         (minAmount === undefined || Math.abs(t.amount) >= minAmount) &&
         (maxAmount === undefined || Math.abs(t.amount) <= maxAmount),
     );
@@ -201,15 +298,50 @@ export default function Transactions({
     data,
     search,
     account,
-    category,
-    type,
-    uncategorized,
-    property,
+    queryIds,
     min,
     max,
     currency,
     params,
+    allDates,
+    from,
+    to,
   ]);
+  const quickCounts = useMemo(
+    () => quickTransactionFilterCounts(baseFiltered, categoryIndex),
+    [baseFiltered, categoryIndex],
+  );
+  const filtered = useMemo(
+    () =>
+      baseFiltered.filter(
+        (t) =>
+          (!toReview || needsReview(t)) &&
+          (!category ||
+            category === "uncategorized" ||
+            matchesTransactionCategory(t, category, categoryIndex)) &&
+          (!type ||
+            (type === "income"
+              ? matchesTransactionIncome(t)
+              : financialType(t) === type)) &&
+          (!uncategorized ||
+            (!t.categoryId &&
+              !t.subcategoryId &&
+              financialType(t) !== "transfer" &&
+              t.kind !== "refund" &&
+              t.kind !== "split_parent")) &&
+          (!property ||
+            matchesQuickTransactionFilter(t, "property", categoryIndex)),
+      ),
+    [
+      baseFiltered,
+      categoryIndex,
+      toReview,
+      category,
+      type,
+      uncategorized,
+      property,
+    ],
+  );
   const reset = () => setPage(0);
   const beginSort = (
     t: Transaction,
@@ -310,7 +442,11 @@ export default function Transactions({
     queueBusy,
     undoBusy,
   ]);
-  const applyToSelection = async (ids: string[], categoryId: string) => {
+  const applyToSelection = async (
+    ids: string[],
+    categoryId: string,
+    decision?: CategoryConflictDecision,
+  ) => {
     if (!data || railSaving.current) return;
     railSaving.current = true;
     setRailBusy(true);
@@ -321,10 +457,31 @@ export default function Transactions({
         throw new Error(
           "A selected transaction is no longer shown. Select it again.",
         );
+      if (!decision) {
+        const rules = await db.rules.toArray();
+        const conflict = (chosen as Transaction[])
+          .map((transaction) =>
+            conflictingCategoryRule(
+              transaction,
+              { categoryId, isTransfer: categoryId === TRANSFER_TARGET },
+              rules,
+            ),
+          )
+          .find((rule) => !!rule);
+        if (conflict) {
+          setRailConflict({ ids, categoryId, rule: conflict });
+          return;
+        }
+      }
+      if (!(await authorizeMonthEdit(chosen as Transaction[]))) return;
       const result = await categorizeCards(
         chosen as Transaction[],
         categoryId,
-        { allowMultipleMerchants: true, backfill: true },
+        {
+          allowMultipleMerchants: true,
+          backfill: decision !== "once",
+          learn: decision !== "once",
+        },
       );
       queueScope.current = [];
       skippedQueueIds.current.clear();
@@ -389,7 +546,7 @@ export default function Transactions({
         : "";
     };
     const move = (e: PointerEvent) => {
-      if (e.pointerId === railDrag.pointerId) {
+      if (activeRailDrag.current && e.pointerId === railDrag.pointerId) {
         railCursor.current = { x: e.clientX, y: e.clientY };
         setRailTarget(hit(e.clientX, e.clientY));
         setRailDrag((p) =>
@@ -399,8 +556,13 @@ export default function Transactions({
     };
     const release = (e: PointerEvent) => {
       if (e.pointerId !== railDrag.pointerId) return;
+      const wasDragging = activeRailDrag.current;
       activeRailDrag.current = false;
-      const target = e.type === "pointerup" ? hit(e.clientX, e.clientY) : "";
+      if (railAnimationFrame.current !== undefined)
+        cancelAnimationFrame(railAnimationFrame.current);
+      railAnimationFrame.current = undefined;
+      const target =
+        wasDragging && e.type === "pointerup" ? hit(e.clientX, e.clientY) : "";
       setRailDrag(undefined);
       setRailTarget("");
       if (target) void applyToSelection(railDrag.ids, target);
@@ -408,6 +570,10 @@ export default function Transactions({
     const cancel = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         activeRailDrag.current = false;
+        if (railAnimationFrame.current !== undefined)
+          cancelAnimationFrame(railAnimationFrame.current);
+        railAnimationFrame.current = undefined;
+        e.preventDefault();
         setRailDrag(undefined);
         setRailTarget("");
       }
@@ -415,19 +581,22 @@ export default function Transactions({
     window.addEventListener("pointermove", move, true);
     window.addEventListener("pointerup", release, true);
     window.addEventListener("pointercancel", release, true);
-    window.addEventListener("keydown", cancel);
+    window.addEventListener("keydown", cancel, true);
     return () => {
       window.removeEventListener("pointermove", move, true);
       window.removeEventListener("pointerup", release, true);
       window.removeEventListener("pointercancel", release, true);
-      window.removeEventListener("keydown", cancel);
+      window.removeEventListener("keydown", cancel, true);
     };
   });
   useEffect(() => {
     if (railDrag?.pointerId === undefined) return;
     let frame = 0;
     const scroll = () => {
-      if (!activeRailDrag.current) return;
+      if (!activeRailDrag.current) {
+        railAnimationFrame.current = undefined;
+        return;
+      }
       const rail = categoryRail.current;
       if (rail) {
         const rect = rail.getBoundingClientRect();
@@ -467,9 +636,14 @@ export default function Transactions({
         }
       }
       frame = requestAnimationFrame(scroll);
+      railAnimationFrame.current = frame;
     };
     frame = requestAnimationFrame(scroll);
-    return () => cancelAnimationFrame(frame);
+    railAnimationFrame.current = frame;
+    return () => {
+      cancelAnimationFrame(frame);
+      railAnimationFrame.current = undefined;
+    };
   }, [railDrag?.pointerId]);
   useEffect(() => {
     const keyboard = (e: KeyboardEvent) => {
@@ -546,11 +720,18 @@ export default function Transactions({
     uncategorized: uncategorized ? "1" : "",
     property: property ? "1" : "",
     advanced: advanced ? "1" : "",
+    query: params.get("query") ?? "",
+    conditions: params.get("conditions") ?? "",
     transferKind: params.get("transferKind") ?? "",
+    flow: params.get("flow") ?? "",
+    accountScope: params.get("accountScope") ?? "",
+    reporting: params.get("reporting") ?? "",
+    review: toReview ? "1" : "",
   }))
     if (value) returnParams.set(key, value);
   const returnTo = `/transactions?${returnParams}`;
   const quickFilterSelected = (filter: string) => {
+    if (filter === "review") return toReview;
     if (filter === "uncategorized") return uncategorized;
     if (uncategorized) return false;
     if (filter === "property") return property || category === "property";
@@ -565,7 +746,7 @@ export default function Transactions({
             {receipt.categoryName} ·{" "}
             {receipt.learning?.length === 1
               ? `${displayMerchant({ merchant: receipt.learning[0].merchant, description: receipt.learning[0].merchant })} on ${data?.accounts.find((a) => a.id === receipt.learning![0].accountId)?.institution ?? "this account"}`
-              : `${receipt.learning?.length ?? 1} merchants`}
+              : `${receipt.learning?.length ?? 1} merchant${(receipt.learning?.length ?? 1) === 1 ? "" : "s"}`}
             {receipt.after.length > (receipt.selectedIds?.length ?? 1)
               ? ` · also applied to ${receipt.after.length - (receipt.selectedIds?.length ?? 1)} matching payment${receipt.after.length - (receipt.selectedIds?.length ?? 1) === 1 ? "" : "s"}`
               : ""}
@@ -577,6 +758,12 @@ export default function Transactions({
             Undo
           </button>
         </div>
+      )}
+      {receipt?.splitRuleOffer && (
+        <SplitRuleOffer
+          key={receipt.splitRuleOffer.transaction.id}
+          {...receipt.splitRuleOffer}
+        />
       )}
       {undoError && (
         <p role="alert" className="notice warning">
@@ -593,7 +780,7 @@ export default function Transactions({
         </div>
         <span className="count-chip">
           {data
-            ? `${filtered.length} results · ${currency}`
+            ? `${filtered.length} result${filtered.length === 1 ? "" : "s"}`
             : "Loading transactions…"}
         </span>
       </div>
@@ -623,7 +810,7 @@ export default function Transactions({
             const value = reported
               ? money(
                   card ? Math.abs(snapshot.balance!) : snapshot.balance!,
-                  currency,
+                  a.currency,
                 )
               : "Unknown";
             const kind =
@@ -655,14 +842,16 @@ export default function Transactions({
           })}
         </div>
       )}
+      <ManualTransactionEditor />
       <section className="card filters">
         <div className="search-line">
           <label className="search-input">
             <Search size={18} />
             <span className="sr-only">Search transactions</span>
             <input
+              id="transaction-search"
               type="search"
-              placeholder="Search merchant, description or tag"
+              placeholder="Search merchant, description, note or tag"
               value={search}
               onChange={(e) => {
                 setSearch(e.target.value);
@@ -672,7 +861,10 @@ export default function Transactions({
           </label>
           <button
             aria-expanded={advanced}
-            onClick={() => setAdvanced(!advanced)}
+            onClick={() => {
+              setAdvanced(!advanced);
+              if (advanced) setQueryIds(undefined);
+            }}
           >
             <SlidersHorizontal size={17} />
             Filters
@@ -684,6 +876,7 @@ export default function Transactions({
           aria-label="Transaction category filters"
         >
           {[
+            { id: "review", name: "To review" },
             { id: "uncategorized", name: "Uncategorized" },
             { id: "groceries", name: "Groceries" },
             { id: "income", name: "Income" },
@@ -692,6 +885,16 @@ export default function Transactions({
           ].map((c) => (
             <button
               key={c.id}
+              aria-label={
+                c.id === "review" || c.id === "uncategorized"
+                  ? undefined
+                  : c.name
+              }
+              aria-describedby={
+                c.id === "review" || c.id === "uncategorized"
+                  ? undefined
+                  : `transaction-filter-count-${c.id}`
+              }
               aria-pressed={quickFilterSelected(c.id)}
               className={
                 c.id === "uncategorized" ? "uncategorized-primary" : undefined
@@ -702,9 +905,10 @@ export default function Transactions({
                   !clear && ["groceries", "salary"].includes(c.id) ? c.id : "",
                 );
                 setUncategorized(!clear && c.id === "uncategorized");
+                setToReview(!clear && c.id === "review");
                 setType(!clear && c.id === "income" ? "income" : "");
                 setProperty(!clear && c.id === "property");
-                if (!clear && c.id === "uncategorized") {
+                if (!clear && ["uncategorized", "review"].includes(c.id)) {
                   setAllDates(true);
                   setAccount("");
                   setSearch("");
@@ -715,9 +919,25 @@ export default function Transactions({
               }}
             >
               {c.name}
-              {c.id === "uncategorized"
-                ? ` ${data?.uncategorizedCount ?? "…"}`
-                : ""}
+              {c.id === "review" ? (
+                ` ${data?.reviewCount ?? "…"}`
+              ) : c.id === "uncategorized" ? (
+                ` ${data?.uncategorizedCount ?? "…"}`
+              ) : (
+                <>
+                  <span aria-hidden="true">
+                    {` ${data ? quickCounts[c.id as QuickTransactionFilter] : "…"}`}
+                  </span>
+                  <span
+                    className="sr-only"
+                    id={`transaction-filter-count-${c.id}`}
+                  >
+                    {data
+                      ? `${quickCounts[c.id as QuickTransactionFilter]} matching transaction${quickCounts[c.id as QuickTransactionFilter] === 1 ? "" : "s"}`
+                      : "Calculating matching transactions"}
+                  </span>
+                </>
+              )}
             </button>
           ))}
         </div>
@@ -893,14 +1113,69 @@ export default function Transactions({
           </>
         )}
       </section>
-      {uncategorized && filtered.length > 0 && (
+      {data && advanced && (
+        <AdvancedSearch
+          transactions={searchItems}
+          sourceTransactions={data.items}
+          accounts={data.accounts}
+          categories={data.categories}
+          tags={data.tags}
+          currency={currency}
+          {...queryFromParams(params)}
+          onChange={(rows) => setQueryIds(new Set(rows.map((t) => t.id)))}
+        />
+      )}
+      <TransferReview />
+      {(toReview || uncategorized) && filtered.length > 0 && (
         <div className="sorting-queue">
-          <span>{filtered.length} transactions to sort</span>
+          <span>
+            {filtered.length} transaction{filtered.length === 1 ? "" : "s"} to
+            sort
+          </span>
           <button className="primary" onClick={() => beginSort(filtered[0])}>
             Start sorting
           </button>
         </div>
       )}
+      {filtered.length > 0 && (
+        <div className="actions">
+          <button
+            onClick={async () => {
+              try {
+                if (!(await authorizeMonthEdit(filtered))) return;
+                const result = await markTransactionsReviewed(
+                  filtered.map((t) => t.id),
+                );
+                setReviewChangeId(result.changeId);
+                setReviewError("");
+              } catch (e) {
+                setReviewError(
+                  e instanceof Error ? e.message : "Review could not be saved.",
+                );
+              }
+            }}
+          >
+            Mark filtered transactions reviewed
+          </button>
+          {reviewChangeId && (
+            <button
+              onClick={() =>
+                void undoChange(reviewChangeId)
+                  .then(() => setReviewChangeId(""))
+                  .catch((e) =>
+                    setReviewError(
+                      e instanceof Error ? e.message : "Undo unavailable.",
+                    ),
+                  )
+              }
+            >
+              Undo review
+            </button>
+          )}
+        </div>
+      )}
+      {reviewError && <p role="alert">{reviewError}</p>}
+      {selectedIds.length > 0 && <BulkTagPicker transactionIds={selectedIds} />}
       {selectedIds.length > 0 && (
         <div className="selection-summary">
           <span>{selectedIds.length} selected</span>
@@ -999,29 +1274,59 @@ export default function Transactions({
             >
               <div className="transaction-description">
                 <strong>{displayMerchant(t)}</strong>
-                <span
-                  className={`transaction-status ${t.isTransfer || t.type === "transfer" || t.transferPairId ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
-                >
+                {!t.isReviewed && (
+                  <span className="review-status">To review</span>
+                )}
+                {t.kind === "split_parent" && (
+                  <span className="transaction-status">
+                    Split ·{" "}
+                    {data?.items.filter((child) => child.parentId === t.id)
+                      .length ?? 0}{" "}
+                    lines
+                  </span>
+                )}
+                {t.kind === "refund" && (
+                  <span className="transaction-status">
+                    Refund
+                    {t.refundAllocations?.length
+                      ? ` · counted in ${
+                          refundCountedMonths(
+                            t,
+                            data?.refundOriginals ?? [],
+                            data?.settings ?? [],
+                            data?.periodRows ?? [],
+                          )
+                            .map((month) => refundMonthName(month, true))
+                            .join(", ") || "original purchase month"
+                        }`
+                      : " · link a purchase"}
+                  </span>
+                )}
+                {t.kind !== "split_parent" && t.kind !== "refund" && (
                   <span
-                    className="category-dot"
-                    style={{
-                      backgroundColor:
-                        financialType(t) === "transfer"
-                          ? "var(--chart-transfer)"
-                          : t.categoryId
-                            ? categoryColor(t.categoryId)
-                            : "transparent",
-                    }}
-                    aria-hidden="true"
-                  />
-                  {t.isTransfer || t.type === "transfer" || t.transferPairId
-                    ? "Transfer"
-                    : t.categoryId || t.subcategoryId
-                      ? (data?.categories.find(
-                          (c) => c.id === (t.categoryId ?? t.subcategoryId),
-                        )?.name ?? "Category unavailable")
-                      : "Needs category"}
-                </span>
+                    className={`transaction-status ${t.isTransfer || t.type === "transfer" || t.transferPairId ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+                  >
+                    <span
+                      className="category-dot"
+                      style={{
+                        backgroundColor:
+                          financialType(t) === "transfer"
+                            ? "var(--chart-transfer)"
+                            : t.categoryId
+                              ? categoryColor(t.categoryId)
+                              : "transparent",
+                      }}
+                      aria-hidden="true"
+                    />
+                    {t.isTransfer || t.type === "transfer" || t.transferPairId
+                      ? "Transfer"
+                      : t.categoryId || t.subcategoryId
+                        ? (data?.categories.find(
+                            (c) => c.id === (t.categoryId ?? t.subcategoryId),
+                          )?.name ?? "Category unavailable")
+                        : "Needs category"}
+                  </span>
+                )}
                 {t.categorySource && (
                   <small className="transaction-origin">
                     {t.categorySource === "manual" ? "you" : "rule"}
@@ -1199,6 +1504,34 @@ export default function Transactions({
           Next
         </button>
       </div>
+      {railConflict && (
+        <CategoryConflictDialog
+          oldCategory={
+            railConflict.rule.type === "transfer"
+              ? "Transfer"
+              : (data?.categories.find(
+                  (category) =>
+                    category.id ===
+                    (railConflict.rule.actions?.find(
+                      (action) => action.type === "category",
+                    )?.categoryId ?? railConflict.rule.categoryId),
+                )?.name ?? "another category")
+          }
+          newCategory={
+            railConflict.categoryId === TRANSFER_TARGET
+              ? "Transfer"
+              : (data?.categories.find(
+                  (category) => category.id === railConflict.categoryId,
+                )?.name ?? "Category")
+          }
+          onCancel={() => setRailConflict(undefined)}
+          onDecision={(decision) => {
+            const conflict = railConflict;
+            setRailConflict(undefined);
+            void applyToSelection(conflict.ids, conflict.categoryId, decision);
+          }}
+        />
+      )}
     </>
   );
 }

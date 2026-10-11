@@ -3,6 +3,7 @@ import { monthBounds } from "../domain/dates";
 import { safeSum } from "../domain/money";
 import { completeMonth } from "./category";
 import { monthlySeries } from "./calculations";
+import { ledgerTransactions } from "./effective-transactions";
 
 export type CoverageStatus = "Complete" | "Partial" | "Unverified" | "No data";
 export interface MonthCoverage {
@@ -26,7 +27,7 @@ export function verifiedStatements(
   today = new Date().toISOString().slice(0, 10),
 ) {
   const grouped = new Map<string, Transaction[]>();
-  for (const transaction of transactions) {
+  for (const transaction of ledgerTransactions(transactions)) {
     const rows = grouped.get(transaction.statementId) ?? [];
     rows.push(transaction);
     grouped.set(transaction.statementId, rows);
@@ -35,6 +36,7 @@ export function verifiedStatements(
     const rows = grouped.get(statement.id) ?? [];
     return (
       statement.validationStatus === "reconciled" &&
+      !statement.validationOverride &&
       statement.periodSource !== "transaction-coverage" &&
       statement.statementPeriodStart <= statement.statementPeriodEnd &&
       statement.statementPeriodEnd <= today &&
@@ -63,13 +65,18 @@ export function monthCoverage(
   month: string,
   currency: string,
   today = new Date().toISOString().slice(0, 10),
+  range?: [string, string],
 ): MonthCoverage {
-  const scoped = accounts.filter((account) => account.currency === currency);
+  const scoped = accounts.filter(
+    (account) =>
+      account.tracking !== "manual" &&
+      (currency === "*" || account.currency === currency),
+  );
   const accountIds = new Set(scoped.map((account) => account.id));
-  const [start, end] = monthBounds(month);
+  const [start, end] = range ?? monthBounds(month);
   const intersects = (statement: Statement) =>
     accountIds.has(statement.accountId) &&
-    statement.currency === currency &&
+    (currency === "*" || statement.currency === currency) &&
     statement.statementPeriodStart < end &&
     statement.statementPeriodEnd >= start;
   const documents = statements.filter(intersects);
@@ -80,10 +87,10 @@ export function monthCoverage(
       .filter((statement) => !verifiedIds.has(statement.id))
       .map((statement) => statement.accountId),
   );
-  for (const transaction of transactions)
+  for (const transaction of ledgerTransactions(transactions))
     if (
       accountIds.has(transaction.accountId) &&
-      transaction.currency === currency &&
+      (currency === "*" || transaction.currency === currency) &&
       transaction.date >= start &&
       transaction.date < end &&
       !verifiedIds.has(transaction.statementId)
@@ -95,7 +102,9 @@ export function monthCoverage(
     .filter(
       (account) =>
         unverifiedAccountIds.has(account.id) ||
-        !completeMonth(month, [account], verified, today),
+        !(range
+          ? completeRange(start, end, account, verified, today)
+          : completeMonth(month, [account], verified, today)),
     )
     .map((account) => account.id);
   const complete = scoped.length > 0 && incompleteAccountIds.length === 0;
@@ -104,7 +113,7 @@ export function monthCoverage(
     transactions.some(
       (transaction) =>
         accountIds.has(transaction.accountId) &&
-        transaction.currency === currency &&
+        (currency === "*" || transaction.currency === currency) &&
         transaction.date >= start &&
         transaction.date < end,
     );
@@ -120,7 +129,14 @@ export function monthCoverage(
     covered: usable.size,
     total: scoped.length,
     hasIncomeSource: scoped.some(
-      (account) => account.accountType !== "credit" && usable.has(account.id),
+      (account) =>
+        ![
+          "credit",
+          "credit_card",
+          "loan",
+          "mortgage",
+          "other_liability",
+        ].includes(account.accountType) && usable.has(account.id),
     ),
     hasData,
     hasUnverifiedStatements,
@@ -130,6 +146,30 @@ export function monthCoverage(
       .map((account) => account.id),
     incompleteAccountIds,
   };
+}
+
+function completeRange(
+  start: string,
+  end: string,
+  account: Account,
+  statements: Statement[],
+  today: string,
+) {
+  if (end > today) return false;
+  let cursor = Date.parse(start);
+  for (const statement of statements
+    .filter((s) => s.accountId === account.id)
+    .sort((a, b) =>
+      a.statementPeriodStart.localeCompare(b.statementPeriodStart),
+    )) {
+    if (Date.parse(statement.statementPeriodStart) > cursor) break;
+    cursor = Math.max(
+      cursor,
+      Date.parse(statement.statementPeriodEnd) + 86400000,
+    );
+    if (cursor >= Date.parse(end)) return true;
+  }
+  return false;
 }
 
 /** Display-only series: zero is a recorded value, never a missing-data marker.

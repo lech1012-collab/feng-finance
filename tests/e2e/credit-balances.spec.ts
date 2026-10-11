@@ -9,7 +9,7 @@ async function importStatement(page: Page, name: string) {
   await expect(
     page.getByRole("heading", { name: "Import statements", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Select PDF statements").setInputFiles(fixture(name));
+  await page.getByLabel("Select statements").setInputFiles(fixture(name));
   await expect(page.locator(".import-review-list")).toBeVisible({
     timeout: 90000,
   });
@@ -25,7 +25,7 @@ async function importStatement(page: Page, name: string) {
     exact: true,
   });
   const acknowledgement = card.getByLabel(
-    /I compared the extracted rows with the PDF/,
+    /I compared the extracted rows with the source file/,
   );
   if (name === "barclaycard" || name === "amex-uk-layout")
     await expect(acknowledgement).toBeVisible();
@@ -47,7 +47,7 @@ async function importStatement(page: Page, name: string) {
 }
 
 function positionMetric(page: Page, label: string) {
-  return page.locator(".position-metrics > div").filter({
+  return page.locator(".position-metrics > a").filter({
     has: page.locator("span").filter({ hasText: new RegExp(`^${label}$`) }),
   });
 }
@@ -55,17 +55,21 @@ function positionMetric(page: Page, label: string) {
 async function assertSingleClosingPoint(
   page: Page,
   date: string,
-  signedBalance: string,
+  balance: string,
 ) {
-  const rows = page.locator(".balance-chart tbody tr");
-  const closing = rows.filter({ has: page.getByText(date, { exact: true }) });
-  await expect(closing).toHaveCount(1);
-  await expect(closing).toContainText(signedBalance);
-  await expect(rows.filter({ hasText: "£" })).toHaveCount(1);
-  await expect(page.locator(".balance-periods")).toHaveCount(0);
-  await expect(page.locator(".balance-range-note")).toContainText(
-    "Import another reconciled statement",
+  const points = page.locator(".position-history circle");
+  await expect(points).toHaveCount(1);
+  await expect(points.locator("title")).toContainText(
+    `${date} 2026: ${balance} debt owed`,
   );
+  await expect(points).toHaveAttribute("data-verified", "true");
+  await expect(
+    page.locator(".position-history [data-total-position]"),
+  ).toHaveCount(0);
+  await expect(page.locator(".balance-periods")).toHaveCount(0);
+  await expect(
+    page.getByText(/Issue-date-only cards show their dated balance/),
+  ).toBeVisible();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -80,15 +84,15 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
     "£109.68",
   );
-  await expect(positionMetric(page, "Cash")).toContainText("Unknown");
+  await expect(positionMetric(page, "Cash")).toContainText("Not imported");
   await expect(positionMetric(page, "Net position")).toContainText(
     "Unavailable",
   );
   await expect(page.locator(".balance-account-value")).toContainText(
-    "Card debt",
+    "Debt owed",
   );
   await expect(page.locator(".balance-account-main")).toContainText(
-    "As of 4 Oct 2026",
+    "as of 4 Oct 2026",
   );
   await expect(page.locator(".balance-account-value")).not.toContainText(
     "Unverified",
@@ -98,14 +102,14 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   await expect(page.locator(".month-summary")).toContainText(
     "Monthly history is not fully verified",
   );
-  await assertSingleClosingPoint(page, "4 Oct", "-£109.68");
+  await assertSingleClosingPoint(page, "4 Oct", "£109.68");
 
   await page.setViewportSize({ width: 375, height: 844 });
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
   const overlappingText = await page
-    .locator(".position-metrics > div")
+    .locator(".position-metrics > a")
     .evaluateAll((columns) =>
       columns.flatMap((column) => {
         const bounds = column.getBoundingClientRect();
@@ -135,15 +139,13 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   await page.getByLabel("Selected month").fill("2026-09");
   await expect(positionMetric(page, "Card debt")).toContainText("Unknown");
   await expect(page.locator(".balance-account-value")).toContainText("Unknown");
+  await expect(page.locator(".position-history circle")).toHaveCount(0);
   await expect(
-    page.locator(".balance-chart tbody tr").filter({ hasText: "£" }),
-  ).toHaveCount(0);
-  await expect(
-    page.locator(".balance-chart table").getByText("4 Oct", { exact: true }),
+    page.locator(".position-history title").filter({ hasText: "4 Oct 2026" }),
   ).toHaveCount(0);
   // £114.68 of purchases and a £5 refund leave £109.68 of card debt.
   // Statement debt must not replace gross spending in the month card.
-  await expect(page.locator(".month-spending strong")).toHaveText("£114.68");
+  await expect(page.locator(".month-spending strong")).toHaveText("£114.68*");
   await expect(page.locator(".month-net strong")).toHaveText("n/a");
 
   await page.getByLabel("Selected month").fill("2026-10");
@@ -170,7 +172,7 @@ test("Amex dated purchase exception keeps its reconciled closing debt and requir
     "£160.00",
   );
   await expect(page.locator(".balance-account-main")).toContainText(
-    "As of 5 Oct 2026",
+    "as of 5 Oct 2026",
   );
   await expect(page.locator(".balance-account-value")).not.toContainText(
     "Unverified",
@@ -178,7 +180,7 @@ test("Amex dated purchase exception keeps its reconciled closing debt and requir
   await expect(page.locator(".month-summary")).toContainText(
     "Monthly history is not fully verified",
   );
-  await assertSingleClosingPoint(page, "5 Oct", "-£160.00");
+  await assertSingleClosingPoint(page, "5 Oct", "£160.00");
   await page.reload();
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
     "£160.00",
@@ -275,10 +277,17 @@ test("a missing stored card row retains the reported balance but removes verifie
     "Monthly history is not fully verified",
   );
   await expect(
-    page.locator(".balance-chart tbody tr").filter({ hasText: "-£109.68" }),
+    page
+      .locator(".position-history circle[data-verified=true] title")
+      .filter({ hasText: "£109.68 debt owed" }),
   ).toHaveCount(0);
   await expect(
-    page.locator(".balance-chart tbody tr").filter({ hasText: "£845.32" }),
+    page
+      .locator(".position-history circle[data-verified=false] title")
+      .filter({ hasText: "£109.68 debt owed" }),
+  ).toHaveCount(1);
+  await expect(
+    page.locator(".position-history [data-total-position][data-verified=true]"),
   ).toHaveCount(0);
   await page.goto("/#/transactions?month=2026-10&allDates=1");
   const accountChip = page

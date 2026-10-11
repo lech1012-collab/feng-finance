@@ -1,3 +1,4 @@
+import { auditedMutation } from "./audit";
 import { db, type FinanceDB } from "./database";
 import { budgetKey } from "../analytics/planning";
 import { currencyPrecision } from "../domain/money";
@@ -12,10 +13,9 @@ export async function saveBudget(
     throw new Error(
       "Enter a non-negative budget with valid currency precision.",
     );
-  await database.transaction(
-    "rw",
-    database.categories,
-    database.settings,
+  await auditedMutation(
+    "Change category budget",
+    ["categories", "settings"],
     async () => {
       const category = await database.categories.get(categoryId);
       if (
@@ -29,5 +29,6 @@ export async function saveBudget(
       if (amount === undefined) await database.settings.delete(key);
       else await database.settings.put({ key, value: JSON.stringify(amount) });
     },
+    database,
   );
 }

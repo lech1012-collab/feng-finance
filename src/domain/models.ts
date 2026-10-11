@@ -1,7 +1,24 @@
-export const APP_VERSION = "1.9.2";
-export const SCHEMA_VERSION = 2;
+export const APP_VERSION = "2.0.0";
+export const SCHEMA_VERSION = 3;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";
+export type TransactionKind =
+  "normal" | "transfer" | "card_repayment" | "refund" | "split_parent";
+export type TransactionSource =
+  "pdf" | "csv" | "ofx" | "qif" | "manual" | "split";
+export type AccountType =
+  | "current"
+  | "credit"
+  | "savings"
+  | "credit_card"
+  | "loan"
+  | "mortgage"
+  | "property"
+  | "vehicle"
+  | "pension"
+  | "investment"
+  | "other_asset"
+  | "other_liability";
 export type ValidationStatus =
   "reconciled" | "warning" | "cannot-reconcile" | "unavailable";
 // Monetary values are ALWAYS integer minor units. GBP 5000 means £50.00.
@@ -9,7 +26,12 @@ export interface Account {
   id: string;
   institution: Institution;
   displayName: string;
-  accountType: "current" | "credit" | "savings";
+  accountType: AccountType;
+  tracking?: "statement" | "manual";
+  includeInNetWorth?: boolean;
+  apr?: number;
+  minPaymentMinor?: number;
+  valuationReminderDays?: number;
   currency: string;
   maskedAccountIdentifier: string;
   createdAt: string;
@@ -31,7 +53,8 @@ export interface Statement {
   sourceFileHash: string;
   importedAt: string;
   parserVersion: string;
-  extractionMethod: "embedded-text" | "OCR" | "manual-review";
+  extractionMethod:
+    "embedded-text" | "OCR" | "manual-review" | "CSV" | "OFX" | "QIF";
   validationStatus: ValidationStatus;
   validationDifference?: number;
   transactionCount: number;
@@ -67,6 +90,17 @@ export interface Transaction {
   createdAt: string;
   updatedAt: string;
   isDemo?: boolean;
+  kind?: TransactionKind;
+  parentId?: string;
+  linkId?: string;
+  refundAllocations?: { transactionId: string; amount: number }[];
+  note?: string;
+  attachmentIds?: string[];
+  source?: TransactionSource;
+  recurringSeriesId?: string;
+  sourceId?: string;
+  appliedRuleIds?: string[];
+  ruleSplit?: { categoryId: string; amount: number; tags?: string[] }[];
 }
 export interface Category {
   id: string;
@@ -91,12 +125,22 @@ export interface Rule {
   priority: number;
   builtIn: boolean;
   lastUsedAt?: string;
+  enabled?: boolean;
+  conditions?: RuleCondition[];
+  conditionMatch?: "all" | "any";
+  actions?: RuleAction[];
+  stopProcessing?: boolean;
+  singleUse?: boolean;
+  auto?: boolean;
+  createdFrom?: "auto" | "user";
+  stats?: { hits: number; lastHit?: string };
 }
 export interface TransferLink {
   id: string;
   transactionIds: [string, string];
   createdAt: string;
   manual: boolean;
+  crossCurrency?: boolean;
 }
 export interface Setting {
   key: string;
@@ -115,6 +159,19 @@ export interface Backup {
   rules: Rule[];
   transferLinks: TransferLink[];
   settings: Setting[];
+  valuations?: ManualValuation[];
+  pots?: Pot[];
+  budgets?: MonthlyBudget[];
+  tags?: Tag[];
+  recurringSeries?: RecurringSeries[];
+  monthCloses?: MonthClose[];
+  attachments?: SerializedAttachment[];
+  fxRates?: FxRate[];
+  transferProposals?: TransferProposal[];
+  savedViews?: SavedView[];
+  savedReports?: SavedReport[];
+  scenarios?: Scenario[];
+  changeLog?: ChangeLog[];
 }
 export interface Reconciliation {
   status: ValidationStatus;
@@ -152,6 +209,7 @@ export interface ParsedStatement {
   warnings: string[];
 }
 export interface ParsedTransaction {
+  sourceId?: string;
   date: string;
   bookingDate?: string;
   description: string;
@@ -168,6 +226,13 @@ export interface DraftTransaction extends Transaction {
   include: boolean;
   acknowledged: boolean;
   manualCategory?: boolean;
+  manualReplacementId?: string;
+  manualReplacementCandidates?: {
+    id: string;
+    date: string;
+    description: string;
+  }[];
+  replaceManual?: boolean;
 }
 export interface ImportDraft {
   statement: Statement;
@@ -179,4 +244,190 @@ export interface ImportDraft {
   warnings: string[];
   reviewedWarnings: boolean;
   duplicateOverride: boolean;
+  csvMapping?: import("../import/formats").CsvMapping;
+  confirmedTransferProposalIds?: string[];
+  /** Explicitly left unlinked during Automatic import review. */
+  rejectedTransferProposalIds?: string[];
+}
+
+/** Amount conditions use absolute minor-unit amounts; direction handles the sign. A between comparison includes both ends. */
+export interface RuleCondition {
+  field:
+    | "description"
+    | "merchant"
+    | "amount"
+    | "direction"
+    | "accountId"
+    | "day"
+    | "currency"
+    | "tag"
+    | "kind"
+    | "reviewed"
+    | "source"
+    | "date"
+    | "note"
+    | "categoryId"
+    | "search"
+    | "displayMerchant";
+  operator:
+    | "contains"
+    | "starts-with"
+    | "equals"
+    | "regex"
+    | "gt"
+    | "gte"
+    | "lt"
+    | "lte"
+    | "between"
+    | "in";
+  value: string | number | boolean | string[];
+  valueTo?: string | number;
+}
+export interface RuleAction {
+  type:
+    "category" | "rename" | "tag" | "kind" | "split" | "reviewed" | "recurring";
+  categoryId?: string;
+  subcategoryId?: string;
+  merchant?: string;
+  tagIds?: string[];
+  kind?: TransactionKind;
+  reviewed?: boolean;
+  recurringSeriesId?: string;
+  splits?: { categoryId: string; percentage: number; tagIds?: string[] }[];
+}
+export interface ManualValuation {
+  id: string;
+  accountId: string;
+  date: string;
+  valueMinor: number;
+  note?: string;
+  isDemo?: boolean;
+}
+export interface Tag {
+  id: string;
+  name: string;
+  colour: string;
+  archived: boolean;
+  isDemo?: boolean;
+}
+export interface Pot {
+  cadence?: "monthly" | "quarterly" | "annual";
+  id: string;
+  type: "goal" | "sinking";
+  name: string;
+  targetMinor: number;
+  currency: string;
+  targetDate?: string;
+  linkedCategoryId?: string;
+  linkedAccountId?: string;
+  contributions: { month: string; amountMinor: number }[];
+  createdAt: string;
+  isDemo?: boolean;
+}
+export interface MonthlyBudget {
+  id: string;
+  categoryId: string;
+  month: string;
+  currency: string;
+  amountMinor: number;
+  rollover: "none" | "surplus" | "both";
+}
+export interface RecurringSeries {
+  id: string;
+  matchKey: string;
+  accountId: string;
+  name: string;
+  currency: string;
+  cadence: "weekly" | "monthly" | "quarterly" | "annual";
+  expectedAmountMinor: number;
+  amountHistory: { date: string; amountMinor: number }[];
+  nextDue: string;
+  status: "active" | "ignored" | "cancel-planned";
+  endDate?: string;
+  lastAcknowledgedAmount?: number;
+  note?: string;
+  isDemo?: boolean;
+}
+export interface MonthClose {
+  month: string;
+  closedAt: string;
+  currency?: string;
+  snapshot: {
+    income: number;
+    expenses: number;
+    net: number;
+    transactionCount: number;
+    categoryTotals?: Record<string, number>;
+  };
+  updatedAt?: string;
+}
+export interface Attachment {
+  id: string;
+  transactionId: string;
+  mime: string;
+  sizeBytes: number;
+  blob: Blob;
+  name?: string;
+  createdAt?: string;
+}
+export interface SerializedAttachment extends Omit<Attachment, "blob"> {
+  dataBase64: string;
+}
+/** Decimal rate strings retain exact downloaded precision; money conversion uses integer arithmetic. */
+export interface FxRate {
+  id: string;
+  date: string;
+  base: string;
+  quote: string;
+  rate: string;
+  source: "ecb" | "manual";
+}
+export interface TransferProposal {
+  id: string;
+  debitTxId: string;
+  creditTxId: string;
+  score: number;
+  status: "pending" | "confirmed" | "rejected";
+  pairKind?: "transfer" | "card_repayment";
+  createdAt?: string;
+  crossCurrency?: boolean;
+}
+export interface SavedView {
+  id: string;
+  name: string;
+  conditions: RuleCondition[];
+  match: "all" | "any";
+  pinned: boolean;
+  query?: string;
+}
+export interface SavedReport {
+  id: string;
+  name: string;
+  groupBy: "category" | "tag" | "account" | "merchant" | "month";
+  measure: "sum" | "count" | "average";
+  chart: "table" | "bar" | "line";
+  conditions: RuleCondition[];
+  pinned: boolean;
+}
+export interface Scenario {
+  currency?: string;
+  id: string;
+  name: string;
+  createdAt: string;
+  changes: {
+    id: string;
+    date: string;
+    amountMinor: number;
+    description: string;
+    type: "one-off" | "recurring-change" | "pause" | "new-recurring";
+    recurringSeriesId?: string;
+    endDate?: string;
+  }[];
+}
+export interface ChangeLog {
+  id: string;
+  label: string;
+  createdAt: string;
+  undoneAt?: string;
+  changes: { table: string; key: string; before?: unknown; after?: unknown }[];
 }

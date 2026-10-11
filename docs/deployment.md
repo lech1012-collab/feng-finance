@@ -32,7 +32,7 @@ An automated Pages workflow is included at `.github/workflows/pages.yml`:
 3. The verification workflow runs the financial and browser tests, production build and dependency audit. After a successful push verification, the Pages workflow builds the verified commit using the repository's actual base path, then deploys only `dist/`.
 4. Open the deployment URL shown in **Actions → Deploy Feng Finance to GitHub Pages**, and install it from Safari. The workflow can also be started manually from Actions; manual runs repeat unit tests and the production build.
 
-The workflow also supports a configured custom domain automatically. Set Pages HTTPS enforcement. Hash routes and relative manifest scope make subpath deployment work. GitHub Pages cannot configure the provided HTTP security headers; use Vercel/Cloudflare when CSP/response-header control is required. Never build a root-path artifact and place it under a subpath. Repository uploads contain application source and synthetic test generators only; financial statements, backups, exports and local database records are excluded.
+The workflow also supports a configured custom domain automatically. Set Pages HTTPS enforcement. Hash routes and relative manifest scope make subpath deployment work. GitHub Pages uses the HTML meta CSP for script and network restrictions, but cannot configure the provided HTTP response headers. Use Vercel/Cloudflare when response-header control or framing protection is required. Never build a root-path artifact and place it under a subpath. Repository uploads contain application source and synthetic test generators only; financial statements, backups, exports and local database records are excluded.
 
 ## Installation and updates
 

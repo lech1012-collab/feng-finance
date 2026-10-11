@@ -13,7 +13,11 @@ export function transferKind(
 ): "card" | "internal" {
   const creditIds = new Set(
     accounts
-      .filter((account) => account.accountType === "credit")
+      .filter(
+        (account) =>
+          account.accountType === "credit" ||
+          account.accountType === "credit_card",
+      )
       .map((a) => a.id),
   );
   if (
@@ -39,12 +43,15 @@ export function excludedFlows(
   accounts: Account[],
   month: string,
   currency: string,
+  range?: [string, string],
 ) {
   const groups = new Map<string, Transaction[]>();
   for (const transaction of transactions) {
     if (
       transaction.currency !== currency ||
-      !transaction.date.startsWith(month) ||
+      !(range
+        ? transaction.date >= range[0] && transaction.date < range[1]
+        : transaction.date.startsWith(month)) ||
       financialType(transaction) !== "transfer"
     )
       continue;
@@ -91,7 +98,12 @@ export function homeDataHealth(settings: Setting[], today: string) {
   return {
     lastExportAt,
     exportedCount,
-    warning: !lastExportAt || (age ?? 0) > 30,
+    warning:
+      !lastExportAt ||
+      (age ?? 0) > 30 ||
+      Number(
+        settings.find((s) => s.key === "backup:importsSinceExport")?.value ?? 0,
+      ) >= 2,
     reviewDate: config.enabled ? reviewDate : undefined,
   };
 }

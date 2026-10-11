@@ -1,3 +1,4 @@
+import { auditedMutation } from "../storage/audit";
 import { useEffect } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -28,7 +29,11 @@ export function ThemeSetting() {
           <button
             key={theme}
             aria-pressed={(setting?.value ?? "dark") === theme}
-            onClick={() => void db.settings.put({ key: "theme", value: theme })}
+            onClick={() =>
+              void auditedMutation("Change appearance", ["settings"], () =>
+                db.settings.put({ key: "theme", value: theme }),
+              )
+            }
           >
             {theme === "dark" ? "Dark" : "Light"}
           </button>

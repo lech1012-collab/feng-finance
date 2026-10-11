@@ -3,8 +3,9 @@ import type { Category, Transaction } from "../domain/models";
 import { monthOffset, monthBounds } from "../domain/dates";
 import { money, safeSum, currencyPrecision } from "../domain/money";
 import { financialType } from "../domain/transaction-type";
+import { effectiveTransactions } from "./effective-transactions";
 export function cashFlow(transactions: Transaction[], currency: string) {
-  const items = transactions.filter(
+  const items = effectiveTransactions(transactions).filter(
     (t) => t.currency === currency && financialType(t) !== "transfer",
   );
   const income = safeSum(
@@ -21,7 +22,7 @@ export function categorySpending(
   currency: string,
 ) {
   const map = new Map<string, number>();
-  for (const t of transactions)
+  for (const t of effectiveTransactions(transactions))
     if (
       t.currency === currency &&
       t.amount < 0 &&
@@ -44,7 +45,7 @@ export function categorySpending(
 }
 export function propertyFlow(transactions: Transaction[], currency: string) {
   return cashFlow(
-    transactions.filter(
+    effectiveTransactions(transactions).filter(
       (t) =>
         t.categoryId === "property-income" ||
         t.categoryId === "property" ||
@@ -59,6 +60,7 @@ export function monthlySeries(
   count: number,
   currency: string,
 ) {
+  transactions = effectiveTransactions(transactions);
   return Array.from({ length: count }, (_, i) => {
     const month = monthOffset(end, i - count + 1);
     return {
@@ -104,6 +106,7 @@ export function comparisons(
   month: string,
   currency: string,
 ) {
+  transactions = effectiveTransactions(transactions);
   const current = categorySpending(
     transactions.filter((t) => t.date.startsWith(month)),
     categories,
@@ -161,7 +164,7 @@ export function comparisons(
 }
 export function recurring(transactions: Transaction[], currency: string) {
   const groups = new Map<string, Transaction[]>();
-  for (const t of transactions)
+  for (const t of effectiveTransactions(transactions))
     if (
       t.currency === currency &&
       t.amount < 0 &&

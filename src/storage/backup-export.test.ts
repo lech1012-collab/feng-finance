@@ -13,6 +13,7 @@ beforeEach(async () => {
 afterEach(() => vi.restoreAllMocks());
 describe("backup export traceability", () => {
   it("records download handoff date and exact count in settings and the portable backup", async () => {
+    await db.settings.put({ key: "backup:importsSinceExport", value: "2" });
     const backup = await exportBackupFile();
     expect(validateBackup(backup)).toEqual(backup);
     expect((await db.settings.get("backup:lastExportAt"))?.value).toBe(
@@ -25,16 +26,27 @@ describe("backup export traceability", () => {
       key: "backup:lastExportAt",
       value: backup.exportedAt,
     });
+    expect((await db.settings.get("backup:importsSinceExport"))?.value).toBe(
+      "0",
+    );
+    expect(backup.settings).toContainEqual({
+      key: "backup:importsSinceExport",
+      value: "0",
+    });
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
   });
   it("does not update last-backup metadata if download handoff fails", async () => {
     const old = "2026-09-01T09:00:00.000Z";
     await db.settings.put({ key: "backup:lastExportAt", value: old });
+    await db.settings.put({ key: "backup:importsSinceExport", value: "2" });
     vi.mocked(HTMLAnchorElement.prototype.click).mockImplementation(() => {
       throw new Error("Download blocked");
     });
     await expect(exportBackupFile()).rejects.toThrow("blocked");
     expect((await db.settings.get("backup:lastExportAt"))?.value).toBe(old);
     expect(await db.settings.get("backup:lastExportCount")).toBeUndefined();
+    expect((await db.settings.get("backup:importsSinceExport"))?.value).toBe(
+      "2",
+    );
   });
 });

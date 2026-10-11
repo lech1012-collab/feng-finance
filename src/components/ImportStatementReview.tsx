@@ -74,7 +74,7 @@ export function ImportStatementReview({
       : entry.state === "saved"
         ? `${entry.imported ?? 0} imported`
         : entry.error
-          ? "Couldn't read this PDF"
+          ? "Couldn't read this statement"
           : blocking
             ? entry.requiresBatchRecheck
               ? "Recheck statement"
@@ -113,7 +113,7 @@ export function ImportStatementReview({
           <h2>{d ? `${d.statement.institution} detected` : entry.file.name}</h2>
           <span>
             {d
-              ? `${d.account.maskedAccountIdentifier} · ${formatDateRange(d.statement.statementPeriodStart, d.statement.statementPeriodEnd)} · ${d.transactions.length} transactions`
+              ? `${d.account.maskedAccountIdentifier} · ${formatDateRange(d.statement.statementPeriodStart, d.statement.statementPeriodEnd)} · ${d.transactions.length} transaction${d.transactions.length === 1 ? "" : "s"}`
               : entry.progress || "Ready to check"}
           </span>
         </span>
@@ -131,8 +131,8 @@ export function ImportStatementReview({
               <strong>This statement couldn't be read</strong>
               <p>{entry.error}</p>
               <p>
-                Use a PDF statement from Barclays, American Express or Revolut,
-                or select the bank below.
+                Use a PDF, CSV, OFX, QFX or QIF statement, or select the bank
+                and account below.
               </p>
             </div>
           </div>
@@ -144,7 +144,9 @@ export function ImportStatementReview({
               {d.statement.currency} ·{" "}
               {d.statement.extractionMethod === "OCR"
                 ? "Local OCR"
-                : "Digital PDF"}
+                : d.statement.extractionMethod === "embedded-text"
+                  ? "Digital PDF"
+                  : `${d.statement.extractionMethod} export`}
             </p>
             <p>
               {formatDateRange(
@@ -187,6 +189,17 @@ export function ImportStatementReview({
                     ? "Balances don't add up"
                     : "Balance validation unavailable"}
               </strong>
+              {validation.status === "unavailable" &&
+                ["CSV", "OFX", "QIF"].includes(
+                  d.statement.extractionMethod,
+                ) && (
+                  <p>
+                    {d.statement.openingBalance === undefined &&
+                    d.statement.closingBalance === undefined
+                      ? "File has no balances"
+                      : "File has no complete opening and closing balances. This period remains unverified."}
+                  </p>
+                )}
               {validation.status === "warning" && (
                 <p>
                   Your statement closes at{" "}
@@ -327,7 +340,11 @@ export function ImportStatementReview({
             )}
             <p>
               {d.transactions.filter((t) => t.duplicate !== "none").length}{" "}
-              possible or confirmed duplicate transactions; excluded by default.
+              possible or confirmed duplicate transaction
+              {d.transactions.filter((t) => t.duplicate !== "none").length === 1
+                ? ""
+                : "s"}
+              ; excluded by default.
             </p>
             {!exactSkipped && (d.warnings.length > 0 || outsideDates) && (
               <div
@@ -357,8 +374,8 @@ export function ImportStatementReview({
                         updateDraft({ reviewedWarnings: e.target.checked })
                       }
                     />
-                    I compared the extracted rows with the PDF, corrected errors
-                    and accept any partial extraction.
+                    I compared the extracted rows with the source file,
+                    corrected errors and accept any partial extraction.
                   </label>
                   {d.statement.extractionMethod === "OCR" && (
                     <p>
@@ -371,7 +388,9 @@ export function ImportStatementReview({
             )}
             <p>
               <strong>
-                {checks.filter((t) => t.include).length} transactions to check.
+                {checks.filter((t) => t.include).length} transaction
+                {checks.filter((t) => t.include).length === 1 ? "" : "s"} to
+                check.
               </strong>{" "}
               {
                 d.transactions.filter(
@@ -456,7 +475,8 @@ export function ImportStatementReview({
                         <strong>{t.description}</strong>
                       </label>
                       <span className="small-chip">
-                        Page {t.sourcePage} ·{" "}
+                        {entry.extracted?.format ? "Row" : "Page"}{" "}
+                        {t.sourcePage} ·{" "}
                         {Math.round(t.extractionConfidence * 100)}%
                       </span>
                     </div>
@@ -464,9 +484,57 @@ export function ImportStatementReview({
                       <p className="warning-text">
                         {t.duplicate === "certain"
                           ? "Known duplicate"
-                          : "Possible duplicate — identical purchases can be legitimate"}{" "}
+                          : "Possible duplicate. Identical purchases can be legitimate"}{" "}
                         · {t.include ? "will be imported" : "excluded"}
                       </p>
+                    )}
+                    {t.manualReplacementId && (
+                      <label>
+                        Matching manual transaction
+                        <select
+                          aria-label={`Manual replacement for ${t.description}`}
+                          disabled={busy}
+                          value={
+                            t.replaceManual === undefined
+                              ? ""
+                              : t.replaceManual
+                                ? t.manualReplacementId
+                                : "keep"
+                          }
+                          onChange={(e) =>
+                            updateRow(t.id, {
+                              replaceManual:
+                                e.target.value === ""
+                                  ? undefined
+                                  : e.target.value !== "keep",
+                              manualReplacementId:
+                                e.target.value && e.target.value !== "keep"
+                                  ? e.target.value
+                                  : t.manualReplacementId,
+                              acknowledged: e.target.value !== "",
+                            })
+                          }
+                        >
+                          <option value="">Choose what to do</option>
+                          {(
+                            t.manualReplacementCandidates ?? [
+                              {
+                                id: t.manualReplacementId,
+                                date: t.date,
+                                description: "manual entry",
+                              },
+                            ]
+                          ).map((candidate) => (
+                            <option key={candidate.id} value={candidate.id}>
+                              Replace {candidate.description} ·{" "}
+                              {formatUkDate(candidate.date)}
+                            </option>
+                          ))}
+                          <option value="keep">
+                            Keep both as separate transactions
+                          </option>
+                        </select>
+                      </label>
                     )}
                     <div className="form-grid">
                       <label>
@@ -545,8 +613,15 @@ export function ImportStatementReview({
                           onChange={(e) =>
                             updateRow(t.id, {
                               manualCategory: true,
+                              isReviewed: true,
                               categorySource: "manual",
                               categoryRuleId: undefined,
+                              appliedRuleIds: [],
+                              ruleSplit: undefined,
+                              kind:
+                                e.target.value === "refund"
+                                  ? "refund"
+                                  : "normal",
                               categoryId: e.target.value || undefined,
                               subcategoryId: undefined,
                             })
@@ -571,8 +646,15 @@ export function ImportStatementReview({
                           onChange={(e) =>
                             updateRow(t.id, {
                               manualCategory: true,
+                              isReviewed: true,
                               categorySource: "manual",
                               categoryRuleId: undefined,
+                              appliedRuleIds: [],
+                              ruleSplit: undefined,
+                              kind:
+                                e.target.value === "transfer"
+                                  ? "transfer"
+                                  : "normal",
                               type: e.target.value as typeof t.type,
                               isTransfer: e.target.value === "transfer",
                               categoryId:
@@ -623,6 +705,32 @@ export function ImportStatementReview({
             Bank, account and statement dates <ChevronDown size={16} />
           </summary>
           <div className="form-grid">
+            {entry.extracted?.format === "qif" && (
+              <label>
+                QIF date format
+                <select
+                  aria-label="QIF date format"
+                  disabled={busy}
+                  value={entry.csvMapping?.dateOrder ?? ""}
+                  onChange={(e) =>
+                    patch({
+                      csvMapping: {
+                        date: 0,
+                        description: 0,
+                        ...entry.csvMapping,
+                        dateOrder: e.target.value as
+                          "day-first" | "month-first",
+                      },
+                      optionsChanged: true,
+                    })
+                  }
+                >
+                  <option value="">Choose the date order in this file</option>
+                  <option value="day-first">Day / month / year (UK)</option>
+                  <option value="month-first">Month / day / year (US)</option>
+                </select>
+              </label>
+            )}
             <label>
               Bank
               <select
@@ -637,9 +745,11 @@ export function ImportStatementReview({
                 }
               >
                 <option value="">Detect automatically</option>
-                {["Barclays", "American Express", "Revolut"].map((b) => (
-                  <option key={b}>{b}</option>
-                ))}
+                {["Barclays", "American Express", "Revolut", "Other"].map(
+                  (b) => (
+                    <option key={b}>{b}</option>
+                  ),
+                )}
               </select>
             </label>
             <label>
@@ -671,7 +781,7 @@ export function ImportStatementReview({
                 patch({ manualPeriod: e.target.checked, optionsChanged: true })
               }
             />
-            Enter statement dates from PDF
+            Enter statement dates from the source file
           </label>
           {entry.manualPeriod && (
             <>
@@ -709,12 +819,22 @@ export function ImportStatementReview({
             </>
           )}
           <div className="actions">
+            {entry.extracted?.csv && (
+              <button
+                disabled={busy}
+                onClick={() => patch({ optionsChanged: true })}
+              >
+                Change export columns
+              </button>
+            )}
             <button disabled={busy} onClick={() => reparse(false)}>
               Parse again
             </button>
-            <button disabled={busy} onClick={() => reparse(true)}>
-              Try local OCR
-            </button>
+            {!entry.extracted?.format && (
+              <button disabled={busy} onClick={() => reparse(true)}>
+                Try local OCR
+              </button>
+            )}
             <Link to="/settings">Create an account</Link>
           </div>
         </details>

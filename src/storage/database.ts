@@ -7,6 +7,19 @@ import type {
   Rule,
   TransferLink,
   Setting,
+  ManualValuation,
+  Pot,
+  MonthlyBudget,
+  Tag,
+  RecurringSeries,
+  MonthClose,
+  Attachment,
+  FxRate,
+  TransferProposal,
+  SavedView,
+  SavedReport,
+  Scenario,
+  ChangeLog,
 } from "../domain/models";
 export class FinanceDB extends Dexie {
   accounts!: EntityTable<Account, "id">;
@@ -16,6 +29,19 @@ export class FinanceDB extends Dexie {
   rules!: EntityTable<Rule, "id">;
   transferLinks!: EntityTable<TransferLink, "id">;
   settings!: EntityTable<Setting, "key">;
+  valuations!: EntityTable<ManualValuation, "id">;
+  pots!: EntityTable<Pot, "id">;
+  budgets!: EntityTable<MonthlyBudget, "id">;
+  tags!: EntityTable<Tag, "id">;
+  recurringSeries!: EntityTable<RecurringSeries, "id">;
+  monthCloses!: EntityTable<MonthClose, "month">;
+  attachments!: EntityTable<Attachment, "id">;
+  fxRates!: EntityTable<FxRate, "id">;
+  transferProposals!: EntityTable<TransferProposal, "id">;
+  savedViews!: EntityTable<SavedView, "id">;
+  savedReports!: EntityTable<SavedReport, "id">;
+  scenarios!: EntityTable<Scenario, "id">;
+  changeLog!: EntityTable<ChangeLog, "id">;
   constructor(name = "feng-finance") {
     super(name);
     this.version(1).stores({
@@ -44,6 +70,57 @@ export class FinanceDB extends Dexie {
             t.tags ??= [];
           });
       });
+    this.version(3)
+      .stores({
+        accounts: "id,institution,currency,accountType,tracking",
+        transactions:
+          "id,date,accountId,statementId,categoryId,transactionFingerprint,[currency+date],[accountId+date],merchant,parentId,kind,source,*tags",
+        valuations: "id,accountId,date,[accountId+date]",
+        pots: "id,type,linkedAccountId,linkedCategoryId",
+        budgets: "id,month,categoryId,[currency+month],[categoryId+month]",
+        tags: "id,name",
+        recurringSeries: "id,accountId,nextDue,status,matchKey",
+        monthCloses: "month,closedAt",
+        attachments: "id,transactionId",
+        fxRates: "id,date,[base+quote+date]",
+        transferProposals: "id,debitTxId,creditTxId,status",
+        savedViews: "id,name",
+        savedReports: "id,name",
+        scenarios: "id,createdAt",
+        changeLog: "id,createdAt,undoneAt",
+      })
+      .upgrade(async (tx) => {
+        await tx
+          .table<Account>("accounts")
+          .toCollection()
+          .modify((a) => {
+            a.tracking ??= "statement";
+            a.includeInNetWorth ??= true;
+          });
+        await tx
+          .table<Transaction>("transactions")
+          .toCollection()
+          .modify((t) => {
+            t.kind ??= t.isTransfer ? "transfer" : "normal";
+            t.source ??= "pdf";
+            t.attachmentIds ??= [];
+          });
+        await tx
+          .table<Rule>("rules")
+          .toCollection()
+          .modify((r) => {
+            r.enabled ??= true;
+            r.stopProcessing ??= true;
+            r.singleUse ??= false;
+          });
+        // Existing links are financial history, so changing the matching default must not unlink them.
+        await tx
+          .table<Setting>("settings")
+          .put({ key: "transferMatching", value: "manual" });
+        await tx
+          .table<Setting>("settings")
+          .put({ key: "transferDateWindowDays", value: "4" });
+      });
   }
 }
 export const db = new FinanceDB();
@@ -53,7 +130,23 @@ export async function initializeDatabase(database = db) {
     database.categories,
     database.rules,
     database.settings,
+    database.changeLog,
     async () => {
+      await database.changeLog
+        .where("createdAt")
+        .below(new Date(Date.now() - 90 * 86400000).toISOString())
+        .delete();
+      for (const setting of [
+        { key: "transferMatching", value: "manual" },
+        { key: "transferDateWindowDays", value: "4" },
+        {
+          key: "reportingCurrency",
+          value: (await database.settings.get("currency"))?.value ?? "GBP",
+        },
+        { key: "fxSource", value: "download" },
+      ])
+        if (!(await database.settings.get(setting.key)))
+          await database.settings.put(setting);
       if (await database.settings.get("initialized")) {
         if (!(await database.settings.get("defaults-1.1"))) {
           const cleaning = defaultCategories.find((c) => c.id === "cleaning")!;

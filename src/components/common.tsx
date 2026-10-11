@@ -77,16 +77,30 @@ export function Metric({
   label,
   value,
   currency,
+  approximate = false,
+  partial = false,
+  unavailable,
 }: {
   label: string;
   value: number;
   currency: string;
+  approximate?: boolean;
+  partial?: boolean;
+  unavailable?: string;
 }) {
   return (
     <div className="metric">
       <span>{label}</span>
       <strong>
-        <Amount value={value} currency={currency} />
+        {unavailable ? (
+          unavailable
+        ) : (
+          <>
+            {approximate ? "≈ " : ""}
+            <Amount value={value} currency={currency} />
+            {partial ? "*" : ""}
+          </>
+        )}
       </strong>
     </div>
   );

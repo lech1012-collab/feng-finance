@@ -1,3 +1,12 @@
+import { ReportBuilder } from "../components/ReportBuilder";
+import { TagAnalysis } from "../components/TagAnalysis";
+import { projectedReportingTransactions } from "../analytics/fx";
+import { effectiveTransactions } from "../analytics/effective-transactions";
+import {
+  reportingCoverage,
+  reportingMonthlySeries,
+} from "../analytics/reporting";
+import { reportingPeriod } from "../domain/period";
 import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
 import { DeeperInsights } from "../components/DeeperInsights";
 import { useState } from "react";
@@ -45,57 +54,43 @@ export default function Analysis({
   const [customTo, setCustomTo] = useState(
     shiftDate(monthBounds(month)[1], -1),
   );
-  const scope = analysisPeriod(month, period, customFrom, customTo);
-  const { start, end } = scope;
   const today = localToday();
-  const data = useLiveQuery(async () => {
-    const [categories, accounts, statements] = await Promise.all([
-      db.categories.toArray(),
-      db.accounts.where("currency").equals(currency).toArray(),
-      db.statements.toArray(),
-    ]);
-    const historyStart = [
-      scope.previousStart || start || `${month}-01`,
-      monthBounds(monthOffset(month, -12))[0],
-    ].sort()[0];
-    const historyEnd = end || monthBounds(month)[1];
-    // Read complete source statements even when a selected range cuts through
-    // a card statement, so the reconciliation check still has every row.
-    const documents = statements.filter(
-      (statement) =>
-        statement.currency === currency &&
-        statement.statementPeriodEnd >= historyStart &&
-        statement.statementPeriodStart < historyEnd,
-    );
-    const readStart = [
-      historyStart,
-      ...documents.map((statement) => statement.statementPeriodStart),
-    ].sort()[0];
-    const readEnd = [
-      historyEnd,
-      ...documents.map((statement) =>
-        shiftDate(statement.statementPeriodEnd, 1),
-      ),
-    ]
-      .sort()
-      .at(-1)!;
-    const transactions = await db.transactions
-      .where("[currency+date]")
-      .between([currency, readStart], [currency, readEnd], true, false)
-      .toArray();
-    return {
-      items: scope.valid
-        ? transactions.filter(
-            (transaction) =>
-              transaction.date >= start && transaction.date < end,
-          )
-        : [],
-      transactions,
-      categories,
-      accounts,
-      statements,
-    };
-  }, [start, end, scope.previousStart, currency, month]);
+  const source = useLiveQuery(
+    async () => ({
+      transactions: await db.transactions.toArray(),
+      categories: await db.categories.toArray(),
+      accounts: await db.accounts.toArray(),
+      statements: await db.statements.toArray(),
+      settings: await db.settings.toArray(),
+      rates: await db.fxRates.toArray(),
+      proposals: await db.transferProposals.toArray(),
+      tags: await db.tags.toArray(),
+    }),
+    [],
+  );
+  const data = source
+    ? {
+        ...source,
+        settings: source.settings ?? [],
+        rates: source.rates ?? [],
+        proposals: source.proposals ?? [],
+        tags: source.tags ?? [],
+        transactions: projectedReportingTransactions(
+          effectiveTransactions(source.transactions),
+          currency,
+          source.rates ?? [],
+        ).transactions,
+      }
+    : undefined;
+  const scope = analysisPeriod(
+    month,
+    period,
+    customFrom,
+    customTo,
+    data?.settings,
+    source?.transactions,
+  );
+  const { start, end } = scope;
   if (!data) return <p>Loading analysis…</p>;
   const selectedItems = scope.valid
     ? data.transactions.filter(
@@ -113,18 +108,21 @@ export default function Analysis({
     : cashFlow(selectedItems, currency);
   const spending = categorySpending(relevant, data.categories, currency);
   const coverage = scope.months.map((m) => {
-    const covered = monthCoverage(
+    const covered = reportingCoverage(
       data.accounts,
       data.statements,
-      data.transactions,
+      source!.transactions,
       m,
       currency,
+      data.rates,
+      data.settings,
+      data.proposals,
       today,
     );
-    const rangeStart = [start, `${m}-01`].sort().at(-1)!;
-    const rangeEnd = [end, monthBounds(m)[1]].sort()[0];
+    const bounds = reportingPeriod(m, data.settings, source!.transactions);
+    const rangeStart = [start, bounds[0]].sort().at(-1)!;
+    const rangeEnd = [end, bounds[1]].sort()[0];
     const intersects = (statement: (typeof data.statements)[number]) =>
-      statement.currency === currency &&
       data.accounts.some((account) => account.id === statement.accountId) &&
       statement.statementPeriodStart < rangeEnd &&
       statement.statementPeriodEnd >= rangeStart;
@@ -151,30 +149,44 @@ export default function Analysis({
         data.accounts.some(
           (account) =>
             account.id === statement.accountId &&
-            account.accountType !== "credit",
+            ![
+              "credit",
+              "credit_card",
+              "loan",
+              "mortgage",
+              "other_liability",
+            ].includes(account.accountType),
         ),
       ),
-      status: covered.complete
-        ? ("Complete" as const)
-        : verified.length
-          ? ("Partial" as const)
-          : hasData
-            ? ("Unverified" as const)
-            : ("No data" as const),
+      status:
+        covered.missingRates || covered.staleRates
+          ? ("Unverified" as const)
+          : covered.complete
+            ? ("Complete" as const)
+            : verified.length
+              ? ("Partial" as const)
+              : hasData
+                ? ("Unverified" as const)
+                : ("No data" as const),
     };
   });
   const hasIncomeSource = coverage.some((c) => c.hasIncomeSource);
   const complete = coverage.length > 0 && coverage.every((c) => c.complete);
+  const missingRates = coverage.some((c) => c.missingRates > 0);
+  const approximate = selectedItems.some((t) => "conversion" in t);
   const previousCoverage = monthsInRange(
     scope.previousStart,
     scope.previousEnd,
   ).map((m) =>
-    monthCoverage(
+    reportingCoverage(
       data.accounts,
       data.statements,
-      data.transactions,
+      source!.transactions,
       m,
       currency,
+      data.rates,
+      data.settings,
+      data.proposals,
       today,
     ),
   );
@@ -190,22 +202,40 @@ export default function Analysis({
   );
   const regular = recurring(relevant, currency);
   const series = scope.months.length
-    ? coverageMonthlySeries(
-        data.transactions,
+    ? reportingMonthlySeries(
+        source!.transactions,
         data.accounts,
         data.statements,
         scope.months.at(-1)!,
         scope.months.length,
         currency,
+        data.rates,
+        data.settings,
+        data.proposals,
         today,
       ).map((point) => {
         const covered = coverage[scope.months.indexOf(point.month)];
         const usable =
           covered.status === "Complete" || covered.status === "Partial";
         const clipped =
-          `${point.month}-01` < start || monthBounds(point.month)[1] > end;
-        const rows = selectedItems.filter((transaction) =>
-          transaction.date.startsWith(point.month),
+          reportingPeriod(point.month, data.settings, source!.transactions)[0] <
+            start ||
+          reportingPeriod(point.month, data.settings, source!.transactions)[1] >
+            end;
+        const rows = selectedItems.filter(
+          (transaction) =>
+            transaction.date >=
+              reportingPeriod(
+                point.month,
+                data.settings,
+                source!.transactions,
+              )[0] &&
+            transaction.date <
+              reportingPeriod(
+                point.month,
+                data.settings,
+                source!.transactions,
+              )[1],
         );
         const amounts = cashFlow(rows, currency);
         return {
@@ -226,7 +256,9 @@ export default function Analysis({
       })
     : [];
   const fullMonths = scope.months.filter(
-    (m) => `${m}-01` >= start && monthBounds(m)[1] <= end,
+    (m) =>
+      reportingPeriod(m, data.settings, source!.transactions)[0] >= start &&
+      reportingPeriod(m, data.settings, source!.transactions)[1] <= end,
   );
   const verifiedSeries = series.filter(
     (point) => point.coverage.complete && fullMonths.includes(point.month),
@@ -276,23 +308,34 @@ export default function Analysis({
           </Link>
         )}
       </div>
-      {!property && <CategoryAnalysisPicker month={month} />}
+      {!property && (
+        <>
+          <CategoryAnalysisPicker month={month} />
+          <Link to={`/review?month=${month}`} className="button">
+            Review month
+          </Link>
+        </>
+      )}
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
         <label className="period-label">
           Period
           <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            {["1", "3", "6", "12", "ytd", "annual", "custom"].map((v) => (
-              <option key={v} value={v}>
-                {v === "ytd"
-                  ? "Year to date"
-                  : v === "annual"
-                    ? "Calendar year"
-                    : v === "custom"
-                      ? "Custom period"
-                      : `${v} month${v === "1" ? "" : "s"}`}
-              </option>
-            ))}
+            {["1", "3", "6", "12", "ytd", "annual", "tax", "custom"].map(
+              (v) => (
+                <option key={v} value={v}>
+                  {v === "ytd"
+                    ? "Year to date"
+                    : v === "annual"
+                      ? "Calendar year"
+                      : v === "tax"
+                        ? "UK tax year"
+                        : v === "custom"
+                          ? "Custom period"
+                          : `${v} month${v === "1" ? "" : "s"}`}
+                </option>
+              ),
+            )}
           </select>
         </label>
       </div>
@@ -330,6 +373,9 @@ export default function Analysis({
             label={property ? "Rental income" : "Income"}
             value={flow.income}
             currency={currency}
+            approximate={approximate}
+            partial={!complete}
+            unavailable={missingRates ? "Rates needed" : undefined}
           />
         ) : (
           <div className="metric">
@@ -343,6 +389,9 @@ export default function Analysis({
             label={property ? "Property costs" : "Expenses"}
             value={flow.expenses}
             currency={currency}
+            approximate={approximate}
+            partial={!complete}
+            unavailable={missingRates ? "Rates needed" : undefined}
           />
         ) : (
           <div className="metric">
@@ -355,6 +404,9 @@ export default function Analysis({
             label={property ? "Net property cash flow" : "Net cash flow"}
             value={flow.net}
             currency={currency}
+            approximate={approximate}
+            partial={!complete}
+            unavailable={missingRates ? "Rates needed" : undefined}
           />
         ) : (
           <div className="metric">
@@ -363,6 +415,19 @@ export default function Analysis({
           </div>
         )}
       </section>
+      {missingRates && (
+        <p className="notice warning" role="status">
+          Some account currencies cannot be converted. Totals are unavailable;
+          lists include only accounts with usable rates.{" "}
+          <Link to="/settings#global-currency">Add exchange rates</Link>.
+        </p>
+      )}
+      {approximate && (
+        <p className="coverage-note">
+          ≈ Converted using transaction-date exchange rates. Original amounts
+          remain in each transaction.
+        </p>
+      )}
       {!complete && coverage.some((c) => c.hasData) && (
         <p className="coverage-note">
           Amounts from imported accounts only; coverage is incomplete.
@@ -384,6 +449,10 @@ export default function Analysis({
           month={month}
           currency={currency}
           months={fullMonths}
+          rawTransactions={source!.transactions}
+          reportingSettings={data.settings}
+          rates={data.rates}
+          proposals={data.proposals}
         />
       )}
       <section className="card">
@@ -607,6 +676,25 @@ export default function Analysis({
             {!regular.length && <p>No recurring pattern found yet.</p>}
           </section>
         </>
+      )}
+      {!property && (
+        <TagAnalysis
+          transactions={selectedItems}
+          categories={data.categories}
+          tags={data.tags}
+          currency={currency}
+        />
+      )}
+      {!property && (
+        <ReportBuilder
+          transactions={data.transactions}
+          accounts={data.accounts}
+          categories={data.categories}
+          tags={data.tags}
+          currency={currency}
+          rawTransactions={source!.transactions}
+          settings={data.settings}
+        />
       )}
     </>
   );

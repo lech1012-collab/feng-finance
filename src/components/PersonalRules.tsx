@@ -54,7 +54,10 @@ export function PersonalRules() {
       </label>
       {preview && bundle && (
         <div className="rule-preview">
-          <h3>{preview.changes.length} transactions to update</h3>
+          <h3>
+            {preview.changes.length} transaction
+            {preview.changes.length === 1 ? "" : "s"} to update
+          </h3>
           <p className="muted">
             Dates, amounts and statement balances stay as printed.
           </p>
@@ -63,7 +66,10 @@ export function PersonalRules() {
               <strong>{r.name}</strong>
               <span className="count-chip">
                 {preview.changes.filter((c) => c.rule.id === r.id).length}{" "}
-                updates
+                update
+                {preview.changes.filter((c) => c.rule.id === r.id).length === 1
+                  ? ""
+                  : "s"}
               </span>
             </div>
           ))}
@@ -76,7 +82,7 @@ export function PersonalRules() {
               try {
                 const n = await applyRuleBundle(bundle, preview.signature);
                 setMessage(
-                  `${n} transactions updated. Your rules will apply to future imports.`,
+                  `${n} transaction${n === 1 ? "" : "s"} updated. Your rules will apply to future imports.`,
                 );
                 setPreview(undefined);
               } catch (err) {

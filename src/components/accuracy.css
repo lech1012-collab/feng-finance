@@ -1,0 +1,164 @@
+.accuracy-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.accuracy-actions button {
+  min-height: 44px;
+}
+.accuracy-actions.compact {
+  margin: 8px 0;
+}
+.accuracy-dialog {
+  width: min(640px, calc(100vw - 32px));
+  max-height: 85dvh;
+  padding: 24px;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: auto;
+  box-sizing: border-box;
+}
+.accuracy-dialog::backdrop {
+  background: #0009;
+  backdrop-filter: blur(3px);
+}
+.accuracy-dialog > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.accuracy-dialog > header h2 {
+  margin: 0;
+}
+.accuracy-dialog > header button {
+  min-width: 44px;
+  min-height: 44px;
+}
+.accuracy-editor {
+  display: grid;
+  gap: 16px;
+}
+.accuracy-editor fieldset {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  min-width: 0;
+}
+.accuracy-editor label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.accuracy-editor input,
+.accuracy-editor select {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 44px;
+}
+.split-line-tags {
+  grid-column: 1 / -1;
+}
+.accuracy-split-summary {
+  display: grid;
+  gap: 8px;
+  margin: 16px 0;
+}
+.accuracy-split-summary a {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.refund-purchases {
+  display: grid;
+  gap: 8px;
+  max-height: 40dvh;
+  overflow: auto;
+}
+.refund-purchase {
+  border: 1px solid var(--line);
+  padding: 12px;
+  border-radius: 12px;
+  display: grid;
+  gap: 8px;
+}
+.refund-purchase .refund-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+}
+.refund-choice input[type="checkbox"] {
+  width: 24px;
+  flex: 0 0 24px;
+}
+.refund-choice span {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.refund-choice small {
+  font-size: 13px;
+}
+.transfer-review-list {
+  display: grid;
+  gap: 12px;
+}
+.transfer-proposal {
+  border: 1px solid var(--line);
+  padding: 16px;
+  border-radius: 12px;
+}
+.transfer-proposal-sides {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+.transfer-proposal-sides > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.transfer-proposal-sides small {
+  font-size: 13px;
+}
+@media (min-width: 1100px) {
+  .accuracy-dialog {
+    width: min(640px, 50vw);
+    height: 100dvh;
+    max-height: 100dvh;
+    margin: 0 0 0 auto;
+    border-radius: 16px 0 0 16px;
+    padding-bottom: max(24px, env(safe-area-inset-bottom));
+  }
+}
+@media (max-width: 600px) {
+  .accuracy-dialog {
+    width: 100%;
+    max-height: 90dvh;
+    margin: auto 0 0;
+    border-radius: 16px 16px 0 0;
+    padding: 20px 16px calc(20px + env(safe-area-inset-bottom));
+  }
+  .accuracy-editor .form-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+  .transfer-proposal-sides {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+@media (max-width: 359px) {
+  .accuracy-editor .form-grid {
+    grid-template-columns: 1fr;
+  }
+}

@@ -67,7 +67,7 @@ describe("categorization order", () => {
         ...defaultRules,
       ]).categoryId,
     ).toBe("shopping"));
-  it("prefers user exact rules", () =>
+  it("runs the higher-priority user rule before a lower-priority exact rule", () =>
     expect(
       categorize(transaction(), [
         { ...rule, pattern: "WAITROSE" },
@@ -80,7 +80,7 @@ describe("categorization order", () => {
           categoryId: "household",
         },
       ]).categoryId,
-    ).toBe("household"));
+    ).toBe("shopping"));
   it("supports account, prefix and amount ranges", () => {
     const r = {
       ...rule,

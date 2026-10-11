@@ -1,12 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { detectSubscriptions, readReview, reviewPrefix } from "./subscriptions";
 import { transaction } from "../tests/helpers";
-const monthly = (merchant = "CLOUD SERVICE", amounts = [1000, 1000, 1500]) =>
+const monthly = (
+  merchant = "CLOUD SERVICE",
+  amounts = [1000, 1000, 1000, 1500],
+) =>
   amounts.map((a, i) =>
     transaction({
       id: `t${i}`,
       merchant,
-      date: `2026-0${i + 7}-05`,
+      date: `2026-${String(i + 6).padStart(2, "0")}-05`,
       amount: -a,
     }),
   );

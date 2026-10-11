@@ -1,4 +1,9 @@
-import type { Account, Transaction, TransferLink } from "../domain/models";
+import type {
+  Account,
+  Transaction,
+  TransferLink,
+  TransferProposal,
+} from "../domain/models";
 import { dayDistance } from "../domain/dates";
 import { id, normalizeDescription } from "../domain/normalize";
 function transferEvidence(t: Transaction, other: Account) {
@@ -74,4 +79,157 @@ export function matchTransfers(
     });
   }
   return links;
+}
+
+export interface TransferProposalOptions {
+  dateWindow?: number;
+  /** A reporting-currency valuation in minor units. Missing rates do not
+   * generate guesses. Cross-currency pairs always require confirmation. */
+  crossCurrencyValue?: (transaction: Transaction) => number | undefined;
+}
+
+export function findTransferProposals(
+  transactions: Transaction[],
+  accounts: Account[],
+  options: TransferProposalOptions = {},
+): TransferProposal[] {
+  const dateWindow = options.dateWindow ?? 4;
+  if (!Number.isInteger(dateWindow) || dateWindow < 0 || dateWindow > 7)
+    throw new Error("Transfer date window must be between 0 and 7 days.");
+  const owned = new Map(accounts.map((account) => [account.id, account]));
+  const refundedPurchases = new Set(
+    transactions.flatMap((transaction) =>
+      (transaction.refundAllocations ?? []).map(
+        (allocation) => allocation.transactionId,
+      ),
+    ),
+  );
+  const eligible = transactions.filter(
+    (transaction) =>
+      owned.has(transaction.accountId) &&
+      transaction.amount !== 0 &&
+      !transaction.transferPairId &&
+      !transaction.parentId &&
+      transaction.kind !== "refund" &&
+      !refundedPurchases.has(transaction.id) &&
+      transaction.kind !== "split_parent",
+  );
+  const creditsByAmount = new Map<string, Transaction[]>();
+  const creditsByDate = new Map<string, Transaction[]>();
+  const convertedValues = new Map<string, number | undefined>();
+  const valueFor = (transaction: Transaction) => {
+    if (!convertedValues.has(transaction.id))
+      convertedValues.set(
+        transaction.id,
+        options.crossCurrencyValue?.(transaction),
+      );
+    return convertedValues.get(transaction.id);
+  };
+  for (const credit of eligible.filter(
+    (transaction) => transaction.amount > 0,
+  )) {
+    const key = `${credit.currency}|${credit.amount}|${credit.date}`;
+    const sameAmount = creditsByAmount.get(key) ?? [];
+    sameAmount.push(credit);
+    creditsByAmount.set(key, sameAmount);
+    const onDate = creditsByDate.get(credit.date) ?? [];
+    onDate.push(credit);
+    creditsByDate.set(credit.date, onDate);
+  }
+  const proposals: TransferProposal[] = [];
+  for (const debit of eligible.filter(
+    (transaction) => transaction.amount < 0,
+  )) {
+    const dates = Array.from({ length: dateWindow * 2 + 1 }, (_, i) =>
+      new Date(Date.parse(debit.date) + (i - dateWindow) * 86400000)
+        .toISOString()
+        .slice(0, 10),
+    );
+    const same = dates.flatMap(
+      (date) =>
+        creditsByAmount.get(`${debit.currency}|${-debit.amount}|${date}`) ?? [],
+    );
+    const cross = options.crossCurrencyValue
+      ? dates
+          .flatMap((date) => creditsByDate.get(date) ?? [])
+          .filter((credit) => {
+            if (credit.currency === debit.currency) return false;
+            const outgoing = valueFor(debit),
+              incoming = valueFor(credit);
+            return (
+              outgoing !== undefined &&
+              incoming !== undefined &&
+              Number.isSafeInteger(outgoing) &&
+              Number.isSafeInteger(incoming) &&
+              outgoing !== 0 &&
+              BigInt(Math.abs(Math.abs(outgoing) - Math.abs(incoming))) *
+                100n <=
+                BigInt(Math.abs(outgoing)) * 2n
+            );
+          })
+      : [];
+    for (const credit of [...same, ...cross]) {
+      const difference = dayDistance(debit.date, credit.date);
+      if (
+        debit.accountId === credit.accountId ||
+        difference > dateWindow ||
+        !!debit.isDemo !== !!credit.isDemo
+      )
+        continue;
+      const destination = owned.get(credit.accountId)!;
+      const source = owned.get(debit.accountId)!;
+      const repayment =
+        ["credit", "credit_card"].includes(destination.accountType) &&
+        !["credit", "credit_card"].includes(source.accountType);
+      const evidence =
+        transferEvidence(debit, destination) ||
+        transferEvidence(credit, source);
+      proposals.push({
+        id: `transfer:${debit.id}:${credit.id}`,
+        debitTxId: debit.id,
+        creditTxId: credit.id,
+        score: Math.max(
+          0.1,
+          Math.min(1, 0.7 + (evidence ? 0.2 : 0) - difference * 0.05),
+        ),
+        status: "pending",
+        pairKind: repayment ? "card_repayment" : "transfer",
+        crossCurrency: debit.currency !== credit.currency,
+        createdAt: new Date().toISOString(),
+      });
+    }
+  }
+  return proposals.sort(
+    (a, b) => b.score - a.score || a.id.localeCompare(b.id),
+  );
+}
+
+export function eligibleAutomaticProposals(
+  proposals: TransferProposal[],
+  transactions: Transaction[],
+): TransferProposal[] {
+  const byId = new Map(
+    transactions.map((transaction) => [transaction.id, transaction]),
+  );
+  const counts = new Map<string, number>();
+  for (const proposal of proposals.filter(
+    (item) => item.status === "pending",
+  )) {
+    counts.set(proposal.debitTxId, (counts.get(proposal.debitTxId) ?? 0) + 1);
+    counts.set(proposal.creditTxId, (counts.get(proposal.creditTxId) ?? 0) + 1);
+  }
+  return proposals.filter((proposal) => {
+    const debit = byId.get(proposal.debitTxId),
+      credit = byId.get(proposal.creditTxId);
+    return (
+      proposal.status === "pending" &&
+      !proposal.crossCurrency &&
+      debit &&
+      credit &&
+      debit.currency === credit.currency &&
+      counts.get(debit.id) === 1 &&
+      counts.get(credit.id) === 1 &&
+      dayDistance(debit.date, credit.date) <= 2
+    );
+  });
 }

@@ -1,3 +1,13 @@
+import { TransferSettings } from "../components/TransferReview";
+import { auditedMutation } from "../storage/audit";
+import { SecuritySettings } from "../components/SecuritySettings";
+import { EncryptedBackup } from "../components/EncryptedBackup";
+import { StorageUsage } from "../components/StorageUsage";
+import { ManualAccountEditor } from "../components/ManualAccountEditor";
+import { PeriodSetting } from "../components/PeriodSetting";
+import { RecentChanges } from "../components/RecentChanges";
+import { RulesManager } from "../components/RulesManager";
+import { TagManager } from "../components/TagManager";
 import { CurrencySetting } from "../components/CurrencySetting";
 import { Reminders } from "../components/Reminders";
 import { useGlobalCurrency } from "../components/CurrencySetting";
@@ -41,6 +51,10 @@ import { matches } from "../categorization/engine";
 import { saveRule, deleteRule } from "../storage/rules";
 import { formatUkDate } from "../domain/dates";
 import { backupErrorMessage } from "../storage/backup-error";
+import {
+  BackupFileTooLargeError,
+  MAX_BACKUP_FILE_BYTES,
+} from "../storage/backup-limits";
 export default function Settings() {
   const currency = useGlobalCurrency();
   const [searchParams] = useSearchParams();
@@ -48,6 +62,8 @@ export default function Settings() {
   const data = useLiveQuery(
     async () => ({
       accounts: await db.accounts.toArray(),
+      taxEnabled:
+        (await db.settings.get("property-tax-report"))?.value === "true",
       categories: await db.categories.toArray(),
       rules: await db.rules.orderBy("priority").reverse().toArray(),
       count: await db.transactions.count(),
@@ -64,6 +80,8 @@ export default function Settings() {
   const [error, setError] = useState("");
   const [pending, setPending] = useState<Backup>();
   const [replaceConfirmed, setReplaceConfirmed] = useState(false);
+  const [includeBackupAttachments, setIncludeBackupAttachments] =
+    useState(true);
   const [erasePhrase, setErasePhrase] = useState("");
   const [showRules, setShowRules] = useState(!!requestedRule);
   useEffect(() => {
@@ -107,7 +125,7 @@ export default function Settings() {
     }
   };
   const backup = async () => {
-    await exportBackupFile();
+    await exportBackupFile({ includeAttachments: includeBackupAttachments });
   };
   const backupTime = data?.backupAt ? Date.parse(data.backupAt) : NaN;
   const backupOverdue =
@@ -128,6 +146,40 @@ export default function Settings() {
       </div>
       <ThemeSetting />
       <CurrencySetting />
+      <PeriodSetting />
+      <TransferSettings />
+      <SecuritySettings />
+      <StorageUsage />
+      <div id="manual-accounts">
+        <ManualAccountEditor currency={currency} />
+      </div>
+      <TagManager />
+
+      <RecentChanges />
+      <section className="card">
+        <h2>Reports</h2>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={data?.taxEnabled ?? false}
+            onChange={(e) =>
+              void auditedMutation(
+                "Change property tax reports",
+                ["settings"],
+                () =>
+                  db.settings.put({
+                    key: "property-tax-report",
+                    value: String(e.target.checked),
+                  }),
+              )
+            }
+          />
+          Enable property tax summary
+        </label>
+        <p className="muted">
+          Adds rental income and selected allowable expenses to Analyse reports.
+        </p>
+      </section>
       <Reminders currency={currency} settings />
       {notice && (
         <div className="notice success" role="status">
@@ -139,25 +191,32 @@ export default function Settings() {
           {error}
         </div>
       )}
+      <EncryptedBackup
+        onRestorePreview={(backup) => {
+          setPending(backup);
+          setReplaceConfirmed(false);
+        }}
+      />
       <section className="card" id="backup">
         <h2>
           <Database size={19} />
           Backup
         </h2>
         <p className="muted">
-          Save your {data?.count ?? 0} transactions to Files or iCloud Drive.
+          Save your {data?.count ?? 0} transaction{data?.count === 1 ? "" : "s"}{" "}
+          to Files or iCloud Drive.
         </p>
         <p
           className={`backup-status ${backupOverdue ? "backup-status--overdue" : ""}`}
         >
           {Number.isFinite(backupTime)
-            ? `Last backup export: ${formatUkDate(data!.backupAt!.slice(0, 10))} · ${Number(data?.backupCount) || 0} transactions`
+            ? `Last backup export: ${formatUkDate(data!.backupAt!.slice(0, 10))} · ${Number(data?.backupCount) || 0} transaction${Number(data?.backupCount) === 1 ? "" : "s"}`
             : "No backup exported yet."}
           {backupOverdue && (
             <strong>
               {" "}
               {Number.isFinite(backupTime)
-                ? "Over 30 days ago—save a fresh backup."
+                ? "Over 30 days ago. Save a fresh backup."
                 : "Save your first backup."}
             </strong>
           )}
@@ -185,6 +244,23 @@ export default function Settings() {
             Export transactions CSV
           </button>
         </div>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={includeBackupAttachments}
+            disabled={busy}
+            onChange={(event) =>
+              setIncludeBackupAttachments(event.target.checked)
+            }
+          />
+          Include attachments in JSON backup
+        </label>
+        {!includeBackupAttachments && (
+          <p className="muted">
+            Notes and financial records are included. Images and attached PDFs
+            are omitted.
+          </p>
+        )}
         <details>
           <summary>Learn more about local storage</summary>
           <p>
@@ -234,8 +310,8 @@ export default function Settings() {
               setReplaceConfirmed(false);
               await run(
                 async () => {
-                  if (file.size > 50 * 1024 * 1024)
-                    throw new Error("Backup exceeds the 50 MB limit.");
+                  if (file.size > MAX_BACKUP_FILE_BYTES)
+                    throw new BackupFileTooLargeError();
                   setPending(validateBackup(JSON.parse(await file.text())));
                 },
                 "Backup validated. Review the replacement warning below.",
@@ -269,6 +345,21 @@ export default function Settings() {
               version {pending.version} · Database version{" "}
               {pending.schemaVersion}
             </p>
+            {pending.transactions.length > 0 && (
+              <p className="muted">
+                Transaction dates:{" "}
+                {formatUkDate(
+                  [...pending.transactions].map((t) => t.date).sort()[0],
+                )}{" "}
+                to{" "}
+                {formatUkDate(
+                  [...pending.transactions]
+                    .map((t) => t.date)
+                    .sort()
+                    .at(-1)!,
+                )}
+              </p>
+            )}
             <p>
               Current accounts, transactions, categories, rules and settings
               will be replaced. You need a backup to undo this.
@@ -330,10 +421,12 @@ export default function Settings() {
                   if (e.target.value.trim())
                     void run(
                       () =>
-                        db.accounts.update(a.id, {
-                          displayName: e.target.value.trim(),
-                          updatedAt: new Date().toISOString(),
-                        }),
+                        auditedMutation("Rename account", ["accounts"], () =>
+                          db.accounts.update(a.id, {
+                            displayName: e.target.value.trim(),
+                            updatedAt: new Date().toISOString(),
+                          }),
+                        ),
                       "Account renamed.",
                     );
                 }}
@@ -411,17 +504,22 @@ export default function Settings() {
             onClick={() =>
               void run(async () => {
                 const now = new Date().toISOString();
-                await db.accounts.add({
-                  id: id(),
-                  institution: bank,
-                  displayName: accountName.trim(),
-                  accountType:
-                    bank === "American Express" ? "credit" : "current",
-                  currency: accountCurrency,
-                  maskedAccountIdentifier: `•••• ${accountMask}`,
-                  createdAt: now,
-                  updatedAt: now,
-                });
+                await auditedMutation(
+                  "Add statement account",
+                  ["accounts"],
+                  () =>
+                    db.accounts.add({
+                      id: id(),
+                      institution: bank,
+                      displayName: accountName.trim(),
+                      accountType:
+                        bank === "American Express" ? "credit" : "current",
+                      currency: accountCurrency,
+                      maskedAccountIdentifier: `•••• ${accountMask}`,
+                      createdAt: now,
+                      updatedAt: now,
+                    }),
+                );
                 setAccountName("");
                 setAccountMask("");
               }, "Account created.")
@@ -503,14 +601,16 @@ export default function Settings() {
           disabled={!categoryName.trim() || busy}
           onClick={() =>
             void run(async () => {
-              await db.categories.add({
-                id: id(),
-                name: categoryName.trim(),
-                kind: categoryKind,
-                parentId: categoryParent || undefined,
-                archived: false,
-                color: "#48708b",
-              });
+              await auditedMutation("Add category", ["categories"], () =>
+                db.categories.add({
+                  id: id(),
+                  name: categoryName.trim(),
+                  kind: categoryKind,
+                  parentId: categoryParent || undefined,
+                  archived: false,
+                  color: "#48708b",
+                }),
+              );
               setCategoryName("");
             }, "Category added.")
           }
@@ -530,22 +630,7 @@ export default function Settings() {
           Your category choices are learned automatically. Changes here apply to
           future imports.
         </p>
-        {showRules && (
-          <RuleList
-            rules={data?.rules ?? []}
-            categories={data?.categories ?? []}
-            accounts={data?.accounts ?? []}
-            run={run}
-            busy={busy}
-            requestedRule={requestedRule ?? undefined}
-          />
-        )}
-        <RuleForm
-          categories={data?.categories ?? []}
-          accounts={data?.accounts ?? []}
-          run={run}
-          busy={busy}
-        />
+        <RulesManager />
         <details>
           <summary>
             Built-in merchant mappings (
@@ -556,10 +641,6 @@ export default function Settings() {
             .map((r) => (
               <p key={r.id}>{r.name}</p>
             ))}
-        </details>
-        <details>
-          <summary>Advanced: import personal rules</summary>
-          <PersonalRules />
         </details>
       </details>
       <details className="card settings-disclosure">
@@ -572,7 +653,8 @@ export default function Settings() {
             <details key={s.id}>
               <summary>
                 {s.institution} · {formatUkDate(s.statementPeriodEnd)} ·{" "}
-                {s.transactionCount} new transactions · {s.validationStatus}
+                {s.transactionCount} new transaction
+                {s.transactionCount === 1 ? "" : "s"} · {s.validationStatus}
               </summary>
               <p>
                 {s.sourceFilename} · parser {s.parserVersion} ·{" "}
@@ -628,9 +710,10 @@ export default function Settings() {
           <summary>Learn more about privacy and installation</summary>
           <p>
             Statements are parsed locally using PDF.js and OCR. There are no
-            analytics, external AI calls, API keys or cloud sync. The host
-            serves static app assets; after the offline cache is ready, imports
-            need no network access.
+            analytics, external AI calls, API keys or cloud sync. Only public
+            ECB rate tables are downloaded when conversion is enabled; no
+            personal data is sent. The host serves static app assets; after the
+            offline cache is ready, imports need no network access.
           </p>
           <p>
             On iPhone, open Feng in Safari → Share → Add to Home Screen → Open
@@ -739,7 +822,9 @@ function CategoryEditor({
             if (e.target.value.trim() && e.target.value.trim() !== c.name)
               void run(
                 () =>
-                  db.categories.update(c.id, { name: e.target.value.trim() }),
+                  auditedMutation("Rename category", ["categories"], () =>
+                    db.categories.update(c.id, { name: e.target.value.trim() }),
+                  ),
                 "Category renamed.",
               );
           }}
@@ -749,7 +834,10 @@ function CategoryEditor({
       <button
         onClick={() =>
           void run(
-            () => db.categories.update(c.id, { archived: !c.archived }),
+            () =>
+              auditedMutation("Archive category", ["categories"], () =>
+                db.categories.update(c.id, { archived: !c.archived }),
+              ),
             c.archived ? "Category restored." : "Category archived.",
           )
         }
@@ -764,384 +852,4 @@ function CategoryEditor({
       {childrenCategories.map(editor)}
     </>
   );
-}
-function RuleList({
-  rules,
-  categories,
-  accounts,
-  run,
-  busy,
-  requestedRule,
-}: {
-  rules: Rule[];
-  categories: Category[];
-  accounts: Account[];
-  run: (fn: () => Promise<unknown>, message: string) => Promise<void>;
-  busy: boolean;
-  requestedRule?: string;
-}) {
-  const [editing, setEditing] = useState<Rule>();
-  const openedRule = useRef<string | undefined>(undefined);
-  useEffect(() => {
-    const selected = rules.find(
-      (rule) => rule.id === requestedRule && !rule.builtIn,
-    );
-    if (selected && openedRule.current !== selected.id) {
-      openedRule.current = selected.id;
-      setEditing(selected);
-    }
-  }, [requestedRule, rules]);
-  const transactions = useLiveQuery(() => db.transactions.toArray(), []);
-  const stats = useMemo(
-    () =>
-      new Map(
-        rules
-          .filter((r) => !r.builtIn)
-          .map((rule) => {
-            const matching = transactions?.filter((t) => matches(rule, t));
-            const lastUsedAt = transactions
-              ?.filter((t) => t.categoryRuleId === rule.id)
-              .reduce<string | undefined>(
-                (last, t) => (!last || t.updatedAt > last ? t.updatedAt : last),
-                rule.lastUsedAt,
-              );
-            return [
-              rule.id,
-              {
-                count: matching?.length,
-                lastUsedAt: lastUsedAt ?? rule.lastUsedAt,
-              },
-            ];
-          }),
-      ),
-    [rules, transactions],
-  );
-  const personal = rules.filter((r) => !r.builtIn);
-  return (
-    <div className="rule-list">
-      {!personal.length && (
-        <p className="muted">
-          No personal rules yet. Categorize a transaction to create one
-          automatically.
-        </p>
-      )}
-      {personal.map((rule) => (
-        <div className="rule-item" key={rule.id}>
-          <div className="rule-details">
-            <strong>
-              {rule.pattern} →{" "}
-              {rule.type === "transfer"
-                ? "Transfer"
-                : (categories.find(
-                    (c) => c.id === (rule.subcategoryId ?? rule.categoryId),
-                  )?.name ?? "Unavailable category")}
-            </strong>
-            <p>
-              {rule.accountId
-                ? accountLabel(accounts.find((a) => a.id === rule.accountId))
-                : "All accounts"}{" "}
-              ·{" "}
-              {rule.match === "exact"
-                ? "Exact merchant"
-                : rule.match === "starts-with"
-                  ? "Starts with"
-                  : "Contains text"}{" "}
-              ·{" "}
-              {rule.direction === "positive"
-                ? "Money in"
-                : rule.direction === "negative"
-                  ? "Money out"
-                  : "Either direction"}
-            </p>
-            <p className="muted">
-              {stats.get(rule.id)?.count === undefined
-                ? "Checking matches…"
-                : `${stats.get(rule.id)!.count} matching transactions`}{" "}
-              · Last used:{" "}
-              {stats.get(rule.id)?.lastUsedAt
-                ? formatUkDate(stats.get(rule.id)!.lastUsedAt!.slice(0, 10))
-                : "not recorded"}
-            </p>
-          </div>
-          <div className="actions">
-            <button
-              disabled={busy}
-              aria-label={`Edit rule ${rule.name}`}
-              onClick={() => setEditing(rule)}
-            >
-              <Pencil size={16} />
-              Edit
-            </button>
-            <button
-              disabled={busy}
-              aria-label={`Delete rule ${rule.name}`}
-              onClick={() =>
-                void run(async () => {
-                  await deleteRule(rule);
-                  if (editing?.id === rule.id) setEditing(undefined);
-                }, "Rule deleted. Existing transactions kept.")
-              }
-            >
-              <Trash2 size={16} />
-              Delete
-            </button>
-          </div>
-          {editing?.id === rule.id && (
-            <RuleForm
-              key={rule.id}
-              rule={editing}
-              categories={categories}
-              accounts={accounts}
-              run={run}
-              busy={busy}
-              onClose={() => setEditing(undefined)}
-            />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-function RuleForm({
-  categories,
-  accounts,
-  run,
-  busy,
-  rule,
-  onClose,
-}: {
-  categories: Category[];
-  accounts: Account[];
-  run: (fn: () => Promise<unknown>, message: string) => Promise<void>;
-  busy: boolean;
-  rule?: Rule;
-  onClose?: () => void;
-}) {
-  const [pattern, setPattern] = useState(rule?.pattern ?? "");
-  const [category, setCategory] = useState(rule?.categoryId ?? "");
-  const [subcategory, setSubcategory] = useState(rule?.subcategoryId ?? "");
-  const [match, setMatch] = useState<Rule["match"]>(rule?.match ?? "contains");
-  const [direction, setDirection] = useState<Rule["direction"]>(
-    rule?.direction ?? "any",
-  );
-  const [transfer, setTransfer] = useState(rule?.type === "transfer");
-  const [account, setAccount] = useState(rule?.accountId ?? "");
-  const [priority, setPriority] = useState(rule?.priority ?? 100);
-  const initialCurrency = accounts.find(
-    (a) => a.id === rule?.accountId,
-  )?.currency;
-  const [min, setMin] = useState(
-    rule?.minAmount === undefined
-      ? ""
-      : decimalMoney(rule.minAmount, initialCurrency),
-  );
-  const [max, setMax] = useState(
-    rule?.maxAmount === undefined
-      ? ""
-      : decimalMoney(rule.maxAmount, initialCurrency),
-  );
-  return (
-    <details className="rule-editor" open={rule ? true : undefined}>
-      <summary>
-        {rule
-          ? "Edit categorization rule"
-          : "Create a categorization or transfer rule"}
-      </summary>
-      <div className="form-grid">
-        <label>
-          Text pattern
-          <input
-            value={pattern}
-            onChange={(e) => setPattern(e.target.value)}
-            maxLength={500}
-          />
-        </label>
-        <label>
-          Match
-          <select
-            aria-label="Match"
-            value={match}
-            onChange={(e) => setMatch(e.target.value as Rule["match"])}
-          >
-            <option value="contains">Contains text</option>
-            <option value="starts-with">Starts with</option>
-            <option value="exact">Exact merchant</option>
-          </select>
-        </label>
-        <label>
-          Direction
-          <select
-            aria-label="Direction"
-            value={direction}
-            onChange={(e) => setDirection(e.target.value as Rule["direction"])}
-          >
-            <option value="any">Any direction</option>
-            <option value="positive">Money in</option>
-            <option value="negative">Money out</option>
-          </select>
-        </label>
-        <label>
-          Account
-          <select
-            aria-label="Account"
-            value={account}
-            onChange={(e) => {
-              setAccount(e.target.value);
-              setMin("");
-              setMax("");
-            }}
-          >
-            <option value="">All accounts</option>
-            {accounts.map((a) => (
-              <option key={a.id} value={a.id}>
-                {accountLabel(a)} · {a.currency}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Category
-          <select
-            aria-label="Category"
-            disabled={transfer}
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              setSubcategory("");
-            }}
-          >
-            <option value="">Choose a category</option>
-            {categories
-              .filter((c) => !c.archived && !c.parentId)
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        {!!categories.filter((c) => c.parentId === category && !c.archived)
-          .length &&
-          !transfer && (
-            <label>
-              Subcategory
-              <select
-                aria-label="Rule subcategory"
-                value={subcategory}
-                onChange={(e) => setSubcategory(e.target.value)}
-              >
-                <option value="">No subcategory</option>
-                {categories
-                  .filter((c) => c.parentId === category && !c.archived)
-                  .map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-              </select>
-            </label>
-          )}
-        <label>
-          Priority
-          <input
-            type="number"
-            value={priority}
-            onChange={(e) => setPriority(Number(e.target.value))}
-          />
-        </label>
-        <label>
-          Minimum absolute amount
-          <input
-            inputMode="decimal"
-            value={min}
-            onChange={(e) => setMin(e.target.value)}
-            disabled={!account}
-          />
-        </label>
-        <label>
-          Maximum absolute amount
-          <input
-            inputMode="decimal"
-            value={max}
-            onChange={(e) => setMax(e.target.value)}
-            disabled={!account}
-          />
-        </label>
-      </div>
-      <p className="muted">
-        Amount ranges require an account so the currency is explicit.
-      </p>
-      <label className="check">
-        <input
-          type="checkbox"
-          checked={transfer}
-          onChange={(e) => setTransfer(e.target.checked)}
-        />
-        Mark matches as internal transfers
-      </label>
-      <button
-        disabled={!pattern.trim() || (!transfer && !category) || busy}
-        onClick={() =>
-          void run(
-            async () => {
-              const currency = accounts.find((a) => a.id === account)?.currency;
-              const minAmount =
-                account && min ? parseMoney(min, currency) : undefined;
-              const maxAmount =
-                account && max ? parseMoney(max, currency) : undefined;
-              if (
-                (minAmount !== undefined && minAmount < 0) ||
-                (maxAmount !== undefined && maxAmount < 0) ||
-                (minAmount !== undefined &&
-                  maxAmount !== undefined &&
-                  minAmount > maxAmount) ||
-                !Number.isSafeInteger(priority)
-              )
-                throw new Error(
-                  "Enter a valid priority and positive amount range.",
-                );
-              await saveRule(
-                {
-                  ...rule,
-                  id: rule?.id ?? id(),
-                  name: `${pattern} → ${transfer ? "Transfer" : categories.find((c) => c.id === category)?.name}`,
-                  match,
-                  pattern: pattern.trim(),
-                  direction,
-                  accountId: account || undefined,
-                  priority,
-                  categoryId: transfer ? undefined : category,
-                  subcategoryId: transfer
-                    ? undefined
-                    : subcategory || undefined,
-                  type: transfer ? "transfer" : undefined,
-                  minAmount,
-                  maxAmount,
-                  builtIn: false,
-                },
-                rule,
-              );
-              setPattern("");
-              onClose?.();
-            },
-            rule
-              ? "Rule updated. Changes apply to future imports."
-              : "Rule created.",
-          )
-        }
-      >
-        {rule ? "Save rule" : "Create rule"}
-      </button>
-      {rule && (
-        <button disabled={busy} onClick={onClose}>
-          Cancel edit
-        </button>
-      )}
-    </details>
-  );
-}
-function accountLabel(account?: Account) {
-  return account
-    ? `${account.institution} · ${account.displayName} · ${account.maskedAccountIdentifier}`
-    : "Unavailable account";
 }

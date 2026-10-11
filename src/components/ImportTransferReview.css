@@ -1,0 +1,48 @@
+.import-transfer-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+}
+.import-transfer-list > label {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  margin: 0;
+  padding: 16px;
+  min-height: 44px;
+}
+.import-transfer-list > label > input {
+  width: 20px;
+  height: 20px;
+  margin: 2px 0;
+}
+.import-transfer-list > label span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.import-transfer-list > label .block {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.import-automatic-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.import-automatic-summary p {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.import-automatic-summary .block {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+}
+.import-automatic-summary button {
+  flex: 0 0 auto;
+  min-height: 44px;
+}

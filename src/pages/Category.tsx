@@ -1,3 +1,7 @@
+import { effectiveTransactions } from "../analytics/effective-transactions";
+import { projectedReportingTransactions } from "../analytics/fx";
+import { reportingCoverage } from "../analytics/reporting";
+import { reportingPeriodLabel } from "../domain/period";
 import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
@@ -45,36 +49,31 @@ export default function CategoryPage({
       : month,
   );
   const [window, setWindow] = useState(6);
-  const data = useLiveQuery(async () => {
-    const [categories, accounts, statements] = await Promise.all([
-      db.categories.toArray(),
-      db.accounts.where("currency").equals(currency).toArray(),
-      db.statements.toArray(),
-    ]);
-    const start = monthBounds(monthOffset(selected, -12))[0];
-    const end = monthBounds(selected)[1];
-    const documents = statements.filter(
-      (s) =>
-        s.currency === currency &&
-        s.statementPeriodStart < end &&
-        s.statementPeriodEnd >= start,
-    );
-    const readStart = [
-      start,
-      ...documents.map((s) => s.statementPeriodStart),
-    ].sort()[0];
-    const readEnd = [
-      end,
-      ...documents.map((s) => shiftDate(s.statementPeriodEnd, 1)),
-    ]
-      .sort()
-      .at(-1)!;
-    const transactions = await db.transactions
-      .where("[currency+date]")
-      .between([currency, readStart], [currency, readEnd], true, false)
-      .toArray();
-    return { transactions, categories, accounts, statements };
-  }, [selected, currency]);
+  const source = useLiveQuery(
+    async () => ({
+      transactions: await db.transactions.toArray(),
+      categories: await db.categories.toArray(),
+      accounts: await db.accounts.toArray(),
+      statements: await db.statements.toArray(),
+      settings: await db.settings.toArray(),
+      rates: await db.fxRates.toArray(),
+      proposals: await db.transferProposals.toArray(),
+    }),
+    [],
+  );
+  const data = source
+    ? {
+        ...source,
+        settings: source.settings ?? [],
+        rates: source.rates ?? [],
+        proposals: source.proposals ?? [],
+        transactions: projectedReportingTransactions(
+          effectiveTransactions(source.transactions),
+          currency,
+          source.rates ?? [],
+        ).transactions,
+      }
+    : undefined;
   if (!data) return <p role="status">Loading category overview…</p>;
   const category = data.categories.find((c) => c.id === id);
   if (!category && id !== "uncategorized")
@@ -88,17 +87,21 @@ export default function CategoryPage({
   const today = localToday();
   const documents = verifiedStatements(
     data.statements,
-    data.transactions,
+    source!.transactions,
     today,
   );
-  const coverage = monthCoverage(
+  const coverage = reportingCoverage(
     data.accounts,
     data.statements,
-    data.transactions,
+    source!.transactions,
     selected,
     currency,
+    data.rates,
+    data.settings,
+    data.proposals,
     today,
   );
+  const approximate = data.transactions.some((t) => "conversion" in t);
   const stats = categoryOverview(
     data.transactions,
     data.accounts,
@@ -110,12 +113,15 @@ export default function CategoryPage({
     window,
     today,
     (m) => {
-      const eligible = monthCoverage(
+      const eligible = reportingCoverage(
         data.accounts,
         data.statements,
-        data.transactions,
+        source!.transactions,
         m,
         currency,
+        data.rates,
+        data.settings,
+        data.proposals,
         today,
       );
       return (
@@ -123,14 +129,19 @@ export default function CategoryPage({
         (category?.kind !== "income" || eligible.hasIncomeSource)
       );
     },
+    data.settings,
+    source!.transactions,
   );
   const series = stats.series.slice(-window).map((point) => {
-    const covered = monthCoverage(
+    const covered = reportingCoverage(
       data.accounts,
       data.statements,
-      data.transactions,
+      source!.transactions,
       point.month,
       currency,
+      data.rates,
+      data.settings,
+      data.proposals,
       today,
     );
     return {
@@ -171,6 +182,9 @@ export default function CategoryPage({
         </div>
       </div>
       <CategoryAnalysisPicker month={selected} category={id} />
+      <p className="muted">
+        {reportingPeriodLabel(selected, data.settings, source!.transactions)}
+      </p>
       <div className="toolbar">
         <MonthPicker month={selected} onChange={chooseMonth} />
         <div
@@ -184,7 +198,7 @@ export default function CategoryPage({
               aria-pressed={window === n}
               onClick={() => setWindow(n)}
             >
-              {n} months
+              {n} month{n === 1 ? "" : "s"}
             </button>
           ))}
         </div>
@@ -206,6 +220,9 @@ export default function CategoryPage({
             }
             value={stats.current.amount}
             currency={currency}
+            approximate={approximate}
+            partial={!coverage.complete}
+            unavailable={coverage.missingRates ? "Rates needed" : undefined}
           />
         ) : (
           <div className="metric">
@@ -226,7 +243,9 @@ export default function CategoryPage({
             {mean === undefined ? "Unavailable" : money(mean, currency)}
           </strong>
           <small>
-            {stats.baseline.length} complete months in previous {window}
+            {stats.baseline.length} complete month
+            {stats.baseline.length === 1 ? "" : "s"} in previous {window} month
+            {window === 1 ? "" : "s"}
           </small>
         </div>
         <div className="metric">
@@ -236,7 +255,8 @@ export default function CategoryPage({
               : "Share of income spent"}
           </span>
           <strong>
-            {!coverage.hasIncomeSource ||
+            {coverage.missingRates ||
+            !coverage.hasIncomeSource ||
             stats.current.incomePercent === undefined
               ? "Unavailable"
               : `${stats.current.incomePercent.toFixed(1)}%`}
@@ -264,6 +284,19 @@ export default function CategoryPage({
           </small>
         </div>
       </section>
+      {coverage.missingRates > 0 && (
+        <p className="notice warning" role="status">
+          Some account currencies cannot be converted. Category totals are
+          unavailable until{" "}
+          <Link to="/settings#global-currency">exchange rates are added</Link>.
+        </p>
+      )}
+      {approximate && (
+        <p className="coverage-note">
+          ≈ Converted using transaction-date exchange rates. Original amounts
+          remain in each transaction.
+        </p>
+      )}
       {coverage.hasUnverifiedStatements && (
         <p className="notice warning" role="status">
           Statements with incomplete date or balance verification are included
@@ -287,6 +320,9 @@ export default function CategoryPage({
                 label="Rent received"
                 value={stats.property.income}
                 currency={currency}
+                approximate={approximate}
+                partial={!coverage.complete}
+                unavailable={coverage.missingRates ? "Rates needed" : undefined}
               />
             ) : (
               <div className="metric">
@@ -299,6 +335,9 @@ export default function CategoryPage({
                 label="Property costs"
                 value={stats.property.expenses}
                 currency={currency}
+                approximate={approximate}
+                partial={!coverage.complete}
+                unavailable={coverage.missingRates ? "Rates needed" : undefined}
               />
             ) : (
               <div className="metric">
@@ -311,6 +350,9 @@ export default function CategoryPage({
                 label="Net property cash flow"
                 value={stats.property.net}
                 currency={currency}
+                approximate={approximate}
+                partial={!coverage.complete}
+                unavailable={coverage.missingRates ? "Rates needed" : undefined}
               />
             ) : (
               <div className="metric">
@@ -458,7 +500,7 @@ export default function CategoryPage({
             {mean === undefined ? "unavailable" : money(mean, currency)}. Sample
             standard deviation:{" "}
             {std === undefined
-              ? "unavailable — needs at least three complete months"
+              ? "unavailable. Needs at least three complete months"
               : money(std, currency)}
             . The baseline excludes this month, missing coverage, and accounts
             with mismatched currency. A verified month with no category spending

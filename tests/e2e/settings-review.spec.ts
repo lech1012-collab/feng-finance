@@ -9,6 +9,12 @@ async function settings(page: Page) {
 }
 async function demo(page: Page) {
   await settings(page);
+  // Keep the full-database restore assertions deterministic. The public-rate
+  // download has its own privacy workflow and must not write during this one.
+  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Rate preference saved." }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
@@ -312,39 +318,46 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
   );
 });
 
-test("Personal rules show scope and can be edited or deleted without touching past payments", async ({
+test("Personal rules preview scope and can be edited or deleted without touching unmatched payments", async ({
   page,
 }) => {
   await demo(page);
   const before = await transactionRecords(page);
   expect(before.length).toBeGreaterThan(0);
   await page.locator("#rules > summary").click();
-  const create = page.locator("#rules > .rule-editor");
-  await create.locator("summary").click();
-  await create
-    .getByLabel("Text pattern", { exact: true })
-    .fill("FICTIONAL UX STORE");
-  await create.getByLabel("Match", { exact: true }).selectOption("exact");
-  await create
-    .getByLabel("Category", { exact: true })
-    .selectOption("childcare");
-  await create
+  const manager = page.locator("#categorization-rules");
+  await manager
     .getByRole("button", { name: "Create rule", exact: true })
     .click();
-  const item = page
-    .locator(".rule-item")
-    .filter({ hasText: "FICTIONAL UX STORE" });
+  const editor = page.getByRole("dialog", { name: "Create rule", exact: true });
+  await editor
+    .getByLabel("Rule name", { exact: true })
+    .fill("Fictional UX store");
+  await editor
+    .getByLabel("Condition 1 value", { exact: true })
+    .fill("FICTIONAL UX STORE");
+  await editor
+    .getByRole("combobox", { name: "Category", exact: true })
+    .selectOption("childcare");
+  await expect(
+    editor.getByRole("heading", { name: "Matches 0 existing transactions" }),
+  ).toBeVisible();
+  await editor.getByRole("button", { name: "Save rule", exact: true }).click();
+  await expect(editor).not.toBeVisible();
+  const item = manager
+    .locator(".settings-row")
+    .filter({ hasText: "Fictional UX store" });
   await expect(item).toContainText("Childcare");
   await expect(item).toContainText("All accounts");
-  await expect(item).toContainText("Exact merchant");
-  await expect(item).toContainText("0 matching transactions");
-  await item.getByRole("button", { name: /Edit rule/ }).click();
-  const editor = item.locator(".rule-editor");
-  await editor.getByLabel("Category", { exact: true }).selectOption("shopping");
-  await editor.getByRole("button", { name: "Save rule", exact: true }).click();
+  await item.getByRole("button", { name: "Edit", exact: true }).click();
+  const edit = page.getByRole("dialog", { name: "Edit rule", exact: true });
+  await edit
+    .getByRole("combobox", { name: "Category", exact: true })
+    .selectOption("shopping");
+  await edit.getByRole("button", { name: "Save rule", exact: true }).click();
   await expect(item).toContainText("Shopping");
-  await expect(item.locator(".rule-editor")).toHaveCount(0);
-  await item.getByRole("button", { name: /Delete rule/ }).click();
+  await expect(edit).not.toBeVisible();
+  await item.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(item).toHaveCount(0);
   expect(await transactionRecords(page)).toEqual(before);
 });

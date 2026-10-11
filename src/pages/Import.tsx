@@ -15,6 +15,13 @@ import { validatePeriod } from "../parsers/period";
 import { id } from "../domain/normalize";
 import type { ImportDraft } from "../domain/models";
 import { statementBalanceDate } from "../analytics/statement-balances";
+import { CsvMappingPanel } from "../components/CsvMappingPanel";
+import { STATEMENT_FILE_ACCEPT, type CsvMapping } from "../import/formats";
+import type { Account } from "../domain/models";
+import { authorizeMonthEdit } from "../storage/month-review";
+import { previewImportTransfers } from "../import/transfer-review";
+import { ImportTransferReview } from "../components/ImportTransferReview";
+import { importMonthGuardDates } from "../import/month-guards";
 
 export default function ImportPage({
   onImported,
@@ -32,6 +39,11 @@ export default function ImportPage({
   );
   const [error, setError] = useState("");
   const [commitStatus, setCommitStatus] = useState("");
+  const [selectedTransferIds, setSelectedTransferIds] = useState<string[]>([]);
+  const [rejectedAutomaticIds, setRejectedAutomaticIds] = useState<string[]>(
+    [],
+  );
+  const initialTransferLinkIds = useRef(new Set<string>());
   const navigate = useNavigate();
   const accounts = useLiveQuery(
     () => db.accounts.filter((a) => !a.isDemo).toArray(),
@@ -45,6 +57,21 @@ export default function ImportPage({
     () => db.statements.filter((s) => !s.isDemo).toArray(),
     [],
   );
+  const savedMappings = useLiveQuery(async () => {
+    const result: Record<string, CsvMapping> = {};
+    for (const setting of await db.settings
+      .filter((row) => row.key.startsWith("csv-mapping:"))
+      .toArray()) {
+      try {
+        result[setting.key.slice("csv-mapping:".length)] = JSON.parse(
+          setting.value,
+        ) as CsvMapping;
+      } catch {
+        /* Invalid saved mappings are reviewed again. */
+      }
+    }
+    return result;
+  }, []);
   const operation = useRef(0);
   const alive = useRef(true);
   useEffect(() => {
@@ -118,7 +145,7 @@ export default function ImportPage({
     patchEntry(entry.id, {
       state: "checking",
       error: "",
-      progress: "Checking this PDF…",
+      progress: "Checking this statement…",
     });
     let extracted = entry.extracted;
     try {
@@ -138,9 +165,11 @@ export default function ImportPage({
       const draft = await prepareDraft(
         extracted,
         entry.bank || undefined,
-        accounts?.find((a) => a.id === entry.accountId),
+        accounts?.find((a) => a.id === entry.accountId) ??
+          entry.accountOverride,
         period,
         pendingDrafts,
+        entry.csvMapping,
       );
       if (!alive.current || token !== operation.current) return;
       const needsReview =
@@ -178,7 +207,7 @@ export default function ImportPage({
             ? e.message
             : "The statement could not be read. No financial data was saved.",
         open: true,
-        progress: "Couldn't read this PDF",
+        progress: "Couldn't read this statement",
       });
     }
   };
@@ -204,9 +233,14 @@ export default function ImportPage({
       invalidAmounts: [],
     }));
     setEntries(selected);
+    setSelectedTransferIds([]);
+    setRejectedAutomaticIds([]);
     setError("");
     setBusy(true);
     setPhase("check");
+    initialTransferLinkIds.current = new Set(
+      (await db.transferLinks.toArray()).map((link) => link.id),
+    );
     const pendingDrafts: ImportDraft[] = [];
     for (const entry of selected) {
       if (!alive.current || token !== operation.current) return;
@@ -253,8 +287,52 @@ export default function ImportPage({
       setPhase("review");
     }
   };
+  const checkMappedCsv = (
+    entry: FileReview,
+    csvMapping: CsvMapping,
+    account: Account,
+  ) => {
+    const changed = {
+      ...entry,
+      csvMapping,
+      accountId: account.id,
+      accountOverride: account,
+      bank: account.institution,
+    };
+    patchEntry(entry.id, changed);
+    void reparse(changed, false);
+  };
   const active = entries.filter(
     (entry) => !entry.skip && entry.state !== "saved",
+  );
+  const transferReviewKey = JSON.stringify(
+    active.flatMap((entry) =>
+      entry.draft
+        ? [
+            entry.draft.account.id,
+            entry.draft.exactDuplicate,
+            entry.draft.duplicateOverride,
+            ...entry.draft.transactions
+              .filter((row) => row.include)
+              .map((row) => [
+                row.id,
+                row.amount,
+                row.currency,
+                row.date,
+                row.type,
+                row.kind,
+                row.isReviewed,
+              ]),
+          ]
+        : [],
+    ),
+  );
+  const transferPreview = useLiveQuery(
+    () =>
+      previewImportTransfers(
+        active.filter((entry) => entry.draft).map((entry) => entry.draft!),
+      ),
+    [transferReviewKey],
   );
   const blocking = active.filter((entry) => importBlockers(entry).length > 0);
   const newCount = active.reduce(
@@ -304,14 +382,56 @@ export default function ImportPage({
       Number(importBlockers(a).length > 0),
   );
   const save = async () => {
-    if (busy || blocking.length || !hasChanges) return;
+    if (busy || blocking.length || !hasChanges || !transferPreview) return;
+    const confirmedTransferProposalIds = selectedTransferIds.filter(
+      (id) =>
+        transferPreview.proposals.some((proposal) => proposal.id === id) &&
+        !transferPreview.automaticProposalIds.includes(id),
+    );
+    const rejectedTransferProposalIds = rejectedAutomaticIds.filter(
+      (id) =>
+        transferPreview.proposals.some((proposal) => proposal.id === id) &&
+        !confirmedTransferProposalIds.includes(id),
+    );
     const selected = active
       .filter((entry) => entry.draft)
       .map((entry) => ({
         id: entry.id,
-        draft: entry.draft!,
+        draft: {
+          ...entry.draft!,
+          confirmedTransferProposalIds,
+          rejectedTransferProposalIds,
+        },
         overrideValidation: entry.override,
       }));
+    const selectedRows = selected.flatMap((item) =>
+      item.draft.transactions.filter((row) => row.include),
+    );
+    const manualRows = (
+      await db.transactions.bulkGet(
+        selectedRows
+          .filter((row) => row.replaceManual && row.manualReplacementId)
+          .map((row) => row.manualReplacementId!),
+      )
+    ).filter((row) => !!row);
+    const pairedIds = new Set(
+      transferPreview.proposals
+        .filter((proposal) =>
+          confirmedTransferProposalIds.includes(proposal.id),
+        )
+        .flatMap((proposal) => [proposal.debitTxId, proposal.creditTxId]),
+    );
+    const pairedRows = transferPreview.transactions.filter((transaction) =>
+      pairedIds.has(transaction.id),
+    );
+    if (
+      !(await authorizeMonthEdit([
+        ...(await importMonthGuardDates(selected.map((item) => item.draft))),
+        ...manualRows,
+        ...pairedRows,
+      ]))
+    )
+      return;
     setBusy(true);
     setError("");
     let pendingId = "";
@@ -399,6 +519,15 @@ export default function ImportPage({
             t.type !== "transfer",
         )
         .count();
+      const importedIds = new Set(importedRows.map((row) => row.id));
+      const automaticallyLinkedCount = await db.transferLinks
+        .filter(
+          (link) =>
+            !link.manual &&
+            !initialTransferLinkIds.current.has(link.id) &&
+            link.transactionIds.some((id) => importedIds.has(id)),
+        )
+        .count();
       setPhase("done");
       navigate("/", {
         replace: true,
@@ -409,6 +538,7 @@ export default function ImportPage({
           skippedFileCount,
           updatedStatementCount: updatedStatements.length,
           sortCount: toSort,
+          automaticallyLinkedCount,
         },
       });
     } catch (e) {
@@ -422,7 +552,7 @@ export default function ImportPage({
         0,
       );
       setError(
-        `${saved + priorSaved ? `${saved + priorSaved} transactions were safely saved. ` : "No transactions were saved. "}${reason} Review the remaining files and retry; saved statements will not be imported twice.`,
+        `${saved + priorSaved ? `${saved + priorSaved} transaction${saved + priorSaved === 1 ? " was" : "s were"} safely saved. ` : "No transactions were saved. "}${reason} Review the remaining files and retry; saved statements will not be imported twice.`,
       );
       patchEntry(pendingId, { error: reason, open: true });
     } finally {
@@ -477,19 +607,18 @@ export default function ImportPage({
           <Upload size={28} />
           <h2>Add your statements</h2>
           <p>
-            Select or drop monthly PDFs from Barclays, American Express or
-            Revolut. We’ll check the numbers and highlight anything that needs
-            you.
+            Select or drop PDF statements or CSV, OFX, QFX and QIF exports.
+            We’ll check the numbers and highlight anything that needs you.
           </p>
           <label
             className={`button primary file-button ${busy ? "disabled" : ""}`}
           >
             <Upload size={18} />
-            Select PDF statements
+            Select statements
             <input
-              aria-label="Select PDF statements"
+              aria-label="Select statements"
               type="file"
-              accept="application/pdf,.pdf"
+              accept={STATEMENT_FILE_ACCEPT}
               multiple
               disabled={busy}
               onChange={(e) => {
@@ -508,11 +637,11 @@ export default function ImportPage({
       {entries.length > 0 && (
         <div className="import-change-files">
           <label className={`button file-button ${busy ? "disabled" : ""}`}>
-            Choose different PDFs
+            Choose different statements
             <input
-              aria-label="Select PDF statements"
+              aria-label="Select statements"
               type="file"
-              accept="application/pdf,.pdf"
+              accept={STATEMENT_FILE_ACCEPT}
               multiple
               disabled={busy}
               onChange={(e) => {
@@ -561,36 +690,75 @@ export default function ImportPage({
       {phase !== "check" && entries.length > 0 && (
         <div className="import-review-list">
           {sorted.map((entry) => (
-            <ImportStatementReview
-              key={entry.id}
-              entry={entry}
-              accounts={accounts ?? []}
-              categories={categories ?? []}
-              history={[
-                ...(history ?? []),
-                ...entries
-                  .filter(
-                    (other) =>
-                      other.id !== entry.id &&
-                      !other.skip &&
-                      other.draft &&
-                      !other.draft.exactDuplicate &&
-                      other.state !== "saved",
-                  )
-                  .map((other) => other.draft!.statement),
-              ]}
-              busy={busy}
-              patch={(patch) => patchReviewEntry(entry.id, patch)}
-              reparse={(ocr) => void reparse(entry, ocr)}
-            />
+            <div key={entry.id}>
+              {entry.extracted?.csv &&
+                (!entry.draft || entry.optionsChanged) && (
+                  <CsvMappingPanel
+                    table={entry.extracted.csv}
+                    initial={
+                      entry.csvMapping ??
+                      entry.draft?.csvMapping ??
+                      entry.extracted.preset
+                    }
+                    initialAccountId={entry.draft?.account.id}
+                    accounts={[
+                      ...(accounts ?? []),
+                      ...(entry.draft &&
+                      !accounts?.some(
+                        (account) => account.id === entry.draft!.account.id,
+                      )
+                        ? [entry.draft.account]
+                        : []),
+                    ]}
+                    savedMappings={savedMappings}
+                    busy={busy}
+                    onCheck={(mapping, account) =>
+                      checkMappedCsv(entry, mapping, account)
+                    }
+                  />
+                )}
+              <ImportStatementReview
+                key={entry.id}
+                entry={entry}
+                accounts={accounts ?? []}
+                categories={categories ?? []}
+                history={[
+                  ...(history ?? []),
+                  ...entries
+                    .filter(
+                      (other) =>
+                        other.id !== entry.id &&
+                        !other.skip &&
+                        other.draft &&
+                        !other.draft.exactDuplicate &&
+                        other.state !== "saved",
+                    )
+                    .map((other) => other.draft!.statement),
+                ]}
+                busy={busy}
+                patch={(patch) => patchReviewEntry(entry.id, patch)}
+                reparse={(ocr) => void reparse(entry, ocr)}
+              />
+            </div>
           ))}
         </div>
+      )}
+      {phase === "review" && transferPreview && (
+        <ImportTransferReview
+          preview={transferPreview}
+          selectedIds={selectedTransferIds}
+          onChange={setSelectedTransferIds}
+          rejectedAutomaticIds={rejectedAutomaticIds}
+          onRejectedAutomaticChange={setRejectedAutomaticIds}
+          busy={busy}
+        />
       )}
       {entries.length > 0 && (
         <div className="import-footer import-outcome-footer">
           <div aria-live="polite">
             <strong>
-              {newCount} new · {duplicateCount} duplicates skipped
+              {newCount} new · {duplicateCount} duplicate
+              {duplicateCount === 1 ? "" : "s"} skipped
               {balanceStatements.length > 0 &&
                 ` · ${balanceStatements.length} balance update${balanceStatements.length === 1 ? "" : "s"}`}
               {excludedCount > 0 && ` · ${excludedCount} excluded`}
@@ -616,7 +784,9 @@ export default function ImportPage({
           ) : (
             <button
               className="primary"
-              disabled={busy || !!blocking.length || !hasChanges}
+              disabled={
+                busy || !!blocking.length || !hasChanges || !transferPreview
+              }
               onClick={() => void save()}
             >
               Confirm import

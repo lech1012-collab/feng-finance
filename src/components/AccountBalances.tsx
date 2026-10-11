@@ -156,7 +156,7 @@ export function AccountBalances({
       <p
         className={`position-coverage coverage-chip ${complete ? "coverage-complete" : "coverage-partial"}`}
       >
-        {covered} of {items.length} accounts ·{" "}
+        {covered} of {items.length} account{items.length === 1 ? "" : "s"} ·{" "}
         {complete
           ? "Reconciled"
           : allProven

@@ -8,7 +8,11 @@ export function sectionForPath(pathname: string): Section {
   if (root === "import") return "import";
   if (root === "settings") return "settings";
   if (root === "planning") return "planning";
-  if (["analysis", "categories", "property", "subscriptions"].includes(root))
+  if (
+    ["analysis", "categories", "property", "subscriptions", "review"].includes(
+      root,
+    )
+  )
     return "analysis";
   return "home";
 }

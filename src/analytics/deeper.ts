@@ -1,3 +1,5 @@
+import { inReportingPeriod, reportingPeriod } from "../domain/period";
+import { effectiveTransactions } from "./effective-transactions";
 import type {
   Account,
   Category,
@@ -37,6 +39,8 @@ export function deeperInsights(
   today: string,
   isComplete?: (month: string) => boolean,
 ) {
+  const periodRows = transactions;
+  transactions = effectiveTransactions(transactions);
   const scopedAccounts = accounts.filter((a) => a.currency === currency);
   const eligible = transactions.filter(
     (t) =>
@@ -46,7 +50,9 @@ export function deeperInsights(
       !t.transferPairId &&
       t.date <= today,
   );
-  const current = eligible.filter((t) => t.date.startsWith(month));
+  const current = eligible.filter((t) =>
+    inReportingPeriod(t.date, month, settings, periodRows),
+  );
   const floor = 25 * 10 ** currencyPrecision(currency);
   const history = Array.from({ length: 6 }, (_, i) =>
     monthOffset(month, -i - 1),
@@ -62,7 +68,9 @@ export function deeperInsights(
   if (complete && history.length >= 3) {
     const flows = history.map((m) =>
       cashFlow(
-        eligible.filter((t) => t.date.startsWith(m)),
+        eligible.filter((t) =>
+          inReportingPeriod(t.date, m, settings, periodRows),
+        ),
         currency,
       ),
     );
@@ -84,7 +92,11 @@ export function deeperInsights(
               spending(current) -
               mean(
                 history.map((m) =>
-                  spending(eligible.filter((t) => t.date.startsWith(m))),
+                  spending(
+                    eligible.filter((t) =>
+                      inReportingPeriod(t.date, m, settings, periodRows),
+                    ),
+                  ),
                 ),
               ),
           };
@@ -126,7 +138,10 @@ export function deeperInsights(
   }
   const groups = new Map<string, Transaction[]>();
   for (const t of eligible)
-    if (t.amount < 0 && t.date < `${month}-01`) {
+    if (
+      t.amount < 0 &&
+      t.date < reportingPeriod(month, settings, periodRows)[0]
+    ) {
       const key = JSON.stringify([
         t.accountId,
         normalizeMerchant(t.merchant),

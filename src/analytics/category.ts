@@ -3,10 +3,13 @@ import type {
   Category,
   Statement,
   Transaction,
+  Setting,
 } from "../domain/models";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { cashFlow, propertyFlow } from "./calculations";
 import { safeSum } from "../domain/money";
+import { effectiveTransactions } from "./effective-transactions";
+import { inReportingPeriod } from "../domain/period";
 const day = (s: string) => Date.parse(s) / 86400000;
 export function completeMonth(
   month: string,
@@ -55,9 +58,11 @@ export function categoryOverview(
   window = 6,
   today = new Date().toISOString().slice(0, 10),
   isComplete?: (month: string) => boolean,
+  periodSettings: Setting[] = [],
+  periodRows: Transaction[] = transactions,
 ) {
   const incomeCategory = categories.find((c) => c.id === id)?.kind === "income";
-  const eligible = transactions.filter(
+  const eligible = effectiveTransactions(transactions).filter(
     (t) =>
       t.currency === currency &&
       !t.isTransfer &&
@@ -72,7 +77,9 @@ export function categoryOverview(
         .map((t) => Math.abs(t.amount)),
     );
   const monthly = (m: string) => {
-    const items = eligible.filter((t) => t.date.startsWith(m));
+    const items = eligible.filter((t) =>
+      inReportingPeriod(t.date, m, periodSettings, periodRows),
+    );
     const flow = cashFlow(items, currency);
     const amount = amountFor(items.filter((t) => categoryMatches(t, id)));
     return {
@@ -105,7 +112,9 @@ export function categoryOverview(
         )
       : undefined;
   const current = monthly(month);
-  const selected = relevant.filter((t) => t.date.startsWith(month));
+  const selected = relevant.filter((t) =>
+    inReportingPeriod(t.date, month, periodSettings, periodRows),
+  );
   const difference = mean === undefined ? undefined : current.amount - mean;
   return {
     current,
@@ -124,7 +133,9 @@ export function categoryOverview(
     incomeCategory,
     transactions: selected,
     property: propertyFlow(
-      eligible.filter((t) => t.date.startsWith(month)),
+      eligible.filter((t) =>
+        inReportingPeriod(t.date, month, periodSettings, periodRows),
+      ),
       currency,
     ),
     children: categories

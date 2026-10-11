@@ -4,6 +4,7 @@ import type {
   Setting,
   Statement,
   Transaction,
+  RecurringSeries,
 } from "../domain/models";
 import { monthBounds, monthOffset, parseDate } from "../domain/dates";
 import { safeSum } from "../domain/money";
@@ -11,6 +12,12 @@ import { normalizeMerchant } from "../domain/normalize";
 import { completeMonth } from "./category";
 import { datedBalanceHistory } from "./balances";
 import { readReview } from "./subscriptions";
+import {
+  effectiveTransactions,
+  ledgerTransactions,
+} from "./effective-transactions";
+import { inReportingPeriod, reportingPeriod } from "../domain/period";
+import { confirmedPaymentEvents, recurringMatches } from "./recurring-events";
 
 export const budgetKey = (currency: string, category: string) =>
   `budget:${currency}:${category}`;
@@ -38,7 +45,7 @@ function verifiedDocuments(
   today: string,
 ) {
   const grouped = new Map<string, Transaction[]>();
-  for (const t of transactions) {
+  for (const t of ledgerTransactions(transactions)) {
     const rows = grouped.get(t.statementId) ?? [];
     rows.push(t);
     grouped.set(t.statementId, rows);
@@ -80,7 +87,7 @@ export function budgetOverview(
   currency: string,
   today: string,
 ) {
-  const eligible = transactions.filter(
+  const eligible = effectiveTransactions(transactions).filter(
     (t) => t.currency === currency && external(t) && t.date <= today,
   );
   const verified = verifiedDocuments(transactions, statements, today);
@@ -89,13 +96,16 @@ export function budgetOverview(
   ).filter((m) =>
     completeMonth(
       m,
-      accounts.filter((a) => a.currency === currency),
+      accounts.filter(
+        (a) => a.currency === currency && a.tracking !== "manual",
+      ),
       verified,
       today,
     ),
   );
   const current = eligible.filter(
-    (t) => t.date.startsWith(month) && t.amount < 0,
+    (t) =>
+      inReportingPeriod(t.date, month, settings, transactions) && t.amount < 0,
   );
   const items = categories
     .filter((c) => !c.parentId && c.kind === "expense" && !c.archived)
@@ -115,7 +125,11 @@ export function budgetOverview(
           ? Math.round(
               safeSum(
                 previous.map((m) =>
-                  spend(eligible.filter((t) => t.date.startsWith(m))),
+                  spend(
+                    eligible.filter((t) =>
+                      inReportingPeriod(t.date, m, settings, transactions),
+                    ),
+                  ),
                 ),
               ) / previous.length,
             )
@@ -178,7 +192,7 @@ export function paymentPatterns(
   today: string,
 ): Pattern[] {
   const groups = new Map<string, Transaction[]>();
-  for (const t of transactions) {
+  for (const t of ledgerTransactions(transactions)) {
     if (t.currency !== currency || t.date > today || !external(t) || !t.amount)
       continue;
     if (
@@ -311,17 +325,33 @@ export function planningForecast(
   currency: string,
   today: string,
   horizon: 30 | 60 | 90,
+  confirmedSeries: RecurringSeries[] = [],
 ) {
   parseDate(today);
-  const scoped = accounts.filter((a) => a.currency === currency);
+  const scoped = accounts.filter(
+    (a) => a.currency === currency && a.tracking !== "manual",
+  );
   const accountIds = new Set(scoped.map((a) => a.id));
-  const observed = transactions.filter(
+  const observed = ledgerTransactions(transactions).filter(
     (t) =>
       accountIds.has(t.accountId) && t.currency === currency && t.date <= today,
   );
-  const patterns = paymentPatterns(observed, settings, currency, today);
+  const series = confirmedSeries.filter(
+    (s) => s.currency === currency && accountIds.has(s.accountId),
+  );
+  const patterns = paymentPatterns(observed, settings, currency, today).filter(
+    (p) => !series.some((s) => p.rows.some((row) => recurringMatches(s, row))),
+  );
   const end = dateAt(day(today) + horizon);
-  const upcoming = paymentEvents(patterns, today, end, observed);
+  const events = (start: string) =>
+    [
+      ...paymentEvents(patterns, start, end, observed),
+      ...confirmedPaymentEvents(series, start, end, observed),
+    ].sort(
+      (a, b) =>
+        a.date.localeCompare(b.date) || a.merchant.localeCompare(b.merchant),
+    );
+  const upcoming = events(today);
   const validStatements = verifiedDocuments(observed, statements, today);
   const history = datedBalanceHistory(
     scoped,
@@ -330,6 +360,7 @@ export function planningForecast(
     today.slice(0, 7),
     currency,
     3,
+    today,
   );
   const anchor = [...history.data].reverse().find((p) => p.total !== null);
   const baseline = Array.from({ length: 6 }, (_, i) =>
@@ -342,6 +373,7 @@ export function planningForecast(
   // including rows older than the recent six used to establish its cadence.
   const recurring = (t: Transaction) =>
     recurringRows.has(t.id) ||
+    series.some((s) => recurringMatches(s, t)) ||
     patterns.some(
       (p) =>
         p.rows[0].accountId === t.accountId &&
@@ -403,7 +435,7 @@ export function planningForecast(
   const gapVariable = gapRows.filter(
     (t) => external(t) && t.amount < 0 && !recurring(t),
   );
-  const estimates = paymentEvents(patterns, anchor.date, end, observed);
+  const estimates = events(anchor.date);
   let movement = 0;
   const points = [
     {

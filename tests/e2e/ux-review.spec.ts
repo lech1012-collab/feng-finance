@@ -104,8 +104,8 @@ async function seedPartialAccounts(page: Page) {
   );
   await page.reload();
   await page.getByLabel("Selected month").fill("2026-09");
-  await expect(page.locator(".position-coverage")).toContainText(
-    "1 of 2 accounts",
+  await expect(page.locator(".position-summary .coverage-chip")).toContainText(
+    "Partial or unverified",
   );
 }
 
@@ -115,16 +115,16 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
   await seedPartialAccounts(page);
   const position = page.locator(".position-metrics");
   await expect(
-    position.locator("div").filter({ hasText: /^Cash/ }),
-  ).toContainText("Unknown");
+    position.locator("a").filter({ hasText: /^Cash/ }),
+  ).toContainText("Not imported");
   await expect(
-    position.locator("div").filter({ hasText: /^Card debt/ }),
+    position.locator("a").filter({ hasText: /^Card debt/ }),
   ).toContainText("£1,357.90");
   await expect(
-    position.locator("div").filter({ hasText: /^Card debt/ }),
+    position.locator("a").filter({ hasText: /^Card debt/ }),
   ).not.toContainText("-£");
   await expect(
-    position.locator("div").filter({ hasText: /^Net position/ }),
+    position.locator("a").filter({ hasText: /^Net position/ }),
   ).toContainText("Unavailable");
   const monthly = page.locator(".month-summary");
   await expect(monthly.locator(".month-income")).toContainText(
@@ -141,9 +141,10 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
     "From imported accounts only",
   );
   await expect(
-    page
-      .locator(".balance-account-missing")
-      .getByRole("button", { name: "Import", exact: true }),
+    page.locator(".balance-account-main").filter({ hasText: "Everyday cash" }),
+  ).toContainText("Not imported");
+  await expect(
+    page.getByRole("button", { name: "Import statement", exact: true }),
   ).toBeVisible();
 });
 
@@ -254,7 +255,7 @@ test("UX mobile: Home and transaction controls stay usable at narrow widths and 
       await expect(
         page.getByRole("heading", { name: "Transactions", exact: true }),
       ).toBeVisible();
-      await expect(page.locator(".count-chip")).toHaveText("2 results · GBP");
+      await expect(page.locator(".count-chip")).toHaveText("2 results");
       await page.evaluate(
         ({ size, family }) => {
           document.documentElement.style.fontSize = size;

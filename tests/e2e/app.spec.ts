@@ -130,12 +130,14 @@ test("manual category memory survives deleting imports and reimporting the same 
   await selectStatement(page, "barclays-memory");
   await page.getByRole("button", { name: /All transactions/ }).click();
   await page.locator(".review-row > summary").click();
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
-    "childcare",
-  );
-  await page.getByLabel("Category", { exact: true }).selectOption("utilities");
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toHaveValue("childcare");
+  await page
+    .getByRole("combobox", { name: "Category", exact: true })
+    .selectOption("utilities");
   await confirmImport(page);
-  await expect(page.locator(".balance-summary")).toContainText("£845.00");
+  await expect(page.locator(".position-summary")).toContainText("£845.00");
   await gotoRoute(page, "/settings");
   await page
     .getByLabel("I understand my imported transaction history will be deleted.")
@@ -152,9 +154,9 @@ test("manual category memory survives deleting imports and reimporting the same 
   await selectStatement(page, "barclays-memory");
   await page.getByRole("button", { name: /All transactions/ }).click();
   await page.locator(".review-row > summary").click();
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
-    "utilities",
-  );
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toHaveValue("utilities");
 });
 test("Salary and Income filters agree with cash flow and verified balance", async ({
   page,
@@ -164,7 +166,7 @@ test("Salary and Income filters agree with cash flow and verified balance", asyn
   await confirmImport(page);
   await expect(page.locator(".month-summary")).toContainText("+£4,126.00");
   await expect(page.locator(".month-summary")).toContainText("£4,226.00");
-  await expect(page.locator(".balance-summary")).toContainText("£5,126.00");
+  await expect(page.locator(".position-summary")).toContainText("£5,126.00");
   await page
     .getByRole("link", { name: /2 transactions need a category/ })
     .click();
@@ -238,7 +240,7 @@ test("Salary and Income filters agree with cash flow and verified balance", asyn
     .getByRole("link", { name: "Home", exact: true })
     .click();
   await expect(page.locator(".month-summary")).toContainText("+£4,126.00");
-  await expect(page.locator(".balance-summary")).toContainText("£5,126.00");
+  await expect(page.locator(".position-summary")).toContainText("£5,126.00");
 });
 test("Planning budgets persist, recurring timeline and forecast horizons stay connected", async ({
   page,
@@ -262,21 +264,35 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
       .locator(".mobile-navigation")
       .getByRole("link", { name: "Planning", exact: true }),
   ).toHaveAttribute("aria-current", "page");
+  await page.getByRole("tab", { name: "Forecast", exact: true }).click();
+  await expect(
+    page.getByRole("tab", { name: "Forecast", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
   await expect(page.locator(".forecast-card")).toContainText("£3,000.00");
   await expect(page.locator(".payment-timeline")).toContainText("Netflix");
   await expect(page.locator(".payment-timeline")).toContainText("10 Oct");
   await expect(page.locator(".forecast-card")).toContainText("6 Nov");
+  await page.getByRole("tab", { name: "Budgets", exact: true }).click();
+  await expect(
+    page.getByRole("tab", { name: "Budgets", exact: true }),
+  ).toHaveAttribute("aria-selected", "true");
+  await expect(page.locator(".forecast-card")).toHaveCount(0);
+  await expect(
+    page.getByRole("textbox", { name: "Selected month", exact: true }),
+  ).toHaveValue("2026-09");
   await page
-    .getByRole("button", { name: "Set Groceries budget", exact: true })
-    .click();
-  await page
-    .getByLabel("Groceries monthly budget", { exact: true })
+    .getByLabel("Monthly rollover budget amount", { exact: true })
     .fill("100");
-  await page.getByRole("button", { name: "Save budget", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Carry into next month", exact: true })
+    .selectOption("surplus");
+  await page
+    .getByRole("button", { name: "Save monthly budget", exact: true })
+    .click();
   const groceries = page.locator(".budget-card").filter({
-    has: page.getByRole("heading", { name: "Groceries", exact: true }),
+    has: page.getByRole("button", { name: "Groceries", exact: true }),
   });
-  await expect(groceries).toContainText("£10.00 over budget");
+  await expect(groceries).toContainText("-£10.00 left");
   await gotoRoute(page, "/settings");
   const backupEvent = page.waitForEvent("download");
   await page
@@ -284,10 +300,15 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
     .click();
   const backup = await backupEvent;
   const bytes = await readFile((await backup.path())!);
-  expect(JSON.parse(bytes.toString()).settings).toContainEqual({
-    key: "budget:GBP:groceries",
-    value: "10000",
-  });
+  expect(JSON.parse(bytes.toString()).budgets).toContainEqual(
+    expect.objectContaining({
+      categoryId: "groceries",
+      currency: "GBP",
+      month: "2026-09",
+      amountMinor: 10000,
+      rollover: "surplus",
+    }),
+  );
   await page
     .getByLabel("Restore Feng Finance Backup", { exact: true })
     .setInputFiles({
@@ -306,12 +327,25 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
   ).toBeVisible();
   await gotoRoute(page, "/planning");
   await page.reload();
+  await expect(groceries).toContainText("£100.00 budget");
+  await groceries
+    .getByRole("button", { name: "Groceries", exact: true })
+    .click();
   await expect(
-    page.getByRole("button", { name: "Edit Groceries budget", exact: true }),
-  ).toHaveText("£100.00");
+    page.getByLabel("Monthly rollover budget amount", { exact: true }),
+  ).toHaveValue("100.00");
+  await expect(
+    page.getByRole("combobox", { name: "Carry into next month", exact: true }),
+  ).toHaveValue("surplus");
   await page.getByRole("button", { name: "Next month", exact: true }).click();
-  await expect(groceries).toContainText("£100.00 remaining");
-  await page.getByLabel("Forecast horizon", { exact: true }).selectOption("90");
+  await expect(
+    page.getByRole("textbox", { name: "Selected month", exact: true }),
+  ).toHaveValue("2026-10");
+  await expect(groceries).toContainText("£100.00 left");
+  await page.getByRole("tab", { name: "Forecast", exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Forecast horizon", exact: true })
+    .selectOption("90");
   await expect(page.locator(".forecast-card")).toContainText("5 Jan 2027");
   await expect(page.locator(".forecast-card")).toContainText("£9,000.00");
   for (const width of [320, 390, 430]) {
@@ -331,8 +365,9 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
     .locator(".mobile-navigation")
     .getByRole("link", { name: "Planning", exact: true })
     .click();
+  await page.getByRole("tab", { name: "Forecast", exact: true }).click();
   await expect(
-    page.getByLabel("Forecast horizon", { exact: true }),
+    page.getByRole("combobox", { name: "Forecast horizon", exact: true }),
   ).toHaveValue("30");
   await page.setViewportSize({ width: 1440, height: 900 });
   const nav = page
@@ -363,7 +398,10 @@ test("verified deeper insights, statement reminders and private calendar export"
   );
   await gotoRoute(page, "/settings");
   await page
-    .getByLabel("Monthly statement review day", { exact: true })
+    .getByRole("combobox", {
+      name: "Monthly statement review day",
+      exact: true,
+    })
     .selectOption("7");
   const exported = page.waitForEvent("download");
   await page
@@ -572,7 +610,7 @@ async function openImport(page: Page) {
   ).toBeVisible();
 }
 async function selectStatement(page: Page, name: string) {
-  await page.getByLabel("Select PDF statements").setInputFiles(fixture(name));
+  await page.getByLabel("Select statements").setInputFiles(fixture(name));
   await expect(page.locator(".import-review-list")).toBeVisible({
     timeout: 90000,
   });
@@ -619,7 +657,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(page.getByText("10", { exact: true }).first()).toBeVisible();
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
-  await expect(page.getByText("+£2,802.35", { exact: true })).toBeVisible();
+  await expect(page.getByText("+£2,782.35", { exact: true })).toBeVisible();
   await page.getByRole("link", { name: /Shopping £1,200.00/ }).click();
   await expect(
     page.getByRole("heading", { name: "Shopping", exact: true }),
@@ -632,10 +670,12 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(
     page.getByRole("button", { name: "Save changes", exact: true }),
   ).toBeVisible();
-  await page.getByLabel("Category", { exact: true }).selectOption("household");
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
-    "household",
-  );
+  await page
+    .getByRole("combobox", { name: "Category", exact: true })
+    .selectOption("household");
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toHaveValue("household");
   await expect(page.getByLabel(/Always categorize this merchant/)).toHaveCount(
     0,
   );
@@ -674,9 +714,9 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   ).toBeVisible();
   await page.getByRole("button", { name: /All transactions/ }).click();
   await page.locator(".review-row > summary").click();
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
-    "shopping",
-  );
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toHaveValue("shopping");
   await confirmImport(page);
   await openImport(page);
   await selectStatement(page, "barclays");
@@ -701,59 +741,150 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
 });
 test("multiple banks, transfer exclusion and currency isolation", async ({
   page,
+  context,
+  offlineHost,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
+  const publicRequests: { url: string; method: string; body: string | null }[] =
+    [];
+  const rateRows = ["TIME_PERIOD,CURRENCY,CURRENCY_DENOM,OBS_VALUE"];
+  for (
+    let day = new Date("2026-09-01T12:00:00Z");
+    day <= new Date("2026-10-08T12:00:00Z");
+    day.setUTCDate(day.getUTCDate() + 1)
+  ) {
+    if (![0, 6].includes(day.getUTCDay()))
+      rateRows.push(`${day.toISOString().slice(0, 10)},GBP,EUR,0.5`);
+  }
+  // WebKit cannot route requests owned by a service worker. This workflow keeps
+  // its real service worker for the offline checks, so intercept only the fixed
+  // public-rate fetch at the page boundary. The separate privacy test blocks
+  // service workers and verifies the actual HTTP request and CSP instead.
+  await page.exposeFunction(
+    "recordPublicRateRequest",
+    (request: { url: string; method: string; body: string | null }) => {
+      publicRequests.push(request);
+    },
+  );
+  await page.addInitScript(
+    ({ endpoint, csv }) => {
+      const originalFetch = window.fetch.bind(window);
+      window.fetch = async (input, init) => {
+        const url =
+          typeof input === "string"
+            ? new URL(input, location.href).href
+            : input instanceof URL
+              ? input.href
+              : input.url;
+        // Offline calls still use the browser's real network/cache behavior.
+        if (url !== endpoint || !navigator.onLine)
+          return originalFetch(input, init);
+        const method =
+          init?.method ?? (input instanceof Request ? input.method : "GET");
+        const body =
+          init?.body !== undefined && init.body !== null
+            ? String(init.body)
+            : input instanceof Request
+              ? (await input.clone().text()) || null
+              : null;
+        await (
+          window as unknown as {
+            recordPublicRateRequest: (request: {
+              url: string;
+              method: string;
+              body: string | null;
+            }) => Promise<void>;
+          }
+        ).recordPublicRateRequest({ url, method, body });
+        return new Response(csv, {
+          status: 200,
+          headers: { "Content-Type": "text/csv" },
+        });
+      };
+    },
+    {
+      endpoint:
+        "https://data-api.ecb.europa.eu/service/data/EXR/D..EUR.SP00.A?lastNObservations=1020&format=csvdata",
+      csv: rateRows.join("\n"),
+    },
+  );
+  await page.goto(offlineHost.origin);
+  await gotoRoute(page, "/settings");
+  await expect(
+    page.getByRole("combobox", { name: "Transfer matching", exact: true }),
+  ).toHaveValue("manual");
   await openImport(page);
   await page
-    .getByLabel("Select PDF statements")
+    .getByLabel("Select statements")
     .setInputFiles([fixture("barclays"), fixture("amex"), fixture("revolut")]);
   await expect(page.locator(".import-statement-card")).toHaveCount(3);
   await expect(page.locator(".import-outcome-footer")).toContainText("19 new");
-  await expect(
-    page.getByRole("heading", { name: "Barclays detected" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "American Express detected" }),
-  ).toBeVisible();
-  await expect(
-    page.getByRole("heading", { name: "Revolut detected" }),
-  ).toBeVisible();
   for (const bank of ["Barclays", "American Express", "Revolut"]) {
     const card = await openStatementCard(page, bank);
     await expect(
       card.getByText("✓ Statement reconciled", { exact: true }),
     ).toBeVisible();
   }
+  const transfers = page.getByRole("region", {
+    name: "Confirm internal transfers",
+    exact: true,
+  });
+  await expect(transfers).toContainText("0 confirmed · 2 left for later");
+  await transfers
+    .getByLabel("Confirm Barclays to Revolut £2,000.00", { exact: true })
+    .check();
+  await transfers
+    .getByLabel("Confirm Barclays to American Express £1,000.00", {
+      exact: true,
+    })
+    .check();
+  await expect(transfers).toContainText("2 confirmed · 0 left for later");
+  await expectTransactionCount(page, 0); // Reviewing pairs must not commit the drafts.
   await confirmImport(page);
+  await expectTransactionCount(page, 19);
   await page.locator('input[type="month"]').fill("2026-09");
-  await expect(page.getByText("+£5,588.65", { exact: true })).toBeVisible();
-  await expect(
-    page.locator(".month-summary").getByText("£7,150.00", { exact: true }),
-  ).toBeVisible();
-  await expect(
-    page.locator(".month-summary").getByText("£1,561.35", { exact: true }),
-  ).toBeVisible();
+  // Refunds await an original purchase and never become arrival-month income.
+  await expect(page.locator(".month-net strong")).toHaveText("+£5,538.65");
+  await expect(page.locator(".month-income strong")).toHaveText("£7,100.00");
+  await expect(page.locator(".month-spending strong")).toHaveText("£1,561.35");
+  expect(publicRequests).toEqual([]);
   await openImport(page);
   await selectStatement(page, "revolut-eur");
   await expect(
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
-  await expect(page.locator(".month-net strong")).toContainText("£");
+  await expectTransactionCount(page, 21);
+  await expect(page.locator(".month-net strong")).toHaveText("≈ +£5,521.37");
   await gotoRoute(page, "/settings");
   await page
-    .getByLabel("Show accounts in", { exact: true })
+    .getByRole("combobox", { name: "Reporting currency", exact: true })
     .selectOption("EUR");
   await expect(
-    page.getByLabel("Show accounts in", { exact: true }),
+    page.getByRole("combobox", { name: "Reporting currency", exact: true }),
   ).toHaveValue("EUR");
   await gotoRoute(page, "/");
-  await expect(
-    page.locator(".month-net strong").getByText("-€22.22", { exact: true }),
-  ).toBeVisible();
+  await expect(page.locator(".month-net strong")).toHaveText("≈ +€11,042.74");
+  await expect(page.locator(".month-income strong")).toHaveText("≈ €14,200.00");
+  await expect(page.locator(".month-spending strong")).toHaveText(
+    "≈ €3,157.26",
+  );
+  await offlineInstalled(page);
+  // WebKit's emulated offline navigation bypasses its service worker. Stopping
+  // this private origin proves a real cached reload without weakening the check.
+  await offlineHost.stop();
   await page.reload();
-  await expect(page.locator(".month-net strong")).toHaveText("-€22.22");
+  await expect(page.locator(".month-net strong")).toHaveText("≈ +€11,042.74");
+  await context.setOffline(true);
+  await expect(
+    page.getByRole("complementary", {
+      name: "Reporting conversion",
+      exact: true,
+    }),
+  ).toContainText("cached offline");
+  await context.setOffline(false);
   for (const route of [
-    "/transactions",
+    "/transactions?month=2026-09",
     "/analysis",
     "/categories/shopping",
     "/subscriptions",
@@ -761,31 +892,68 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   ]) {
     await gotoRoute(page, route);
     await expect(
+      page.getByRole("combobox", { name: "Reporting currency", exact: true }),
+    ).toHaveCount(0);
+    await expect(
       page.getByLabel("Show accounts in", { exact: true }),
     ).toHaveCount(0);
     await expect(
       page.getByLabel("Dashboard currency", { exact: true }),
     ).toHaveCount(0);
+    if (route.startsWith("/transactions")) {
+      // Reporting conversion must not hide foreign accounts or rewrite their rows.
+      await expect(page.locator(".transaction-row")).toHaveCount(21);
+      await expect(
+        page.locator(".transaction-row").filter({ hasText: "RESTAURANT" }),
+      ).toContainText("-€34.56");
+      await expect(
+        page.locator(".transaction-row").filter({ hasText: "SIEMENS" }),
+      ).toContainText("+£5,000.00");
+    }
   }
   await gotoRoute(page, "/settings");
-  await expect(
-    page.getByLabel("Show accounts in", { exact: true }),
-  ).toHaveValue("EUR");
   const downloadPromise = page.waitForEvent("download");
   await page
     .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
     .click();
-  const downloaded = await downloadPromise;
-  const backupPath = await downloaded.path();
+  const backupPath = await (await downloadPromise).path();
   expect(backupPath).not.toBeNull();
   const backup = JSON.parse(await readFile(backupPath!, "utf8"));
   expect(backup.settings).toContainEqual({ key: "currency", value: "EUR" });
+  expect(backup.transferLinks).toHaveLength(2);
+  expect(
+    backup.transactions
+      .filter(
+        (transaction: { currency: string }) => transaction.currency === "EUR",
+      )
+      .map((transaction: { amount: number }) => transaction.amount)
+      .sort((a: number, b: number) => a - b),
+  ).toEqual([-3456, 1234]);
+  expect(
+    backup.transactions.find((transaction: { description: string }) =>
+      transaction.description.includes("SIEMENS"),
+    ).amount,
+  ).toBe(500000);
+  expect(
+    backup.fxRates.some(
+      (rate: { base: string; quote: string; rate: string }) =>
+        rate.base === "EUR" && rate.quote === "GBP" && rate.rate === "0.5",
+    ),
+  ).toBe(true);
+  expect(publicRequests.length).toBeGreaterThan(0);
+  for (const request of publicRequests)
+    expect(request).toEqual({
+      url: "https://data-api.ecb.europa.eu/service/data/EXR/D..EUR.SP00.A?lastNObservations=1020&format=csvdata",
+      method: "GET",
+      body: null,
+    });
   await page
-    .getByLabel("Show accounts in", { exact: true })
+    .getByRole("combobox", { name: "Reporting currency", exact: true })
     .selectOption("GBP");
   await gotoRoute(page, "/");
-  await expect(page.locator(".month-net strong")).toHaveText("+£5,588.65");
+  await expect(page.locator(".month-net strong")).toHaveText("≈ +£5,521.37");
 });
+
 test("Barclaycard issue date, two reading columns and repayment exclusion", async ({
   page,
 }) => {
@@ -808,13 +976,24 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await expect(
     page.getByText("Statement issued 4 Oct", { exact: true }),
   ).toBeVisible();
+  const transfers = page.getByRole("region", {
+    name: "Confirm internal transfers",
+    exact: true,
+  });
+  await transfers
+    .getByLabel("Confirm Barclays to Barclays £900.00", { exact: true })
+    .check();
+  await expect(transfers).toContainText("1 confirmed · 0 left for later");
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await page
+    .getByLabel(/I compared the extracted rows with the source file/)
+    .check();
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
-  await expect(page.locator(".month-net strong")).toHaveText("-£109.68");
+  // An unlinked merchant refund awaits its original purchase; it is not income.
+  await expect(page.locator(".month-net strong")).toHaveText("-£114.68*");
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
@@ -843,7 +1022,9 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await statement
     .getByText("Bank, account and statement dates", { exact: true })
     .click();
-  await page.getByLabel("Bank", { exact: true }).selectOption("Barclays");
+  await page
+    .getByRole("combobox", { name: "Bank", exact: true })
+    .selectOption("Barclays");
   await expect(statement).toHaveClass(/import-statement-blocking/);
   await expect(statement.locator(":scope > summary .small-chip")).toHaveText(
     "Parse again",
@@ -860,7 +1041,7 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await expect(page.getByRole("alert")).toContainText(
     "Enter the start and end dates",
   );
-  await page.getByLabel("Enter statement dates from PDF").check();
+  await page.getByLabel("Enter statement dates from the source file").check();
   await page.getByLabel("Statement start date").fill("2026-09-01");
   await page.getByLabel("Statement end date").fill("2026-09-30");
   await page.getByRole("button", { name: "Parse again", exact: true }).click();
@@ -870,7 +1051,9 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await page
+    .getByLabel(/I compared the extracted rows with the source file/)
+    .check();
   await confirmImport(page);
   await openImport(page);
   await selectStatement(page, "barclays-october");
@@ -878,7 +1061,7 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
     page.getByText("1 to 31 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByLabel("Enter statement dates from PDF"),
+    page.getByLabel("Enter statement dates from the source file"),
   ).not.toBeChecked();
 });
 test("reconciliation warning cannot be silently committed", async ({
@@ -904,32 +1087,82 @@ test("reconciliation warning cannot be silently committed", async ({
     .filter({ hasText: "Statement history" })
     .click();
   await expect(
-    page.getByText(/Barclays · 30 Sep · 1 new transactions · warning/),
+    page.getByText(/Barclays · 30 Sep · 1 new transaction · warning/),
   ).toBeVisible();
 });
 test("backup, destructive confirmation, restore and demo deletion", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
   await gotoRoute(page, "/settings");
+  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Rate preference saved." }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await expectTransactionCount(page, 133);
+  await expectTransactionCount(page, 176);
   const downloadEvent = page.waitForEvent("download");
   await page
-    .getByRole("button", { name: "Export Feng Finance Backup" })
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
     .click();
-  const download = await downloadEvent;
-  const path = await download.path();
+  const path = await (await downloadEvent).path();
   expect(path).toBeTruthy();
   const bytes = await readFile(path!);
   const json = JSON.parse(bytes.toString());
   expect(json.format).toBe("feng-finance");
-  expect(json.transactions).toHaveLength(133);
+  expect(json.schemaVersion).toBe(3);
+  expect(json.accounts).toHaveLength(8);
+  expect(json.transactions).toHaveLength(176);
+  expect(
+    json.valuations
+      .map((valuation: { valueMinor: number }) => valuation.valueMinor)
+      .sort((a: number, b: number) => a - b),
+  ).toEqual([28000000, 45000000]);
+  expect(json.pots).toHaveLength(1);
+  expect(json.recurringSeries).toHaveLength(1);
+  expect(
+    json.transferProposals.some(
+      (proposal: { status: string }) => proposal.status === "pending",
+    ),
+  ).toBe(true);
+  expect(
+    json.transactions.filter(
+      (transaction: { parentId?: string }) => transaction.parentId,
+    ),
+  ).toHaveLength(2);
+  expect(
+    json.fxRates.some(
+      (rate: { base: string; quote: string }) =>
+        rate.base === "EUR" && rate.quote === "GBP",
+    ),
+  ).toBe(true);
   await page
     .getByRole("button", { name: "Delete demo data", exact: true })
     .click();
   await expectTransactionCount(page, 0);
+  await expect(page.locator(".demo-banner")).toHaveCount(0);
+  // Deleting the demo removes its planning, transfer and valuation records too.
+  const emptyDownload = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
+    .click();
+  const emptyPath = await (await emptyDownload).path();
+  const emptyBackup = JSON.parse(await readFile(emptyPath!, "utf8"));
+  for (const table of [
+    "accounts",
+    "statements",
+    "transactions",
+    "transferLinks",
+    "transferProposals",
+    "valuations",
+    "pots",
+    "recurringSeries",
+    "tags",
+    "fxRates",
+  ])
+    expect(emptyBackup[table]).toHaveLength(0);
   await page
     .getByLabel("Restore Feng Finance Backup", { exact: true })
     .setInputFiles({
@@ -938,17 +1171,35 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
       buffer: bytes,
     });
   await expect(
-    page.getByRole("button", { name: "Replace data with backup" }),
+    page
+      .locator(".settings-preview .restore-count")
+      .filter({ hasText: "accounts" })
+      .locator("dd"),
+  ).toHaveText("8");
+  await expect(
+    page
+      .locator(".settings-preview .restore-count")
+      .filter({ hasText: "transactions" })
+      .locator("dd"),
+  ).toHaveText("176");
+  await expect(
+    page.getByRole("button", { name: "Replace data with backup", exact: true }),
   ).toBeDisabled();
   await page.getByLabel(/I understand that this replaces/).check();
-  await page.getByRole("button", { name: "Replace data with backup" }).click();
-  await expectTransactionCount(page, 133);
+  await page
+    .getByRole("button", { name: "Replace data with backup", exact: true })
+    .click();
+  await expectTransactionCount(page, 176);
   await expect(
     page
       .getByRole("status")
       .filter({ hasText: "Backup restored successfully." }),
   ).toBeVisible();
+  await expect(page.locator(".demo-banner")).toContainText(
+    "fictitious financial data",
+  );
 });
+
 test("offline launch, local PDF import, backup and no financial upload", async ({
   page,
   context,
@@ -1016,10 +1267,21 @@ test("scanned PDF uses bundled OCR and requires amount verification offline", as
 test("mobile layout, navigation, property and demo analysis are usable", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
   await gotoRoute(page, "/settings");
+  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Rate preference saved." }),
+  ).toBeVisible();
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
+  // Demo loading commits asynchronously and changes the shared app layout.
+  // Wait for both the completed action and its live-query banner before tapping.
+  await expect(
+    page.getByRole("status").filter({ hasText: "Fictitious demo data added." }),
+  ).toBeVisible();
+  await expect(page.locator(".demo-banner")).toBeVisible();
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
@@ -1055,11 +1317,12 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     name: "Transaction category filters",
   });
   await expect(quick.getByRole("button")).toHaveText([
-    "Uncategorized 0",
-    "Groceries",
-    "Income",
-    "Property",
-    "Salary",
+    "To review 2",
+    "Uncategorized 2",
+    /Groceries\s*2/,
+    /Income\s*2/,
+    /Property\s*4/,
+    /Salary\s*1/,
   ]);
   for (const [name, count] of [
     ["Groceries", 2],
@@ -1071,7 +1334,24 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     await expect(page.locator(".transaction-row")).toHaveCount(count);
   }
   await quick.getByRole("button", { name: "Salary", exact: true }).click();
-  await expect(page.locator(".transaction-row")).toHaveCount(19);
+  // September has 25 source payments; the five extra demo scenarios are in October.
+  await expect(page.locator(".transaction-row")).toHaveCount(25);
+  await expect(
+    page
+      .locator(".transaction-row")
+      .filter({ hasText: "FICTITIOUS EURO CAFE" }),
+  ).toContainText("-€45.99");
+  await quick
+    .getByRole("button", { name: "Uncategorized 2", exact: true })
+    .click();
+  await expect(page.locator(".transaction-row")).toHaveCount(2);
+  await expect(page.locator(".transaction-row .transaction-status")).toHaveText(
+    ["Needs category", "Needs category"],
+  );
+  await expect(page.locator(".transaction-row .review-status")).toHaveText([
+    "To review",
+    "To review",
+  ]);
   await page.screenshot({
     path: `test-results/dashboard-${test.info().project.name}.png`,
     fullPage: true,
@@ -1082,12 +1362,13 @@ test("service worker update is explicit and preserves stored records", async ({
   page,
   offlineHost,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
   await page.goto(offlineHost.origin + "/#/settings");
   await offlineInstalled(page);
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await expectTransactionCount(page, 133);
+  await expectTransactionCount(page, 176);
   offlineHost.advanceWorker();
   await page.evaluate(async () => {
     const registration = await navigator.serviceWorker.getRegistration();
@@ -1100,7 +1381,7 @@ test("service worker update is explicit and preserves stored records", async ({
   const reload = page.waitForEvent("load");
   await page.getByRole("button", { name: "Update", exact: true }).click();
   await reload;
-  await expectTransactionCount(page, 133);
+  await expectTransactionCount(page, 176);
   await expect(page.getByText(/Feng Finance update available/)).toHaveCount(0);
 });
 
@@ -1108,7 +1389,7 @@ test("unsupported PDF is explicit and leaves the database empty", async ({
   page,
 }) => {
   await openImport(page);
-  await page.getByLabel("Select PDF statements").setInputFiles({
+  await page.getByLabel("Select statements").setInputFiles({
     name: "invalid.pdf",
     mimeType: "application/pdf",
     buffer: Buffer.from("This is not a PDF"),
@@ -1125,7 +1406,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
 }) => {
   await openImport(page);
   await page
-    .getByLabel("Select PDF statements")
+    .getByLabel("Select statements")
     .setInputFiles([fixture("amex-uk-layout"), fixture("revolut-uk-layout")]);
   await expect(page.locator(".import-statement-card")).toHaveCount(2);
   const amex = await openStatementCard(page, "American Express");
@@ -1145,7 +1426,9 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await amex.getByLabel(/I compared the extracted rows with the PDF/).check();
+  await amex
+    .getByLabel(/I compared the extracted rows with the source file/)
+    .check();
   await expect(
     page.getByRole("heading", { name: "Revolut detected" }),
   ).toBeVisible();
@@ -1159,7 +1442,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
   await revolut
-    .getByLabel(/I compared the extracted rows with the PDF/)
+    .getByLabel(/I compared the extracted rows with the source file/)
     .check();
   await expect(
     revolut.locator(".review-metrics > div").filter({ hasText: "Money in" }),
@@ -1167,9 +1450,41 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     revolut.locator(".review-metrics > div").filter({ hasText: "Money out" }),
   ).toContainText("£510.00");
+  // These fictional statements contain different repayment amounts, so there
+  // is no pair to infer. Explicitly mark the known own-card movements instead.
+  await amex.getByRole("button", { name: /All transactions/ }).click();
+  const amexPayment = amex
+    .locator(".review-row")
+    .filter({ hasText: "PAYMENT RECEIVED - THANK YOU" });
+  if (
+    !(await amexPayment.evaluate(
+      (element) => (element as HTMLDetailsElement).open,
+    ))
+  )
+    await amexPayment.locator(":scope > summary").click();
+  await amexPayment
+    .getByRole("combobox", { name: "Type", exact: true })
+    .selectOption("transfer");
+  await revolut.getByRole("button", { name: /All transactions/ }).click();
+  const revolutPayment = revolut
+    .locator(".review-row")
+    .filter({ hasText: "To AMERICAN EXP 9999" });
+  if (
+    !(await revolutPayment.evaluate(
+      (element) => (element as HTMLDetailsElement).open,
+    ))
+  )
+    await revolutPayment.locator(":scope > summary").click();
+  await revolutPayment
+    .getByRole("combobox", { name: "Type", exact: true })
+    .selectOption("transfer");
+  // Marking transfers changes analytics only, not the statement's raw totals.
+  await expect(
+    revolut.locator(".review-metrics > div").filter({ hasText: "Money out" }),
+  ).toContainText("£510.00");
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
-  await expect(page.locator(".month-net strong")).toHaveText("+£455.00");
+  await expect(page.locator(".month-net strong")).toHaveText("+£455.00*");
   await openImport(page);
   await selectStatement(page, "revolut-uk-layout");
   await expect(
@@ -1192,12 +1507,17 @@ test("dark default, persistent appearance and mobile layouts without overlapping
   page,
 }) => {
   test.setTimeout(120000);
+  await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
   await gotoRoute(page, "/settings");
+  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Rate preference saved." }),
+  ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
-  await expectTransactionCount(page, 133);
+  await expectTransactionCount(page, 176);
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
@@ -1355,40 +1675,31 @@ test("personal rule corrections update existing transactions and future imports 
     .locator("summary")
     .filter({ hasText: "Categorization & transfer rules" })
     .click();
-  await page
-    .locator("summary")
-    .filter({ hasText: "Advanced: import personal rules" })
+  const manager = page.locator("#categorization-rules");
+  await manager
+    .getByRole("button", { name: "Create rule", exact: true })
     .click();
-  await page
-    .getByLabel("Import personal rules", { exact: true })
-    .setInputFiles({
-      name: "synthetic-rules.json",
-      mimeType: "application/json",
-      buffer: Buffer.from(
-        JSON.stringify({
-          format: "feng-finance-rules",
-          version: 1,
-          categories: [],
-          rules: [
-            {
-              name: "My household purchases",
-              match: "contains",
-              pattern: "JOHN LEWIS",
-              direction: "negative",
-              categoryId: "household",
-            },
-          ],
-        }),
-      ),
-    });
+  const editor = page.getByRole("dialog", { name: "Create rule", exact: true });
+  await editor
+    .getByLabel("Rule name", { exact: true })
+    .fill("My household purchases");
+  await editor
+    .getByLabel("Condition 1 value", { exact: true })
+    .fill("JOHN LEWIS");
+  await editor
+    .getByRole("combobox", { name: "Category", exact: true })
+    .selectOption("household");
   await expect(
-    page.getByRole("heading", { name: "1 transactions to update" }),
+    editor.getByRole("heading", { name: "Matches 1 existing transaction" }),
   ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Apply corrections & remember rules" })
-    .click();
   await expect(
-    page.getByRole("status").filter({ hasText: "1 transactions updated" }),
+    editor.getByLabel("Apply to existing transactions", { exact: true }),
+  ).toBeChecked();
+  await editor.getByRole("button", { name: "Save rule", exact: true }).click();
+  await expect(
+    manager
+      .getByRole("status")
+      .filter({ hasText: "1 existing transaction updated. Rule saved." }),
   ).toBeVisible();
   await gotoRoute(page, "/");
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-09");
@@ -1401,9 +1712,9 @@ test("personal rule corrections update existing transactions and future imports 
   ).toBeVisible();
   await page.getByRole("button", { name: /All transactions/ }).click();
   await page.locator(".review-row > summary").click();
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
-    "household",
-  );
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toHaveValue("household");
   await confirmImport(page);
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-10");
 });
@@ -1476,9 +1787,9 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
   ).toBeVisible();
   await page.getByRole("button", { name: /All transactions/ }).click();
   await page.locator(".review-row > summary").click();
-  await expect(page.getByLabel("Category", { exact: true })).toHaveValue(
-    "cleaning",
-  );
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toHaveValue("cleaning");
 });
 
 test("uncategorized card tap, cancelled drag, keyboard categorization and month swipes", async ({
@@ -1536,17 +1847,32 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
 test("subscription notification centre supports review, cancellation plans and persistent decisions", async ({
   page,
 }) => {
-  await page.goto("/");
+  await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
+  await gotoRoute(page, "/settings");
+  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Rate preference saved." }),
+  ).toBeVisible();
+  await gotoRoute(page, "/");
   await page.getByRole("button", { name: /Try fictitious demo data/ }).click();
-  await page
-    .locator(".home-todos")
-    .getByRole("link", { name: /recurring charges? to review/ })
-    .click();
+  await expectTransactionCount(page, 176);
+  await expect(page.locator(".demo-banner")).toContainText(
+    "fictitious financial data",
+  );
+  // Home shows the three most urgent tasks. The seeded transfer and statement
+  // gaps can outrank recurring review, which remains available at its route.
+  await gotoRoute(page, "/subscriptions");
   await expect(
     page.getByRole("heading", { name: "Subscription review", exact: true }),
   ).toBeVisible();
   const netflix = page.getByRole("article", { name: "NETFLIX", exact: true });
   await expect(netflix).toBeVisible();
+  await expect(netflix).toContainText("£14.99");
+  await expect(netflix).toContainText("£179.88 / year");
+  await expect(netflix).toContainText(
+    "Latest charge increased by £2.00 (+15%)",
+  );
+  await expect(netflix).toContainText("median of the previous three charges");
   await netflix.locator(".subscription-swipe").scrollIntoViewIfNeeded();
   const box = (await netflix.locator(".subscription-swipe").boundingBox())!;
   await page.mouse.move(box.x + box.width - 25, box.y + 30);
@@ -1790,7 +2116,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   await page.goto("/");
   const choose = page.waitForEvent("filechooser");
   await page
-    .getByRole("button", { name: "Import statement", exact: true })
+    .getByRole("button", { name: "Import your first statement", exact: true })
     .click();
   await (await choose).setFiles(fixture("barclays-sort"));
   await expect(
@@ -1806,25 +2132,27 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
       .filter({ visible: true })
       .locator('[aria-current="page"]'),
   ).toHaveText("Home");
-  await expect(page.locator(".balance-total")).toHaveText("£935.00");
+  await expect(
+    page.locator(".position-metrics > a").filter({ hasText: /^Cash/ }),
+  ).toContainText("£935.00");
   await expect(
     page.getByRole("img", {
-      name: "1 month total and individual account balance history",
+      name: "Verified daily account balances with gaps for missing bank coverage and stepped manual valuations",
     }),
   ).toBeVisible();
   await expect(
     page.getByText("Browse all categories", { exact: true }),
   ).toHaveCount(0);
-  const balanceCard = page.locator(".balance-summary");
+  const balanceCard = page.locator(".position-summary");
   await expect(
     balanceCard.getByRole("group", { name: "Balance comparison period" }),
-  ).toHaveCount(0);
-  await expect(balanceCard).toContainText(
-    "Import another reconciled statement to compare balances.",
+  ).toHaveCount(1);
+  await expect(balanceCard.locator(".balance-change")).toContainText(
+    "-6.5% vs last month",
   );
   await expect(
-    page.locator(".balance-chart .recharts-line-curve").first(),
-  ).toHaveAttribute("d", /L/);
+    page.locator(".position-history g[data-account-id] path").first(),
+  ).toHaveAttribute("d", /[HV]/);
   await page.setViewportSize({ width: 1440, height: 900 });
   const settingsPosition = await page
     .locator(".sidebar nav")
@@ -1896,7 +2224,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
     page.getByRole("link", { name: "Property analysis", exact: true }),
   ).toHaveCount(0);
   await page
-    .getByLabel("Category analysis", { exact: true })
+    .getByRole("combobox", { name: "Category analysis", exact: true })
     .selectOption("property");
   await expect(
     page.getByRole("heading", { name: "Property", exact: true }),
@@ -1935,7 +2263,9 @@ test("Uncategorized queue spans imported months and saves immediately disappear"
     .getByRole("dialog")
     .getByRole("link", { name: "View transaction details", exact: true })
     .click();
-  await page.getByLabel("Category", { exact: true }).selectOption("shopping");
+  await page
+    .getByRole("combobox", { name: "Category", exact: true })
+    .selectOption("shopping");
   await page.getByRole("button", { name: "Save changes", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),

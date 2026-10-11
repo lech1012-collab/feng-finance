@@ -1,7 +1,17 @@
 import { ZodError } from "zod";
+import { BackupFileTooLargeError } from "./backup-limits";
 
 const unsupportedBackup =
   "This is not a supported Feng Finance backup. Choose a JSON file exported using Export Feng Finance Backup. Your existing data has not been changed.";
+
+export class UnsupportedBackupVersionError extends Error {
+  constructor() {
+    super(
+      "This backup version is not supported. Update Feng Finance before restoring it.",
+    );
+    this.name = "UnsupportedBackupVersionError";
+  }
+}
 
 const integrityErrors = new Set([
   "Backup contains duplicate identifiers.",
@@ -11,6 +21,22 @@ const integrityErrors = new Set([
   "Backup statement transaction count does not match.",
   "Invalid categorization rule.",
   "Invalid transfer link.",
+  "Backup contains an invalid split transaction.",
+  "Backup contains an invalid attachment reference.",
+  "Backup contains an invalid recurring-series reference.",
+  "Refunds must be positive money-in transactions.",
+  "Backup contains an invalid refund allocation.",
+  "Backup contains an invalid refund purchase.",
+  "Refunds exceed the original purchase amount.",
+  "Split amounts do not equal their original transaction.",
+  "Invalid valuation account.",
+  "Invalid pot reference or duplicate contribution month.",
+  "Invalid budget category.",
+  "Invalid recurring-series account.",
+  "Invalid attachment data or owner.",
+  "Invalid transfer proposal.",
+  "Invalid audit history.",
+  "Audit history contains an invalid record identifier.",
 ]);
 
 /** Never expose schema dumps, imported values or browser storage diagnostics. */
@@ -18,6 +44,10 @@ export function backupErrorMessage(
   error: unknown,
   operation: "validate" | "restore" = "validate",
 ): string {
+  if (error instanceof UnsupportedBackupVersionError)
+    return "This backup version is not supported by this app. Update Feng Finance, then try again, or choose a compatible backup. Your existing data has not been changed.";
+  if (error instanceof BackupFileTooLargeError)
+    return "This backup exceeds the 100 MB restore limit. Choose a smaller Feng Finance backup exported without attachments. Your existing data has not been changed.";
   if (error instanceof SyntaxError)
     return "This file is not valid JSON. Choose an original Feng Finance backup exported from Settings. Your existing data has not been changed.";
 

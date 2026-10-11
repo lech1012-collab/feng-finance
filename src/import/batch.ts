@@ -1,5 +1,7 @@
 import type { ImportDraft, Statement } from "../domain/models";
 import { commitDraft, refreshReviewedDraft, validateDraft } from "./pipeline";
+import { previewImportTransfers } from "./transfer-review";
+import { db } from "../storage/database";
 
 export interface ReviewedStatement {
   id: string;
@@ -24,11 +26,30 @@ export async function commitReviewedBatch(
   onOutcome: (outcome: BatchOutcome) => void,
   onProgress: (id: string) => void = () => undefined,
 ) {
+  const transferPreview = await previewImportTransfers(
+    statements.map((item) => item.draft),
+  );
+  const selectedTransfers = new Set(
+    statements.flatMap((item) => item.draft.confirmedTransferProposalIds ?? []),
+  );
+  if (selectedTransfers.size) {
+    if (
+      [...selectedTransfers].some(
+        (id) =>
+          !transferPreview.proposals.some((proposal) => proposal.id === id),
+      )
+    )
+      throw new Error(
+        "A selected transfer changed during review. Check the import again before saving it.",
+      );
+  }
   for (const item of statements) {
     if (item.draft.exactDuplicate && !item.draft.duplicateOverride) continue;
     validateDraft(item.draft, item.overrideValidation);
   }
-  for (const item of statements) {
+  const importedIds: string[] = [];
+  for (let index = 0; index < statements.length; index++) {
+    const item = statements[index];
     onProgress(item.id);
     const draft = await refreshReviewedDraft(item.draft);
     if (draft.exactDuplicate && !draft.duplicateOverride) {
@@ -66,7 +87,26 @@ export async function commitReviewedBatch(
       });
       continue;
     }
-    const imported = await commitDraft(draft, item.overrideValidation);
+    const pendingTransactionIds = new Set(
+      statements
+        .slice(index + 1)
+        .flatMap((statement) =>
+          statement.draft.exactDuplicate && !statement.draft.duplicateOverride
+            ? []
+            : statement.draft.transactions
+                .filter((row) => row.include)
+                .map((row) => row.id),
+        ),
+    );
+    const imported = await commitDraft(
+      draft,
+      item.overrideValidation,
+      pendingTransactionIds,
+      true,
+    );
+    importedIds.push(
+      ...draft.transactions.filter((row) => row.include).map((row) => row.id),
+    );
     onOutcome({
       id: item.id,
       draft,
@@ -76,6 +116,24 @@ export async function commitReviewedBatch(
       excludedUnique,
       statementSkipped: false,
     });
+  }
+  if (importedIds.length) {
+    const { refreshTransferProposals } = await import("../storage/accuracy");
+    // Wait for every file: a later statement can contain a competing match.
+    // Only the unique pairs actually shown in review may link automatically.
+    await refreshTransferProposals(importedIds, {
+      mode: transferPreview.mode,
+      automaticProposalIds: new Set(transferPreview.automaticProposalIds),
+    });
+  }
+  if (selectedTransfers.size) {
+    const confirmed = await db.transferProposals.bulkGet([
+      ...selectedTransfers,
+    ]);
+    if (confirmed.some((proposal) => proposal?.status !== "confirmed"))
+      throw new Error(
+        "A confirmed transfer could not be saved because its counterpart changed. Review the remaining import before trying again.",
+      );
   }
 }
 

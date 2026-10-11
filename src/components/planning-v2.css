@@ -1,0 +1,206 @@
+.planning-v2-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 4px 0 12px;
+  margin-bottom: 12px;
+}
+.planning-v2-tabs button {
+  min-height: 44px;
+  white-space: nowrap;
+  flex: 0 0 auto;
+}
+.planning-v2-tabs [aria-selected="true"] {
+  border-color: var(--accent);
+  background: var(--surface-raised, var(--surface));
+  font-weight: 700;
+}
+.planning-v2-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+.planning-v2-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.planning-v2-form .check {
+  flex-direction: row;
+  align-items: center;
+}
+.planning-v2-form .actions,
+.planning-v2-form p {
+  grid-column: 1/-1;
+}
+.planning-v2-form input,
+.planning-v2-form select,
+.planning-v2-form textarea {
+  min-height: 44px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.planning-v2-list {
+  display: grid;
+  gap: 8px;
+}
+.planning-v2-object {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+  text-align: left;
+  padding: 12px;
+}
+.planning-v2-object span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.planning-v2-object small {
+  display: block;
+  color: var(--muted);
+  margin-top: 4px;
+}
+.planning-v2-object > strong {
+  flex: 0 1 auto;
+  overflow-wrap: anywhere;
+}
+.planning-v2-panels [hidden] {
+  display: none !important;
+}
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 4px;
+}
+.calendar-day {
+  min-height: 76px;
+  min-width: 0;
+  padding: 6px 3px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 12px;
+  gap: 5px;
+  overflow: hidden;
+}
+.calendar-day strong {
+  font-size: 13px;
+}
+.calendar-day .actual-payment {
+  background: var(--chart-expense, #f08a7e);
+  color: var(--bg, #10131a);
+  border-radius: 4px;
+  padding: 3px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.calendar-day .expected-payment {
+  border: 1px solid var(--chart-expense, #f08a7e);
+  border-radius: 4px;
+  padding: 3px;
+  max-width: 100%;
+  overflow: hidden;
+}
+.calendar-day[aria-pressed="true"] {
+  outline: 2px solid var(--accent, #8fb0ff);
+}
+.calendar-weekday {
+  text-align: center;
+  font-size: 12px;
+  padding: 8px 0;
+}
+.planning-v2-form .full-width {
+  grid-column: 1/-1;
+}
+.pot-progress {
+  height: 8px;
+  overflow: hidden;
+  background: var(--line);
+  border-radius: 4px;
+  margin: 12px 0;
+}
+.pot-progress span {
+  height: 100%;
+  display: block;
+  background: var(--chart-net, #e7c46a);
+}
+.planning-compact-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.planning-compact-table td,
+.planning-compact-table th {
+  padding: 12px 6px;
+  text-align: left;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.planning-compact-table td:last-child,
+.planning-compact-table th:last-child {
+  text-align: right;
+}
+.planning-v2-form .scenario-item {
+  grid-column: 1/-1;
+  display: grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap: 8px;
+}
+.calendar-day .payday-marker {
+  border: 1px solid var(--chart-income, #6ea8ff);
+  color: var(--chart-income, #6ea8ff);
+  padding: 2px;
+  font-size: 12px;
+}
+.planning-v2-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
+  gap: 16px;
+}
+.planning-v2-kpis strong {
+  display: block;
+  font-size: 22px;
+  overflow-wrap: anywhere;
+}
+.planning-v2-kpis small {
+  color: var(--muted);
+}
+@media (max-width: 360px) {
+  .calendar-grid {
+    gap: 2px;
+  }
+  .calendar-day {
+    font-size: 12px;
+    padding: 6px 1px;
+    min-height: 72px;
+  }
+  .planning-v2-form .scenario-item {
+    grid-template-columns: 1fr;
+  }
+  .planning-compact-table {
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .planning-v2-tabs,
+  .planning-v2-object {
+    transition: none;
+  }
+}
+
+.calendar-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.calendar-grid {
+  min-width: 308px;
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
+}
+.calendar-day {
+  min-width: 44px;
+}

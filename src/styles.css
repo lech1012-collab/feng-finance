@@ -276,7 +276,7 @@ small {
   display: none;
 }
 main {
-  max-width: 1270px;
+  max-width: 760px;
   padding: 36px 44px 32px;
   margin: 0 auto;
 }
@@ -669,7 +669,7 @@ main {
   margin: 5px 0 0;
 }
 .desktop-footer {
-  max-width: 1270px;
+  max-width: 760px;
   margin: 0 auto;
   padding: 0 44px 23px;
   font-size: 0.75rem;
@@ -1661,6 +1661,16 @@ details p {
     animation: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* Let readable financial figures determine the column count when text grows. */
+.position-metrics,
+.month-figures {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+.position-metrics strong,
+.month-figures strong {
+  overflow-wrap: normal;
 }
 
 /* Calm, adaptive surfaces. Dark is the first-paint and installed-app default. */
@@ -2676,6 +2686,47 @@ h3 {
 .category-dialog::backdrop {
   background: #0009;
 }
+.category-dialog[open] {
+  display: flex;
+  flex-direction: column;
+  height: min(760px, calc(100dvh - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+  box-sizing: border-box;
+}
+.category-fixed-content {
+  flex: 0 0 auto;
+  min-width: 0;
+  position: relative;
+  z-index: 3;
+}
+.category-options-scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  overflow-anchor: none;
+  padding-right: 4px;
+}
+.category-options-scroll .category-tile-grid {
+  max-height: none;
+  overflow: visible;
+}
+.category-fixed-content .sorting-card {
+  margin: 8px 0 12px;
+}
+.category-fixed-content .sorting-card > div > strong {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.category-dialog > .sort-details {
+  flex: 0 0 auto;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
 .category-dialog-heading {
   display: flex;
   align-items: flex-start;
@@ -2797,6 +2848,17 @@ h3 {
     max-height: calc(100dvh - env(safe-area-inset-top) - 12px);
     border-radius: 22px 22px 0 0;
     padding: 18px 16px calc(18px + env(safe-area-inset-bottom));
+  }
+  .category-dialog[open] {
+    height: min(760px, calc(100dvh - env(safe-area-inset-top) - 12px));
+    max-height: calc(100dvh - env(safe-area-inset-top) - 12px);
+    padding-bottom: calc(13px + env(safe-area-inset-bottom));
+  }
+  .category-dialog-heading .eyebrow {
+    display: none;
+  }
+  .category-dialog-heading h2 {
+    margin-bottom: 4px;
   }
   .sorting-card {
     grid-template-columns: 20px minmax(0, 1fr);
@@ -3634,7 +3696,9 @@ h3 {
   margin: 13px 0 21px;
 }
 .position-metrics > div,
-.month-figures > div {
+.month-figures > div,
+.position-metrics > a,
+.month-figures > a {
   min-width: 0;
   display: flex;
   flex-direction: column;
@@ -4265,6 +4329,8 @@ summary {
     top: 21px;
     max-height: calc(100dvh - 42px);
     overflow-y: auto;
+    overflow-anchor: none;
+    scroll-behavior: auto;
   }
   .category-rail .rail-tile {
     display: flex;
@@ -4354,7 +4420,9 @@ summary {
     min-width: 0;
     max-width: 100%;
     text-align: center;
-    overflow-wrap: anywhere;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   .mobile-navigation a[href="#/"] svg {
     width: 26px;
@@ -4447,4 +4515,189 @@ summary {
     scroll-margin-top: 24px;
     scroll-margin-bottom: calc(var(--mobile-nav-height, 78px) + 24px);
   }
+}
+/* v2 semantic roles remain consistent across the page palettes. */
+:root,
+.app {
+  --chart-income: #6ea8ff;
+  --chart-expense: #f08a7e;
+  --chart-net: #e7c46a;
+  --chart-transfer: #a99bd6;
+  --income-color: var(--chart-income);
+  --spending-color: var(--chart-expense);
+  --net-color: var(--chart-net);
+  --warning-color: #f2b35b;
+  --error-color: #ff7a7a;
+  --ok-color: #7fd1c7;
+  --border: var(--line);
+  --text: var(--ink);
+}
+:root[data-theme="light"],
+:root[data-theme="light"] .app {
+  --chart-income: #235caf;
+  --chart-expense: #a6463c;
+  --chart-net: #775700;
+  --chart-transfer: #66539e;
+  --warning-color: #835000;
+  --error-color: #ad2020;
+  --ok-color: #286e68;
+}
+.positive,
+.month-income strong {
+  color: var(--chart-income);
+}
+.spending-amount,
+.month-spending strong {
+  color: var(--chart-expense);
+}
+.month-net strong {
+  color: var(--chart-net);
+}
+.transfer-amount {
+  color: var(--chart-transfer);
+}
+.card {
+  border-radius: 12px;
+}
+.card h2 {
+  font-size: 1.125rem;
+}
+.review-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.review-steps button {
+  flex: 1 1 150px;
+}
+.review-status {
+  display: inline-flex;
+  padding: 4px 8px;
+  border: 1px solid var(--warning-color);
+  border-radius: 6px;
+  color: var(--warning-color);
+  font-size: 0.8125rem;
+  width: fit-content;
+}
+.transaction-description {
+  overflow-wrap: anywhere;
+}
+.position-history {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-width: 0;
+}
+.position-summary .position-metrics strong {
+  overflow-wrap: anywhere;
+}
+.position-summary .balance-account {
+  padding: 16px 0;
+  min-height: 44px;
+}
+.position-summary .balance-account-main {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.position-summary .balance-account-main > span {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.position-summary .balance-account-value {
+  text-align: right;
+}
+.position-summary small,
+.settings-row small {
+  display: block;
+  font-size: 0.8125rem;
+}
+.demo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+small,
+.muted,
+.eyebrow,
+.small-chip,
+.category-tile span {
+  font-size: max(0.8125rem, 12px);
+}
+button,
+.button,
+summary {
+  min-width: 44px;
+}
+summary {
+  min-height: 44px;
+  padding-block: 10px;
+}
+textarea {
+  width: 100%;
+  min-height: 96px;
+  resize: vertical;
+  font: inherit;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+@media (max-width: 760px) {
+  .card {
+    border-radius: 16px;
+  }
+  .review-steps button {
+    flex-basis: calc(50% - 8px);
+  }
+  button,
+  .button {
+    font-size: 0.9375rem;
+  }
+  .position-summary .balance-account-main {
+    flex-wrap: wrap;
+  }
+  .position-summary .balance-account-value {
+    margin-left: auto;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* Keep financial figures readable when system text size increases. */
+.position-summary .position-metrics,
+.month-summary .month-figures {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+.position-summary .position-metrics strong,
+.month-summary .month-figures strong {
+  overflow-wrap: normal;
+  word-break: normal;
+}
+
+/* Account amounts keep their digits together when text scales up. */
+.position-summary .balance-account-main > span:first-child {
+  flex: 1 1 9rem;
+}
+.position-summary .balance-account-main > .balance-account-value {
+  flex: 0 1 auto;
+  min-width: min-content;
+  max-width: 100%;
+}
+.position-summary .balance-account-value strong {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  font-variant-numeric: tabular-nums;
 }

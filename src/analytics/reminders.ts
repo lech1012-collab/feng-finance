@@ -145,9 +145,11 @@ export function reminderCalendar(
   config: ReminderConfig,
   today: string,
   reminders: FinanceReminder[],
+  notBefore?: string,
 ) {
-  const next = `${today.slice(0, 7)}-${String(config.day).padStart(2, "0")}`;
-  const due = next < today ? shiftMonths(next, 1) : next;
+  const earliest = notBefore && notBefore > today ? notBefore : today;
+  const next = `${earliest.slice(0, 7)}-${String(config.day).padStart(2, "0")}`;
+  const due = next < earliest ? shiftMonths(next, 1) : next;
   const event = (date: string, uid: string, title: string, repeat = false) => [
     "BEGIN:VEVENT",
     `UID:${uid}@feng-finance.local`,
@@ -187,4 +189,14 @@ export function reminderCalendar(
     "END:VCALENDAR",
     "",
   ].join("\r\n");
+}
+
+/** Start the next review no earlier than the selected month's successor or today. */
+export function monthReviewCalendar(
+  config: ReminderConfig,
+  reviewedMonth: string,
+  today: string,
+) {
+  const nextMonthStart = `${monthOffset(reviewedMonth, 1)}-01`;
+  return reminderCalendar(config, today, [], nextMonthStart);
 }

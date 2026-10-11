@@ -5,12 +5,16 @@ import type {
   Category,
   Statement,
   Transaction,
+  FxRate,
+  Setting,
+  TransferProposal,
 } from "../domain/models";
 import { db } from "../storage/database";
 import { deeperInsights } from "../analytics/deeper";
 import { localToday } from "../analytics/reminders";
 import { monthCoverage, verifiedStatements } from "../analytics/coverage";
 import { monthLabel } from "../domain/dates";
+import { reportingCoverage } from "../analytics/reporting";
 export function DeeperInsights({
   transactions,
   accounts,
@@ -20,6 +24,10 @@ export function DeeperInsights({
   currency,
   compact = false,
   months,
+  rawTransactions,
+  reportingSettings,
+  rates = [],
+  proposals = [],
 }: {
   transactions: Transaction[];
   accounts: Account[];
@@ -29,13 +37,17 @@ export function DeeperInsights({
   currency: string;
   compact?: boolean;
   months?: string[];
+  rawTransactions?: Transaction[];
+  reportingSettings?: Setting[];
+  rates?: FxRate[];
+  proposals?: TransferProposal[];
 }) {
-  const settings = useLiveQuery(() =>
-    db.settings.where("key").startsWith("subscription:").toArray(),
-  );
+  const settings = useLiveQuery(() => db.settings.toArray());
   if (!transactions.length || months?.length === 0) return null;
   const today = localToday();
-  const documents = verifiedStatements(statements, transactions, today);
+  const ledger = rawTransactions ?? transactions;
+  const preferences = reportingSettings ?? settings ?? [];
+  const documents = verifiedStatements(statements, ledger, today);
   const selected = months ?? [month];
   const results = selected.map((selectedMonth) => ({
     month: selectedMonth,
@@ -44,13 +56,25 @@ export function DeeperInsights({
       accounts,
       documents,
       categories,
-      settings ?? [],
+      preferences,
       selectedMonth,
       currency,
       today,
       (m) =>
-        monthCoverage(accounts, statements, transactions, m, currency, today)
-          .complete,
+        rawTransactions
+          ? reportingCoverage(
+              accounts,
+              statements,
+              ledger,
+              m,
+              currency,
+              rates,
+              preferences,
+              proposals,
+              today,
+            ).complete
+          : monthCoverage(accounts, statements, ledger, m, currency, today)
+              .complete,
     ),
   }));
   const result = results.at(-1)!;

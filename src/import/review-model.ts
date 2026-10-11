@@ -2,6 +2,8 @@ import type { ImportDraft, Institution } from "../domain/models";
 import type { ExtractedFile } from "./pipeline";
 import { reconcile } from "../domain/reconcile";
 import { parseDate } from "../domain/dates";
+import type { Account } from "../domain/models";
+import type { CsvMapping } from "./formats";
 
 export interface FileReview {
   id: string;
@@ -13,6 +15,8 @@ export interface FileReview {
   error: string;
   bank: Institution | "";
   accountId: string;
+  csvMapping?: CsvMapping;
+  accountOverride?: Account;
   manualPeriod: boolean;
   periodStart: string;
   periodEnd: string;
@@ -38,6 +42,7 @@ export function needsRowCheck(
   return (
     row.extractionConfidence < 0.8 ||
     row.duplicate !== "none" ||
+    !!row.manualReplacementId ||
     row.date < draft.statement.statementPeriodStart ||
     row.date > draft.statement.statementPeriodEnd
   );
@@ -94,7 +99,7 @@ export function importBlockers(entry: FileReview): string[] {
     blockers.push("Verify transactions dated outside the statement period.");
   if (draft.warnings.length && !draft.reviewedWarnings)
     blockers.push(
-      "Compare the extracted rows with the PDF and confirm the warning.",
+      "Compare the extracted rows with the source file and confirm the warning.",
     );
   if (
     draft.transactions.some(
@@ -105,5 +110,14 @@ export function importBlockers(entry: FileReview): string[] {
     )
   )
     blockers.push("Verify the highlighted amounts or kept duplicates.");
+  if (
+    draft.transactions.some(
+      (t) =>
+        t.include && t.manualReplacementId && t.replaceManual === undefined,
+    )
+  )
+    blockers.push(
+      "Choose whether to replace the matching manual transactions or keep both.",
+    );
   return blockers;
 }

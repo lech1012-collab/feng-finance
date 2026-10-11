@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import {
   ResponsiveContainer,
   LineChart,
@@ -12,128 +12,23 @@ import {
   ReferenceLine,
 } from "recharts";
 import { db } from "../storage/database";
-import { saveBudget } from "../storage/budgets";
-import { budgetOverview, planningForecast } from "../analytics/planning";
-import { localToday } from "../analytics/reminders";
+import { reportingPlanningForecast } from "../analytics/reporting-forecast";
 import {
-  decimalMoney,
-  money,
-  parseMoney,
-  currencyPrecision,
-} from "../domain/money";
+  CalendarPanel,
+  DebtPanel,
+  MonthlyBudgetsPanel,
+  PotsPanel,
+  ScenarioPanel,
+} from "../components/PlanningExtensions";
+import { reportingPeriod, reportingPeriodLabel } from "../domain/period";
+import { localToday } from "../analytics/reminders";
+import { money, currencyPrecision } from "../domain/money";
 import { MonthPicker } from "../components/common";
 import { ImportButton } from "../components/ImportPicker";
 import { monthOffset, monthLabel, formatUkDate } from "../domain/dates";
 import { monthCoverage, verifiedStatements } from "../analytics/coverage";
 import { displayMerchant } from "../domain/presentation";
 
-function BudgetLimit({
-  categoryId,
-  name,
-  currency,
-  limit,
-  average,
-}: {
-  categoryId: string;
-  name: string;
-  currency: string;
-  limit?: number;
-  average?: number;
-}) {
-  const [editing, setEditing] = useState(false);
-  const [value, setValue] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const commit = async (amount: number | undefined) => {
-    setBusy(true);
-    try {
-      await saveBudget(categoryId, currency, amount);
-      setEditing(false);
-      setError("");
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Budget could not be saved.");
-    } finally {
-      setBusy(false);
-    }
-  };
-  return (
-    <div className="budget-editor">
-      {editing ? (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            try {
-              const amount = value.trim()
-                ? parseMoney(value, currency)
-                : undefined;
-              if (amount !== undefined && amount < 0)
-                throw new Error("Budget cannot be negative.");
-              void commit(amount);
-            } catch (e) {
-              setError(e instanceof Error ? e.message : "Invalid amount.");
-            }
-          }}
-        >
-          <label>
-            Monthly limit for {name}
-            <input
-              autoFocus
-              inputMode="decimal"
-              aria-label={`${name} monthly budget`}
-              value={value}
-              disabled={busy}
-              onChange={(e) => setValue(e.target.value)}
-              placeholder="Amount"
-            />
-          </label>
-          <div className="actions">
-            <button type="submit" disabled={busy}>
-              Save budget
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => {
-                setEditing(false);
-                setError("");
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-          <small>
-            Leave empty to remove the limit. Applies to every month in{" "}
-            {currency}.
-          </small>
-        </form>
-      ) : (
-        <button
-          className="budget-limit"
-          aria-label={`${limit === undefined ? "Set" : "Edit"} ${name} budget`}
-          onClick={() => {
-            setValue(limit === undefined ? "" : decimalMoney(limit, currency));
-            setEditing(true);
-          }}
-        >
-          {limit === undefined ? "Set monthly limit" : money(limit, currency)}
-        </button>
-      )}
-      {!editing &&
-        limit === undefined &&
-        average !== undefined &&
-        average > 0 && (
-          <button
-            className="budget-suggestion"
-            disabled={busy}
-            onClick={() => void commit(average)}
-          >
-            Use usual {money(average, currency)}
-          </button>
-        )}
-      {error && <p role="alert">{error}</p>}
-    </div>
-  );
-}
 export default function Planning({
   month,
   setMonth,
@@ -149,32 +44,26 @@ export default function Planning({
     `${monthOffset(month, -6)}-01`,
   ].sort()[0];
   const [horizon, setHorizon] = useState<30 | 60 | 90>(30);
-  const [extraCategory, setExtraCategory] = useState("");
+  const [params, setParams] = useSearchParams();
+  const tabs = ["budgets", "pots", "calendar", "debt", "forecast"] as const;
+  const tab = tabs.find((t) => t === params.get("tab")) ?? "budgets";
   const data = useLiveQuery(
     async () => ({
-      accounts: await db.accounts.where("currency").equals(currency).toArray(),
+      accounts: await db.accounts.toArray(),
+      rates: await db.fxRates.toArray(),
       statements: await db.statements.toArray(),
       categories: await db.categories.toArray(),
       settings: await db.settings.toArray(),
+      recurringSeries: await db.recurringSeries.toArray(),
       transactions: await db.transactions
-        .where("[currency+date]")
-        .between([currency, earliest], [currency, today], true, true)
+        .where("date")
+        .between(earliest, today, true, true)
         .toArray(),
     }),
     [currency, today, earliest],
   );
   if (!data) return <p role="status">Loading your plan…</p>;
-  const budgets = budgetOverview(
-    data.transactions,
-    data.accounts,
-    data.statements,
-    data.categories,
-    data.settings,
-    month,
-    currency,
-    today,
-  );
-  const forecast = planningForecast(
+  const forecast = reportingPlanningForecast(
     data.transactions,
     data.accounts,
     data.statements,
@@ -182,10 +71,8 @@ export default function Planning({
     currency,
     today,
     horizon,
-  );
-  const shown = budgets.items.filter(
-    (i) =>
-      i.spent > 0 || i.limit !== undefined || i.category.id === extraCategory,
+    data.rates,
+    data.recurringSeries,
   );
   const end = forecast.points.at(-1);
   const factor = 10 ** currencyPrecision(currency);
@@ -200,8 +87,9 @@ export default function Planning({
     data.statements,
     data.transactions,
     month,
-    currency,
+    "*",
     today,
+    reportingPeriod(month, data.settings, data.transactions),
   );
   const recentCutoff = new Date(
     Date.parse(`${today}T00:00:00Z`) - 35 * 86400000,
@@ -210,6 +98,7 @@ export default function Planning({
     .slice(0, 10);
   const missingAccounts = data.accounts.filter(
     (account) =>
+      account.tracking !== "manual" &&
       !documents.some(
         (statement) =>
           statement.accountId === account.id &&
@@ -234,325 +123,341 @@ export default function Planning({
           Fictitious demo data is included in this plan.
         </p>
       )}
-      <section className="card">
-        <div className="section-heading">
-          <h2>Monthly budgets</h2>
-        </div>
+      <div className="card">
         <MonthPicker month={month} onChange={setMonth} />
         <p className="coverage-note">
-          {monthLabel(month)} · {coverage.status}
+          {reportingPeriodLabel(month, data.settings, data.transactions)} ·{" "}
+          {coverage.status}
         </p>
-        <div className="planning-kpis">
-          <div>
-            <span>Planned limit</span>
-            <strong>{money(budgets.totalLimit, currency)}</strong>
-          </div>
-          <div>
-            <span>Spent in budgeted categories</span>
-            <strong>{money(budgets.budgetedSpending, currency)}</strong>
-          </div>
-          <div>
-            <span>
-              {budgets.totalLimit >= budgets.budgetedSpending
-                ? "Remaining"
-                : "Over budget"}
-            </span>
-            <strong>
-              {money(
-                Math.abs(budgets.totalLimit - budgets.budgetedSpending),
-                currency,
-              )}
-            </strong>
-          </div>
-        </div>
-        <p className="coverage-note">
-          Recorded spending only; incomplete imports can understate it.
-          Transfers are excluded. {money(budgets.unbudgetedSpending, currency)}{" "}
-          of spending is outside your configured budgets.
-        </p>
-        <label className="planning-category">
-          Add a category budget
-          <select
-            aria-label="Add a category budget"
-            value={extraCategory}
-            onChange={(e) => setExtraCategory(e.target.value)}
+      </div>
+      <div
+        className="planning-v2-tabs"
+        role="tablist"
+        aria-label="Planning view"
+      >
+        {tabs.map((value, index) => (
+          <button
+            id={`planning-tab-${value}`}
+            aria-controls={`planning-panel-${value}`}
+            role="tab"
+            aria-selected={tab === value}
+            tabIndex={tab === value ? 0 : -1}
+            key={value}
+            onClick={() => setParams({ tab: value })}
+            onKeyDown={(e) => {
+              if (!["ArrowLeft", "ArrowRight"].includes(e.key)) return;
+              e.preventDefault();
+              const next =
+                tabs[
+                  (index + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) %
+                    tabs.length
+                ];
+              setParams({ tab: next });
+              document.getElementById(`planning-tab-${next}`)?.focus();
+            }}
           >
-            <option value="">Choose category</option>
-            {budgets.items.map((i) => (
-              <option key={i.category.id} value={i.category.id}>
-                {i.category.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {!shown.length && (
-          <p className="muted">
-            Choose a category above to set your first monthly limit.
-          </p>
+            {value[0].toUpperCase() + value.slice(1)}
+          </button>
+        ))}
+      </div>
+      <div className="planning-v2-panels">
+        {tab === "budgets" && (
+          <div
+            id="planning-panel-budgets"
+            role="tabpanel"
+            aria-labelledby="planning-tab-budgets"
+          >
+            <MonthlyBudgetsPanel currency={currency} month={month} />
+          </div>
         )}
-        <div className="budget-grid">
-          {shown.map((i) => (
-            <article className="budget-card" key={i.category.id}>
+        {tab === "pots" && (
+          <div
+            id="planning-panel-pots"
+            role="tabpanel"
+            aria-labelledby="planning-tab-pots"
+          >
+            <PotsPanel currency={currency} month={month} />
+          </div>
+        )}
+        {tab === "calendar" && (
+          <div
+            id="planning-panel-calendar"
+            role="tabpanel"
+            aria-labelledby="planning-tab-calendar"
+          >
+            <CalendarPanel currency={currency} month={month} />
+          </div>
+        )}
+        {tab === "debt" && (
+          <div
+            id="planning-panel-debt"
+            role="tabpanel"
+            aria-labelledby="planning-tab-debt"
+          >
+            <DebtPanel currency={currency} month={month} />
+          </div>
+        )}
+        {tab === "forecast" && (
+          <div
+            id="planning-panel-forecast"
+            role="tabpanel"
+            aria-labelledby="planning-tab-forecast"
+          >
+            <section className="card forecast-card">
               <div className="section-heading">
-                <Link to={`/categories/${i.category.id}?month=${month}`}>
-                  <h3>{i.category.name}</h3>
-                </Link>
-                <span>{money(i.spent, currency)} spent</span>
+                <h2>Projected total balance</h2>
+                <select
+                  aria-label="Forecast horizon"
+                  value={horizon}
+                  onChange={(e) =>
+                    setHorizon(Number(e.target.value) as 30 | 60 | 90)
+                  }
+                >
+                  {[30, 60, 90].map((d) => (
+                    <option key={d} value={d}>
+                      {d} days
+                    </option>
+                  ))}
+                </select>
               </div>
-              <BudgetLimit
-                key={`${currency}:${i.category.id}`}
-                categoryId={i.category.id}
-                name={i.category.name}
-                currency={currency}
-                limit={i.limit}
-                average={i.average}
-              />
-              {i.limit !== undefined && (
-                <>
-                  <div
-                    className="budget-progress"
-                    role="meter"
-                    aria-label={`${i.category.name} budget used`}
-                    aria-valuemin={0}
-                    aria-valuemax={Math.max(i.limit, 1)}
-                    aria-valuenow={Math.min(i.spent, Math.max(i.limit, 1))}
-                    aria-valuetext={`${money(i.spent, currency)} spent of ${money(i.limit, currency)}`}
-                  >
-                    <span
-                      style={{
-                        width: `${Math.min(100, i.limit ? (i.spent / i.limit) * 100 : i.spent ? 100 : 0)}%`,
-                      }}
-                    />
-                  </div>
-                  <p className={i.remaining! < 0 ? "warning-text" : "muted"}>
-                    {money(Math.abs(i.remaining!), currency)}{" "}
-                    {i.remaining! < 0 ? "over budget" : "remaining"}
-                  </p>
-                </>
-              )}
-              {i.average !== undefined && (
-                <small className="muted">
-                  Usual spending {money(i.average, currency)} ·{" "}
-                  {budgets.historyMonths} verified months
-                </small>
-              )}
-            </article>
-          ))}
-        </div>
-      </section>
-      <section className="card forecast-card">
-        <div className="section-heading">
-          <h2>Projected total balance</h2>
-          <select
-            aria-label="Forecast horizon"
-            value={horizon}
-            onChange={(e) => setHorizon(Number(e.target.value) as 30 | 60 | 90)}
-          >
-            {[30, 60, 90].map((d) => (
-              <option key={d} value={d}>
-                {d} days
-              </option>
-            ))}
-          </select>
-        </div>
-        <p className="coverage-note">
-          From {formatUkDate(today)} · next {horizon} days. Cash and savings
-          minus card debt; this is an estimate of your financial position.
-        </p>
-        <p className="forecast-inputs">
-          Based on {forecast.baselineMonths} complete previous month
-          {forecast.baselineMonths === 1 ? "" : "s"} ·{" "}
-          {data.accounts.length - missingAccounts.length} of{" "}
-          {data.accounts.length} accounts have recent verified balances.
-        </p>
-        {missingAccounts.length > 0 && (
-          <p className="coverage-note">
-            Missing or stale balances:{" "}
-            {missingAccounts.map((account) => account.displayName).join(", ")}.
-            No total forecast is shown until all accounts have a shared verified
-            balance.
-          </p>
-        )}
-        {forecast.reason ? (
-          <div className="notice">
-            <p>{forecast.reason}</p>
-            <ImportButton>Import recent statements</ImportButton>
-          </div>
-        ) : (
-          end && (
-            <>
-              <div className="planning-kpis">
-                <div>
-                  <span>Estimated on {formatUkDate(end.date)}</span>
-                  <strong>{money(end.balance, currency)}</strong>
-                </div>
-                <div>
-                  <span>Expected income · next {horizon} days</span>
-                  <strong>{money(forecast.income, currency)}</strong>
-                </div>
-                <div>
-                  <span>Expected bills · next {horizon} days</span>
-                  <strong>{money(forecast.bills, currency)}</strong>
-                </div>
-              </div>
-              <div
-                className="chart"
-                role="img"
-                aria-label="Projected total balance with higher and lower variable-spending scenarios"
-              >
-                <ResponsiveContainer width="100%" height={260}>
-                  <LineChart
-                    data={forecast.points}
-                    margin={{ top: 13, right: 8, left: -15, bottom: 0 }}
-                  >
-                    <CartesianGrid vertical={false} stroke="var(--line)" />
-                    <XAxis
-                      dataKey="date"
-                      minTickGap={40}
-                      tickFormatter={(v) => formatUkDate(String(v))}
-                      tick={{ fill: "var(--muted)", fontSize: 13 }}
-                    />
-                    <YAxis
-                      tickFormatter={(v) =>
-                        `${+(Number(v) / factor / 1000).toFixed(1)}k`
-                      }
-                      tick={{ fill: "var(--muted)", fontSize: 13 }}
-                    />
-                    <Tooltip
-                      labelFormatter={(value) => formatUkDate(String(value))}
-                      formatter={(v) => money(Number(v), currency)}
-                      contentStyle={{
-                        background: "var(--surface)",
-                        border: "1px solid var(--line)",
-                        color: "var(--ink)",
-                      }}
-                    />
-                    <ReferenceLine y={0} stroke="var(--chart-expense)" />
-                    <Line
-                      name="Usual spending"
-                      dataKey="balance"
-                      stroke="var(--chart-balance)"
-                      strokeWidth={3}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                    <Line
-                      name="25% more variable spending"
-                      dataKey="lower"
-                      stroke="var(--chart-expense)"
-                      strokeDasharray="4 4"
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                    <Line
-                      name="25% less variable spending"
-                      dataKey="upper"
-                      stroke="var(--chart-net)"
-                      strokeDasharray="4 4"
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="chart-legend">
-                <span>Solid: usual spending</span>
-                <span>Dashed: variable spending ±25%</span>
-              </div>
-              {shortage && (
-                <p className="notice warning">
-                  The model drops below zero around{" "}
-                  {formatUkDate(shortage.date)}. Check payment timing and recent
-                  balances before making spending decisions.
+              <p className="coverage-note">
+                From {formatUkDate(today)} · next {horizon} days.{" "}
+                {forecast.converted
+                  ? "≈ Converted using cached exchange rates. "
+                  : ""}
+                Cash and savings minus card debt; this is an estimate of your
+                financial position.{" "}
+                {forecast.rateDates.length > 0
+                  ? `Rates as of ${forecast.rateDates.map((date) => formatUkDate(date)).join(", ")}. Future rates are assumed unchanged.`
+                  : ""}
+              </p>
+              <p className="forecast-inputs">
+                Based on {forecast.baselineMonths} complete previous month
+                {forecast.baselineMonths === 1 ? "" : "s"} ·{" "}
+                {data.accounts.filter((a) => a.tracking !== "manual").length -
+                  missingAccounts.length}{" "}
+                of {data.accounts.filter((a) => a.tracking !== "manual").length}{" "}
+                account
+                {data.accounts.filter((a) => a.tracking !== "manual").length ===
+                1
+                  ? ""
+                  : "s"}{" "}
+                with recent verified balances.
+              </p>
+              {missingAccounts.length > 0 && (
+                <p className="coverage-note">
+                  Missing or stale balances:{" "}
+                  {missingAccounts
+                    .map((account) => account.displayName)
+                    .join(", ")}
+                  . No total forecast is shown until all accounts have a shared
+                  verified balance.
                 </p>
               )}
-              <details>
-                <summary>Forecast inputs and assumptions</summary>
-                <p>
-                  Starting point: {money(forecast.anchor!.total!, currency)}{" "}
-                  verified on {formatUkDate(forecast.anchor!.date)} across{" "}
-                  {data.accounts.length} accounts. Movements since that date use
-                  imported transactions and estimated missing recurring
-                  payments. Unobserved day-to-day spending is estimated from{" "}
-                  {forecast.baselineMonths} complete months.
+              {forecast.reason ? (
+                <div className="notice">
+                  <p>{forecast.reason}</p>
+                  <ImportButton>Import recent statements</ImportButton>
+                </div>
+              ) : (
+                end && (
+                  <>
+                    <div className="planning-kpis">
+                      <div>
+                        <span>Estimated on {formatUkDate(end.date)}</span>
+                        <strong>{money(end.balance, currency)}</strong>
+                      </div>
+                      <div>
+                        <span>Expected income · next {horizon} days</span>
+                        <strong>{money(forecast.income, currency)}</strong>
+                      </div>
+                      <div>
+                        <span>Expected bills · next {horizon} days</span>
+                        <strong>{money(forecast.bills, currency)}</strong>
+                      </div>
+                    </div>
+                    <div
+                      className="chart"
+                      role="img"
+                      aria-label="Projected total balance with higher and lower variable-spending scenarios"
+                    >
+                      <ResponsiveContainer width="100%" height={260}>
+                        <LineChart
+                          data={forecast.points}
+                          margin={{ top: 13, right: 8, left: -15, bottom: 0 }}
+                        >
+                          <CartesianGrid
+                            vertical={false}
+                            stroke="var(--line)"
+                          />
+                          <XAxis
+                            dataKey="date"
+                            minTickGap={40}
+                            tickFormatter={(v) => formatUkDate(String(v))}
+                            tick={{ fill: "var(--muted)", fontSize: 13 }}
+                          />
+                          <YAxis
+                            tickFormatter={(v) =>
+                              `${+(Number(v) / factor / 1000).toFixed(1)}k`
+                            }
+                            tick={{ fill: "var(--muted)", fontSize: 13 }}
+                          />
+                          <Tooltip
+                            labelFormatter={(value) =>
+                              formatUkDate(String(value))
+                            }
+                            formatter={(v) => money(Number(v), currency)}
+                            contentStyle={{
+                              background: "var(--surface)",
+                              border: "1px solid var(--line)",
+                              color: "var(--ink)",
+                            }}
+                          />
+                          <ReferenceLine y={0} stroke="var(--chart-expense)" />
+                          <Line
+                            name="Usual spending"
+                            dataKey="balance"
+                            stroke="var(--chart-balance)"
+                            strokeWidth={3}
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                          <Line
+                            name="25% more variable spending"
+                            dataKey="lower"
+                            stroke="var(--chart-expense)"
+                            strokeDasharray="4 4"
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                          <Line
+                            name="25% less variable spending"
+                            dataKey="upper"
+                            stroke="var(--chart-net)"
+                            strokeDasharray="4 4"
+                            dot={false}
+                            isAnimationActive={false}
+                          />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                    <div className="chart-legend">
+                      <span>Solid: usual spending</span>
+                      <span>Dashed: variable spending ±25%</span>
+                    </div>
+                    {shortage && (
+                      <p className="notice warning">
+                        The model drops below zero around{" "}
+                        {formatUkDate(shortage.date)}. Check payment timing and
+                        recent balances before making spending decisions.
+                      </p>
+                    )}
+                    <details>
+                      <summary>Forecast inputs and assumptions</summary>
+                      <p>
+                        Starting point:{" "}
+                        {money(forecast.anchor!.total!, currency)} verified on{" "}
+                        {formatUkDate(forecast.anchor!.date)} across{" "}
+                        {data.accounts.length} account
+                        {data.accounts.length === 1 ? "" : "s"}. Movements since
+                        that date use imported transactions and estimated
+                        missing recurring payments. Unobserved day-to-day
+                        spending is estimated from {forecast.baselineMonths}{" "}
+                        complete month{forecast.baselineMonths === 1 ? "" : "s"}
+                        .
+                      </p>
+                      <ul>
+                        {!forecast.converted &&
+                          data.accounts
+                            .filter((a) => a.tracking !== "manual")
+                            .map((account, index) => (
+                              <li key={account.id}>
+                                {account.displayName}:{" "}
+                                {money(
+                                  forecast.anchor!.balances[
+                                    `account${index}`
+                                  ] ?? 0,
+                                  currency,
+                                )}{" "}
+                                on {formatUkDate(forecast.anchor!.date)}
+                              </li>
+                            ))}
+                      </ul>
+                      <p>
+                        Usual variable spending: approximately{" "}
+                        {money(Math.round(forecast.dailyVariable!), currency)}{" "}
+                        per day. Bills use the last charge; repeating income
+                        uses the lowest of the last three payments. Cancelled
+                        subscriptions and transfers are excluded from future
+                        payments. No repeating income detected means no income
+                        is assumed.
+                      </p>
+                      <p>
+                        The dashed lines change variable spending by 25%; they
+                        are scenarios, not statistical confidence limits. New
+                        purchases, irregular income, rate changes, taxes and
+                        payment delays may change the result. Budgets do not
+                        replace observed spending in this forecast.
+                      </p>
+                    </details>
+                  </>
+                )
+              )}
+            </section>
+            <section className="card">
+              <div className="section-heading">
+                <h2>Upcoming payments</h2>
+                <span className="muted">Next {horizon} days</span>
+              </div>
+              <p className="coverage-note">
+                Expected dates and amounts from repeated imported transactions.
+                These are estimates, not confirmed bills or payments.
+              </p>
+              {!forecast.upcoming.length ? (
+                <p className="muted">
+                  No supported recurring pattern found yet. Import more
+                  statement history to identify recurring income and bills.
                 </p>
-                <ul>
-                  {data.accounts.map((account, index) => (
-                    <li key={account.id}>
-                      {account.displayName}:{" "}
-                      {money(
-                        forecast.anchor!.balances[`account${index}`]!,
-                        currency,
-                      )}{" "}
-                      on {formatUkDate(forecast.anchor!.date)}
+              ) : (
+                <ol className="payment-timeline">
+                  {forecast.upcoming.map((p) => (
+                    <li key={p.id}>
+                      <Link
+                        to={`/transactions?allDates=1&account=${p.accountId}&search=${encodeURIComponent(p.merchant)}`}
+                      >
+                        <div>
+                          <strong>
+                            {displayMerchant({
+                              merchant: p.merchant,
+                              description: p.merchant,
+                            })}
+                          </strong>
+                          <span>
+                            {formatUkDate(p.date)} · {accounts.get(p.accountId)}{" "}
+                            · {p.cadence}
+                          </span>
+                          <small>
+                            {p.evidence} payment{p.evidence === 1 ? "" : "s"}{" "}
+                            support{p.evidence === 1 ? "s" : ""} this estimate
+                          </small>
+                        </div>
+                        <strong
+                          className={
+                            p.amount < 0 ? "payment-out" : "payment-in"
+                          }
+                        >
+                          {money(p.amount, currency, true)}
+                        </strong>
+                      </Link>
                     </li>
                   ))}
-                </ul>
-                <p>
-                  Usual variable spending: approximately{" "}
-                  {money(Math.round(forecast.dailyVariable!), currency)} per
-                  day. Bills use the last charge; repeating income uses the
-                  lowest of the last three payments. Cancelled subscriptions and
-                  transfers are excluded from future payments. No repeating
-                  income detected means no income is assumed.
-                </p>
-                <p>
-                  The dashed lines change variable spending by 25%; they are
-                  scenarios, not statistical confidence limits. New purchases,
-                  irregular income, rate changes, taxes and payment delays may
-                  change the result. Budgets do not replace observed spending in
-                  this forecast.
-                </p>
-              </details>
-            </>
-          )
+                </ol>
+              )}
+            </section>
+            <ScenarioPanel currency={currency} points={forecast.points} />
+          </div>
         )}
-      </section>
-      <section className="card">
-        <div className="section-heading">
-          <h2>Upcoming payments</h2>
-          <span className="muted">Next {horizon} days</span>
-        </div>
-        <p className="coverage-note">
-          Expected dates and amounts from repeated imported transactions. These
-          are estimates, not confirmed bills or payments.
-        </p>
-        {!forecast.upcoming.length ? (
-          <p className="muted">
-            No supported recurring pattern found yet. Import more statement
-            history to identify recurring income and bills.
-          </p>
-        ) : (
-          <ol className="payment-timeline">
-            {forecast.upcoming.map((p) => (
-              <li key={p.id}>
-                <Link
-                  to={`/transactions?allDates=1&account=${p.accountId}&search=${encodeURIComponent(p.merchant)}`}
-                >
-                  <div>
-                    <strong>
-                      {displayMerchant({
-                        merchant: p.merchant,
-                        description: p.merchant,
-                      })}
-                    </strong>
-                    <span>
-                      {formatUkDate(p.date)} · {accounts.get(p.accountId)} ·{" "}
-                      {p.cadence}
-                    </span>
-                    <small>{p.evidence} payments support this estimate</small>
-                  </div>
-                  <strong
-                    className={p.amount < 0 ? "payment-out" : "payment-in"}
-                  >
-                    {money(p.amount, currency, true)}
-                  </strong>
-                </Link>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
+      </div>
     </>
   );
 }

@@ -112,4 +112,17 @@ describe("Home backup and statement review health", () => {
       reviewDate: undefined,
     });
   });
+  it("warns after two new statement imports even with a recent backup", () => {
+    const settings = [
+      { key: "backup:lastExportAt", value: "2026-10-07T12:00:00.000Z" },
+      { key: "backup:importsSinceExport", value: "2" },
+    ];
+    expect(homeDataHealth(settings, "2026-10-08").warning).toBe(true);
+    expect(
+      homeDataHealth(
+        [{ ...settings[0] }, { ...settings[1], value: "1" }],
+        "2026-10-08",
+      ).warning,
+    ).toBe(false);
+  });
 });

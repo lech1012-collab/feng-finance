@@ -9,28 +9,35 @@ import {
   ShoppingBag,
   ChevronRight,
 } from "lucide-react";
-import { AccountBalances } from "../components/AccountBalances";
-import { BalanceChart } from "../components/BalanceChart";
+import { PositionSummary } from "../components/PositionSummary";
 import { ImportButton } from "../components/ImportPicker";
 import { MonthPicker } from "../components/common";
 import { CashChart } from "../components/Chart";
 import { db } from "../storage/database";
+import { auditedMutation } from "../storage/audit";
 import { loadDemo } from "../storage/demo";
 import { monthBounds, monthLabel, monthOffset } from "../domain/dates";
 import { displayDate, displayMerchant } from "../domain/presentation";
 import { cashFlow, categorySpending } from "../analytics/calculations";
-import {
-  coverageMonthlySeries,
-  monthCoverage,
-  verifiedStatements,
-} from "../analytics/coverage";
+import { verifiedStatements } from "../analytics/coverage";
 import { excludedFlows, homeDataHealth } from "../analytics/home-summary";
-import { planningForecast } from "../analytics/planning";
+import { reportingPlanningForecast } from "../analytics/reporting-forecast";
+import { potsOverview } from "../analytics/planning-v2";
 import { deeperInsights } from "../analytics/deeper";
 import { localToday } from "../analytics/reminders";
 import { detectSubscriptions } from "../analytics/subscriptions";
 import { money } from "../domain/money";
 import { accountSnapshot } from "../analytics/balances";
+import {
+  effectiveTransactions,
+  needsReview,
+} from "../analytics/effective-transactions";
+import { projectedReportingTransactions } from "../analytics/fx";
+import {
+  reportingCoverage,
+  reportingMonthlySeries,
+} from "../analytics/reporting";
+import { reportingPeriod, reportingPeriodLabel } from "../domain/period";
 
 export default function Home({
   month,
@@ -48,7 +55,7 @@ export default function Home({
   const data = useLiveQuery(async () => {
     const [statements, accounts] = await Promise.all([
       db.statements.toArray(),
-      db.accounts.where("currency").equals(currency).toArray(),
+      db.accounts.toArray(),
     ]);
     let from = [
       monthBounds(monthOffset(month, -12))[0],
@@ -58,16 +65,13 @@ export default function Home({
     // Card statements can extend beyond the selected calendar month. Load all
     // their rows so coverage verification can check their printed balances.
     const documents = statements.filter(
-      (s) =>
-        s.currency === currency &&
-        s.statementPeriodStart <= to &&
-        s.statementPeriodEnd >= from,
+      (s) => s.statementPeriodStart <= to && s.statementPeriodEnd >= from,
     );
     from = [from, ...documents.map((s) => s.statementPeriodStart)].sort()[0];
     to = [to, ...documents.map((s) => s.statementPeriodEnd)].sort().at(-1)!;
     const transactions = await db.transactions
-      .where("[currency+date]")
-      .between([currency, from], [currency, to], true, true)
+      .where("date")
+      .between(from, to, true, true)
       .toArray();
     // A latest dated account balance may be older than the analysis window, or
     // a card may contain purchases before its printed period. Check its complete
@@ -88,8 +92,24 @@ export default function Home({
         ),
       )
     ).flat();
+    const manualWalletIds = accounts
+      .filter(
+        (account) =>
+          account.tracking === "manual" &&
+          ["current", "savings"].includes(account.accountType),
+      )
+      .map((account) => account.id);
+    // Wallet balances need every movement since their opening valuation, even
+    // when that movement predates the chart's analysis window.
+    const manualWalletRows = manualWalletIds.length
+      ? await db.transactions
+          .where("accountId")
+          .anyOf(manualWalletIds)
+          .toArray()
+      : [];
     const indexedRows = new Map(transactions.map((row) => [row.id, row]));
-    for (const row of sourceRows) indexedRows.set(row.id, row);
+    for (const row of [...sourceRows, ...manualWalletRows])
+      indexedRows.set(row.id, row);
     return {
       transactions: [...indexedRows.values()],
       categories: await db.categories.toArray(),
@@ -98,58 +118,111 @@ export default function Home({
       settings: await db.settings.toArray(),
       count: await db.transactions.count(),
       uncategorized: await db.transactions
-        .where("[currency+date]")
-        .between([currency, "0000"], [currency, "9999"], true, true)
         .filter(
           (t) =>
+            !t.parentId &&
             !t.categoryId &&
-            !t.subcategoryId &&
             !t.isTransfer &&
-            t.type !== "transfer" &&
-            !t.transferPairId,
+            t.kind !== "refund" &&
+            t.kind !== "split_parent",
         )
         .count(),
+      toReview: await db.transactions.filter(needsReview).count(),
+      rates: await db.fxRates.toArray(),
+      valuations: await db.valuations.toArray(),
+      pots: await db.pots.toArray(),
+      proposals: await db.transferProposals.toArray(),
+      recurringSeries: await db.recurringSeries.toArray(),
     };
   }, [month, currency, today]);
   if (!data) return <p role="status">Loading your finances…</p>;
 
-  const current = data.transactions.filter((t) => t.date.startsWith(month));
+  if (!data.accounts.length && !data.count)
+    return (
+      <>
+        <div className="page-heading">
+          <h1>Home</h1>
+        </div>
+        <section className="welcome card">
+          <Wallet size={30} />
+          <h2>Your finances, in one place.</h2>
+          <p>
+            Import statements to see your financial position. Everything stays
+            on this device.
+          </p>
+          <div className="actions">
+            <ImportButton className="button primary">
+              Import your first statement
+            </ImportButton>
+            <button onClick={() => void loadDemo()}>
+              Try fictitious demo data
+            </button>
+          </div>
+        </section>
+      </>
+    );
+
+  const projection = projectedReportingTransactions(
+    effectiveTransactions(data.transactions),
+    currency,
+    data.rates,
+  );
+  const reportingRows = projection.transactions;
+  const [start, end] = reportingPeriod(month, data.settings, data.transactions);
+  const current = reportingRows.filter((t) => t.date >= start && t.date < end);
   const flow = cashFlow(current, currency);
-  const coverage = monthCoverage(
+  const coverage = reportingCoverage(
     data.accounts,
     data.statements,
     data.transactions,
     month,
     currency,
+    data.rates,
+    data.settings,
+    data.proposals,
     today,
+    projection,
   );
-  const previousCoverage = monthCoverage(
+  const previousMonth = monthOffset(month, -1);
+  const previousCoverage = reportingCoverage(
     data.accounts,
     data.statements,
     data.transactions,
-    monthOffset(month, -1),
+    previousMonth,
     currency,
+    data.rates,
+    data.settings,
+    data.proposals,
     today,
+    projection,
+  );
+  const previousRange = reportingPeriod(
+    previousMonth,
+    data.settings,
+    data.transactions,
   );
   const previous = cashFlow(
-    data.transactions.filter((t) => t.date.startsWith(monthOffset(month, -1))),
+    reportingRows.filter(
+      (t) => t.date >= previousRange[0] && t.date < previousRange[1],
+    ),
     currency,
   );
   const difference = flow.net - previous.net;
   const categories = categorySpending(current, data.categories, currency);
   const excluded = excludedFlows(
-    data.transactions,
+    projectedReportingTransactions(data.transactions, currency, data.rates)
+      .transactions,
     data.accounts,
     month,
     currency,
+    [start, end],
   );
-  const subscriptions = detectSubscriptions(
-    data.transactions,
-    data.settings,
-    currency,
-    today,
-  ).filter((s) => s.needsReview);
-  const forecast = planningForecast(
+  const subscriptions = [...new Set(data.accounts.map((a) => a.currency))]
+    .flatMap((native) =>
+      detectSubscriptions(data.transactions, data.settings, native, today),
+    )
+    .filter((s) => s.needsReview);
+  const forecast = reportingPlanningForecast(
     data.transactions,
     data.accounts,
     data.statements,
@@ -157,9 +230,28 @@ export default function Home({
     currency,
     today,
     30,
+    data.rates,
+    data.recurringSeries,
   );
-  const insights = deeperInsights(
+  const selectedEnd = new Date(
+    Date.parse(`${monthBounds(month)[1]}T12:00:00Z`) - 86400000,
+  )
+    .toISOString()
+    .slice(0, 10);
+  const potSummary = potsOverview(
+    data.pots,
+    data.accounts,
+    data.statements,
     data.transactions,
+    currency,
+    selectedEnd < today ? selectedEnd : today,
+    data.rates,
+    data.valuations,
+  );
+  const flowHref = (kind: string) =>
+    `/transactions?month=${month}&flow=${kind}&from=${start}&to=${new Date(Date.parse(`${end}T12:00:00Z`) - 86400000).toISOString().slice(0, 10)}&allDates=0`;
+  const insights = deeperInsights(
+    reportingRows,
     data.accounts,
     verifiedStatements(data.statements, data.transactions, today),
     data.categories,
@@ -168,23 +260,30 @@ export default function Home({
     currency,
     today,
     (candidateMonth) =>
-      monthCoverage(
+      reportingCoverage(
         data.accounts,
         data.statements,
         data.transactions,
         candidateMonth,
         currency,
+        data.rates,
+        data.settings,
+        data.proposals,
         today,
+        projection,
       ).complete,
   );
   const insight = insights.items[0];
   const health = homeDataHealth(data.settings, today);
-  const sortHref = "/transactions?uncategorized=1&allDates=1&sort=1";
+  const sortHref = "/transactions?review=1&allDates=1&sort=1";
   const missingAccounts = data.accounts.filter((a) =>
     coverage.incompleteAccountIds.includes(a.id),
   );
   const todo = [
-    ...(data.uncategorized > 0 ? [{ kind: "sort", account: undefined }] : []),
+    ...(data.toReview > 0 ? [{ kind: "sort", account: undefined }] : []),
+    ...(coverage.pendingTransfers > 0
+      ? [{ kind: "transfers", account: undefined }]
+      : []),
     ...(missingAccounts.length
       ? [
           {
@@ -214,6 +313,9 @@ export default function Home({
       </div>
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
+        <span className="muted">
+          {reportingPeriodLabel(month, data.settings, data.transactions)}
+        </span>
       </div>
       {location.state?.importedCount !== undefined && (
         <div className="notice import-result" role="status">
@@ -222,37 +324,60 @@ export default function Home({
             {location.state.updatedStatementCount > 0 &&
               ` · ${location.state.updatedStatementCount} statement${location.state.updatedStatementCount === 1 ? "" : "s"} updated`}
             {location.state.duplicateCount > 0 &&
-              ` · ${location.state.duplicateCount} duplicates skipped`}
+              ` · ${location.state.duplicateCount} duplicate${location.state.duplicateCount === 1 ? "" : "s"} skipped`}
             {location.state.excludedCount > 0 &&
               ` · ${location.state.excludedCount} excluded by you`}
             {location.state.skippedFileCount > 0 &&
               ` · ${location.state.skippedFileCount} PDF${location.state.skippedFileCount === 1 ? "" : "s"} skipped`}
-            {data.uncategorized > 0 && ` · ${data.uncategorized} still to sort`}
+            {location.state.automaticallyLinkedCount > 0 &&
+              ` · ${location.state.automaticallyLinkedCount} pair${location.state.automaticallyLinkedCount === 1 ? "" : "s"} linked automatically`}
+            {data.toReview > 0 && ` · ${data.toReview} still to review`}
           </span>
-          {data.uncategorized > 0 && <Link to={sortHref}>Sort now</Link>}
+          {location.state.automaticallyLinkedCount > 0 && (
+            <Link to="/transactions?type=transfer&allDates=1">
+              Review linked transfers
+            </Link>
+          )}
+          {data.toReview > 0 && <Link to={sortHref}>Sort now</Link>}
         </div>
       )}
-      {!data.count && !data.statements.length && (
-        <section className="welcome card">
-          <Wallet size={30} />
-          <h2>Your finances, in one place.</h2>
-          <p>Import your bank statements to see your financial position.</p>
-          <div className="actions">
-            <ImportButton className="button primary">
-              Import your first statement
-            </ImportButton>
-            <button onClick={() => void loadDemo()}>
-              Try fictitious demo data
-            </button>
-          </div>
-        </section>
-      )}
-      <AccountBalances
+      {location.state?.importedCount > 0 &&
+        !data.settings.some(
+          (s) => s.key === "setup:dismissed" && s.value === "true",
+        ) && (
+          <section
+            className="card first-import-setup"
+            aria-label="After your first import"
+          >
+            <div className="section-heading">
+              <h2>Ready for next month</h2>
+              <button
+                onClick={() =>
+                  void auditedMutation("Dismiss setup tips", ["settings"], () =>
+                    db.settings.put({ key: "setup:dismissed", value: "true" }),
+                  )
+                }
+              >
+                Dismiss
+              </button>
+            </div>
+            <p>Protect access and keep a copy of your data.</p>
+            <div className="actions">
+              <Link to="/settings#security">Set app lock</Link>
+              <Link to="/settings#backup">Save backup</Link>
+              <Link to="/settings#transfers">Transfer matching</Link>
+            </div>
+          </section>
+        )}
+      <PositionSummary
         transactions={data.transactions}
         period={balancePeriod}
         onPeriodChange={setBalancePeriod}
         accounts={data.accounts}
         statements={data.statements}
+        valuations={data.valuations}
+        rates={data.rates}
+        pots={data.pots}
         month={month}
         currency={currency}
       />
@@ -267,32 +392,40 @@ export default function Home({
           </span>
         </div>
         <div className="month-figures">
-          <div className="month-income">
+          <Link to={flowHref("income")} className="month-income">
             <span>Income</span>
             {coverage.hasIncomeSource ? (
-              <strong>{money(flow.income, currency)}</strong>
+              <strong>
+                {coverage.missingRates
+                  ? "Rates needed"
+                  : `${projection.converted ? "≈ " : ""}${money(flow.income, currency)}${coverage.complete ? "" : "*"}`}
+              </strong>
             ) : (
               <strong className="metric-unavailable">
                 No income source imported
               </strong>
             )}
-          </div>
-          <div className="month-spending">
+          </Link>
+          <Link to={flowHref("spending")} className="month-spending">
             <span>Spending</span>
             <strong>
               {coverage.hasData
-                ? money(flow.expenses, currency)
+                ? coverage.missingRates
+                  ? "Rates needed"
+                  : `${projection.converted ? "≈ " : ""}${money(flow.expenses, currency)}${coverage.complete ? "" : "*"}`
                 : "Not imported"}
             </strong>
-          </div>
-          <div className="month-net">
+          </Link>
+          <Link to={flowHref("net")} className="month-net">
             <span>Net cash flow</span>
             <strong>
               {coverage.hasIncomeSource && coverage.hasData
-                ? money(flow.net, currency, true)
+                ? coverage.missingRates
+                  ? "n/a"
+                  : `${projection.converted ? "≈ " : ""}${money(flow.net, currency, true)}${coverage.complete ? "" : "*"}`
                 : "n/a"}
             </strong>
-          </div>
+          </Link>
         </div>
         {!coverage.complete && coverage.hasData && (
           <p className="month-status">From imported accounts only.</p>
@@ -319,6 +452,13 @@ export default function Home({
         </p>
         <div className="not-counted">
           <span>Not counted:</span>
+          {data.transactions.some(
+            (t) => t.kind === "refund" && t.date >= start && t.date < end,
+          ) && (
+            <Link to={`/transactions?month=${month}&allDates=0`}>
+              Refunds · counted in original purchase months
+            </Link>
+          )}
           <Link
             to={`/transactions?month=${month}&type=transfer&transferKind=internal`}
           >
@@ -348,7 +488,10 @@ export default function Home({
                     </>
                   ) : (
                     <>
-                      <strong>Update {missingAccounts.length} accounts</strong>
+                      <strong>
+                        Update {missingAccounts.length} account
+                        {missingAccounts.length === 1 ? "" : "s"}
+                      </strong>
                       <small>
                         {missingAccounts.map((a) => a.displayName).join(" · ")}{" "}
                         · {monthLabel(month)}
@@ -362,12 +505,20 @@ export default function Home({
               <Link
                 className="home-todo"
                 key={item.kind}
-                to={item.kind === "sort" ? sortHref : "/subscriptions"}
+                to={
+                  item.kind === "sort"
+                    ? sortHref
+                    : item.kind === "transfers"
+                      ? "/transactions?transfers=1&allDates=1"
+                      : "/subscriptions"
+                }
               >
                 <span>
                   {item.kind === "sort"
-                    ? `Sort ${data.uncategorized} transaction${data.uncategorized === 1 ? "" : "s"}`
-                    : `${subscriptions.length} recurring charge${subscriptions.length === 1 ? "" : "s"} to review`}
+                    ? `Review ${data.toReview} transaction${data.toReview === 1 ? "" : "s"}`
+                    : item.kind === "transfers"
+                      ? `${coverage.pendingTransfers} transfer${coverage.pendingTransfers === 1 ? "" : "s"} to confirm`
+                      : `${subscriptions.length} recurring charge${subscriptions.length === 1 ? "" : "s"} to review`}
                 </span>
                 {item.kind === "sort" ? (
                   <strong>Start</strong>
@@ -380,6 +531,14 @@ export default function Home({
         </section>
       )}
 
+      {todo.length === 0 && (
+        <section className="card home-todos">
+          <h2>All sorted</h2>
+          <Link to={`/review?month=${month}`} className="button">
+            Review month
+          </Link>
+        </section>
+      )}
       <section className="card categories-card">
         <div className="section-heading">
           <h2>Where did my money go?</h2>
@@ -455,6 +614,35 @@ export default function Home({
         )}
       </section>
 
+      {data.pots.length > 0 && (
+        <section className="card">
+          <div className="section-heading">
+            <h2>Pots and goals</h2>
+            <Link to="/planning">Planning</Link>
+          </div>
+          {potSummary.items.slice(0, 3).map(({ pot, progress, partial }) => (
+            <Link className="insight-row" key={pot.id} to="/planning?tab=pots">
+              <span>
+                {pot.name}
+                <small>Set aside · included in your cash</small>
+              </span>
+              <strong>
+                {progress.linkedUnavailable
+                  ? "Balance unavailable"
+                  : money(progress.savedMinor, pot.currency)}{" "}
+                / {money(pot.targetMinor, pot.currency)}
+                {partial ? "*" : ""}
+              </strong>
+            </Link>
+          ))}
+          {potSummary.partial && (
+            <p className="coverage-note">
+              * Some linked balances or exchange rates are unavailable. Pots
+              earmark cash; they never reduce your account balance.
+            </p>
+          )}
+        </section>
+      )}
       <section className="card flow-card">
         <div className="section-heading">
           <h2>Cash flow</h2>
@@ -462,23 +650,32 @@ export default function Home({
         </div>
         <CashChart
           showValues={false}
-          data={coverageMonthlySeries(
+          data={reportingMonthlySeries(
             data.transactions,
             data.accounts,
             data.statements,
             month,
             6,
             currency,
+            data.rates,
+            data.settings,
+            data.proposals,
             today,
           )}
           currency={currency}
         />
       </section>
-      <BalanceChart
-        period={balancePeriod}
+
+      <PositionSummary
+        historyOnly
         transactions={data.transactions}
+        period={balancePeriod}
+        onPeriodChange={setBalancePeriod}
         accounts={data.accounts}
         statements={data.statements}
+        valuations={data.valuations}
+        rates={data.rates}
+        pots={data.pots}
         month={month}
         currency={currency}
       />
@@ -510,14 +707,22 @@ export default function Home({
                   imported payments
                 </small>
               </span>
-              <strong>{money(payment.amount, currency, true)}</strong>
+              <strong>
+                {forecast.converted ? "≈ " : ""}
+                {money(payment.amount, currency, true)}
+              </strong>
             </Link>
           ))}
           <p className="coverage-note">
             {forecast.reason
               ? `Balance forecast unavailable: ${forecast.reason}`
-              : `Forecast based on ${forecast.baselineMonths} complete imported months and verified balances for all ${data.accounts.length} accounts.`}
+              : `Forecast based on ${forecast.baselineMonths} complete imported month${forecast.baselineMonths === 1 ? "" : "s"} and verified balances across ${data.accounts.length} account${data.accounts.length === 1 ? "" : "s"}.`}
           </p>
+          {forecast.converted && (
+            <p className="coverage-note">
+              Future payments use cached exchange rates, which may change.
+            </p>
+          )}
         </section>
       )}
 
@@ -561,7 +766,7 @@ export default function Home({
             : "No backup exported yet."}
           {health.lastExportAt &&
             health.warning &&
-            " Save a new backup; the last is over 30 days old."}
+            " Save a new backup to include recent imports and changes."}
         </p>
         <p className="muted">
           {data.count} transaction{data.count === 1 ? "" : "s"} on this device
@@ -569,11 +774,6 @@ export default function Home({
             ` · next statement review ${displayDate(health.reviewDate)}`}
         </p>
       </section>
-      {data.transactions.some((t) => t.isDemo) && (
-        <div className="demo-note">
-          Fictitious demo data. <Link to="/settings">Manage demo data</Link>
-        </div>
-      )}
     </>
   );
 }

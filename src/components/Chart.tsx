@@ -277,7 +277,7 @@ export function CashChart({
       </div>
       <div className="chart-legend">
         {property ? (
-          <span>— Property net cash flow</span>
+          <span>Property net cash flow</span>
         ) : (
           <>
             <span>
@@ -372,7 +372,7 @@ export function CashChart({
                   <th>{d.label}</th>
                   {data.some((point) => point.coverage) && (
                     <td>
-                      {d.coverage?.status ?? "—"}
+                      {d.coverage?.status ?? "Unavailable"}
                       {d.coverage?.hasUnverifiedStatements &&
                         d.coverage.status === "Partial" &&
                         " · verification incomplete"}

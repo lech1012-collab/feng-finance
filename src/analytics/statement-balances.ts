@@ -1,6 +1,7 @@
 import type { Statement, Transaction } from "../domain/models";
 import { parseDate } from "../domain/dates";
 import { safeSum } from "../domain/money";
+import { ledgerTransactions } from "./effective-transactions";
 
 /** An issue-date-only card still has a dated closing balance. Its inferred
  * transaction coverage must never be mistaken for a printed billing period. */
@@ -53,7 +54,9 @@ export function statementBalanceEvidence(
     return result("The statement has not reconciled.");
   if (!Number.isSafeInteger(statement.openingBalance))
     return result("No opening balance is available to check the closing sum.");
-  const rows = transactions.filter((row) => row.statementId === statement.id);
+  const rows = ledgerTransactions(transactions).filter(
+    (row) => row.statementId === statement.id && row.source !== "manual",
+  );
   if (
     rows.length !== statement.transactionCount ||
     new Set(rows.map((row) => row.id)).size !== rows.length

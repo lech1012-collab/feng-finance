@@ -19,6 +19,9 @@ export interface Subscription {
   cadence?: string;
   annual?: number;
   increase: number;
+  increasePercent?: number;
+  previousMedian?: number;
+  priceChangeDate?: string;
   overlap: boolean;
   stale: boolean;
   afterCancellation: boolean;
@@ -51,6 +54,34 @@ export function readReview(value?: string): SubscriptionReview | undefined {
 const knownService =
   /\b(NETFLIX|SPOTIFY|ADOBE|DISNEY|AUDIBLE|APPLE\.COM\/BILL|APPLE MUSIC|ICLOUD|YOUTUBE PREMIUM|MICROSOFT 365|DROPBOX|AMAZON PRIME|OPENAI|CHATGPT)\b/;
 const day = (date: string) => Date.parse(date) / 86400000;
+export function subscriptionPriceRise(
+  charges: Transaction[],
+  currency: string,
+) {
+  if (charges.length < 4) return { increase: 0, percent: 0 };
+  const sorted = charges
+    .slice()
+    .sort((a, b) => a.date.localeCompare(b.date) || a.id.localeCompare(b.id));
+  const latest = Math.abs(sorted.at(-1)!.amount);
+  const prior = sorted
+    .slice(-4, -1)
+    .map((t) => Math.abs(t.amount))
+    .sort((a, b) => a - b);
+  const median = prior[1];
+  const delta = latest - median;
+  // A repeated charge at the same new price never creates a second rise event.
+  const unchanged = latest === Math.abs(sorted.at(-2)!.amount);
+  const qualifying =
+    !unchanged &&
+    delta > 0 &&
+    (delta * 100 >= median * 5 || delta >= 10 ** currencyPrecision(currency));
+  return {
+    increase: qualifying ? delta : 0,
+    percent: qualifying && median ? (delta / median) * 100 : 0,
+    median,
+    date: qualifying ? sorted.at(-1)!.date : undefined,
+  };
+}
 export function detectSubscriptions(
   transactions: Transaction[],
   settings: Setting[],
@@ -65,6 +96,7 @@ export function detectSubscriptions(
       t.isTransfer ||
       t.type === "transfer" ||
       t.transferPairId ||
+      t.parentId ||
       t.date > today
     )
       continue;
@@ -133,14 +165,8 @@ export function detectSubscriptions(
     if (!known && (everydayCategory || !(pattern && stable))) continue;
     const cadence = pattern && stable ? pattern : undefined;
     const amount = -last.amount;
-    const previous =
-      recent.length > 1 ? -recent[recent.length - 2].amount : amount;
-    const increase =
-      cadence &&
-      amount - previous >=
-        Math.max(10 ** currencyPrecision(currency), previous * 0.05)
-        ? amount - previous
-        : 0;
+    const rise = subscriptionPriceRise(charges, currency);
+    const increase = cadence ? rise.increase : 0;
     const review = reviews.get(key);
     const status = review?.status ?? "review";
     const afterCancellation =
@@ -154,8 +180,9 @@ export function detectSubscriptions(
       afterCancellation ||
       (status === "keep" &&
         !!review &&
-        amount - review.amount >=
-          Math.max(10 ** currencyPrecision(currency), review.amount * 0.05));
+        amount > review.amount &&
+        (amount - review.amount >= 10 ** currencyPrecision(currency) ||
+          (amount - review.amount) * 100 >= review.amount * 5));
     candidates.push({
       key,
       merchant,
@@ -169,6 +196,9 @@ export function detectSubscriptions(
           ? amount * cadence.yearly
           : undefined,
       increase,
+      increasePercent: increase ? rise.percent : undefined,
+      previousMedian: rise.median,
+      priceChangeDate: rise.date,
       overlap: false,
       stale,
       afterCancellation,

@@ -10,6 +10,11 @@ import {
 } from "../analytics/subscriptions";
 import { db } from "../storage/database";
 import { money, safeSum } from "../domain/money";
+import { convertMinor } from "../analytics/fx";
+import { formatUkDate } from "../domain/dates";
+import { auditedMutation } from "../storage/audit";
+import { undoChange } from "../storage/audit";
+import "../components/planning-v2.css";
 const statuses: [SubscriptionStatus, string][] = [
   ["review", "Review"],
   ["keep", "Keep"],
@@ -24,7 +29,7 @@ function SubscriptionCard({
 }: {
   item: Subscription;
   account: string;
-  onReviewed: (message: string) => void;
+  onReviewed: (message: string, changeId: string) => void;
 }) {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -33,17 +38,39 @@ function SubscriptionCard({
     setBusy(true);
     setError("");
     try {
-      await db.settings.put({
-        key: reviewPrefix + (await sha256(new TextEncoder().encode(s.key))),
-        value: JSON.stringify({
-          status,
-          groupKey: s.key,
-          date: new Date().toISOString().slice(0, 10),
-          amount: s.amount,
-        }),
-      });
+      const key =
+        reviewPrefix + (await sha256(new TextEncoder().encode(s.key)));
+      const result = await auditedMutation(
+        "Review recurring charge",
+        ["settings", "recurringSeries"],
+        async () => {
+          await db.settings.put({
+            key,
+            value: JSON.stringify({
+              status,
+              groupKey: s.key,
+              date: new Date().toISOString().slice(0, 10),
+              amount: s.amount,
+            }),
+          });
+          await db.recurringSeries.toCollection().modify((series) => {
+            if (series.matchKey === s.key) {
+              series.status =
+                status === "ignore"
+                  ? "ignored"
+                  : status === "cancel"
+                    ? "cancel-planned"
+                    : "active";
+              if (status === "keep") series.lastAcknowledgedAmount = s.amount;
+              if (status === "cancelled")
+                series.endDate = new Date().toISOString().slice(0, 10);
+            }
+          });
+        },
+      );
       onReviewed(
         `${s.merchant}: ${statuses.find(([value]) => value === status)?.[1]}. You can change this under All detected.`,
+        result.changeId,
       );
     } catch {
       setError("Could not save your review. Please try again.");
@@ -70,7 +97,7 @@ function SubscriptionCard({
           </p>
           <h2>{s.merchant}</h2>
           <p className="muted">
-            {account} · Last charged {s.charges.at(-1)!.date}
+            {account} · Last charged {formatUkDate(s.charges.at(-1)!.date)}
           </p>
         </div>
         <strong className="subscription-amount">
@@ -93,8 +120,11 @@ function SubscriptionCard({
       )}
       {s.increase > 0 && (
         <p className="notice warning">
-          Latest charge increased by {money(s.increase, s.currency)} compared
-          with the previous charge.
+          Latest charge increased by {money(s.increase, s.currency)}
+          {s.increasePercent !== undefined
+            ? ` (+${Math.round(s.increasePercent)}%)`
+            : ""}{" "}
+          compared with the median of the previous three charges.
         </p>
       )}
       {s.status === "keep" && s.needsReview && s.increase === 0 && (
@@ -147,7 +177,10 @@ function SubscriptionCard({
       )}
       {error && <p role="alert">{error}</p>}
       <details>
-        <summary>View {s.charges.length} charges and source evidence</summary>
+        <summary>
+          View {s.charges.length} charge{s.charges.length === 1 ? "" : "s"} and
+          source evidence
+        </summary>
         <p className="muted">
           Regular payments are candidates, not proof of a subscription or
           non-use. Bills and essential services can also recur.
@@ -162,7 +195,7 @@ function SubscriptionCard({
               key={t.id}
             >
               <span>
-                {t.date} · {t.description}
+                {formatUkDate(t.date)} · {t.description}
               </span>
               <strong>{money(t.amount, t.currency)}</strong>
             </Link>
@@ -174,21 +207,56 @@ function SubscriptionCard({
 export default function Subscriptions({ currency }: { currency: string }) {
   const data = useSubscriptions(currency);
   const [message, setMessage] = useState("");
+  const [changeId, setChange] = useState(""),
+    [error, setError] = useState("");
   const [view, setView] = useState("review");
+  const [sort, setSort] = useState("review");
   if (!data) return <p role="status">Checking recurring charges…</p>;
   const review = data.items.filter((s) => s.needsReview);
   const plans = data.items.filter(
     (s) => s.status === "cancel" && !s.stale && s.annual !== undefined,
   );
-  const potential = safeSum(plans.map((s) => s.annual!));
-  const visible =
+  const today = new Date().toISOString().slice(0, 10);
+  const inReporting = (amount: number, native: string) =>
+    convertMinor(amount, native, currency, today, data.rates)?.amount;
+  const potentialRows = plans.map((s) => inReporting(s.annual!, s.currency));
+  const potential = safeSum(
+    potentialRows.filter((n): n is number => n !== undefined),
+  );
+  const annualRows = data.items
+    .filter(
+      (s) =>
+        s.annual !== undefined &&
+        !s.stale &&
+        !["ignore", "cancelled"].includes(s.status),
+    )
+    .map((s) => inReporting(s.annual!, s.currency));
+  const annualTotal = safeSum(
+    annualRows.filter((n): n is number => n !== undefined),
+  );
+  const missing =
+    annualRows.some((n) => n === undefined) ||
+    potentialRows.some((n) => n === undefined);
+  const visible = (
     view === "all"
       ? data.items
       : view === "cancel"
         ? data.items.filter(
             (s) => s.status === "cancel" || s.status === "cancelled",
           )
-        : review;
+        : review
+  )
+    .slice()
+    .sort((a, b) =>
+      sort === "yearly"
+        ? (inReporting(b.annual ?? 0, b.currency) ?? -1) -
+          (inReporting(a.annual ?? 0, a.currency) ?? -1)
+        : sort === "merchant"
+          ? a.merchant.localeCompare(b.merchant)
+          : Number(b.afterCancellation) - Number(a.afterCancellation) ||
+            Number(b.needsReview) - Number(a.needsReview) ||
+            (b.annual ?? b.amount) - (a.annual ?? a.amount),
+    );
   return (
     <>
       <div className="page-heading">
@@ -200,10 +268,36 @@ export default function Subscriptions({ currency }: { currency: string }) {
       <p className="muted">
         Find charges you may have forgotten. Based on up to three years of
         imported statements
-        {data.lastDate ? `, with transactions through ${data.lastDate}` : ""}.
-        Your data stays on this device.
+        {data.lastDate
+          ? `, with transactions through ${formatUkDate(data.lastDate)}`
+          : ""}
+        . Your data stays on this device.
       </p>
       <section className="card">
+        <div className="planning-v2-kpis">
+          <div>
+            <small>Yearly recurring cost</small>
+            <strong>
+              {data.items.some((s) => s.currency !== currency) ? "≈ " : ""}
+              {annualRows.length > 0 && annualRows.every((n) => n === undefined)
+                ? "Rates needed"
+                : annualRows.length === 0
+                  ? "Not detected"
+                  : money(annualTotal, currency)}
+              {missing ? "*" : ""}
+            </strong>
+            <small>
+              At the latest observed prices.{" "}
+              {missing
+                ? "Some currencies need cached rates; this total is partial."
+                : ""}
+            </small>
+          </div>
+          <div>
+            <small>Recurring charges</small>
+            <strong>{annualRows.length}</strong>
+          </div>
+        </div>
         <h2>{review.length} to review</h2>
         <p>
           Swipe a charge left to plan cancellation, right to keep it. You can
@@ -225,8 +319,29 @@ export default function Subscriptions({ currency }: { currency: string }) {
       {message && (
         <p className="notice" role="status">
           {message}
+          {changeId && (
+            <button
+              onClick={() =>
+                void undoChange(changeId)
+                  .then(() => {
+                    setChange("");
+                    setMessage("Review undone.");
+                  })
+                  .catch((e) =>
+                    setError(
+                      e instanceof Error
+                        ? e.message
+                        : "Could not undo this review.",
+                    ),
+                  )
+              }
+            >
+              Undo
+            </button>
+          )}
         </p>
       )}
+      {error && <p role="alert">{error}</p>}
       <div
         className="subscription-tabs"
         role="group"
@@ -246,6 +361,18 @@ export default function Subscriptions({ currency }: { currency: string }) {
           </button>
         ))}
       </div>
+      <label>
+        Sort recurring charges
+        <select
+          aria-label="Sort recurring charges"
+          value={sort}
+          onChange={(e) => setSort(e.target.value)}
+        >
+          <option value="review">Needs review first</option>
+          <option value="yearly">Yearly cost: highest first</option>
+          <option value="merchant">Merchant name</option>
+        </select>
+      </label>
       {!visible.length && (
         <section className="card">
           <h2>
@@ -266,7 +393,10 @@ export default function Subscriptions({ currency }: { currency: string }) {
           <SubscriptionCard
             key={s.key}
             item={s}
-            onReviewed={setMessage}
+            onReviewed={(message, id) => {
+              setMessage(message);
+              setChange(id);
+            }}
             account={
               data.accounts.find((a) => a.id === s.accountId)?.displayName ??
               "Account"
