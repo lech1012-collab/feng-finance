@@ -359,12 +359,41 @@ test("first run and the main pages fit narrow screens and large text without ove
       await page.evaluate(() => {
         document.documentElement.style.fontSize = "200%";
       });
-      expect(
-        await page.evaluate(
-          () => document.documentElement.scrollWidth <= window.innerWidth + 1,
-        ),
-        `${width}px ${route}`,
-      ).toBe(true);
+      // Font changes update Recharts through ResizeObserver on a later frame.
+      // Check the settled layout, retaining the exact overflow in failure output.
+      await expect
+        .poll(
+          () =>
+            page.evaluate(() => {
+              const viewportWidth = window.innerWidth;
+              const documentWidth = document.documentElement.scrollWidth;
+              if (documentWidth <= viewportWidth + 1) return { fits: true };
+              return {
+                fits: false,
+                viewportWidth,
+                documentWidth,
+                overflowing: Array.from(document.querySelectorAll("body *"))
+                  .filter((element) => {
+                    const rect = element.getBoundingClientRect();
+                    return rect.right > viewportWidth + 1 && rect.width > 0;
+                  })
+                  .map((element) => ({
+                    tag: element.tagName,
+                    className: element.getAttribute("class"),
+                    text: element.textContent?.slice(0, 120),
+                    right: element.getBoundingClientRect().right,
+                    width: element.getBoundingClientRect().width,
+                  }))
+                  .slice(0, 20),
+              };
+            }),
+          {
+            timeout: 3000,
+            intervals: [100, 250, 500],
+            message: `${width}px ${route}: layout must fit after text resizing`,
+          },
+        )
+        .toEqual({ fits: true });
       const navigation = page.locator(".mobile-navigation");
       await expect(navigation).toBeVisible();
       const navigationHeightRatio = await navigation.evaluate(
