@@ -125,6 +125,8 @@ const subtotalRE =
 const sectionRE =
   /^(?:your transactions|payments(?: towards your account)?|new transactions|transactions, interest and charges|how you've used your card|purchases|card purchases|credits|refunds|interest and charges)\s*$/i;
 const issuerBannerRE = /^(?:Barclays|Barclaycard|American Express|Revolut)$/i;
+const currencyStatementTitleRE =
+  /^(?:(?:GBP|EUR|USD|CHF|AUD|CAD|NZD|HKD|SGD|JPY|KWD)\s+Statement|Statement(?:\s+(?:of\s+account|in))?\s+(?:GBP|EUR|USD|CHF|AUD|CAD|NZD|HKD|SGD|JPY|KWD))$/i;
 function headerItems(row: PositionedRow) {
   const entries: {
     item: ExtractedTextItem;
@@ -424,14 +426,16 @@ export function reconstructTable(
     };
     for (let rowIndex = 0; rowIndex < rows.length; rowIndex++) {
       const row = rows[rowIndex];
-      // An inherited date band must not turn a repeated issuer title above the
-      // next page's printed table header into a malformed transaction. This
-      // positional rule deliberately does not match bank-name merchants or
-      // malformed rows inside the table or rows with financial/date tokens.
+      // Inherited financial bands must not turn a repeated issuer/currency
+      // title above the next page's printed table header into a transaction.
+      // These titles remain financial source evidence when they occur inside
+      // the table, or when the row contains transaction/date/amount tokens.
       if (
         firstTableHeader &&
         row.y < firstTableHeader.y &&
         (issuerBannerRE.test(row.text.trim()) ||
+          (currencyStatementTitleRE.test(row.text.trim()) &&
+            row.y < page.height * 0.2) ||
           (firstTitle &&
             normalizedTitle(row.text) === normalizedTitle(firstTitle.text) &&
             row.y < page.height * 0.2 &&
