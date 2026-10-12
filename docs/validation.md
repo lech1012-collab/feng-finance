@@ -2,7 +2,7 @@
 
 This release implements the 8 October 2026 developer specification and its v2.2
 amendment. It remains a React/strict TypeScript/Vite/Dexie application with local
-PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.0**
+PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.1**
 uses additive IndexedDB **schema 4**. Portable JSON backup format remains
 **version 1**; supported older databases and backups are migrated without resetting
 financial records.
@@ -20,6 +20,14 @@ Match the successful runs' SHA to the release tag; Pages builds that exact verif
 commit. The local checks below were recorded while preparing the candidate and
 do not replace that gate. Live preserved-data upgrade is checked after publication.
 Physical iPhone acceptance remains separate even when automated checks pass.
+
+The v2.2.0 release passed [its complete CI run](https://github.com/lech1012-collab/feng-finance/actions/runs/38281554978)
+and [exact-commit Pages deployment](https://github.com/lech1012-collab/feng-finance/actions/runs/38283398312).
+The live update from v1.9.2 then exposed a release-dialog race: closing What's new
+could reopen it before the saved preference reached the live query. Patch v2.2.1
+suppresses stale preferences only after acknowledgement succeeds; failed saves
+remain retryable and About can still reopen release notes. This patch changes no
+financial calculations, parser version, database schema or migration.
 
 ## Implementation scope
 
@@ -48,18 +56,18 @@ explicitly deferred.
 Checks on 12 October 2026 use fictitious data only. Focused passing checks below
 do not substitute for a consolidated run against the final release commit.
 
-| Check                                      | Recorded result                                                                                                                                                               |
-| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit/component suite                       | **865 tests passed in 110 files** in GitHub CI after the Revolut correction. The final release gate repeats that suite together with all browser workflows.                   |
-| Production build                           | Passed strict TypeScript and Vite; **441 precache entries**, approximately **22.5 MiB**. The final source is rebuilt in release CI.                                           |
-| Beta browser acceptance                    | **18 passed** across Chromium and WebKit: notice acknowledgement, native picker gesture, installation policy, feedback/privacy and safe update lifecycle.                     |
-| Migration and local OCR browser acceptance | **14 passed** across Chromium and WebKit: original keys/PIN/receipt bytes preserved, exact recovery, stopped-origin OCR, source crops, cancellation and one-penny correction. |
-| Financial write/update guards              | **10 passed** in three focused files, including held and rejected writes, concurrent writes and audit/closure behavior.                                                       |
-| Full Chromium/WebKit browser suite         | **162 cases configured**. Release CI runs every case against its own production build and blocks Pages on any failure.                                                        |
-| Dependency audit                           | `npm audit --audit-level=moderate`: **0 vulnerabilities**. Repeat if dependencies change.                                                                                     |
-| Repository/release guards                  | Repository and release metadata checks passed; **9** Node guard tests passed. The release-tag CI job requires matching package, application and changelog versions.           |
-| GitHub Pages and live upgrade              | Pages requires exact-commit CI; publication is followed by explicit **v1.9.2 → v2.2.0 / schema 4** update and comparison with preserved fictitious baseline records.          |
-| Physical iPhone/Safari acceptance          | Manual; browser emulation does not certify installation, Files, Face ID, VoiceOver, eviction or device timing.                                                                |
+| Check                                      | Recorded result                                                                                                                                                                                                                                   |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit/component suite                       | **868 tests passed in 111 files** locally for v2.2.1, including three release-dialog regressions. v2.2.0 CI passed 865 tests in 110 files. The patch release gate repeats the full suite.                                                         |
+| Production build                           | Passed strict TypeScript and Vite; **441 precache entries**, approximately **22.5 MiB**. The final source is rebuilt in release CI.                                                                                                               |
+| Beta browser acceptance                    | **18 passed** across Chromium and WebKit: notice acknowledgement, native picker gesture, installation policy, feedback/privacy and safe update lifecycle.                                                                                         |
+| Migration and local OCR browser acceptance | **14 passed** across Chromium and WebKit: original keys/PIN/receipt bytes preserved, exact recovery, stopped-origin OCR, source crops, cancellation and one-penny correction.                                                                     |
+| Financial write/update guards              | **10 passed** in three focused files, including held and rejected writes, concurrent writes and audit/closure behavior.                                                                                                                           |
+| Full Chromium/WebKit browser suite         | **162 cases passed** in v2.2.0 CI. Patch release CI repeats every case against its own production build and blocks Pages on any failure.                                                                                                          |
+| Dependency audit                           | `npm audit --audit-level=moderate`: **0 vulnerabilities**. Repeat if dependencies change.                                                                                                                                                         |
+| Repository/release guards                  | Repository and release metadata checks passed; **9** Node guard tests passed. The release-tag CI job requires matching package, application and changelog versions.                                                                               |
+| GitHub Pages and live upgrade              | v2.2.0 is deployed after exact-commit CI. The preserved fictitious profile updated explicitly from **v1.9.2 / schema 2** to **v2.2.0 / schema 4**. Patch publication is followed by explicit v2.2.1 update, record comparison and offline launch. |
+| Physical iPhone/Safari acceptance          | Manual; browser emulation does not certify installation, Files, Face ID, VoiceOver, eviction or device timing.                                                                                                                                    |
 
 The browser suite independently compares PDF rows, native signs, gross Money
 in/Money out, opening/closing balances and resulting analytics. It covers
@@ -121,9 +129,11 @@ implemented.
 7. Pass repository/release guards and dependency audit. Publish the verified source
    without private fixtures, create its matching version tag and deploy only static
    assets from that exact commit.
-8. Update a tab/profile running v1.9.2 using the explicit update control. Verify
-   v2.2.0/schema 4, untouched prior financial records, pre-migration safety recovery,
-   complete offline assets and an offline relaunch.
+8. Update a preserved older tab/profile using the explicit update control. Verify
+   v2.2.1/schema 4, untouched prior financial records, pre-migration safety recovery,
+   complete offline assets, one-time release-note acknowledgement and an offline
+   relaunch. A safety snapshot created during the v2.2.0 migration retains that
+   original version metadata during the schema-neutral v2.2.1 patch.
 9. Complete the [physical iPhone checklist](iphone-checklist.md) before making
    device-specific installation, performance or accessibility claims.
 

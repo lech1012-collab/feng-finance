@@ -3,6 +3,7 @@ import { acknowledgeBeta } from "./fixtures";
 import { startStaticHost, type LocalHost } from "./static-host";
 import { accounts, transaction } from "../../src/tests/helpers";
 import { APP_VERSION, type Statement } from "../../src/domain/models";
+import { CURRENT_RELEASE } from "../../src/beta/release";
 
 // These tests deliberately retain the genuine first-launch experience.
 const test = base.extend<{ offlineHost: LocalHost }>({
@@ -423,7 +424,7 @@ test("Settings feedback includes a warning and only technical details when no de
   ).toBeFocused();
 });
 
-test("a version change waits for Home and shows What's new once with five release points", async ({
+test("a version change waits for Home and shows What's new once with current release points", async ({
   page,
 }) => {
   await page.goto("/#/");
@@ -468,12 +469,22 @@ test("a version change waits for Home and shows What's new once with five releas
   await expect(release).toContainText(`Version ${APP_VERSION}`);
   await expect(
     release.getByRole("list").first().getByRole("listitem"),
-  ).toHaveCount(5);
+  ).toHaveCount(CURRENT_RELEASE.points.length);
   await expect(
     release.getByRole("heading", { name: "Please test", exact: true }),
   ).toBeVisible();
   await release.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(release).toHaveCount(0);
   await expect.poll(() => setting(page, "lastSeenVersion")).toBe(APP_VERSION);
+  await page.goto("/#/settings");
+  await expect(
+    page.getByRole("heading", { name: "Settings", exact: true }),
+  ).toBeVisible();
+  await page.goto("/#/");
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  await expect(release).toHaveCount(0);
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),

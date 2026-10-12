@@ -53,6 +53,7 @@ import { BetaNotice } from "./beta/BetaNotice";
 import { InstallBanner, InstallHelp } from "./beta/InstallGuidance";
 import { DataNotices } from "./beta/DataNotices";
 import { WhatsNew } from "./beta/WhatsNew";
+import { useWhatsNewPrompt } from "./beta/useWhatsNewPrompt";
 import { useDesktopInstall } from "./beta/useDesktopInstall";
 import { installUpdateChecks, useSafeUpdateVisibility } from "./beta/updates";
 import {
@@ -123,7 +124,6 @@ function Shell() {
   const [exactRecovery, setExactRecovery] = useState(false);
   const [actualStoragePersisted, setActualStoragePersisted] =
     useState<boolean>();
-  const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [runtimeMode] = useState(currentRuntimeMode);
   const desktopInstall = useDesktopInstall();
   const betaData = useLiveQuery(async () => {
@@ -160,22 +160,21 @@ function Shell() {
     location.pathname,
     betaBusy || !!selectedFiles.length || pendingFinancialWrite,
   );
-  useEffect(() => {
-    if (
-      betaData &&
-      !exactRecovery &&
-      !betaBusy &&
-      safeUpdate &&
-      !needsBetaNotice(betaData.prefs) &&
-      needsWhatsNew(betaData.prefs, APP_VERSION)
-    )
-      setShowWhatsNew(true);
-  }, [betaData, exactRecovery, betaBusy, safeUpdate]);
   const saveBetaSettings = async (settings: Setting[]) => {
     await db.transaction("rw", db.settings, () =>
       db.settings.bulkPut(settings),
     );
   };
+  const whatsNewPrompt = useWhatsNewPrompt(
+    !!betaData &&
+      !exactRecovery &&
+      !betaBusy &&
+      safeUpdate &&
+      !needsBetaNotice(betaData.prefs) &&
+      needsWhatsNew(betaData.prefs, APP_VERSION),
+    APP_VERSION,
+    () => saveBetaSettings([{ key: "lastSeenVersion", value: APP_VERSION }]),
+  );
   const requestBetaStorage = async () => {
     const persisted = await requestPersistentStorage(navigator.storage);
     setActualStoragePersisted(persisted);
@@ -606,15 +605,10 @@ function Shell() {
                 }}
               />
             )}
-          {showWhatsNew && (
+          {whatsNewPrompt.visible && (
             <WhatsNew
               release={CURRENT_RELEASE}
-              onClose={async () => {
-                await saveBetaSettings([
-                  { key: "lastSeenVersion", value: APP_VERSION },
-                ]);
-                setShowWhatsNew(false);
-              }}
+              onClose={whatsNewPrompt.dismiss}
             />
           )}
           <main id="main" tabIndex={-1}>
