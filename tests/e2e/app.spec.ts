@@ -1520,12 +1520,21 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     revolut.getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
+  const revolutProof = revolut.getByRole("region", {
+    name: "Statement reading and checks",
+    exact: true,
+  });
+  await expect(revolutProof).toContainText("Statement figures match exactly");
+  await expect(revolutProof).toContainText("6 balance-checked");
+  await expect(revolutProof).toContainText("0 need review");
+  await expect(
+    revolut.getByLabel(/I compared the extracted rows with the source file/),
+  ).toHaveCount(0);
+  // The Amex date exception was explicitly accepted above. Revolut has exact
+  // source proof, so it should not demand another acknowledgment to continue.
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
-  ).toBeDisabled();
-  await revolut
-    .getByLabel(/I compared the extracted rows with the source file/)
-    .check();
+  ).toBeEnabled();
   await expect(
     revolut.locator(".review-metrics > div").filter({ hasText: "Money in" }),
   ).toContainText("£950.00");
@@ -1594,6 +1603,49 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
         transaction.date === "2026-09-05",
     ),
   ).toMatchObject({ date: "2026-09-05", bookingDate: "2026-09-05" });
+  const revolutStatement = backup.statements.find(
+    (statement: { institution: string }) => statement.institution === "Revolut",
+  );
+  expect(revolutStatement).toMatchObject({
+    transactionCount: 6,
+    openingBalance: 50000,
+    closingBalance: 94000,
+    validationDifference: 0,
+    validationStatus: "reconciled",
+    validationPolicy: "exact-v2.2",
+  });
+  const revolutRows = backup.transactions.filter(
+    (transaction: { statementId: string }) =>
+      transaction.statementId === revolutStatement.id,
+  );
+  expect(revolutRows).toHaveLength(6);
+  expect(
+    revolutRows.reduce(
+      (sum: number, row: { amount: number }) => sum + Math.max(0, row.amount),
+      0,
+    ),
+  ).toBe(95000);
+  expect(
+    revolutRows.reduce(
+      (sum: number, row: { amount: number }) => sum + Math.max(0, -row.amount),
+      0,
+    ),
+  ).toBe(51000);
+  expect(
+    revolutRows
+      .filter(
+        (row: { date: string; amount: number }) =>
+          row.date === "2026-09-28" && row.amount === -2500,
+      )
+      .map((row: { sourcePage: number; balanceAfterTransaction: number }) => [
+        row.sourcePage,
+        row.balanceAfterTransaction,
+      ])
+      .sort(),
+  ).toEqual([
+    [2, 96500],
+    [3, 94000],
+  ]);
   await openImport(page);
   await selectStatement(page, "revolut-uk-layout");
   await expect(
@@ -1940,7 +1992,25 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
     .getByRole("link", { name: "Home", exact: true })
     .click();
   await expect(page.locator('input[type="month"]')).toHaveValue("2026-09");
-  const picker = (await page.locator(".month-picker").boundingBox())!;
+  const monthPicker = page.locator(".month-picker");
+  // Safari's installation and local-data notices can put the picker behind
+  // the fixed bottom navigation. A user scrolls it into view before swiping;
+  // direct mouse coordinates do not receive Playwright's actionability checks.
+  await monthPicker.evaluate((element) =>
+    element.scrollIntoView({ block: "center" }),
+  );
+  await expect
+    .poll(() =>
+      monthPicker.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const y = box.y + box.height / 2;
+        return [box.x + box.width - 55, box.x + 55].every((x) =>
+          element.contains(document.elementFromPoint(x, y)),
+        );
+      }),
+    )
+    .toBe(true);
+  const picker = (await monthPicker.boundingBox())!;
   await page.mouse.move(
     picker.x + picker.width - 55,
     picker.y + picker.height / 2,
