@@ -1,5 +1,6 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
+import { readFile } from "node:fs/promises";
 import type { Transaction } from "../../src/domain/models";
 
 const fixture = (name: string) => resolve(`tests/fixtures/${name}.pdf`);
@@ -17,9 +18,16 @@ async function importStatement(page: Page, name: string) {
   await expect(card).toHaveCount(1);
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
-  await expect(
-    card.getByText("✓ Statement reconciled", { exact: true }),
-  ).toBeVisible();
+  if (name === "amex-uk-layout")
+    await expect(
+      card.locator(".validation").getByText("Statement needs review", {
+        exact: true,
+      }),
+    ).toBeVisible();
+  else
+    await expect(
+      card.getByText("✓ Statement reconciled", { exact: true }),
+    ).toBeVisible();
   const confirm = page.getByRole("button", {
     name: "Confirm import",
     exact: true,
@@ -33,7 +41,30 @@ async function importStatement(page: Page, name: string) {
     await expect(
       card.getByText(/1 transaction dates fall outside/),
     ).toBeVisible();
-  if (await acknowledgement.count()) {
+  if (name === "amex-uk-layout") {
+    await expect(confirm).toBeDisabled();
+    await card.getByText("Alternative column reading", { exact: true }).click();
+    await card
+      .getByRole("button", { name: "Import anyway…", exact: true })
+      .click();
+    const dialog = page.getByRole("dialog", {
+      name: "Import an unverified statement?",
+      exact: true,
+    });
+    const accept = dialog.getByRole("button", {
+      name: "Import unverified statement",
+      exact: true,
+    });
+    await expect(accept).toBeDisabled();
+    await dialog
+      .getByLabel(
+        "I checked the original statement and accept importing these unverified figures.",
+        { exact: true },
+      )
+      .check();
+    await accept.click();
+    await expect(dialog).not.toBeVisible();
+  } else if (await acknowledgement.count()) {
     await expect(confirm).toBeDisabled();
     await acknowledgement.check();
   }
@@ -163,27 +194,33 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   await expect(accountChip).not.toContainText("Unverified");
 });
 
-test("Amex dated purchase exception keeps its reconciled closing debt and requires review", async ({
+test("Amex dates outside the period preserve reported debt while remaining unverified", async ({
   page,
 }) => {
   await importStatement(page, "amex-uk-layout");
   await expect(page.getByLabel("Selected month")).toHaveValue("2026-10");
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
-    "£160.00",
+    "Unknown",
   );
   await expect(page.locator(".balance-account-main")).toContainText(
     "as of 5 Oct 2026",
   );
-  await expect(page.locator(".balance-account-value")).not.toContainText(
-    "Unverified",
+  await expect(page.locator(".balance-account-value")).toContainText("£160.00");
+  await expect(page.locator(".balance-account-value")).toContainText(
+    "Unverified reported balance",
   );
   await expect(page.locator(".month-summary")).toContainText(
     "Monthly history is not fully verified",
   );
-  await assertSingleClosingPoint(page, "5 Oct", "£160.00");
+  await expect(
+    page.locator(".position-history circle[data-verified=true]"),
+  ).toHaveCount(0);
+  await expect(
+    page.locator(".position-history circle[data-verified=false] title"),
+  ).toContainText("5 Oct 2026: £160.00 debt owed");
   await page.reload();
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
-    "£160.00",
+    "Unknown",
   );
   await page.goto("/#/transactions?month=2026-10&allDates=1");
   const accountChip = page
@@ -191,9 +228,30 @@ test("Amex dated purchase exception keeps its reconciled closing debt and requir
     .getByRole("button", { name: /American Express.*0444/ });
   await expect(accountChip).toContainText("£160.00 debt");
   await expect(accountChip).not.toContainText("-£160.00");
-  await expect(accountChip).not.toContainText("Unverified");
+  await expect(accountChip).toContainText("Reported · Unverified");
   await page.reload();
   await expect(accountChip).toContainText("£160.00 debt");
+  await expect(accountChip).toContainText("Reported · Unverified");
+  await page.goto("/#/settings");
+  const downloaded = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
+    .click();
+  const backupPath = await (await downloaded).path();
+  const backup = JSON.parse(await readFile(backupPath!, "utf8"));
+  expect(backup.statements).toHaveLength(1);
+  expect(backup.statements[0]).toMatchObject({
+    openingBalance: -120000,
+    closingBalance: -16000,
+    validationDifference: 0,
+    validationStatus: "warning",
+    validationOverride: true,
+  });
+  expect(
+    backup.transactions.find(
+      (transaction: { date: string }) => transaction.date === "2026-09-05",
+    ),
+  ).toMatchObject({ date: "2026-09-05", bookingDate: "2026-09-05" });
 });
 
 test("a missing stored card row retains the reported balance but removes verified debt, net and history", async ({

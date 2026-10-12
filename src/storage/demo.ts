@@ -673,8 +673,8 @@ export async function deleteDemo() {
         .filter((row) => !row.isDemo)
         .toArray()) {
         const changes: Partial<Transaction> = {};
-        if (real.tags.some((tag) => demoTags.has(tag)))
-          changes.tags = real.tags.filter((tag) => !demoTags.has(tag));
+        if ((real.tags ?? []).some((tag) => demoTags.has(tag)))
+          changes.tags = (real.tags ?? []).filter((tag) => !demoTags.has(tag));
         if (real.parentId && demoIds.has(real.parentId))
           changes.parentId = undefined;
         if (

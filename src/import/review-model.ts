@@ -1,9 +1,12 @@
 import type { ImportDraft, Institution } from "../domain/models";
 import type { ExtractedFile } from "./pipeline";
-import { reconcile } from "../domain/reconcile";
+import { draftReconciliation, type PdfReviewOptions } from "./pipeline";
 import { parseDate } from "../domain/dates";
 import type { Account } from "../domain/models";
 import type { CsvMapping } from "./formats";
+import type { ImportProgress } from "./pdf-session-types";
+import type { GenericParseResult } from "./generic/types";
+import { outsideStatementPeriod } from "./statement-period";
 
 export interface FileReview {
   id: string;
@@ -33,6 +36,40 @@ export interface FileReview {
   statementSkipped?: boolean;
   duplicateInBatch?: boolean;
   requiresBatchRecheck?: boolean;
+  pdfReviewOptions?: PdfReviewOptions;
+  detailedProgress?: ImportProgress;
+  cancelled?: boolean;
+}
+
+/** Raw source rows must remain reviewable even when normalization failed. */
+export function sourceReview(
+  entry: FileReview,
+): GenericParseResult | undefined {
+  return entry.draft?.parserReview ?? entry.extracted?.generic;
+}
+
+export function invalidSourceRows(result: GenericParseResult) {
+  return result.rowChecks.filter((row) => {
+    if (row.reviewAction?.kind === "exclude") return false;
+    const reading =
+      row.readings.find((item) => item.id === row.selectedReadingId) ??
+      row.readings[0];
+    if (
+      !reading?.date ||
+      !Number.isSafeInteger(reading.amount) ||
+      !reading.description.trim()
+    )
+      return true;
+    try {
+      return (
+        parseDate(reading.date) !== reading.date ||
+        (reading.bookingDate !== undefined &&
+          parseDate(reading.bookingDate) !== reading.bookingDate)
+      );
+    } catch {
+      return true;
+    }
+  });
 }
 
 export function needsRowCheck(
@@ -40,11 +77,16 @@ export function needsRowCheck(
   draft: ImportDraft,
 ) {
   return (
-    row.extractionConfidence < 0.8 ||
+    (draft.parserReview && !draft.parserFallback
+      ? row.checkLevel === "review" || row.checkLevel === "manual_override"
+      : row.extractionConfidence < 0.8) ||
     row.duplicate !== "none" ||
     !!row.manualReplacementId ||
-    row.date < draft.statement.statementPeriodStart ||
-    row.date > draft.statement.statementPeriodEnd
+    outsideStatementPeriod(
+      row,
+      draft.statement.statementPeriodStart,
+      draft.statement.statementPeriodEnd,
+    )
   );
 }
 
@@ -64,15 +106,27 @@ export function importBlockers(entry: FileReview): string[] {
     blockers.push(
       "Recheck this statement because another selected file was skipped or changed.",
     );
-  if (
-    reconcile(
-      draft.statement.openingBalance,
-      draft.statement.closingBalance,
-      draft.transactions.map((t) => t.amount),
-    ).status === "warning" &&
-    !entry.override
-  )
+  if (draftReconciliation(draft).status === "warning" && !entry.override)
     blockers.push("Review or explicitly accept the balance difference.");
+  if (draft.parserReview && !draft.parserFallback) {
+    if (invalidSourceRows(draft.parserReview).length)
+      blockers.push(
+        "Correct or exclude unread dates, descriptions and amounts.",
+      );
+    if (
+      draft.parserReview.status === "identity-required" ||
+      !draft.parserReview.mapping
+    )
+      blockers.push("Confirm the account, dates and column mapping.");
+    if (
+      (!draft.parserReview.checks.reconciledExactly ||
+        draft.parserReview.checks.needsReviewRows > 0) &&
+      !entry.override
+    )
+      blockers.push(
+        "Review source rows or explicitly accept an unverified statement.",
+      );
+  }
   if (entry.optionsChanged)
     blockers.push("Parse again to apply the bank, account or statement dates.");
   if (entry.invalidAmounts.length)
@@ -90,10 +144,12 @@ export function importBlockers(entry: FileReview): string[] {
     blockers.push("Correct the transaction dates.");
   if (
     !draft.reviewedWarnings &&
-    draft.transactions.some(
-      (row) =>
-        row.date < draft.statement.statementPeriodStart ||
-        row.date > draft.statement.statementPeriodEnd,
+    draft.transactions.some((row) =>
+      outsideStatementPeriod(
+        row,
+        draft.statement.statementPeriodStart,
+        draft.statement.statementPeriodEnd,
+      ),
     )
   )
     blockers.push("Verify transactions dated outside the statement period.");
@@ -105,7 +161,9 @@ export function importBlockers(entry: FileReview): string[] {
     draft.transactions.some(
       (t) =>
         t.include &&
-        (t.extractionConfidence < 0.8 || t.duplicate !== "none") &&
+        (((!draft.parserReview || draft.parserFallback) &&
+          t.extractionConfidence < 0.8) ||
+          t.duplicate !== "none") &&
         !t.acknowledged,
     )
   )

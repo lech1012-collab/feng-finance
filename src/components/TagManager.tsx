@@ -247,7 +247,7 @@ export function TagManager() {
             onClick={() =>
               void perform(async () => {
                 const matches = await db.transactions
-                  .filter((t) => t.tags.includes(editing.id))
+                  .filter((t) => (t.tags ?? []).includes(editing.id))
                   .toArray();
                 if (!(await authorizeMonthEdit(matches)))
                   return { changeId: "" };

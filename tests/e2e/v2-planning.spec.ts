@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
 
 async function records(page: Page, table: string) {

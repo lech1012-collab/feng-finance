@@ -1,0 +1,49 @@
+.feedback-dialog {
+  max-width: 38rem;
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.feedback-warning {
+  font-weight: 600;
+}
+.feedback-context {
+  display: grid;
+  gap: 0.45rem;
+}
+.feedback-context > div {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.5rem;
+}
+.feedback-context dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.feedback-context dt {
+  color: var(--muted);
+}
+.feedback-diagnostics {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 44px;
+}
+.feedback-diagnostics > div {
+  grid-column: 2;
+}
+.feedback-copy {
+  display: grid;
+  gap: 0.5rem;
+}
+.feedback-copy textarea {
+  width: 100%;
+  min-height: 10rem;
+  max-height: 18rem;
+  resize: vertical;
+  font-size: 1rem;
+}
+.feedback-panel > p {
+  margin-top: 0.5rem;
+}

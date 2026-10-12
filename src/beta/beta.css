@@ -1,0 +1,103 @@
+.beta-notice {
+  color: var(--text);
+  background: var(--surface);
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: min(520px, calc(100vw - 32px));
+  max-height: calc(
+    100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)
+  );
+  overflow: auto;
+}
+.beta-notice::backdrop {
+  background: rgba(0, 0, 0, 0.7);
+}
+.beta-notice-content {
+  padding: 32px;
+}
+.beta-notice h1 {
+  font-size: clamp(1.6rem, 5vw, 2.3rem);
+  margin: 20px 0;
+}
+.beta-notice p {
+  line-height: 1.6;
+}
+.beta-notice-actions {
+  display: grid;
+  gap: 12px;
+  margin-top: 28px;
+}
+.beta-notice-actions button {
+  width: 100%;
+  min-height: 48px;
+}
+.install-banner,
+.beta-data-notice {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 12px;
+}
+.install-banner p,
+.beta-data-notice p {
+  margin: 0 0 8px;
+}
+.install-steps {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+.install-steps li {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+.install-steps svg {
+  flex-shrink: 0;
+}
+.beta-data-notice .actions,
+.install-banner .actions {
+  flex-wrap: wrap;
+}
+.beta-whats-new {
+  max-width: 560px;
+}
+.beta-about-metadata {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px 16px;
+}
+.beta-about-metadata dt {
+  font-weight: 600;
+}
+.beta-about-metadata dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .beta-notice-content {
+    padding: 24px;
+  }
+  .beta-notice {
+    border-radius: 16px;
+  }
+  .beta-introduction {
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+  .beta-introduction .beta-notice-content {
+    min-height: 100%;
+    box-sizing: border-box;
+    padding-top: max(32px, env(safe-area-inset-top));
+    padding-bottom: max(32px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+}

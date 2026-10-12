@@ -1,3 +1,4 @@
+import { reconciliationTolerance } from "../domain/reconcile";
 import type { Statement, Transaction } from "../domain/models";
 import { parseDate } from "../domain/dates";
 import { safeSum } from "../domain/money";
@@ -81,7 +82,7 @@ export function statementBalanceEvidence(
       Math.abs(
         safeSum([statement.openingBalance!, ...rows.map((row) => row.amount)]) -
           statement.closingBalance!,
-      ) > 1
+      ) > reconciliationTolerance(statement.validationPolicy)
     )
       return result(
         "Stored amounts do not reconcile with the closing balance.",

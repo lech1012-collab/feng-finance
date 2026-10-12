@@ -6,13 +6,41 @@ account balances and spending analysis. It runs as a website or installed web
 app, including on iPhone Safari. No App Store onboarding or backend is required.
 
 Financial records, parsing, categorization, notes, attachments and backups stay
-on the device. The only external data feature is an approved download of public
+on the device. The external data feature is an approved download of public
 ECB exchange-rate tables. The request contains no financial records, account
 identifiers, cookies or request body. There is no external AI, telemetry,
 advertising, session replay, cloud synchronization or remotely accessible account.
+Optional feedback opens an owner-configured form or email only when the user
+chooses it; technical context contains no financial records.
+
+## Beta
+
+Feng is a beta. Check imported figures against the original statements before
+relying on them; it does not provide financial advice. Start with **Explore with
+demo data**, then install it from Safari's Share menu → Add to Home Screen → Add.
+Installation help, storage status, What's new, Privacy and Send feedback are in
+Settings → About and feedback.
+
+Initial layout hints cover Barclays current accounts, Barclaycard, American
+Express and Revolut. The generic PDF parser also tries unfamiliar statements.
+Every layout still needs its own arithmetic checks; synthetic fixtures do not
+certify every real statement variant. Questionable rows remain visible for
+correction, and an unverified import requires an explicit override.
+
+Records belong to the browser or installed app where they were imported. The
+developer cannot see or recover them. Save backups outside that browser/device.
+Feedback is optional and opens after a privacy warning. It includes technical
+context, with optional diagnostics redacted locally. Never send real statements
+or screenshots containing real figures.
+
+See the [beta test plan](docs/beta-test-plan.md) and
+[feedback configuration](docs/feedback-configuration.md). The public source
+retains the rights stated in [LICENSE](LICENSE); dependency licences are unchanged.
 
 The [v2 implementation matrix](docs/v2-implementation.md) maps the developer
-specification to source code and verification. Read the
+specification to source code and verification. The
+[v2.2 amendment matrix](docs/v22-implementation.md) covers the generic parser and
+beta safeguards. Read the
 [security notes](docs/security-v2.md), [privacy audit](docs/privacy.md) and
 [validation record](docs/validation.md) for limitations and current release checks.
 
@@ -40,6 +68,9 @@ npx playwright install --with-deps chromium webkit
 npm run test:e2e                  # Browser workflows, including mobile viewport
 npm audit                        # Dependency vulnerability review
 npm run check                    # Unit tests, build and browser tests
+npm run check:repo                # Reject statements, exports and secrets in Git
+npm run check:release             # Package, app and changelog versions match
+npm run test:hygiene              # Staged-path and release-metadata guard tests
 ```
 
 Generate fixtures before running browser tests. `npm ci` copies the local PDF,
@@ -56,8 +87,9 @@ before disconnecting. Physical iPhone checks are documented separately in the
    detected account and period, gross **Money in/Money out**, balances,
    reconciliation, possible duplicates and any uncertain extracted rows.
 3. Resolve highlighted issues. Confirm proposed transfers or card repayments.
-   Failed reconciliation, partial extraction and uncertain OCR require explicit
-   review; choosing a category cannot make an invalid statement reconciled.
+   Failed reconciliation, partial extraction and unresolved OCR require explicit
+   review. Fully resolved image readings with exact checks can be confirmed;
+   choosing a category cannot make an invalid statement reconciled.
 4. Confirm import. Feng returns Home. **To review** includes both uncategorized
    and categorized-but-unreviewed transactions.
 5. Sort the remaining records, then use the four-step monthly review to inspect
@@ -106,7 +138,8 @@ minor units. GBP `-8245` means **-£82.45**. Money entering an account is positi
 money leaving is negative. Credit-card amounts owed are negative balances,
 presented as positive **Card debt**. Original amounts are never rewritten by
 categorization, conversion, refunds or planning. Statement reconciliation uses
-source ledger rows and accepts at most one minor-unit rounding difference.
+source ledger rows. New PDF imports require exactly zero difference; a one-penny
+difference requires review. Historical statements keep their original status.
 
 Import both the bank and card statements. Categorize individual card purchases;
 classify the repayment as **Card repayment**, so it does not count again as
@@ -201,7 +234,7 @@ GBP, EUR and other supported account currencies can contribute to the same
 report. Original transaction, statement and account-detail amounts remain in
 native currency. Converted figures show **≈** and expose the rate/date.
 
-ECB rates are downloaded only from `www.ecb.europa.eu` with a fixed public GET.
+ECB rates are downloaded only from `data-api.ecb.europa.eu` with a fixed public GET.
 Daily transactions use that date's rate or the most recent prior available
 business-day rate. Cross rates go through EUR. Rates are cached in IndexedDB,
 backed up and used offline; dated manual overrides work without a download.
@@ -229,10 +262,18 @@ scripts/              Static runtime assets and generated synthetic PDF fixtures
 Routing uses hash URLs, so static hosting needs no application server rewrite.
 PDF.js runs its own worker; OCR uses a local Tesseract worker and English model.
 Bank detection uses several signals. Text is reconstructed from positions into
-rows and columns before a bank-specific adapter parses it. Wrapped descriptions,
-repeated dates, signs, totals and statement periods have regression fixtures.
-OCR is a fallback and has lower confidence. Source text is rendered through React
-text nodes, never unsafe imported HTML. Original import PDFs are not retained.
+rows and columns before the generic parser compares candidate column and sign
+readings. Bank profiles supply hints; running balances and printed totals supply
+proof. Separate bank adapters remain available for local regression comparisons.
+Wrapped descriptions, repeated dates, signs, totals and statement periods have
+regression fixtures. Local OCR handles unusable text, with numeric-cell retry
+where arithmetic identifies a suspect value. Row-level review retains source
+evidence and optional saved layouts; templates still require fresh validation.
+Source text is rendered through React text nodes, never unsafe imported HTML.
+Original import PDFs are held in memory through review and released afterward;
+they are not persisted. Optional raw diagnostics are off by default, remain local
+and retain only the last five imports. Shared diagnostic exports replace every
+cell with a placeholder.
 
 Statement SHA-256 hashes detect exact reimports. Transaction fingerprints and
 occurrence/balance evidence protect regenerated and overlapping imports without
@@ -251,13 +292,13 @@ touched records rather than copying all 20,000 transactions for a single edit.
 
 ### Backup, restore and schema versions
 
-Legacy JSON remains readable:
+Portable JSON remains readable, including older schema versions:
 
 ```json
 {
   "format": "feng-finance",
   "version": 1,
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "moneyUnit": "minor",
   "exportedAt": "2026-10-08T12:00:00.000Z"
 }
@@ -266,8 +307,10 @@ Legacy JSON remains readable:
 The full file additionally contains accounts, statements, transactions,
 categories, rules, transfer links/settings, valuations, pots, monthly budgets,
 tags, recurring series, closed months, rates, proposals, saved views/reports,
-scenarios and local audit history. Attachments are portable base64 descriptors;
-export can omit them and removes their references from the exported copy.
+scenarios, saved import layouts and local audit history. Raw import diagnostics
+and migration safety backups are local-only and omitted. Attachments are portable
+base64 descriptors; export can omit them and removes their references from the
+exported copy.
 Local PIN hashes, salts, platform credential IDs and other `security:` settings
 are excluded, including audit snapshots. Restore keeps the current device's lock
 configuration; moving devices requires configuring that device's lock.
@@ -291,6 +334,13 @@ IndexedDB schema 1 is preserved. Schema 2 added merchant/review metadata. Schema
 original descriptions, account IDs, rules and links. Existing confirmed transfers
 are not retrospectively unlinked by the new manual default. Migration tests open
 old databases and restore old-format backups without resetting financial data.
+Schema 4 adds import layouts, optional diagnostics and local migration recovery.
+A pre-update safety snapshot keeps the previous data for 14 days; it is separate
+from a portable backup and is not uploaded. Restore previous data requires
+confirmation because changes made after the update will be replaced.
+It restores original keys, receipt bytes and prior lock settings atomically while
+keeping the current additive database schema. Exact recovery does not immediately
+rewrite old records with new defaults or perform automatic financial maintenance.
 No parser failure or version check automatically clears the database.
 
 For repeat-import testing, export a backup, then Settings → **Delete imported
@@ -309,8 +359,9 @@ Pages publishing. All production assets are static; no server secret is needed.
 
 On iPhone: open the HTTPS URL in Safari → **Share** → **Add to Home Screen** →
 enable **Open as Web App** → **Add**. Launch from the icon. Wait for Offline ready,
-then test airplane mode. The service worker offers a user-controlled Update;
-it does not replace application code midway through import.
+then test airplane mode. The service worker offers a user-controlled Reload;
+it does not replace application code midway through import. The reload banner
+appears on Home after current editing and review have finished.
 
 Settings reminders work while Feng is open. Exported `.ics` events let an existing
 calendar show review alerts while the web app is closed, without a notification
@@ -319,15 +370,32 @@ account information. Calendar alert support varies; verify calendar permissions
 and remove old exported events there when preferences change. Feng does not
 promise background monitoring or push notifications while closed.
 
+Each release has a matching `vAPP_VERSION` Git tag and bundled What's new entry.
+CI checks version metadata and repository hygiene before publishing; normal pull
+requests do not need a tag. Verify the release commit with
+`npm run check:release -- --require-tag` after creating its tag.
+
+A custom domain can use an owner-supplied `public/CNAME` and `VITE_BASE_PATH=/`.
+The project URL builds at `VITE_BASE_PATH=/feng-finance/`. Changing origin creates
+separate browser storage; move records using an exported backup and explicit
+restore rather than expecting an automatic transfer.
+
 ## Private fixtures and limitations
 
 Put real statements only in ignored `private-fixtures/` and select them locally.
 Never commit real PDFs, extracted text, backups, account identifiers, screenshots
 or traces containing financial records. Generated fixtures and demo data are
 fictitious. If a real layout exposes a bug, create a synthetic regression and
-change its bank adapter; do not weaken validation. To add a bank, implement the
-parser contract, bank-detection signals and synthetic sign/period/layout/balance
-tests, then register the adapter.
+extend its profile or parser tests without weakening validation. To add a bank,
+provide detection/header/sign hints and synthetic period/layout/balance tests;
+the generic parser must continue to decide from source evidence.
+
+CI checks tracked repository paths. Where no custom hook is configured, npm also
+installs a pre-commit guard. PDFs and CSVs may only be committed under
+`tests/fixtures/synthetic/`, and must contain fictitious data. The guard inspects
+paths rather than contents and also blocks private fixture folders, backups and
+secrets. `.env.example` contains public configuration names; private `.env` files
+are ignored and blocked.
 
 - Synthetic adapters do not prove support for every historical bank layout.
   Warnings and explicit source review remain essential; offsetting extraction

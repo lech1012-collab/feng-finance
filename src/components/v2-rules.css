@@ -9,6 +9,10 @@
   flex: 1;
   min-width: 140px;
 }
+/* Safari's native menu must reflow long choices at larger text sizes. */
+.v2-inline-form select {
+  white-space: normal;
+}
 .condition-editor {
   display: grid;
   gap: 12px;

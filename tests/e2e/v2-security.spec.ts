@@ -1,4 +1,10 @@
-import { devices, expect, test as base, type Page } from "@playwright/test";
+import {
+  devices,
+  expect,
+  test as base,
+  type Page,
+  acknowledgeBeta,
+} from "./fixtures";
 import { readFile, rm } from "node:fs/promises";
 import { startStaticHost, type LocalHost } from "./static-host";
 
@@ -47,6 +53,7 @@ const test = base.extend<{ offlineHost: LocalHost; receiptPage: Page }>({
 
 async function settingsWithDemo(page: Page, origin = "") {
   await page.goto(`${origin}/#/settings`);
+  await acknowledgeBeta(page);
   await expect(
     page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();

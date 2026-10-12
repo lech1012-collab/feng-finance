@@ -61,7 +61,7 @@ export function CategoryBoard({
   const [search, setSearch] = useState("");
   const [accuracyMode, setAccuracyMode] = useState<"split" | "refund">();
   const [showTags, setShowTags] = useState(false);
-  const [tags, setTags] = useState(t.tags);
+  const [tags, setTags] = useState(t.tags ?? []);
   const [conflict, setConflict] = useState<{
     rule: Rule;
     categoryId: string;
@@ -69,7 +69,7 @@ export function CategoryBoard({
   useEffect(() => {
     setAccuracyMode(undefined);
     setShowTags(false);
-    setTags(t.tags);
+    setTags(t.tags ?? []);
     setConflict(undefined);
     if (optionsScroller.current) optionsScroller.current.scrollTop = 0;
   }, [t.id]);

@@ -220,9 +220,17 @@ export async function attachmentStorageBytes(database: FinanceDB = db) {
   });
   return total;
 }
-export async function requestPersistentStorage(): Promise<boolean> {
-  if (!navigator.storage?.persist) return false;
-  return navigator.storage.persist();
+export async function requestPersistentStorage(
+  database: FinanceDB = db,
+): Promise<boolean> {
+  const granted = navigator.storage?.persist
+    ? await navigator.storage.persist()
+    : false;
+  await database.settings.put({
+    key: "storagePersisted",
+    value: String(granted),
+  });
+  return granted;
 }
 export async function storageUsage(database: FinanceDB = db) {
   const [estimate, attachments] = await Promise.all([

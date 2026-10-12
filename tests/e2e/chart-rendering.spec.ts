@@ -1,4 +1,4 @@
-import { test, expect, type Locator } from "@playwright/test";
+import { test, expect, type Locator } from "./fixtures";
 
 async function expectSignedBars(chart: Locator) {
   await expect

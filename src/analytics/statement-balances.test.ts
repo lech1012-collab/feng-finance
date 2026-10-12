@@ -243,4 +243,28 @@ describe("credit statement closing-balance evidence", () => {
       ).status,
     ).not.toBe("reconciled");
   });
+  it("requires exact balance proof for new PDF imports while preserving historical tolerance", () => {
+    const { statement, transactions } = amex();
+    const mismatched = {
+      ...statement,
+      closingBalance: statement.closingBalance! + 1,
+    };
+    expect(
+      statementBalanceEvidence(mismatched, transactions, today).status,
+    ).toBe("reconciled");
+    expect(
+      statementBalanceEvidence(
+        { ...mismatched, validationPolicy: "exact-v2.2" },
+        transactions,
+        today,
+      ).status,
+    ).toBe("unverified");
+    expect(
+      statementBalanceEvidence(
+        { ...statement, validationPolicy: "exact-v2.2" },
+        transactions,
+        today,
+      ).status,
+    ).toBe("reconciled");
+  });
 });

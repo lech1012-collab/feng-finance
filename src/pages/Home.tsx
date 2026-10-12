@@ -52,89 +52,118 @@ export default function Home({
   const [share, setShare] = useState("spending");
   const [balancePeriod, setBalancePeriod] = useState(1);
   const today = localToday();
-  const data = useLiveQuery(async () => {
-    const [statements, accounts] = await Promise.all([
-      db.statements.toArray(),
-      db.accounts.toArray(),
-    ]);
-    let from = [
-      monthBounds(monthOffset(month, -12))[0],
-      `${Number(today.slice(0, 4)) - 3}${today.slice(4)}`,
-    ].sort()[0];
-    let to = [monthBounds(month)[1], today].sort().at(-1)!;
-    // Card statements can extend beyond the selected calendar month. Load all
-    // their rows so coverage verification can check their printed balances.
-    const documents = statements.filter(
-      (s) => s.statementPeriodStart <= to && s.statementPeriodEnd >= from,
-    );
-    from = [from, ...documents.map((s) => s.statementPeriodStart)].sort()[0];
-    to = [to, ...documents.map((s) => s.statementPeriodEnd)].sort().at(-1)!;
-    const transactions = await db.transactions
-      .where("date")
-      .between(from, to, true, true)
-      .toArray();
-    // A latest dated account balance may be older than the analysis window, or
-    // a card may contain purchases before its printed period. Check its complete
-    // source rows by index, rather than mistaking an unloaded row for deletion.
-    const snapshots = accounts.map((account) =>
-      accountSnapshot(account, statements, month),
-    );
-    const sourceRows = (
-      await Promise.all(
+  const data = useLiveQuery(
+    () =>
+      db.transaction(
+        "r",
         [
-          ...new Set(
-            snapshots.flatMap((snapshot) =>
-              snapshot.statement ? [snapshot.statement.id] : [],
-            ),
-          ),
-        ].map((statementId) =>
-          db.transactions.where("statementId").equals(statementId).toArray(),
-        ),
-      )
-    ).flat();
-    const manualWalletIds = accounts
-      .filter(
-        (account) =>
-          account.tracking === "manual" &&
-          ["current", "savings"].includes(account.accountType),
-      )
-      .map((account) => account.id);
-    // Wallet balances need every movement since their opening valuation, even
-    // when that movement predates the chart's analysis window.
-    const manualWalletRows = manualWalletIds.length
-      ? await db.transactions
-          .where("accountId")
-          .anyOf(manualWalletIds)
-          .toArray()
-      : [];
-    const indexedRows = new Map(transactions.map((row) => [row.id, row]));
-    for (const row of [...sourceRows, ...manualWalletRows])
-      indexedRows.set(row.id, row);
-    return {
-      transactions: [...indexedRows.values()],
-      categories: await db.categories.toArray(),
-      accounts,
-      statements,
-      settings: await db.settings.toArray(),
-      count: await db.transactions.count(),
-      uncategorized: await db.transactions
-        .filter(
-          (t) =>
-            !t.parentId &&
-            !t.categoryId &&
-            !t.isTransfer &&
-            t.kind !== "refund" &&
-            t.kind !== "split_parent",
-        )
-        .count(),
-      toReview: await db.transactions.filter(needsReview).count(),
-      rates: await db.fxRates.toArray(),
-      valuations: await db.valuations.toArray(),
-      pots: await db.pots.toArray(),
-      proposals: await db.transferProposals.toArray(),
-      recurringSeries: await db.recurringSeries.toArray(),
-    };
-  }, [month, currency, today]);
+          db.statements,
+          db.accounts,
+          db.transactions,
+          db.categories,
+          db.settings,
+          db.fxRates,
+          db.valuations,
+          db.pots,
+          db.transferProposals,
+          db.recurringSeries,
+        ],
+        async () => {
+          // One coherent snapshot avoids combining source balances and transactions
+          // from different commits, and keeps remounted reads out of the implicit cache.
+          const [statements, accounts] = await Promise.all([
+            db.statements.toArray(),
+            db.accounts.toArray(),
+          ]);
+          let from = [
+            monthBounds(monthOffset(month, -12))[0],
+            `${Number(today.slice(0, 4)) - 3}${today.slice(4)}`,
+          ].sort()[0];
+          let to = [monthBounds(month)[1], today].sort().at(-1)!;
+          // Card statements can extend beyond the selected calendar month. Load all
+          // their rows so coverage verification can check their printed balances.
+          const documents = statements.filter(
+            (s) => s.statementPeriodStart <= to && s.statementPeriodEnd >= from,
+          );
+          from = [
+            from,
+            ...documents.map((s) => s.statementPeriodStart),
+          ].sort()[0];
+          to = [to, ...documents.map((s) => s.statementPeriodEnd)]
+            .sort()
+            .at(-1)!;
+          const transactions = await db.transactions
+            .where("date")
+            .between(from, to, true, true)
+            .toArray();
+          // A latest dated account balance may be older than the analysis window, or
+          // a card may contain purchases before its printed period. Check its complete
+          // source rows by index, rather than mistaking an unloaded row for deletion.
+          const snapshots = accounts.map((account) =>
+            accountSnapshot(account, statements, month),
+          );
+          const sourceRows = (
+            await Promise.all(
+              [
+                ...new Set(
+                  snapshots.flatMap((snapshot) =>
+                    snapshot.statement ? [snapshot.statement.id] : [],
+                  ),
+                ),
+              ].map((statementId) =>
+                db.transactions
+                  .where("statementId")
+                  .equals(statementId)
+                  .toArray(),
+              ),
+            )
+          ).flat();
+          const manualWalletIds = accounts
+            .filter(
+              (account) =>
+                account.tracking === "manual" &&
+                ["current", "savings"].includes(account.accountType),
+            )
+            .map((account) => account.id);
+          // Wallet balances need every movement since their opening valuation, even
+          // when that movement predates the chart's analysis window.
+          const manualWalletRows = manualWalletIds.length
+            ? await db.transactions
+                .where("accountId")
+                .anyOf(manualWalletIds)
+                .toArray()
+            : [];
+          const indexedRows = new Map(transactions.map((row) => [row.id, row]));
+          for (const row of [...sourceRows, ...manualWalletRows])
+            indexedRows.set(row.id, row);
+          return {
+            transactions: [...indexedRows.values()],
+            categories: await db.categories.toArray(),
+            accounts,
+            statements,
+            settings: await db.settings.toArray(),
+            count: await db.transactions.count(),
+            uncategorized: await db.transactions
+              .filter(
+                (t) =>
+                  !t.parentId &&
+                  !t.categoryId &&
+                  !t.isTransfer &&
+                  t.kind !== "refund" &&
+                  t.kind !== "split_parent",
+              )
+              .count(),
+            toReview: await db.transactions.filter(needsReview).count(),
+            rates: await db.fxRates.toArray(),
+            valuations: await db.valuations.toArray(),
+            pots: await db.pots.toArray(),
+            proposals: await db.transferProposals.toArray(),
+            recurringSeries: await db.recurringSeries.toArray(),
+          };
+        },
+      ),
+    [month, currency, today],
+  );
   if (!data) return <p role="status">Loading your finances…</p>;
 
   if (!data.accounts.length && !data.count)

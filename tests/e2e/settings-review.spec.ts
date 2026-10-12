@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, acknowledgeBeta } from "./fixtures";
 import { readFile } from "node:fs/promises";
 
 async function settings(page: Page) {
@@ -284,9 +284,12 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
   await phrase.fill("ERASE");
   await expect(wipe).toBeEnabled();
   await wipe.click();
+  // Erase also removes consent preferences, so acknowledge the fresh notice
+  // before continuing the recovery journey with the downloaded backup.
   await expect(
-    page.getByText("All local financial data was cleared.", { exact: true }),
+    page.getByRole("dialog", { name: "Welcome to Feng" }),
   ).toBeVisible();
+  await acknowledgeBeta(page);
   await expect(page.locator("#backup")).toContainText(
     "Save your 0 transactions",
   );

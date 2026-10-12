@@ -221,7 +221,13 @@ export function CurrencySetting() {
   );
 }
 /** Only downloads the fixed public ECB table. Import never sends financial data. */
-export function CurrencyViewNotice({ currency }: { currency: string }) {
+export function CurrencyViewNotice({
+  currency,
+  allowAutomaticDownload = true,
+}: {
+  currency: string;
+  allowAutomaticDownload?: boolean;
+}) {
   const data = useLiveQuery(
     async () => ({
       accounts: await db.accounts.toArray(),
@@ -244,6 +250,7 @@ export function CurrencyViewNotice({ currency }: { currency: string }) {
   useEffect(() => {
     if (
       !data ||
+      !allowAutomaticDownload ||
       !foreign.length ||
       !enabled ||
       !navigator.onLine ||
@@ -256,7 +263,7 @@ export function CurrencyViewNotice({ currency }: { currency: string }) {
     if (downloaded === today) return;
     running.current = true;
     void refreshRates().catch(() => setFailed(true));
-  }, [!!data, foreign.length, enabled, today]);
+  }, [!!data, foreign.length, enabled, today, allowAutomaticDownload]);
   if (!foreign.length) return null;
   const stale = last && workingDayAge(last, today) > 3;
   return (
@@ -266,7 +273,7 @@ export function CurrencyViewNotice({ currency }: { currency: string }) {
     >
       <span>
         {!last
-          ? !enabled
+          ? !enabled || !allowAutomaticDownload
             ? "Exchange rates are needed. Enter manual rates in Settings."
             : failed
               ? "Rates unavailable. Add a manual rate or reconnect; converted totals are unverified."

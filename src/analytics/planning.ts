@@ -1,3 +1,4 @@
+import { reconciliationTolerance } from "../domain/reconcile";
 import type {
   Account,
   Category,
@@ -68,7 +69,7 @@ function verifiedDocuments(
       Math.abs(
         safeSum([s.openingBalance, ...rows.map((t) => t.amount)]) -
           s.closingBalance,
-      ) <= 1
+      ) <= reconciliationTolerance(s.validationPolicy)
     );
   });
 }

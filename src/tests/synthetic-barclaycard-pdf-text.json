@@ -1,0 +1,403 @@
+{
+  "items": [
+    {
+      "page": 1,
+      "text": "Your Platinum Visa statement",
+      "x": 48,
+      "y": 35,
+      "width": 131.72000000000003,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "Number 4111 1111 1111 4444",
+      "x": 48,
+      "y": 50,
+      "width": 135.64000000000004,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "barclaycard.co.uk/login",
+      "x": 330,
+      "y": 65,
+      "width": 102.26000000000002,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "Your previous balance:",
+      "x": 48,
+      "y": 140,
+      "width": 102.27000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "£900.00",
+      "x": 240,
+      "y": 140,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "Payments towards your account:",
+      "x": 48,
+      "y": 160,
+      "width": 145.06000000000003,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "£900.00",
+      "x": 240,
+      "y": 160,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "Your new balance:",
+      "x": 48,
+      "y": 180,
+      "width": 82.82000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "£109.68",
+      "x": 240,
+      "y": 180,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 1,
+      "text": "Page 1 of 2 // issued on 04 October 2026",
+      "x": 360,
+      "y": 808,
+      "width": 182.3399999999998,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "Your transactions",
+      "x": 48,
+      "y": 50,
+      "width": 77.81,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "Your previous balance",
+      "x": 48,
+      "y": 80,
+      "width": 99.49000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£900.00",
+      "x": 240,
+      "y": 80,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "Payments towards your account",
+      "x": 48,
+      "y": 108,
+      "width": 142.28000000000003,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£900.00",
+      "x": 240,
+      "y": 108,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "28 Sep Direct Debit - Payment",
+      "x": 52,
+      "y": 126,
+      "width": 133.58,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£900.00",
+      "x": 250,
+      "y": 126,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "Transactions, interest and charges",
+      "x": 48,
+      "y": 152,
+      "width": 153.40000000000003,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£109.68",
+      "x": 240,
+      "y": 152,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "How you've used your card",
+      "x": 48,
+      "y": 171,
+      "width": 120.29000000000002,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£109.68",
+      "x": 240,
+      "y": 171,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "02 Sep WAITROSE",
+      "x": 52,
+      "y": 185,
+      "width": 86.34,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "e",
+      "x": 244,
+      "y": 185,
+      "width": 5.5600000000000005,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£80.00",
+      "x": 260,
+      "y": 185,
+      "width": 30.580000000000005,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "05 Sep FICTIONAL CAFE",
+      "x": 52,
+      "y": 199,
+      "width": 114.67999999999999,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£12.34",
+      "x": 260,
+      "y": 199,
+      "width": 30.580000000000005,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "05 Sep FICTIONAL CAFE",
+      "x": 52,
+      "y": 213,
+      "width": 114.67999999999999,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£12.34",
+      "x": 260,
+      "y": 213,
+      "width": 30.580000000000005,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "08 Sep MERCHANT REFUND",
+      "x": 330,
+      "y": 50,
+      "width": 136.09999999999997,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£5.00 CR",
+      "x": 540,
+      "y": 50,
+      "width": 42.239999999999974,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "10 Sep TRAVEL SHOP",
+      "x": 330,
+      "y": 64,
+      "width": 105.01999999999995,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£10.00",
+      "x": 540,
+      "y": 64,
+      "width": 30.580000000000005,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "20 Euro at exchange rate 2.00",
+      "x": 365,
+      "y": 78,
+      "width": 134.5299999999999,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "Your new balance",
+      "x": 330,
+      "y": 140,
+      "width": 80.03999999999995,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    },
+    {
+      "page": 2,
+      "text": "£109.68",
+      "x": 540,
+      "y": 140,
+      "width": 36.14000000000001,
+      "height": 10,
+      "fontSize": 10,
+      "parseSource": "text",
+      "confidence": 1
+    }
+  ],
+  "pages": [
+    {
+      "page": 1,
+      "width": 600,
+      "height": 842,
+      "rotation": 0
+    },
+    {
+      "page": 2,
+      "width": 600,
+      "height": 842,
+      "rotation": 0
+    }
+  ]
+}

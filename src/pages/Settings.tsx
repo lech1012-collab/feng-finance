@@ -1,3 +1,13 @@
+import {
+  AboutLifecycle,
+  type DesktopInstallControl,
+} from "../beta/AboutLifecycle";
+import type { RuntimeMode } from "../beta/policy";
+import { FeedbackPanel } from "../components/FeedbackPanel";
+import { RELEASE_CONFIGURATION as releaseConfiguration } from "../beta/configuration";
+import { SafetyRecovery } from "../components/SafetyRecovery";
+import { ImportLayoutsSettings } from "../components/ImportLayoutsSettings";
+import { ImportDiagnosticsSettings } from "../components/ImportDiagnosticsSettings";
 import { TransferSettings } from "../components/TransferReview";
 import { auditedMutation } from "../storage/audit";
 import { SecuritySettings } from "../components/SecuritySettings";
@@ -16,15 +26,7 @@ import { PersonalRules } from "../components/PersonalRules";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import {
-  Download,
-  ShieldCheck,
-  Database,
-  Plus,
-  Upload,
-  Trash2,
-  Pencil,
-} from "lucide-react";
+import { Download, Database, Plus, Upload, Trash2, Pencil } from "lucide-react";
 import { db } from "../storage/database";
 import {
   exportBackupFile,
@@ -55,7 +57,13 @@ import {
   BackupFileTooLargeError,
   MAX_BACKUP_FILE_BYTES,
 } from "../storage/backup-limits";
-export default function Settings() {
+export interface BetaSettingsProps {
+  mode: RuntimeMode;
+  storagePersisted: boolean;
+  desktopInstall: DesktopInstallControl;
+  onRequestStorage: () => Promise<void>;
+}
+export default function Settings({ beta }: { beta?: BetaSettingsProps } = {}) {
   const currency = useGlobalCurrency();
   const [searchParams] = useSearchParams();
   const requestedRule = searchParams.get("rule");
@@ -69,6 +77,11 @@ export default function Settings() {
       count: await db.transactions.count(),
       backupAt: (await db.settings.get("backup:lastExportAt"))?.value,
       backupCount: (await db.settings.get("backup:lastExportCount"))?.value,
+      diagnostics: await db.importDiagnostics
+        .orderBy("createdAt")
+        .reverse()
+        .limit(5)
+        .toArray(),
       statements: await db.statements
         .orderBy("statementPeriodEnd")
         .reverse()
@@ -144,6 +157,24 @@ export default function Settings() {
         </div>
         <span className="small-chip">v{APP_VERSION}</span>
       </div>
+      {beta && (
+        <AboutLifecycle
+          mode={beta.mode}
+          storagePersisted={beta.storagePersisted}
+          buildDate={releaseConfiguration.buildDate}
+          desktopInstall={beta.desktopInstall}
+          onRequestStorage={beta.onRequestStorage}
+          feedback={
+            <FeedbackPanel
+              configuration={releaseConfiguration}
+              diagnostics={data?.diagnostics ?? []}
+            />
+          }
+        />
+      )}
+      <SafetyRecovery />
+      <ImportLayoutsSettings />
+      <ImportDiagnosticsSettings />
       <ThemeSetting />
       <CurrencySetting />
       <PeriodSetting />
@@ -276,7 +307,12 @@ export default function Settings() {
                   throw new Error(
                     "Persistent storage requests are not supported by this browser. Keep backups in Files.",
                   );
-                if (!(await navigator.storage.persist()))
+                const granted = await navigator.storage.persist();
+                await db.settings.put({
+                  key: "storagePersisted",
+                  value: String(granted),
+                });
+                if (!granted)
                   throw new Error(
                     "The browser did not grant persistent storage. Keep backups in Files.",
                   );
@@ -698,38 +734,9 @@ export default function Settings() {
           </button>
         </div>
       </section>
-      <section className="card privacy-card">
-        <h2>
-          <ShieldCheck size={20} />
-          Privacy & installation
-        </h2>
-        <p className="muted">
-          Statements and financial data stay on this device.
-        </p>
-        <details>
-          <summary>Learn more about privacy and installation</summary>
-          <p>
-            Statements are parsed locally using PDF.js and OCR. There are no
-            analytics, external AI calls, API keys or cloud sync. Only public
-            ECB rate tables are downloaded when conversion is enabled; no
-            personal data is sent. The host serves static app assets; after the
-            offline cache is ready, imports need no network access.
-          </p>
-          <p>
-            On iPhone, open Feng in Safari → Share → Add to Home Screen → Open
-            as Web App → Add.
-          </p>
-        </details>
-        <p>
-          This application does not encrypt its local database. Protect your
-          device with a passcode; anyone using this browser profile can access
-          its financial data.
-        </p>
-        <p>
-          App {APP_VERSION} · IndexedDB schema {SCHEMA_VERSION} · Backup format
-          1
-        </p>
-      </section>
+      <p className="muted">
+        IndexedDB schema {SCHEMA_VERSION} · Backup format 1
+      </p>
       <section className="card danger-zone">
         <h2>Danger zone</h2>
         <button disabled={busy} onClick={exportBackup}>

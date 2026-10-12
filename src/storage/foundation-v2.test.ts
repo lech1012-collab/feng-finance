@@ -58,7 +58,7 @@ describe("version 2 foundation", () => {
     expect((await migrated.settings.get("transferMatching"))?.value).toBe(
       "manual",
     );
-    expect(migrated.verno).toBe(3);
+    expect(migrated.verno).toBe(4);
     expect(await migrated.pots.count()).toBe(0);
     await migrated.delete();
   });

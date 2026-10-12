@@ -103,7 +103,7 @@ function Editor({
   const [category, setCategory] = useState(t.categoryId ?? "");
   const [subcategory, setSubcategory] = useState(t.subcategoryId ?? "");
   const [type, setType] = useState(financialType(t));
-  const [tags, setTags] = useState(t.tags);
+  const [tags, setTags] = useState(t.tags ?? []);
   const [pair, setPair] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -231,8 +231,20 @@ function Editor({
             <dd>{t.sourcePage}</dd>
           </div>
           <div>
-            <dt>Extraction confidence</dt>
-            <dd>{Math.round(t.extractionConfidence * 100)}%</dd>
+            <dt>Source check</dt>
+            <dd>
+              {t.checkLevel === "balance"
+                ? "Checked against running balance"
+                : t.checkLevel === "total"
+                  ? "Checked against statement total"
+                  : t.checkLevel === "ocr"
+                    ? "Read from an image"
+                    : t.checkLevel === "manual_override"
+                      ? "Imported as unverified"
+                      : t.checkLevel === "review"
+                        ? "Needs review"
+                        : "Original import check"}
+            </dd>
           </div>
           <div>
             <dt>Transfer status</dt>

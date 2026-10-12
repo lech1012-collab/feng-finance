@@ -372,9 +372,14 @@ function SplitEditor({
       amount: "",
       categoryId: transaction.categoryId ?? "",
       note: "",
-      tags: [...transaction.tags],
+      tags: [...(transaction.tags ?? [])],
     },
-    { amount: "", categoryId: "", note: "", tags: [...transaction.tags] },
+    {
+      amount: "",
+      categoryId: "",
+      note: "",
+      tags: [...(transaction.tags ?? [])],
+    },
   ]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -537,7 +542,7 @@ function SplitEditor({
                 amount: "",
                 categoryId: "",
                 note: "",
-                tags: [...transaction.tags],
+                tags: [...(transaction.tags ?? [])],
               },
             ])
           }

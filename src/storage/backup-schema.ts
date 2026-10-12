@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { layoutTemplateSchema } from "./layout-template-schema";
 import { SCHEMA_VERSION } from "../domain/models";
 import { currencyPrecision } from "../domain/money";
 export const identifier = z.string().min(1).max(200);
@@ -161,6 +162,17 @@ export const statementSchema = z.object({
   validationOverride: z.boolean().optional(),
   warnings: z.array(text),
   isDemo: z.boolean().optional(),
+  parserMethod: z
+    .enum(["text", "text+ocr", "ocr", "template", "user_mapping"])
+    .optional(),
+  rowsBalanceChecked: z.number().int().nonnegative().optional(),
+  rowsTotalChecked: z.number().int().nonnegative().optional(),
+  rowsNeedingReview: z.number().int().nonnegative().optional(),
+  bankProfileId: identifier.optional(),
+  validationPolicy: z.literal("exact-v2.2").optional(),
+  rowsExcludedByReview: z.number().int().nonnegative().optional(),
+  unreadPages: z.array(z.number().int().positive()).optional(),
+  layoutTemplateId: identifier.optional(),
 });
 export const transactionSchema = z.object({
   id: identifier,
@@ -202,6 +214,12 @@ export const transactionSchema = z.object({
   recurringSeriesId: identifier.optional(),
   sourceId: identifier.optional(),
   appliedRuleIds: z.array(identifier).optional(),
+  checkLevel: z
+    .enum(["balance", "total", "ocr", "review", "manual_override"])
+    .optional(),
+  parseSource: z.enum(["text", "ocr", "user"]).optional(),
+  layoutTemplateId: identifier.optional(),
+  parseRowId: identifier.optional(),
   ruleSplit: z
     .array(
       z.object({
@@ -435,6 +453,7 @@ export const backupSchema = z.object({
   savedReports: z.array(reportSchema).optional(),
   scenarios: z.array(scenarioSchema).optional(),
   changeLog: z.array(changeLogSchema).optional(),
+  layoutTemplates: z.array(layoutTemplateSchema).optional(),
 });
 export const auditAttachmentSchema = attachmentSchema
   .omit({ dataBase64: true })
@@ -472,4 +491,5 @@ export const auditRecordSchemas: Record<
   savedViews: viewSchema,
   savedReports: reportSchema,
   scenarios: scenarioSchema,
+  layoutTemplates: layoutTemplateSchema,
 };

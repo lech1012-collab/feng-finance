@@ -22,13 +22,25 @@ Record iOS version, device, deployment origin and app version. These checks must
 - [ ] Export backup in airplane mode; save to Files; reopen JSON; export CSV and inspect decimal amounts.
 - [ ] Restore valid backup after explicit replace warning; counts/categories/rules/transfer links survive. Invalid/future backup leaves data intact.
 - [ ] Delete demo preserves separate synthetic imports; erasing all local data requires the exact text ERASE.
-- [ ] Load a previous app release, deploy an updated release; update banner appears; ignore safely, then finish review and tap Update; database contents persist.
+- [ ] Load a previous app release, deploy an updated release; the update banner appears on Home; ignore safely, then finish review and tap Reload; database contents persist.
 - [ ] Import a large statement and inspect responsiveness/memory; measure typical digital monthly workflow against the one-minute goal.
 - [ ] Restore a 20,000-row synthetic backup; search/filter monthly pages, analysis and backup remain responsive. Record timings rather than assuming simulator results apply.
 - [ ] Safari Web Inspector network check: no financial data leaves the device; imports work disconnected.
 - [ ] Export a backup, restart device, confirm data remains; test browser storage/persistence settings. Do not treat this as guaranteed retention.
 
 Only after those checks, test private real statements from ignored `private-fixtures/`, compare each transaction and closing balance locally and record layout differences using synthetic reproductions. Do not share real financial screenshots or traces.
+
+## Beta introduction and recovery
+
+- [ ] On a fresh Safari profile, the first notice explains beta accuracy, local data/developer access, financial-advice limits and demo-first use. Escape/back does not bypass it. Both choices remain reachable at 320px and 200% text.
+- [ ] Explore with demo data loads fictitious accounts. Import my statements opens Files from the same tap; cancellation retains the current screen. The notice does not repeat after successful acknowledgement and relaunch.
+- [ ] Protected-storage permission is requested after acknowledgement. About and feedback shows Protected or the browser-clearing warning accurately; denying permission does not prevent backup or use.
+- [ ] In a Safari tab, installation help says Share → Add to Home Screen → Add. Not now suppresses the banner for seven days; Don't show again persists. No more than three banner appearances occur. Installed mode suppresses it. In another iOS browser, Copy link helps open Safari.
+- [ ] Import a fictitious statement in a Safari tab. The separate-storage warning explains exporting and restoring in the installed app, rather than promising shared data. An import older than seven days without a backup prompts Save backup; saving suppresses the reminder.
+- [ ] On desktop, a browser-provided install prompt is retained until Settings → Install help. Clicking Install Feng invokes it; browsers without the event still show manual guidance.
+- [ ] On an update, the banner remains hidden during import, sorting, editing and open dialogs. Return Home and explicitly Reload. What's new appears once, with at most five release points and Please test; dismissing preserves records.
+- [ ] Upgrade a previous schema containing fictitious transactions, a receipt and a PIN. Settings → Restore previous data previews the local safety snapshot and requires confirmation. Restore replaces subsequent edits and reinstates the prior records and lock credentials. The database remains at the newer additive schema. Verify expiry after 14 days on an expendable profile.
+- [ ] Send feedback opens a warning before any form/email. Its technical details omit statements, merchant names, figures and account identifiers. Optional copied diagnostics replace every cell's text, dates and amounts with placeholders. Keeping raw diagnostics is off by default and disabling it clears retained diagnostics.
 
 ## Version 1.1 appearance and review
 

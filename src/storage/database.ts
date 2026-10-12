@@ -1,5 +1,16 @@
 import Dexie, { type EntityTable } from "dexie";
+import { APP_VERSION } from "../domain/models";
+import {
+  captureBeforeMigration,
+  migrationSafeFactory,
+  expireSafetyBackup,
+  isExactRecovery,
+  type SafetyUpgradeContext,
+  type SafetyBackupRecord,
+} from "./safety-backup";
 import type {
+  LayoutTemplate,
+  ImportDiagnostics,
   Account,
   Statement,
   Transaction,
@@ -22,6 +33,9 @@ import type {
   ChangeLog,
 } from "../domain/models";
 export class FinanceDB extends Dexie {
+  safetyBackups!: EntityTable<SafetyBackupRecord, "key">;
+  layoutTemplates!: EntityTable<LayoutTemplate, "id">;
+  importDiagnostics!: EntityTable<ImportDiagnostics, "id">;
   accounts!: EntityTable<Account, "id">;
   statements!: EntityTable<Statement, "id">;
   transactions!: EntityTable<Transaction, "id">;
@@ -43,8 +57,20 @@ export class FinanceDB extends Dexie {
   scenarios!: EntityTable<Scenario, "id">;
   changeLog!: EntityTable<ChangeLog, "id">;
   constructor(name = "feng-finance") {
-    super(name);
+    const context: SafetyUpgradeContext = {
+      sourceNativeVersion: 0,
+      targetNativeVersion: 0,
+      sourceSchema: [],
+      capturedInThisTransaction: false,
+    };
+    const factory = Dexie.dependencies.indexedDB;
+    super(name, {
+      indexedDB: factory
+        ? migrationSafeFactory(factory, name, context)
+        : undefined,
+    });
     this.version(1).stores({
+      safetyBackups: "key,expiresAt",
       accounts: "id,institution,currency",
       statements:
         "id,accountId,sourceFileHash,statementPeriodEnd,[accountId+statementPeriodStart+statementPeriodEnd]",
@@ -61,6 +87,7 @@ export class FinanceDB extends Dexie {
           "id,date,accountId,statementId,categoryId,transactionFingerprint,[currency+date],[accountId+date],merchant",
       })
       .upgrade(async (tx) => {
+        await captureBeforeMigration(tx, context, APP_VERSION);
         await tx
           .table<Transaction>("transactions")
           .toCollection()
@@ -90,6 +117,7 @@ export class FinanceDB extends Dexie {
         changeLog: "id,createdAt,undoneAt",
       })
       .upgrade(async (tx) => {
+        await captureBeforeMigration(tx, context, APP_VERSION);
         await tx
           .table<Account>("accounts")
           .toCollection()
@@ -121,10 +149,20 @@ export class FinanceDB extends Dexie {
           .table<Setting>("settings")
           .put({ key: "transferDateWindowDays", value: "4" });
       });
+    this.version(4)
+      .stores({
+        layoutTemplates: "id,fingerprint,status,lastUsedAt",
+        importDiagnostics: "id,statementId,createdAt",
+      })
+      .upgrade(async (tx) => {
+        await captureBeforeMigration(tx, context, APP_VERSION);
+      });
   }
 }
 export const db = new FinanceDB();
 export async function initializeDatabase(database = db) {
+  await expireSafetyBackup(database);
+  if (await isExactRecovery(database)) return;
   await database.transaction(
     "rw",
     database.categories,

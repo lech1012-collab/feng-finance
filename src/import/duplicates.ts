@@ -22,6 +22,7 @@ export function duplicateStatus(
   existing: Transaction[],
   samePeriod = false,
 ): "none" | "certain" | "possible" {
+  const occurrence = t.occurrence ?? 0;
   const sameSourceId =
     t.sourceId &&
     existing.find(
@@ -83,7 +84,7 @@ export function duplicateStatus(
         sameFields.length,
         crossFormat.length,
         sameBalanceAcrossFormats.length,
-      ) > t.occurrence;
+      ) > occurrence;
     if (sameBalanceAcrossFormats.length === 1 && coveredOccurrence)
       return "certain";
     if (
@@ -95,17 +96,17 @@ export function duplicateStatus(
       return "certain";
     // Different known running balances distinguish legitimate identical purchases.
     return sameFields.filter((p) => p.balanceAfterTransaction === undefined)
-      .length > t.occurrence ||
+      .length > occurrence ||
       crossFormat.filter((p) => p.balanceAfterTransaction === undefined)
-        .length > t.occurrence
+        .length > occurrence
       ? "possible"
       : "none";
   }
-  if (samePeriod && sameFields.some((p) => p.occurrence === t.occurrence))
+  if (samePeriod && sameFields.some((p) => (p.occurrence ?? 0) === occurrence))
     return "certain";
   // An export with three identical purchases must not lose purchase #3 when
   // only two matching occurrences are already stored.
-  return Math.max(sameFields.length, crossFormat.length) > t.occurrence
+  return Math.max(sameFields.length, crossFormat.length) > occurrence
     ? "possible"
     : "none";
 }

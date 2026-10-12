@@ -1,5 +1,23 @@
-export const APP_VERSION = "2.0.0";
-export const SCHEMA_VERSION = 3;
+import type {
+  TransactionParserMetadata,
+  StatementParserMetadata,
+  GenericParseResult,
+  LayoutTemplate,
+  ReconstructedTable,
+  RowCheck,
+  StatementChecks,
+  ParserMethod,
+} from "../import/generic/types";
+export type {
+  LayoutTemplate,
+  CheckLevel,
+  ColumnRole,
+  ParserMethod,
+  RowCheck,
+  TableRowKind,
+} from "../import/generic/types";
+export const APP_VERSION = "2.2.0";
+export const SCHEMA_VERSION = 4;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";
 export type TransactionKind =
@@ -38,7 +56,7 @@ export interface Account {
   updatedAt: string;
   isDemo?: boolean;
 }
-export interface Statement {
+export interface Statement extends StatementParserMetadata {
   id: string;
   institution: Institution;
   accountId: string;
@@ -62,7 +80,7 @@ export interface Statement {
   warnings: string[];
   isDemo?: boolean;
 }
-export interface Transaction {
+export interface Transaction extends TransactionParserMetadata {
   id: string;
   accountId: string;
   statementId: string;
@@ -172,6 +190,7 @@ export interface Backup {
   savedReports?: SavedReport[];
   scenarios?: Scenario[];
   changeLog?: ChangeLog[];
+  layoutTemplates?: LayoutTemplate[];
 }
 export interface Reconciliation {
   status: ValidationStatus;
@@ -180,6 +199,8 @@ export interface Reconciliation {
   difference?: number;
 }
 export interface PageTextItem {
+  fontSize?: number;
+  parseSource?: "text" | "ocr";
   text: string;
   x: number;
   y: number;
@@ -194,7 +215,7 @@ export interface TextRow {
   items: PageTextItem[];
   text: string;
 }
-export interface ParsedStatement {
+export interface ParsedStatement extends StatementParserMetadata {
   institution: Institution;
   accountIdentifier?: string;
   accountType: Account["accountType"];
@@ -208,7 +229,7 @@ export interface ParsedStatement {
   transactions: ParsedTransaction[];
   warnings: string[];
 }
-export interface ParsedTransaction {
+export interface ParsedTransaction extends TransactionParserMetadata {
   sourceId?: string;
   date: string;
   bookingDate?: string;
@@ -235,6 +256,9 @@ export interface DraftTransaction extends Transaction {
   replaceManual?: boolean;
 }
 export interface ImportDraft {
+  /** Source evidence exists only during this import, never in portable records. */
+  parserReview?: GenericParseResult;
+  parserFallback?: boolean;
   statement: Statement;
   account: Account;
   transactions: DraftTransaction[];
@@ -430,4 +454,15 @@ export interface ChangeLog {
   createdAt: string;
   undoneAt?: string;
   changes: { table: string; key: string; before?: unknown; after?: unknown }[];
+}
+
+export interface ImportDiagnostics {
+  id: string;
+  statementId?: string;
+  createdAt: string;
+  parserVersion: string;
+  method: ParserMethod;
+  table: ReconstructedTable;
+  rows: RowCheck[];
+  checks: StatementChecks;
 }

@@ -187,7 +187,7 @@ export async function categorizeCards(
         tags:
           options.tags && chosen.some((p) => p.id === t.id)
             ? options.tags
-            : t.tags,
+            : (t.tags ?? []),
         categorySource: chosen.some((p) => p.id === t.id)
           ? ("manual" as const)
           : ("rule" as const),

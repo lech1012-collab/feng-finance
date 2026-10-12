@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import { useState, type ReactNode } from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -13,8 +14,15 @@ import type {
   Statement,
 } from "../domain/models";
 import { formatDateRange, formatUkDate } from "../domain/dates";
-import { decimalMoney, money, parseMoney } from "../domain/money";
+import {
+  currencyPrecision,
+  decimalMoney,
+  money,
+  parseMoney,
+} from "../domain/money";
+import { id } from "../domain/normalize";
 import { draftReconciliation } from "../import/pipeline";
+import { outsideStatementPeriod } from "../import/statement-period";
 import { statementMovements } from "../import/movements";
 import { statementPeriodNotices } from "../import/batch";
 import {
@@ -22,6 +30,7 @@ import {
   needsRowCheck,
   type FileReview,
 } from "../import/review-model";
+import type { RowReviewAction } from "../import/generic/types";
 
 export function ImportStatementReview({
   entry,
@@ -31,6 +40,9 @@ export function ImportStatementReview({
   busy,
   patch,
   reparse,
+  sourceReview,
+  onSourceAction,
+  onCreateAccount,
 }: {
   entry: FileReview;
   accounts: Account[];
@@ -39,9 +51,19 @@ export function ImportStatementReview({
   busy: boolean;
   patch: (update: Partial<FileReview>) => void;
   reparse: (ocr: boolean) => void;
+  sourceReview?: ReactNode;
+  onSourceAction?: (rowId: string, action: RowReviewAction) => void;
+  onCreateAccount?: (account: Account) => void;
 }) {
   const d = entry.draft;
   const validation = d && draftReconciliation(d);
+  const [creatingAccount, setCreatingAccount] = useState(false);
+  const [newAccountName, setNewAccountName] = useState("Current account");
+  const [newAccountType, setNewAccountType] =
+    useState<Account["accountType"]>("current");
+  const [newAccountCurrency, setNewAccountCurrency] = useState("GBP");
+  const [newAccountSuffix, setNewAccountSuffix] = useState("");
+  const [accountError, setAccountError] = useState("");
   const flow = d && statementMovements(d.transactions, d.statement.currency);
   const exactSkipped =
     d?.exactDuplicate && !d.duplicateOverride && !entry.requiresBatchRecheck;
@@ -58,15 +80,38 @@ export function ImportStatementReview({
         t.id === id ? { ...t, ...update } : t,
       ),
     });
+  const correctSource = (
+    row: ImportDraft["transactions"][number],
+    correction: { date?: string; amount?: number },
+  ) => {
+    if (
+      row.parseRowId &&
+      d?.parserReview &&
+      !d.parserFallback &&
+      onSourceAction
+    ) {
+      onSourceAction(row.parseRowId, {
+        kind: "correct",
+        date: correction.date ?? row.date,
+        description: row.description,
+        amount: correction.amount ?? row.amount,
+        balanceAfterTransaction: row.balanceAfterTransaction,
+      });
+    } else {
+      updateRow(row.id, { ...correction, acknowledged: true });
+    }
+  };
   const blockers = importBlockers(entry);
   const blocking =
     (entry.state === "review" || entry.state === "error") &&
     blockers.length > 0;
   const notices = d ? statementPeriodNotices(d, history) : [];
-  const outsideDates = d?.transactions.some(
-    (t) =>
-      t.date < d.statement.statementPeriodStart ||
-      t.date > d.statement.statementPeriodEnd,
+  const outsideDates = d?.transactions.some((t) =>
+    outsideStatementPeriod(
+      t,
+      d.statement.statementPeriodStart,
+      d.statement.statementPeriodEnd,
+    ),
   );
   const status =
     entry.skip || exactSkipped
@@ -83,7 +128,9 @@ export function ImportStatementReview({
                 : entry.invalidAmounts.length
                   ? "Correct invalid amounts"
                   : validation?.status === "warning" && !entry.override
-                    ? "Balances don't add up"
+                    ? validation.difference
+                      ? "Balances don't add up"
+                      : "Statement needs review"
                     : checks.some(
                           (t) =>
                             t.include &&
@@ -94,7 +141,7 @@ export function ImportStatementReview({
                       ? "Verify highlighted rows"
                       : "Review needed"
             : validation?.status === "warning"
-              ? "Unverified · accepted difference"
+              ? "Unverified · accepted"
               : validation?.status === "reconciled"
                 ? "✓ Reconciled"
                 : "Balance unavailable";
@@ -124,6 +171,7 @@ export function ImportStatementReview({
       </summary>
       <div className="import-statement-content">
         <p className="muted import-source-name">{entry.file.name}</p>
+        {entry.state === "checking" && <p role="status">{entry.progress}</p>}
         {entry.error && (
           <div className="notice import-blocking-warning" role="alert">
             <AlertTriangle size={18} />
@@ -186,7 +234,9 @@ export function ImportStatementReview({
                 {validation.status === "reconciled"
                   ? "✓ Statement reconciled"
                   : validation.status === "warning"
-                    ? "Balances don't add up"
+                    ? validation.difference
+                      ? "Balances don't add up"
+                      : "Statement needs review"
                     : "Balance validation unavailable"}
               </strong>
               {validation.status === "unavailable" &&
@@ -200,20 +250,25 @@ export function ImportStatementReview({
                       : "File has no complete opening and closing balances. This period remains unverified."}
                   </p>
                 )}
-              {validation.status === "warning" && (
-                <p>
-                  Your statement closes at{" "}
-                  {money(d.statement.closingBalance ?? 0, d.statement.currency)}
-                  . Feng calculates{" "}
-                  {money(validation.calculated ?? 0, d.statement.currency)}, a
-                  difference of{" "}
-                  {money(
-                    Math.abs(validation.difference ?? 0),
-                    d.statement.currency,
-                  )}
-                  . Check for a missing row, incorrect sign or misread amount.
-                </p>
-              )}
+              {validation.status === "warning" &&
+                !!validation.difference &&
+                !d.parserReview && (
+                  <p>
+                    Your statement closes at{" "}
+                    {money(
+                      d.statement.closingBalance ?? 0,
+                      d.statement.currency,
+                    )}
+                    . Feng calculates{" "}
+                    {money(validation.calculated ?? 0, d.statement.currency)}, a
+                    difference of{" "}
+                    {money(
+                      Math.abs(validation.difference ?? 0),
+                      d.statement.currency,
+                    )}
+                    . Check for a missing row, incorrect sign or misread amount.
+                  </p>
+                )}
               {d.account.accountType === "credit" && (
                 <p className="muted">
                   Credit card balances use a minus sign for money owed.
@@ -270,24 +325,30 @@ export function ImportStatementReview({
                     disabled={busy}
                     onClick={() => patch({ showAll: true })}
                   >
-                    Find the difference
+                    {validation.difference
+                      ? "Find the difference"
+                      : "Review transactions"}
                   </button>
-                  <label className="check">
-                    <input
-                      type="checkbox"
-                      checked={entry.override}
-                      disabled={busy}
-                      onChange={(e) => patch({ override: e.target.checked })}
-                    />
-                    I reviewed the source PDF and explicitly accept this balance
-                    difference.
-                  </label>
+                  {(!d.parserReview || d.parserFallback) && (
+                    <label className="check">
+                      <input
+                        type="checkbox"
+                        checked={entry.override}
+                        disabled={busy}
+                        onChange={(e) => patch({ override: e.target.checked })}
+                      />
+                      {validation.difference
+                        ? "I reviewed the source PDF and explicitly accept this balance difference."
+                        : "I reviewed the source PDF and explicitly accept this unverified statement."}
+                    </label>
+                  )}
                   <p className="muted">
                     Importing anyway leaves this statement unverified.
                   </p>
                 </>
               )}
             </div>
+            {sourceReview}
             {notices.map((notice, index) => (
               <p className="coverage-note" key={`${notice.kind}-${index}`}>
                 <strong>{notice.kind === "gap" ? "Gap" : "Overlap"}:</strong>{" "}
@@ -476,8 +537,7 @@ export function ImportStatementReview({
                       </label>
                       <span className="small-chip">
                         {entry.extracted?.format ? "Row" : "Page"}{" "}
-                        {t.sourcePage} ·{" "}
-                        {Math.round(t.extractionConfidence * 100)}%
+                        {t.sourcePage}
                       </span>
                     </div>
                     {t.duplicate !== "none" && (
@@ -544,10 +604,7 @@ export function ImportStatementReview({
                           type="date"
                           value={t.date}
                           onChange={(e) =>
-                            updateRow(t.id, {
-                              date: e.target.value,
-                              acknowledged: true,
-                            })
+                            correctSource(t, { date: e.target.value })
                           }
                         />
                       </label>
@@ -557,6 +614,7 @@ export function ImportStatementReview({
                           disabled={busy}
                           aria-label={`Amount for ${t.description}`}
                           type="text"
+                          key={`${t.id}:${t.amount}`}
                           inputMode="decimal"
                           defaultValue={decimalMoney(t.amount, t.currency)}
                           onBlur={(e) => {
@@ -570,26 +628,25 @@ export function ImportStatementReview({
                                 entry.invalidAmounts.filter(
                                   (id) => id !== t.id,
                                 );
-                              patch({
-                                invalidAmounts,
-                                draft: {
-                                  ...d,
-                                  transactions: d.transactions.map((row) =>
-                                    row.id === t.id
-                                      ? {
-                                          ...row,
-                                          amount,
-                                          type: row.isTransfer
-                                            ? "transfer"
-                                            : amount >= 0
-                                              ? "income"
-                                              : "expense",
-                                          acknowledged: true,
-                                        }
-                                      : row,
-                                  ),
-                                },
-                              });
+                              patch({ invalidAmounts });
+                              if (
+                                t.parseRowId &&
+                                d.parserReview &&
+                                !d.parserFallback &&
+                                onSourceAction
+                              ) {
+                                correctSource(t, { amount });
+                              } else {
+                                updateRow(t.id, {
+                                  amount,
+                                  type: t.isTransfer
+                                    ? "transfer"
+                                    : amount >= 0
+                                      ? "income"
+                                      : "expense",
+                                  acknowledged: true,
+                                });
+                              }
                             } catch {
                               patch({
                                 invalidAmounts: [
@@ -678,7 +735,8 @@ export function ImportStatementReview({
                       </label>
                     </div>
                     {t.include &&
-                      (t.extractionConfidence < 0.8 ||
+                      (((!d.parserReview || d.parserFallback) &&
+                        t.extractionConfidence < 0.8) ||
                         t.duplicate !== "none") && (
                         <label className="check">
                           <input
@@ -700,6 +758,7 @@ export function ImportStatementReview({
             </section>
           </>
         )}
+        {!d && sourceReview}
         <details className="parse-options" open={!d && !!entry.error}>
           <summary>
             Bank, account and statement dates <ChevronDown size={16} />
@@ -759,10 +818,24 @@ export function ImportStatementReview({
                 disabled={busy}
                 value={entry.accountId}
                 onChange={(e) =>
-                  patch({ accountId: e.target.value, optionsChanged: true })
+                  patch({
+                    accountId: e.target.value,
+                    accountOverride: undefined,
+                    optionsChanged: true,
+                  })
                 }
               >
                 <option value="">Detect automatically</option>
+                {entry.accountOverride &&
+                  !accounts.some(
+                    (account) => account.id === entry.accountOverride?.id,
+                  ) && (
+                    <option value={entry.accountOverride.id}>
+                      {entry.accountOverride.displayName} ·{" "}
+                      {entry.accountOverride.maskedAccountIdentifier} ·{" "}
+                      {entry.accountOverride.currency}
+                    </option>
+                  )}
                 {accounts.map((a) => (
                   <option key={a.id} value={a.id}>
                     {a.institution} · {a.displayName} ·{" "}
@@ -835,8 +908,135 @@ export function ImportStatementReview({
                 Try local OCR
               </button>
             )}
-            <Link to="/settings">Create an account</Link>
+            {onCreateAccount ? (
+              <button
+                disabled={busy}
+                onClick={() => {
+                  const parsed = entry.extracted?.generic?.parsed;
+                  if (parsed) {
+                    setNewAccountCurrency(parsed.currency);
+                    setNewAccountType(parsed.accountType);
+                    setNewAccountName(
+                      parsed.accountType === "credit"
+                        ? "Credit card"
+                        : "Current account",
+                    );
+                  }
+                  setCreatingAccount((value) => !value);
+                }}
+              >
+                Create an account
+              </button>
+            ) : (
+              <Link to="/settings">Create an account</Link>
+            )}
           </div>
+          {creatingAccount && onCreateAccount && (
+            <form
+              onSubmit={(event) => {
+                event.preventDefault();
+                if (busy) return;
+                try {
+                  const name = newAccountName.trim();
+                  const currency = newAccountCurrency.trim().toUpperCase();
+                  if (!name) throw new Error("Enter an account name.");
+                  if (!/^\d{4}$/.test(newAccountSuffix))
+                    throw new Error(
+                      "Copy the last four account or card digits from this statement.",
+                    );
+                  currencyPrecision(currency);
+                  const now = new Date().toISOString();
+                  onCreateAccount({
+                    id: id(),
+                    institution:
+                      entry.bank ||
+                      entry.extracted?.generic?.parsed?.institution ||
+                      "Other",
+                    displayName: name,
+                    accountType: newAccountType,
+                    currency,
+                    maskedAccountIdentifier: `•••• ${newAccountSuffix}`,
+                    tracking: "statement",
+                    createdAt: now,
+                    updatedAt: now,
+                  });
+                  setAccountError("");
+                  setCreatingAccount(false);
+                } catch (cause) {
+                  setAccountError(
+                    cause instanceof Error
+                      ? cause.message
+                      : "Check the account details.",
+                  );
+                }
+              }}
+            >
+              <h3>Identify this account</h3>
+              <p>
+                These details stay on your device and are saved only when you
+                confirm the import.
+              </p>
+              <div className="form-grid">
+                <label>
+                  Account name
+                  <input
+                    disabled={busy}
+                    value={newAccountName}
+                    onChange={(event) => setNewAccountName(event.target.value)}
+                    maxLength={200}
+                    required
+                  />
+                </label>
+                <label>
+                  Account type
+                  <select
+                    disabled={busy}
+                    value={newAccountType}
+                    onChange={(event) =>
+                      setNewAccountType(
+                        event.target.value as Account["accountType"],
+                      )
+                    }
+                  >
+                    <option value="current">Current account</option>
+                    <option value="credit">Credit card</option>
+                    <option value="savings">Savings</option>
+                  </select>
+                </label>
+                <label>
+                  Currency
+                  <input
+                    disabled={busy}
+                    value={newAccountCurrency}
+                    onChange={(event) =>
+                      setNewAccountCurrency(event.target.value)
+                    }
+                    minLength={3}
+                    maxLength={3}
+                    required
+                  />
+                </label>
+                <label>
+                  Last four account or card digits
+                  <input
+                    disabled={busy}
+                    inputMode="numeric"
+                    pattern="[0-9]{4}"
+                    maxLength={4}
+                    value={newAccountSuffix}
+                    onChange={(event) =>
+                      setNewAccountSuffix(event.target.value.replace(/\D/g, ""))
+                    }
+                    required
+                  />
+                </label>
+              </div>
+              {accountError && <p role="alert">{accountError}</p>}
+              <button disabled={busy} type="submit">
+                Use this account
+              </button>
+            </form>
+          )}
         </details>
         {entry.state !== "saved" && (
           <label className="check">

@@ -47,12 +47,12 @@ export async function mergeTags(sourceId: string, targetId: string) {
         ...new Set(values.map((v) => (v === sourceId ? targetId : v))),
       ];
       const transactions = await db.transactions
-        .filter((t) => t.tags.includes(sourceId))
+        .filter((t) => (t.tags ?? []).includes(sourceId))
         .toArray();
       await ensureMonthsOpen(transactions);
       for (const t of transactions)
         await db.transactions.update(t.id, {
-          tags: replace(t.tags),
+          tags: replace(t.tags ?? []),
           updatedAt: new Date().toISOString(),
         });
       for (const rule of await db.rules.toArray()) {
@@ -131,8 +131,8 @@ export async function tagTransactions(
         if (t)
           await db.transactions.update(t.id, {
             tags: remove
-              ? t.tags.filter((tag) => !tagIds.includes(tag))
-              : [...new Set([...t.tags, ...tagIds])],
+              ? (t.tags ?? []).filter((tag) => !tagIds.includes(tag))
+              : [...new Set([...(t.tags ?? []), ...tagIds])],
             updatedAt: new Date().toISOString(),
           });
       return values.filter(Boolean).length;
@@ -147,7 +147,7 @@ export function tagSummary(
 ) {
   const list = effectiveTransactions(transactions).filter(
     (t) =>
-      t.tags.includes(tagId) &&
+      (t.tags ?? []).includes(tagId) &&
       t.currency === currency &&
       financialType(t) !== "transfer",
   );

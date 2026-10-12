@@ -1,6 +1,6 @@
 {
   "name": "feng-finance",
-  "version": "2.0.0",
+  "version": "2.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -10,12 +10,15 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "fixtures": "node scripts/fixtures.mjs && node scripts/card-fixture.mjs && node scripts/layout-fixtures.mjs",
+    "fixtures": "node scripts/fixtures.mjs && node scripts/card-fixture.mjs && node scripts/layout-fixtures.mjs && node scripts/ocr-fixtures.mjs",
     "prepare:assets": "node scripts/assets.mjs",
-    "postinstall": "npm run prepare:assets",
+    "postinstall": "npm run prepare:assets && node scripts/install-hooks.mjs",
     "check": "npm test && npm run build && npm run test:e2e",
     "format": "prettier --write src scripts tests *.json *.ts docs README.md",
-    "format:check": "prettier --check src scripts tests *.json *.ts docs README.md"
+    "format:check": "prettier --check src scripts tests *.json *.ts docs README.md",
+    "check:repo": "node scripts/check-repo-hygiene.mjs",
+    "check:release": "node scripts/check-release.mjs",
+    "test:hygiene": "node --test scripts/check-repo-hygiene.test.mjs scripts/check-release.test.mjs"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",

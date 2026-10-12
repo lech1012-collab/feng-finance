@@ -35,6 +35,7 @@ const extraTables = [
   "savedReports",
   "scenarios",
   "changeLog",
+  "layoutTemplates",
 ] as const;
 const securityKey = (key: string) => key.startsWith("security:");
 const sum = (values: number[]) =>
@@ -77,6 +78,7 @@ export function validateBackup(input: unknown): Backup {
     b.savedReports ?? [],
     b.scenarios ?? [],
     b.changeLog ?? [],
+    b.layoutTemplates ?? [],
   ];
   if (
     !idCollections.every(unique) ||
@@ -444,7 +446,14 @@ export async function createBackup(
       exportedAt: new Date().toISOString(),
       accounts: await database.accounts.toArray(),
       statements: await database.statements.toArray(),
-      transactions: await database.transactions.toArray(),
+      transactions: (await database.transactions.toArray()).map(
+        (transaction) => ({
+          ...transaction,
+          tags: transaction.tags ?? [],
+          occurrence: transaction.occurrence ?? 0,
+          isReviewed: transaction.isReviewed ?? false,
+        }),
+      ),
       categories: await database.categories.toArray(),
       rules: await database.rules.toArray(),
       transferLinks: await database.transferLinks.toArray(),
@@ -466,6 +475,7 @@ export async function createBackup(
       savedReports: await database.savedReports.toArray(),
       scenarios: await database.scenarios.toArray(),
       changeLog: await database.changeLog.toArray(),
+      layoutTemplates: await database.layoutTemplates.toArray(),
     }),
   );
   const portableAttachments: SerializedAttachment[] = await Promise.all(
@@ -478,6 +488,7 @@ export async function createBackup(
     (entry) =>
       !entry.changes.some(
         (change) =>
+          ["safetyBackups", "importDiagnostics"].includes(change.table) ||
           (change.table === "settings" && securityKey(change.key)) ||
           (!includeAttachments &&
             (change.table === "attachments" ||
@@ -740,7 +751,7 @@ export async function exportCsv(database: FinanceDB = db) {
       transaction.type,
       categories.get(transaction.categoryId ?? "")?.name,
       categories.get(transaction.subcategoryId ?? "")?.name,
-      transaction.tags.map((tag) => tags.get(tag) ?? tag).join("|"),
+      (transaction.tags ?? []).map((tag) => tags.get(tag) ?? tag).join("|"),
       transaction.statementId,
       transaction.id,
       transaction.parentId,

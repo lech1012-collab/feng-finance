@@ -18,8 +18,9 @@ import { getParser } from "../parsers";
 import { PARSER_VERSION } from "../parsers/interface";
 import type { StatementPeriod } from "../parsers/period";
 import { duplicateStatus } from "./duplicates";
+import { outsideStatementPeriod } from "./statement-period";
 import { categorize } from "../categorization/engine";
-import { reconcile } from "../domain/reconcile";
+import { reconcileWithPolicy } from "../domain/reconcile";
 import { rememberCategory } from "../storage/category-memory";
 import {
   csvPreset,
@@ -41,6 +42,16 @@ import { applyTransferProposal } from "../storage/accuracy";
 import { markRefundCandidates } from "../analytics/effective-transactions";
 import { convertMinor } from "../analytics/fx";
 import { importMonthGuardDates } from "./month-guards";
+import { preparePdfReading, type PdfReviewOptions } from "./pdf-review";
+export { savePdfLayout, type PdfReviewOptions } from "./pdf-review";
+import type { GenericParseResult } from "./generic/types";
+import type {
+  PdfImportSession,
+  ExtractionResult,
+  ImportProgress,
+} from "./pdf-session-types";
+import { firstRealImportAt } from "../beta/policy";
+import { retainImportDiagnostics } from "../storage/import-diagnostics";
 function applyCategory(
   transaction: Transaction,
   rules: import("../domain/models").Rule[],
@@ -54,6 +65,9 @@ function applyCategory(
   };
 }
 export interface ExtractedFile {
+  pdfSession?: PdfImportSession;
+  extraction?: ExtractionResult;
+  generic?: GenericParseResult;
   rows: TextRow[];
   hash: string;
   filename: string;
@@ -69,6 +83,10 @@ export async function extractFile(
   file: File,
   progress: (s: string) => void,
   forceOcr = false,
+  options: {
+    signal?: AbortSignal;
+    detailedProgress?: (progress: ImportProgress) => void;
+  } = {},
 ): Promise<ExtractedFile> {
   const extension = file.name.split(".").at(-1)?.toLowerCase();
   if (extension && ["csv", "ofx", "qfx", "qif"].includes(extension)) {
@@ -98,37 +116,42 @@ export async function extractFile(
       text: format === "qif" ? text : undefined,
     };
   }
-  const { validateFile, openPdf, extractEmbedded } = await import("./pdf");
+  const { createPdfImportSession } = await import("./pdf-session");
   progress("Checking PDF and calculating fingerprint…");
-  const { bytes, hash } = await validateFile(file);
-  const doc = await openPdf(bytes);
+  const session = await createPdfImportSession(file, {
+    signal: options.signal,
+  });
   try {
-    const embedded = await extractEmbedded(doc, progress);
-    let items: PageTextItem[] = embedded.items;
-    const ocrPages = forceOcr
-      ? Array.from({ length: doc.numPages }, (_, i) => i + 1)
-      : embedded.emptyPages;
-    if (ocrPages.length) {
-      progress("Preparing local OCR…");
-      const { extractOcr } = await import("./ocr");
-      const scanned = await extractOcr(doc, ocrPages, progress);
-      items = [...items.filter((i) => !ocrPages.includes(i.page)), ...scanned];
-    }
+    const extraction = await session.extract({
+      forceOcr,
+      signal: options.signal,
+      progress: (detail) => {
+        progress(detail.message);
+        options.detailedProgress?.(detail);
+      },
+    });
     return {
-      rows: reconstructRows(items),
-      hash,
+      rows: reconstructRows(
+        extraction.items.map((item) => ({ ...item, y: item.y + item.height })),
+      ),
+      hash: session.hash,
       filename: file.name,
-      method: ocrPages.length ? "OCR" : "embedded-text",
-      warnings: ocrPages.length
-        ? [
-            "Scanned text was read with local OCR. Verify every transaction amount against the source PDF.",
-          ]
-        : [],
+      method: extraction.method === "text" ? "embedded-text" : "OCR",
+      warnings:
+        extraction.cancelled || extraction.unreadPages.length
+          ? [
+              `Image reading stopped. ${extraction.completedPages.length} of ${extraction.pageCount} pages were read; unread pages require review and an explicit Unverified import.`,
+            ]
+          : [],
+      pdfSession: session,
+      extraction,
     };
-  } finally {
-    await doc.loadingTask.destroy();
+  } catch (error) {
+    await session.dispose();
+    throw error;
   }
 }
+
 export async function prepareDraft(
   extracted: ExtractedFile,
   selectedBank?: Institution,
@@ -136,20 +159,16 @@ export async function prepareDraft(
   periodOverride?: StatementPeriod,
   pendingDrafts: ImportDraft[] = [],
   csvMapping?: CsvMapping,
+  pdfReviewOptions: PdfReviewOptions = {},
 ): Promise<ImportDraft> {
   const detection = detectBank(extracted.rows);
-  if (
-    !extracted.format &&
-    !selectedBank &&
-    (detection.institution === "Other" ||
-      detection.confidence < 0.7 ||
-      detection.ambiguous)
-  )
-    throw new Error(
-      "Bank detection is uncertain. Select the bank and parse again.",
-    );
-  const parser = !extracted.format
-    ? getParser(selectedBank ?? detection.institution, extracted.rows)
+  const bank =
+    selectedBank ?? selectedAccount?.institution ?? detection.institution;
+  const pdfReading = !extracted.format
+    ? await preparePdfReading(extracted, bank, selectedAccount, {
+        ...pdfReviewOptions,
+        period: periodOverride ?? pdfReviewOptions.period,
+      })
     : undefined;
   let savedMapping: CsvMapping | undefined;
   if (selectedAccount && extracted.csv && !csvMapping) {
@@ -203,7 +222,7 @@ export async function prepareDraft(
                 ? (selectedAccount?.institution ?? "Other")
                 : extracted.parsed.institution),
           }
-        : parser!.parse(extracted.rows, periodOverride);
+        : pdfReading!.parsed;
   if (periodOverride && extracted.format)
     Object.assign(parsed, {
       periodStart: periodOverride.start,
@@ -285,13 +304,15 @@ export async function prepareDraft(
       .first();
     if (previous) parsed.openingBalance = previous.closingBalance;
   }
-  const validation = parser
-    ? parser.validate(parsed)
-    : reconcile(
-        parsed.openingBalance,
-        parsed.closingBalance,
-        parsed.transactions.map((t) => t.amount),
-      );
+  const validation =
+    pdfReading?.generic && !pdfReading.fallback
+      ? pdfReading.generic.checks.reconciliation
+      : reconcileWithPolicy(
+          parsed.openingBalance,
+          parsed.closingBalance,
+          parsed.transactions.map((t) => t.amount),
+          parsed.validationPolicy,
+        );
   const statements = await db.statements
     .where("accountId")
     .equals(account.id)
@@ -397,6 +418,8 @@ export async function prepareDraft(
   }
   return {
     account,
+    parserReview: pdfReading?.generic,
+    parserFallback: pdfReading?.fallback,
     statement: {
       id: sid,
       institution: parsed.institution,
@@ -417,6 +440,15 @@ export async function prepareDraft(
       validationDifference: validation.difference,
       transactionCount: transactions.length,
       warnings,
+      parserMethod: parsed.parserMethod,
+      validationPolicy: parsed.validationPolicy,
+      rowsBalanceChecked: parsed.rowsBalanceChecked,
+      rowsTotalChecked: parsed.rowsTotalChecked,
+      rowsNeedingReview: parsed.rowsNeedingReview,
+      bankProfileId: parsed.bankProfileId,
+      rowsExcludedByReview: parsed.rowsExcludedByReview,
+      unreadPages: parsed.unreadPages,
+      layoutTemplateId: parsed.layoutTemplateId,
     },
     transactions,
     exactDuplicate:
@@ -437,11 +469,41 @@ export async function prepareDraft(
   };
 }
 export function draftReconciliation(draft: ImportDraft) {
-  return reconcile(
+  const validation = reconcileWithPolicy(
     draft.statement.openingBalance,
     draft.statement.closingBalance,
     draft.transactions.map((t) => t.amount),
+    draft.statement.validationPolicy,
   );
+  // A printed, valid purchase date can precede a card's posting period. Retain
+  // that date, but a new PDF cannot be called verified without matching dates.
+  if (
+    draft.statement.validationPolicy === "exact-v2.2" &&
+    draft.transactions.some((row) =>
+      outsideStatementPeriod(
+        row,
+        draft.statement.statementPeriodStart,
+        draft.statement.statementPeriodEnd,
+      ),
+    )
+  )
+    validation.status = "warning";
+  const evidence = !draft.parserFallback
+    ? draft.parserReview?.checks
+    : undefined;
+  if (
+    evidence &&
+    (validation.status === "unavailable" || !evidence.reconciledExactly)
+  ) {
+    return {
+      ...evidence.reconciliation,
+      ...validation,
+      status: evidence.reconciledExactly
+        ? evidence.reconciliation.status
+        : ("warning" as const),
+    };
+  }
+  return validation;
 }
 /** Keep reviewed corrections while refreshing account identities and duplicate checks.
  * Each statement in a multi-file import must see the statements committed before it.
@@ -530,6 +592,48 @@ export async function refreshReviewedDraft(
 }
 export function validateDraft(draft: ImportDraft, overrideValidation: boolean) {
   const validation = draftReconciliation(draft);
+  if (draft.parserReview && !draft.parserFallback) {
+    const sourceTransactions = draft.parserReview.parsed?.transactions ?? [];
+    if (
+      sourceTransactions.length !== draft.transactions.length ||
+      sourceTransactions.some((source) => {
+        const normalized = draft.transactions.find(
+          (row) => row.parseRowId === source.parseRowId,
+        );
+        return (
+          !normalized ||
+          normalized.amount !== source.amount ||
+          normalized.date !== source.date ||
+          normalized.bookingDate !== source.bookingDate ||
+          normalized.balanceAfterTransaction !== source.balanceAfterTransaction
+        );
+      })
+    )
+      throw new Error(
+        "Source readings changed during review. Check the statement again before importing.",
+      );
+    if (
+      draft.parserReview.rowChecks.some(
+        (row) =>
+          row.reviewAction?.kind !== "exclude" &&
+          row.issues.some((issue) =>
+            ["invalid-date", "invalid-amount", "missing-description"].includes(
+              issue,
+            ),
+          ),
+      )
+    )
+      throw new Error(
+        "Correct or exclude every source row with an invalid date, amount or description before importing.",
+      );
+    if (
+      draft.parserReview.rowChecks.some((row) => !row.resolved) &&
+      !overrideValidation
+    )
+      throw new Error(
+        "Review the source rows or explicitly import them as Unverified.",
+      );
+  }
   if (draft.exactDuplicate && !draft.duplicateOverride)
     throw new Error(
       "This statement has already been imported. An explicit duplicate override is required.",
@@ -542,6 +646,7 @@ export function validateDraft(draft: ImportDraft, overrideValidation: boolean) {
     throw new Error("Acknowledge the extraction warnings before importing.");
   for (const t of draft.transactions) {
     parseDate(t.date);
+    if (t.bookingDate !== undefined) parseDate(t.bookingDate);
     currencyPrecision(t.currency);
     if (
       !Number.isSafeInteger(t.amount) ||
@@ -549,7 +654,12 @@ export function validateDraft(draft: ImportDraft, overrideValidation: boolean) {
         !Number.isSafeInteger(t.balanceAfterTransaction))
     )
       throw new Error("A transaction amount is invalid.");
-    if (t.include && t.extractionConfidence < 0.8 && !t.acknowledged)
+    if (
+      (!draft.parserReview || draft.parserFallback) &&
+      t.include &&
+      t.extractionConfidence < 0.8 &&
+      !t.acknowledged
+    )
       throw new Error("Verify every uncertain transaction before importing.");
     if (t.include && t.duplicate !== "none" && !t.acknowledged)
       throw new Error("Confirm potential duplicates before keeping them.");
@@ -560,11 +670,22 @@ export function validateDraft(draft: ImportDraft, overrideValidation: boolean) {
     if (!t.description.trim())
       throw new Error("Transaction descriptions must not be empty.");
     if (
-      t.date < draft.statement.statementPeriodStart ||
-      t.date > draft.statement.statementPeriodEnd
-    )
+      outsideStatementPeriod(
+        t,
+        draft.statement.statementPeriodStart,
+        draft.statement.statementPeriodEnd,
+      )
+    ) {
+      if (
+        draft.statement.validationPolicy === "exact-v2.2" &&
+        !overrideValidation
+      )
+        throw new Error(
+          "A printed transaction date is outside the statement period. Check the source or explicitly import the statement as Unverified.",
+        );
       if (!draft.reviewedWarnings)
         throw new Error("Transaction date is outside the statement period.");
+    }
   }
   return validation;
 }
@@ -590,7 +711,14 @@ export async function commitDraft(
       replaceManual: _replace,
       ...t
     } = row;
-    t.isReviewed = manuallyCategorized.has(t.id) || t.isReviewed;
+    t.isReviewed =
+      manuallyCategorized.has(t.id) ||
+      t.isReviewed ||
+      !!draft.parserReview?.rowChecks.find(
+        (check) => check.rowId === t.parseRowId,
+      )?.reviewAction;
+    if (overrideValidation && t.checkLevel === "review")
+      t.checkLevel = "manual_override";
     t.updatedAt = new Date().toISOString();
     t.transactionFingerprint = await fingerprint(t);
     incoming.push(t);
@@ -609,6 +737,8 @@ export async function commitDraft(
       "monthCloses",
       "transferProposals",
       "fxRates",
+      "importDiagnostics",
+      "layoutTemplates",
     ],
     async () => {
       await ensureMonthsOpen(await importMonthGuardDates([draft]));
@@ -719,7 +849,7 @@ export async function commitDraft(
             "This manual transaction has a transfer, split or refund link. Unlink or unsplit it before replacing it, or keep both records during review.",
           );
         await ensureMonthsOpen([manual]);
-        t.tags = [...new Set([...manual.tags, ...t.tags])];
+        t.tags = [...new Set([...(manual.tags ?? []), ...(t.tags ?? [])])];
         t.sourceMerchant = t.sourceMerchant ?? t.merchant;
         t.merchant = manual.merchant;
         t.note = manual.note;
@@ -756,6 +886,12 @@ export async function commitDraft(
         ...draft.account,
         updatedAt: new Date().toISOString(),
       });
+      const firstImport =
+        firstRealImportAt(
+          await db.statements.toArray(),
+          (await db.settings.get("firstRealImportAt"))?.value,
+        ) ?? draft.statement.importedAt;
+      await db.settings.put({ key: "firstRealImportAt", value: firstImport });
       await db.statements.add({
         ...draft.statement,
         validationStatus: validation.status,
@@ -779,6 +915,20 @@ export async function commitDraft(
         key: "backup:importsSinceExport",
         value: String(importCount + 1),
       });
+      if (draft.parserReview)
+        await retainImportDiagnostics(
+          {
+            id: `pdf:${draft.statement.sourceFileHash}`,
+            statementId: draft.statement.id,
+            createdAt: new Date().toISOString(),
+            parserVersion: draft.statement.parserVersion,
+            method: draft.statement.parserMethod ?? "text",
+            table: draft.parserReview.table,
+            rows: draft.parserReview.rowChecks,
+            checks: draft.parserReview.checks,
+          },
+          db,
+        );
       await db.transactions.bulkAdd(incoming);
       for (const t of incoming) {
         if (manuallyCategorized.has(t.id)) {

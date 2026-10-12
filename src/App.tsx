@@ -10,6 +10,7 @@ import {
   useEffect,
   useState,
   useRef,
+  useSyncExternalStore,
   lazy,
   Suspense,
   Component,
@@ -41,7 +42,31 @@ import { statementBalanceDate } from "./analytics/statement-balances";
 import Home from "./pages/Home";
 import { AppLock } from "./components/AppLock";
 import { MonthReview } from "./components/MonthReview";
-import { deleteDemo } from "./storage/demo";
+import { CURRENT_RELEASE } from "./beta/release";
+import { isExactRecovery } from "./storage/safety-backup";
+import {
+  hasPendingFinancialWrites,
+  subscribeFinancialWrites,
+} from "./storage/write-activity";
+import { APP_VERSION, type Setting } from "./domain/models";
+import { BetaNotice } from "./beta/BetaNotice";
+import { InstallBanner, InstallHelp } from "./beta/InstallGuidance";
+import { DataNotices } from "./beta/DataNotices";
+import { WhatsNew } from "./beta/WhatsNew";
+import { useDesktopInstall } from "./beta/useDesktopInstall";
+import { installUpdateChecks, useSafeUpdateVisibility } from "./beta/updates";
+import {
+  betaPreferences,
+  currentRuntimeMode,
+  needsBetaNotice,
+  needsWhatsNew,
+  noticeAcknowledgedSettings,
+  requestPersistentStorage,
+  firstRealImportAt,
+} from "./beta/policy";
+import { exportBackupFile } from "./storage/backup";
+import "./beta/beta.css";
+import { loadDemo, deleteDemo } from "./storage/demo";
 import { useSearchParams } from "react-router-dom";
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Category = lazy(() => import("./pages/Category"));
@@ -92,6 +117,107 @@ function Shell() {
   const [initialized, setInitialized] = useState(false);
   const [initError, setInitError] = useState("");
   const [updateAvailable, setUpdateAvailable] = useState(false);
+
+  const [betaBusy, setBetaBusy] = useState(false);
+  const [betaFlowError, setBetaFlowError] = useState(false);
+  const [exactRecovery, setExactRecovery] = useState(false);
+  const [actualStoragePersisted, setActualStoragePersisted] =
+    useState<boolean>();
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [runtimeMode] = useState(currentRuntimeMode);
+  const desktopInstall = useDesktopInstall();
+  const betaData = useLiveQuery(async () => {
+    if (!initialized) return undefined;
+    const settings = await db.settings.toArray();
+    const statements = await db.statements.filter((s) => !s.isDemo).toArray();
+    const prefs = betaPreferences(settings);
+    prefs.firstRealImportAt = firstRealImportAt(
+      statements,
+      prefs.firstRealImportAt,
+    );
+    return { prefs, hasRealImports: statements.length > 0 };
+  }, [initialized]);
+  useEffect(() => {
+    if (!betaData) return;
+    let active = true;
+    void (navigator.storage?.persisted?.() ?? Promise.resolve(false))
+      .then((protectedStorage) => {
+        if (active) setActualStoragePersisted(protectedStorage);
+      })
+      .catch(() => {
+        if (active) setActualStoragePersisted(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [!!betaData, betaData?.prefs.storagePersisted]);
+  const pendingFinancialWrite = useSyncExternalStore(
+    subscribeFinancialWrites,
+    hasPendingFinancialWrites,
+    hasPendingFinancialWrites,
+  );
+  const safeUpdate = useSafeUpdateVisibility(
+    location.pathname,
+    betaBusy || !!selectedFiles.length || pendingFinancialWrite,
+  );
+  useEffect(() => {
+    if (
+      betaData &&
+      !exactRecovery &&
+      !betaBusy &&
+      safeUpdate &&
+      !needsBetaNotice(betaData.prefs) &&
+      needsWhatsNew(betaData.prefs, APP_VERSION)
+    )
+      setShowWhatsNew(true);
+  }, [betaData, exactRecovery, betaBusy, safeUpdate]);
+  const saveBetaSettings = async (settings: Setting[]) => {
+    await db.transaction("rw", db.settings, () =>
+      db.settings.bulkPut(settings),
+    );
+  };
+  const requestBetaStorage = async () => {
+    const persisted = await requestPersistentStorage(navigator.storage);
+    setActualStoragePersisted(persisted);
+    try {
+      await saveBetaSettings([
+        { key: "storagePersisted", value: String(persisted) },
+      ]);
+    } catch {
+      setStorageWarning(
+        "Storage protection could not be recorded. Save a backup before importing more statements.",
+      );
+    }
+  };
+  const acceptBeta = async (choice: "demo" | "import") => {
+    // Keep the native Files picker in the user's synchronous tap gesture.
+    if (choice === "import") openImportPicker();
+    setBetaBusy(true);
+    setBetaFlowError(false);
+    try {
+      await saveBetaSettings([
+        ...noticeAcknowledgedSettings(),
+        ...(betaData?.prefs.lastSeenVersion
+          ? []
+          : [
+              {
+                key: "lastSeenVersion",
+                value: betaData?.hasRealImports ? "previous" : APP_VERSION,
+              },
+            ]),
+      ]);
+      await requestBetaStorage();
+      if (choice === "demo") {
+        await loadDemo();
+        navigate("/");
+      }
+    } catch (error) {
+      setBetaFlowError(true);
+      throw error;
+    } finally {
+      setBetaBusy(false);
+    }
+  };
 
   const demoCount = useLiveQuery(
     () => db.accounts.filter((a) => !!a.isDemo).count(),
@@ -150,10 +276,34 @@ function Shell() {
     return () => observer.disconnect();
   }, []);
   useEffect(() => {
+    let cleanupUpdateChecks: (() => void) | undefined;
     void initializeDatabase()
-      .then(() => {
+      .then(async () => {
+        const recovered = await isExactRecovery(db);
+        setExactRecovery(recovered);
         setInitialized(true);
-        void autoCloseEligibleMonths().catch(() => {});
+        if (!recovered) void autoCloseEligibleMonths().catch(() => {});
+        try {
+          if (
+            !recovered &&
+            navigator.storage?.persisted &&
+            (await db.settings.get("betaNoticeAcceptedVersion"))
+          ) {
+            const protectedStorage = await navigator.storage
+              .persisted()
+              .catch(() => false);
+            const previous = await db.settings.get("storagePersisted");
+            if (previous?.value !== String(protectedStorage))
+              await db.settings.put({
+                key: "storagePersisted",
+                value: String(protectedStorage),
+              });
+          }
+        } catch {
+          setStorageWarning(
+            "Storage protection could not be checked. Save a backup before importing more statements.",
+          );
+        }
       })
       .catch(() =>
         setInitError(
@@ -167,16 +317,8 @@ function Shell() {
         onNeedRefresh: () => setUpdateAvailable(true),
 
         onRegisteredSW: (_url, registration) => {
-          if (registration) {
-            void registration.update().catch(() => {});
-            window.setInterval(
-              () => {
-                if (navigator.onLine)
-                  void registration.update().catch(() => {});
-              },
-              60 * 60 * 1000,
-            );
-          }
+          if (registration)
+            cleanupUpdateChecks = installUpdateChecks(registration);
         },
         onRegisterError: () =>
           !navigator.serviceWorker.controller &&
@@ -188,7 +330,6 @@ function Shell() {
       off = () => setOnline(false);
     window.addEventListener("online", on);
     window.addEventListener("offline", off);
-    void navigator.storage?.persist?.().catch(() => {});
     if (navigator.storage?.estimate)
       void navigator.storage.estimate().then((s) => {
         if (s.quota && s.usage && s.usage / s.quota > 0.8)
@@ -197,6 +338,7 @@ function Shell() {
           );
       });
     return () => {
+      cleanupUpdateChecks?.();
       window.removeEventListener("online", on);
       window.removeEventListener("offline", off);
     };
@@ -227,7 +369,17 @@ function Shell() {
     };
   }, [location.pathname, location.hash]);
   const updateApp = async () => {
+    const permitted = () =>
+      ["", "#", "#/"].includes(window.location.hash.split("?")[0]) &&
+      location.pathname === "/" &&
+      !betaBusy &&
+      !selectedFiles.length &&
+      !hasPendingFinancialWrites() &&
+      !document.querySelector("dialog[open], [aria-modal='true']");
+    if (!permitted()) return;
     const registration = await navigator.serviceWorker.getRegistration();
+    // Navigation or a save can begin while the browser resolves registration.
+    if (!permitted()) return;
     if (!registration?.waiting) {
       window.location.reload();
       return;
@@ -398,22 +550,30 @@ function Shell() {
             </Link>
             {!online && <span className="small-chip">Offline</span>}
           </header>
-          {updateAvailable && (
-            <div className="notice update-notice" role="status">
-              <span>
-                Feng Finance update available. Save any import review first;
-                updating reloads the app.
-              </span>
-              <button onClick={() => void updateApp()}>Update</button>
-            </div>
-          )}
+          {updateAvailable &&
+            safeUpdate &&
+            betaData &&
+            !needsBetaNotice(betaData.prefs) && (
+              <div className="notice update-notice" role="status">
+                <span>A new version of Feng is ready</span>
+                <button onClick={() => void updateApp()}>Reload</button>
+              </div>
+            )}
           {storageWarning && (
             <div className="notice warning" role="status">
               {storageWarning}
             </div>
           )}
           {initialized && !initError && (
-            <CurrencyViewNotice currency={currency} />
+            <CurrencyViewNotice
+              currency={currency}
+              allowAutomaticDownload={
+                !exactRecovery &&
+                !!betaData &&
+                !needsBetaNotice(betaData.prefs) &&
+                !betaBusy
+              }
+            />
           )}
           {initialized && !!demoCount && (
             <div className="notice demo-banner" role="status">
@@ -421,11 +581,56 @@ function Shell() {
               <button onClick={() => void deleteDemo()}>Clear demo</button>
             </div>
           )}
+          {betaData &&
+            !exactRecovery &&
+            !betaBusy &&
+            !needsBetaNotice(betaData.prefs) && (
+              <InstallBanner
+                prefs={betaData.prefs}
+                mode={runtimeMode}
+                onSave={saveBetaSettings}
+              />
+            )}
+          {betaData &&
+            !exactRecovery &&
+            !betaBusy &&
+            !needsBetaNotice(betaData.prefs) &&
+            location.pathname === "/" && (
+              <DataNotices
+                prefs={betaData.prefs}
+                mode={runtimeMode}
+                hasRealImports={betaData.hasRealImports}
+                onSave={saveBetaSettings}
+                onBackup={async () => {
+                  await exportBackupFile();
+                }}
+              />
+            )}
+          {showWhatsNew && (
+            <WhatsNew
+              release={CURRENT_RELEASE}
+              onClose={async () => {
+                await saveBetaSettings([
+                  { key: "lastSeenVersion", value: APP_VERSION },
+                ]);
+                setShowWhatsNew(false);
+              }}
+            />
+          )}
           <main id="main" tabIndex={-1}>
             {initError ? (
               <p role="alert">{initError}</p>
-            ) : !initialized ? (
+            ) : !initialized || !betaData ? (
               <p role="status">Opening your local finances…</p>
+            ) : needsBetaNotice(betaData.prefs) || betaBusy || betaFlowError ? (
+              <BetaNotice
+                onAccept={acceptBeta}
+                installHelp={
+                  runtimeMode.ios && !runtimeMode.installed ? (
+                    <InstallHelp mode={runtimeMode} />
+                  ) : undefined
+                }
+              />
             ) : (
               <Suspense fallback={<p role="status">Loading…</p>}>
                 <Routes>
@@ -497,7 +702,21 @@ function Shell() {
                       />
                     }
                   />
-                  <Route path="/settings" element={<Settings />} />
+                  <Route
+                    path="/settings"
+                    element={
+                      <Settings
+                        beta={{
+                          mode: runtimeMode,
+                          storagePersisted:
+                            actualStoragePersisted ??
+                            betaData.prefs.storagePersisted,
+                          desktopInstall,
+                          onRequestStorage: requestBetaStorage,
+                        }}
+                      />
+                    }
+                  />
                   <Route
                     path="/review"
                     element={<ReviewRoute month={month} currency={currency} />}

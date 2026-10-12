@@ -282,7 +282,7 @@ export default function Transactions({
           )) &&
         (!queryIds || queryIds.has(t.id)) &&
         (!search ||
-          `${t.description} ${t.merchant} ${t.note ?? ""} ${t.tags.join(" ")}`
+          `${t.description} ${t.merchant} ${t.note ?? ""} ${(t.tags ?? []).join(" ")}`
             .toLowerCase()
             .includes(search.toLowerCase())) &&
         (!account || t.accountId === account) &&

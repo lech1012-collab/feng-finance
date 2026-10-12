@@ -121,7 +121,7 @@ describe("storage and backup integrity", () => {
     expect(preserved?.description).toBe("WAITROSE");
     expect(preserved?.occurrence).toBe(0);
     expect(preserved?.tags).toEqual([]);
-    expect(current.verno).toBe(3);
+    expect(current.verno).toBe(4);
     await current.delete();
   });
 });

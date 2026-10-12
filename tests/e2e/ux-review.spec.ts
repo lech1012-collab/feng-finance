@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page } from "./fixtures";
 
 /** Fictitious source records reproduce a partially imported household without
  * requiring a real statement or relying on categories/amounts from demo mode. */

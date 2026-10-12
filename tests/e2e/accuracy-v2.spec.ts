@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 
 async function seedAccuracy(page: Page) {
   await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));

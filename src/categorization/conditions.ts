@@ -33,9 +33,9 @@ export function conditionValue(
     case "day":
       return Number(t.date.slice(8, 10));
     case "tag":
-      return t.tags;
+      return t.tags ?? [];
     case "reviewed":
-      return t.isReviewed;
+      return t.isReviewed ?? false;
     case "kind":
       return (
         t.kind ??

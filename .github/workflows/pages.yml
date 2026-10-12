@@ -36,10 +36,16 @@ jobs:
       - uses: actions/configure-pages@v5
         id: pages
       - run: npm ci
+      - run: npm run check:repo
+      - run: npm run check:release
+      - run: npm run test:hygiene
       - run: npm test
       - run: npm run build
         env:
           VITE_BASE_PATH: ${{ steps.pages.outputs.base_path }}/
+          VITE_FEEDBACK_URL: ${{ vars.VITE_FEEDBACK_URL }}
+          VITE_FEEDBACK_EMAIL: ${{ vars.VITE_FEEDBACK_EMAIL }}
+          VITE_FEEDBACK_CONTEXT_PARAMETER: ${{ vars.VITE_FEEDBACK_CONTEXT_PARAMETER }}
       - uses: actions/upload-pages-artifact@v4
         with:
           path: dist

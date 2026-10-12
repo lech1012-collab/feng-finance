@@ -1,3 +1,4 @@
+import { reconciliationTolerance } from "../domain/reconcile";
 import type { Account, Statement, Transaction } from "../domain/models";
 import { monthBounds } from "../domain/dates";
 import { safeSum } from "../domain/money";
@@ -53,7 +54,7 @@ export function verifiedStatements(
       Math.abs(
         safeSum([statement.openingBalance, ...rows.map((row) => row.amount)]) -
           statement.closingBalance,
-      ) <= 1
+      ) <= reconciliationTolerance(statement.validationPolicy)
     );
   });
 }

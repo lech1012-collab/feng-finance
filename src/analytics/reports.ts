@@ -68,8 +68,8 @@ export function reportRows(
       report.groupBy === "category"
         ? [t.categoryId ?? "uncategorized"]
         : report.groupBy === "tag"
-          ? t.tags.length
-            ? t.tags
+          ? (t.tags ?? []).length
+            ? (t.tags ?? [])
             : ["untagged"]
           : report.groupBy === "account"
             ? [t.accountId]
@@ -307,7 +307,7 @@ export function transactionsCsv(
       t.kind ?? "normal",
       categories.find((c) => c.id === t.categoryId)?.name ?? "",
       categories.find((c) => c.id === t.subcategoryId)?.name ?? "",
-      t.tags
+      (t.tags ?? [])
         .map((id) => tags.find((tag) => tag.id === id)?.name ?? id)
         .join("|"),
       t.statementId,
@@ -315,7 +315,7 @@ export function transactionsCsv(
       t.parentId,
       t.source ?? "pdf",
       t.sourcePage,
-      t.isReviewed,
+      t.isReviewed ?? false,
       t.categoryRuleId,
       t.note,
       t.bookingDate,
@@ -330,12 +330,12 @@ export function transactionsCsv(
       t.accountId,
       t.categoryId,
       t.subcategoryId,
-      t.tags.join("|"),
+      (t.tags ?? []).join("|"),
       t.sourceMerchant,
       t.categorySource,
       t.appliedRuleIds?.join("|"),
       t.transactionFingerprint,
-      t.occurrence,
+      t.occurrence ?? 0,
       t.isTransfer,
       t.linkId,
       t.recurringSeriesId,

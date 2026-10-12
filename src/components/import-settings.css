@@ -1,0 +1,55 @@
+.import-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.618rem;
+  align-items: center;
+}
+.import-settings-actions button {
+  min-height: 44px;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+}
+.import-layout-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 0;
+  border-top: 1px solid var(--border);
+}
+.import-layout-setting > div:first-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.import-layout-setting strong,
+.import-layout-setting small {
+  display: block;
+}
+.import-layout-setting small {
+  margin-top: 0.382rem;
+  color: var(--muted);
+}
+.import-layout-setting form {
+  width: 100%;
+}
+.import-layout-setting form input {
+  width: 100%;
+}
+.import-layout-setting form .import-settings-actions {
+  margin-top: 0.618rem;
+}
+.safety-recovery-confirm {
+  min-width: 0;
+  border: 0;
+  padding: 0;
+}
+.safety-recovery-confirm legend {
+  font-weight: 600;
+  margin: 1rem 0 0.618rem;
+}
+@media (max-width: 560px) {
+  .import-layout-setting {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

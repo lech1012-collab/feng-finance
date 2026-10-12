@@ -61,7 +61,7 @@ describe("import review corrections", () => {
   it.each([
     ["changed parser options", "Parse again"],
     ["invalid amount", "Correct invalid amounts"],
-    ["invalid date", "Review needed"],
+    ["invalid date", "Statement needs review"],
     ["retained duplicate", "Verify highlighted rows"],
     ["batch recheck", "Recheck statement"],
   ])("marks %s as blocked even when amounts reconcile", async (kind, label) => {
@@ -85,8 +85,17 @@ describe("import review corrections", () => {
     expect(card?.querySelector("summary .small-chip")).not.toHaveTextContent(
       "✓ Reconciled",
     );
-    // Arithmetic proof remains visible independently of the outstanding review.
-    expect(screen.getByText("✓ Statement reconciled")).toBeInTheDocument();
+    // Date validation can fail even when the arithmetic difference is zero.
+    // Keep the figures visible without calling the whole statement reconciled.
+    if (kind === "invalid date") {
+      expect(container.querySelector(".validation strong")).toHaveTextContent(
+        "Statement needs review",
+      );
+      expect(screen.getByText("Difference")).toBeInTheDocument();
+      expect(screen.getAllByText("£0.00").length).toBeGreaterThan(0);
+    } else {
+      expect(screen.getByText("✓ Statement reconciled")).toBeInTheDocument();
+    }
   });
 
   it("clears the blocking status only after all review blockers are resolved", async () => {

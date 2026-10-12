@@ -397,7 +397,9 @@ export abstract class BaseParser implements StatementParser {
     const balances = this.extractBalances(rows, currency);
     const extraction = this.extractTransactions(rows, period.end, currency);
     const outside = extraction.transactions.filter(
-      (t) => t.date < period.start || t.date > period.end,
+      (t) =>
+        (t.bookingDate ?? t.date) < period.start ||
+        (t.bookingDate ?? t.date) > period.end,
     );
     return {
       institution: this.institution,

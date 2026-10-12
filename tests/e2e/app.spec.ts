@@ -3,7 +3,8 @@ import {
   expect,
   type Locator,
   type Page,
-} from "@playwright/test";
+  acknowledgeBeta,
+} from "./fixtures";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { startStaticHost, type LocalHost } from "./static-host";
@@ -809,6 +810,7 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
     },
   );
   await page.goto(offlineHost.origin);
+  await acknowledgeBeta(page);
   await gotoRoute(page, "/settings");
   await expect(
     page.getByRole("combobox", { name: "Transfer matching", exact: true }),
@@ -1039,7 +1041,7 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await expect(statement).not.toHaveClass(/import-statement-blocking/);
   await selectStatement(page, "barclays-no-period");
   await expect(page.getByRole("alert")).toContainText(
-    "Enter the start and end dates",
+    "Enter the dates printed on the PDF",
   );
   await page.getByLabel("Enter statement dates from the source file").check();
   await page.getByLabel("Statement start date").fill("2026-09-01");
@@ -1077,9 +1079,31 @@ test("reconciliation warning cannot be silently committed", async ({
   await expect(
     page.getByRole("button", { name: "Confirm import" }),
   ).toBeDisabled();
+  await expect(
+    page.getByLabel(/I reviewed the source PDF and explicitly accept/),
+  ).toHaveCount(0);
   await page
-    .getByLabel(/I reviewed the source PDF and explicitly accept/)
+    .getByRole("button", { name: "Import anyway…", exact: true })
+    .click();
+  const override = page.getByRole("dialog", {
+    name: "Import an unverified statement?",
+    exact: true,
+  });
+  const acceptUnverified = override.getByRole("button", {
+    name: "Import unverified statement",
+    exact: true,
+  });
+  await expect(acceptUnverified).toBeDisabled();
+  await override
+    .getByLabel(
+      "I checked the original statement and accept importing these unverified figures.",
+    )
     .check();
+  await acceptUnverified.click();
+  await expect(override).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeEnabled();
   await confirmImport(page);
   await gotoRoute(page, "/settings");
   await page
@@ -1112,7 +1136,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   const bytes = await readFile(path!);
   const json = JSON.parse(bytes.toString());
   expect(json.format).toBe("feng-finance");
-  expect(json.schemaVersion).toBe(3);
+  expect(json.schemaVersion).toBe(4);
   expect(json.accounts).toHaveLength(8);
   expect(json.transactions).toHaveLength(176);
   expect(
@@ -1218,6 +1242,7 @@ test("offline launch, local PDF import, backup and no financial upload", async (
     }
   });
   await page.goto(offlineHost.origin);
+  await acknowledgeBeta(page);
   await offlineInstalled(page);
   await offlineHost.stop();
   await page.reload();
@@ -1240,12 +1265,13 @@ test("offline launch, local PDF import, backup and no financial upload", async (
   );
   expect(unexpected).toEqual([]);
 });
-test("scanned PDF uses bundled OCR and requires amount verification offline", async ({
+test("scanned PDF uses bundled OCR and exact source checks offline", async ({
   page,
   offlineHost,
 }) => {
   test.setTimeout(120000);
   await page.goto(offlineHost.origin);
+  await acknowledgeBeta(page);
   await offlineInstalled(page);
   await offlineHost.stop();
   await openImport(page);
@@ -1254,15 +1280,42 @@ test("scanned PDF uses bundled OCR and requires amount verification offline", as
     page.getByRole("heading", { name: "Barclays detected" }),
   ).toBeVisible({ timeout: 90000 });
   await expect(page.getByText(/Local OCR/).first()).toBeVisible();
+  const proof = page.getByRole("region", {
+    name: "Statement reading and checks",
+  });
+  await expect(proof).toContainText("Statement figures match exactly");
+  await expect(proof).toContainText("Read from image");
+  await expect(proof).toContainText("0 need review");
   await expect(
     page.getByRole("button", { name: "Confirm import" }),
-  ).toBeDisabled();
-  await page.getByLabel(/I compared the extracted rows/).check();
-  await page.getByLabel(/I verified this transaction/).check();
+  ).toBeEnabled();
+  await expect(page.getByLabel(/I verified this transaction/)).toHaveCount(0);
   await expect(
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
+  await gotoRoute(page, "/settings");
+  const downloaded = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
+    .click();
+  const backupPath = await (await downloaded).path();
+  const backup = JSON.parse(await readFile(backupPath!, "utf8"));
+  expect(backup.transactions).toHaveLength(1);
+  expect(backup.transactions[0]).toMatchObject({
+    amount: -8000,
+    date: "2026-09-02",
+    parseSource: "ocr",
+    sourcePage: 1,
+  });
+  expect(backup.statements[0]).toMatchObject({
+    openingBalance: 100000,
+    closingBalance: 92000,
+    validationDifference: 0,
+    validationStatus: "reconciled",
+    validationPolicy: "exact-v2.2",
+    extractionMethod: "OCR",
+  });
 });
 test("mobile layout, navigation, property and demo analysis are usable", async ({
   page,
@@ -1364,6 +1417,7 @@ test("service worker update is explicit and preserves stored records", async ({
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
   await page.goto(offlineHost.origin + "/#/settings");
+  await acknowledgeBeta(page);
   await offlineInstalled(page);
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
@@ -1375,14 +1429,22 @@ test("service worker update is explicit and preserves stored records", async ({
     if (!registration) throw new Error("No installed worker");
     await registration.update();
   });
-  await expect(page.getByText(/Feng Finance update available/)).toBeVisible({
+  await expect(
+    page.getByRole("button", { name: "Reload", exact: true }),
+  ).toHaveCount(0);
+  await gotoRoute(page, "/");
+  await expect(
+    page.getByText("A new version of Feng is ready", { exact: true }),
+  ).toBeVisible({
     timeout: 30000,
   });
   const reload = page.waitForEvent("load");
-  await page.getByRole("button", { name: "Update", exact: true }).click();
+  await page.getByRole("button", { name: "Reload", exact: true }).click();
   await reload;
   await expectTransactionCount(page, 176);
-  await expect(page.getByText(/Feng Finance update available/)).toHaveCount(0);
+  await expect(
+    page.getByText("A new version of Feng is ready", { exact: true }),
+  ).toHaveCount(0);
 });
 
 test("unsupported PDF is explicit and leaves the database empty", async ({
@@ -1415,7 +1477,9 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     page.getByRole("heading", { name: "American Express detected" }),
   ).toBeVisible();
   await expect(
-    amex.getByText("✓ Statement reconciled", { exact: true }),
+    amex.locator(".validation").getByText("Statement needs review", {
+      exact: true,
+    }),
   ).toBeVisible();
   await expect(
     amex.getByText("6 Sep to 5 Oct 2026", { exact: true }),
@@ -1426,9 +1490,27 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
+  await amex.getByText("Alternative column reading", { exact: true }).click();
   await amex
-    .getByLabel(/I compared the extracted rows with the source file/)
+    .getByRole("button", { name: "Import anyway…", exact: true })
+    .click();
+  const unverified = page.getByRole("dialog", {
+    name: "Import an unverified statement?",
+    exact: true,
+  });
+  const acceptUnverified = unverified.getByRole("button", {
+    name: "Import unverified statement",
+    exact: true,
+  });
+  await expect(acceptUnverified).toBeDisabled();
+  await unverified
+    .getByLabel(
+      "I checked the original statement and accept importing these unverified figures.",
+      { exact: true },
+    )
     .check();
+  await acceptUnverified.click();
+  await expect(unverified).not.toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Revolut detected" }),
   ).toBeVisible();
@@ -1485,6 +1567,33 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
   await expect(page.locator(".month-net strong")).toHaveText("+£455.00*");
+  // Accepting the exception must preserve the original purchase/posting date
+  // and native statement debt while leaving its verification explicitly false.
+  await gotoRoute(page, "/settings");
+  const downloaded = page.waitForEvent("download");
+  await page
+    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
+    .click();
+  const backupPath = await (await downloaded).path();
+  const backup = JSON.parse(await readFile(backupPath!, "utf8"));
+  const amexStatement = backup.statements.find(
+    (statement: { institution: string }) =>
+      statement.institution === "American Express",
+  );
+  expect(amexStatement).toMatchObject({
+    openingBalance: -120000,
+    closingBalance: -16000,
+    validationDifference: 0,
+    validationStatus: "warning",
+    validationOverride: true,
+  });
+  expect(
+    backup.transactions.find(
+      (transaction: { statementId: string; date: string }) =>
+        transaction.statementId === amexStatement.id &&
+        transaction.date === "2026-09-05",
+    ),
+  ).toMatchObject({ date: "2026-09-05", bookingDate: "2026-09-05" });
   await openImport(page);
   await selectStatement(page, "revolut-uk-layout");
   await expect(
@@ -1952,7 +2061,8 @@ test("Barclays blank dates retain every grouped transaction across pages", async
     openingBalance: 100000,
     closingBalance: 105000,
     validationStatus: "reconciled",
-    parserVersion: "1.0.3",
+    parserVersion: "2.2.0",
+    validationPolicy: "exact-v2.2",
   });
   expect(
     backup.transactions.find((t: { description: string }) =>

@@ -1,6 +1,6 @@
 # Static deployment
 
-The simplest option is Vercel's static Vite preset. The app uses hash routes, so no server, functions or route rewrite is needed. Publish only `dist/` and keep financial/private fixtures out of the hosting project.
+The existing deployment uses GitHub Pages and its verified Actions workflow. The app uses hash routes, so no server, functions or route rewrite is needed. Publish only `dist/` and keep financial/private fixtures out of the hosting project. Vercel and Cloudflare Pages are alternatives for static hosting.
 
 ## Vercel
 
@@ -14,7 +14,7 @@ For CLI deployment from an authenticated local account: `npx vercel --prod` in t
 
 ## Cloudflare Pages
 
-Use a Pages Git project with build command `npm run build`, output directory `dist`, root set to this project, Node 24 and no bindings/functions. `public/_headers` becomes `dist/_headers` and configures CSP and cache headers. Alternatively, from an authenticated account: `npx wrangler pages deploy dist --project-name feng-finance` after a successful build. Do not add Workers, D1 or R2.
+Use a Pages Git project with build command `npm run build`, output directory `dist`, root set to this project, Node 24 and no bindings/functions. The build generates `dist/_headers` with CSP and cache headers, including the configured feedback origin. Alternatively, from an authenticated account: `npx wrangler pages deploy dist --project-name feng-finance` after a successful build. Do not add Workers, D1 or R2.
 
 ## GitHub Pages
 
@@ -32,16 +32,18 @@ An automated Pages workflow is included at `.github/workflows/pages.yml`:
 3. The verification workflow runs the financial and browser tests, production build and dependency audit. After a successful push verification, the Pages workflow builds the verified commit using the repository's actual base path, then deploys only `dist/`.
 4. Open the deployment URL shown in **Actions → Deploy Feng Finance to GitHub Pages**, and install it from Safari. The workflow can also be started manually from Actions; manual runs repeat unit tests and the production build.
 
-The workflow also supports a configured custom domain automatically. Set Pages HTTPS enforcement. Hash routes and relative manifest scope make subpath deployment work. GitHub Pages uses the HTML meta CSP for script and network restrictions, but cannot configure the provided HTTP response headers. Use Vercel/Cloudflare when response-header control or framing protection is required. Never build a root-path artifact and place it under a subpath. Repository uploads contain application source and synthetic test generators only; financial statements, backups, exports and local database records are excluded.
+For a custom domain, add the owner-supplied domain as the sole line of `public/CNAME`, configure DNS and Pages' custom-domain setting, and build with `VITE_BASE_PATH=/`. The Pages workflow obtains its base path from GitHub. Set Pages HTTPS enforcement. Changing origin gives the installed app a separate database: export a backup before switching and restore it explicitly on the new origin. Hash routes and relative manifest scope make subpath deployment work. GitHub Pages uses the HTML meta CSP for script and network restrictions, but cannot configure the provided HTTP response headers. Use Vercel/Cloudflare when response-header control or framing protection is required. Never build a root-path artifact and place it under a subpath. Repository uploads contain application source and synthetic test generators only; financial statements, backups, exports and local database records are excluded.
 
 ## Installation and updates
 
 Safari → Share → Add to Home Screen → Open as Web App → Add. Use the same origin consistently to preserve the device-local database. Each installed browser profile/device keeps separate data.
 
-The service worker precaches the HTML, hashed scripts, PDF worker/font/decoder assets, local English OCR model/runtime, icons and CSS. Updates wait until the user taps **Update**; users are warned to finish import review before reloading. The app checks for updates on launch and hourly while online. The new worker activates on user request; old precaches are cleaned. Database migrations execute independently and preserve records.
+The service worker precaches the HTML, hashed scripts, PDF worker/font/decoder assets, local English OCR model/runtime, icons and CSS. Updates wait until the user taps **Reload** on Home after closing current editing or import review. The app checks for updates on launch, when returning to the foreground, when reconnecting, and hourly while online. The new worker activates on user request; old precaches are cleaned. Database migrations execute independently and preserve records. A local pre-migration snapshot retains the prior data for 14 days; Settings → Restore previous data requires confirmation and replaces changes made after the update.
 
 Do not cache `sw.js` or `manifest.webmanifest` indefinitely at a CDN. Deploy all files atomically. Keep HTTPS enabled. After each release, verify the update prompt from a tab running the previous release and confirm its transactions and backups remain intact.
 
+Set optional feedback destinations as public repository Actions variables `VITE_FEEDBACK_URL`, `VITE_FEEDBACK_EMAIL` and `VITE_FEEDBACK_CONTEXT_PARAMETER`; see [feedback configuration](feedback-configuration.md). Without them, Settings offers technical details for the tester to copy. No API key is needed. Check matching package, application and What's new versions with `npm run check:release`; create the matching `vAPP_VERSION` tag on the verified release commit and run `npm run check:release -- --require-tag` before publication.
+
 ## Build artifact transfer
 
-Run `npm run build`, then upload all of `dist/` together. No `src`, `tests`, backups or local IndexedDB data are required by the host. PWA operation needs HTTPS or localhost. The 22 MB precache is an intentional first-install download that enables offline OCR without a CDN.
+Run `npm run build`, then upload all of `dist/` together. No `src`, `tests`, backups or local IndexedDB data are required by the host. PWA operation needs HTTPS or localhost. The roughly 23 MB precache is an intentional first-install download that enables offline OCR without a CDN.

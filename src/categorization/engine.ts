@@ -107,7 +107,10 @@ export function categorize(
         patch.sourceMerchant = t.sourceMerchant ?? t.merchant;
       } else if (action.type === "tag")
         patch.tags = [
-          ...new Set([...(patch.tags ?? t.tags), ...(action.tagIds ?? [])]),
+          ...new Set([
+            ...(patch.tags ?? t.tags ?? []),
+            ...(action.tagIds ?? []),
+          ]),
         ];
       else if (action.type === "kind" && action.kind) {
         if (action.kind === "refund" && t.amount <= 0) continue;

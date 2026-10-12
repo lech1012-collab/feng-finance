@@ -1,0 +1,3 @@
+#!/bin/sh
+# Only staged paths are inspected; statement contents are never read or printed.
+node scripts/check-repo-hygiene.mjs --staged

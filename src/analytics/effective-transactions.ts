@@ -66,7 +66,8 @@ export function effectiveTransactions(
   }
   for (const lines of children.values())
     lines.sort(
-      (a, b) => a.occurrence - b.occurrence || a.id.localeCompare(b.id),
+      (a, b) =>
+        (a.occurrence ?? 0) - (b.occurrence ?? 0) || a.id.localeCompare(b.id),
     );
   const adjustments = new Map<string, number>();
   const refundedByPurchase = new Map<string, number>();

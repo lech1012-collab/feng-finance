@@ -1,4 +1,4 @@
-import { expect, test as base, type Page } from "@playwright/test";
+import { acknowledgeBeta, expect, test as base, type Page } from "./fixtures";
 import { startStaticHost, type LocalHost } from "./static-host";
 
 const test = base.extend<{ offlineHost: LocalHost }>({
@@ -15,6 +15,7 @@ const test = base.extend<{ offlineHost: LocalHost }>({
 async function seed(page: Page, rates = true, origin = "") {
   await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
   await page.goto(`${origin}/#/`);
+  await acknowledgeBeta(page);
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
@@ -358,6 +359,9 @@ test("first run and the main pages fit narrow screens and large text without ove
       await expect(page.locator("main h1")).toBeVisible();
       await page.evaluate(() => {
         document.documentElement.style.fontSize = "200%";
+        // Match the wider Linux Safari system font as well as mobile defaults.
+        // The native tax-year menu previously leaked beyond its flex label.
+        document.documentElement.style.fontFamily = '"DejaVu Sans", sans-serif';
       });
       // Font changes update Recharts through ResizeObserver on a later frame.
       // Check the settled layout, retaining the exact overflow in failure output.
@@ -372,6 +376,23 @@ test("first run and the main pages fit narrow screens and large text without ove
                 fits: false,
                 viewportWidth,
                 documentWidth,
+                leakingContainers: Array.from(
+                  document.querySelectorAll("body *"),
+                )
+                  .filter(
+                    (element) =>
+                      element.clientWidth > 0 &&
+                      element.scrollWidth > element.clientWidth + 1 &&
+                      getComputedStyle(element).overflowX === "visible",
+                  )
+                  .map((element) => ({
+                    tag: element.tagName,
+                    className: element.getAttribute("class"),
+                    clientWidth: element.clientWidth,
+                    scrollWidth: element.scrollWidth,
+                    text: element.textContent?.slice(0, 120),
+                  }))
+                  .slice(0, 20),
                 overflowing: Array.from(document.querySelectorAll("body *"))
                   .filter((element) => {
                     const rect = element.getBoundingClientRect();
@@ -383,6 +404,8 @@ test("first run and the main pages fit narrow screens and large text without ove
                     text: element.textContent?.slice(0, 120),
                     right: element.getBoundingClientRect().right,
                     width: element.getBoundingClientRect().width,
+                    clientWidth: element.clientWidth,
+                    scrollWidth: element.scrollWidth,
                   }))
                   .slice(0, 20),
               };
@@ -394,6 +417,19 @@ test("first run and the main pages fit narrow screens and large text without ove
           },
         )
         .toEqual({ fits: true });
+      if (route === "/analysis") {
+        const taxYear = page.getByRole("combobox", {
+          name: "UK tax year",
+          exact: true,
+        });
+        expect(
+          await taxYear.evaluate((element) => {
+            const label = element.closest("label")!;
+            return label.scrollWidth <= label.clientWidth + 1;
+          }),
+          `${width}px ${route}: the tax-year choice must fit inside its field`,
+        ).toBe(true);
+      }
       const navigation = page.locator(".mobile-navigation");
       await expect(navigation).toBeVisible();
       const navigationHeightRatio = await navigation.evaluate(
@@ -420,6 +456,7 @@ test("first run and the main pages fit narrow screens and large text without ove
       });
       await page.evaluate(() => {
         document.documentElement.style.fontSize = "";
+        document.documentElement.style.fontFamily = "";
       });
     }
   }

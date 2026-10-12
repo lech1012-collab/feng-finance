@@ -1,3 +1,4 @@
+import { reconciliationTolerance } from "../domain/reconcile";
 import type { Account, Statement, Transaction } from "../domain/models";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { safeSum } from "../domain/money";
@@ -174,7 +175,8 @@ export function datedBalanceHistory(
       statementBalanceDate(s) < monthBounds(month)[1] &&
       statementBalanceDate(s) <= today &&
       s.closingBalance !== undefined &&
-      s.validationStatus === "reconciled",
+      s.validationStatus === "reconciled" &&
+      !s.validationOverride,
   );
   const end = documents.length
     ? Math.max(...documents.map((s) => dateStamp(statementBalanceDate(s))))
@@ -199,14 +201,20 @@ export function datedBalanceHistory(
     rows.set(t.statementId, existing);
   }
   const values = new Map<string, Map<number, number | null>>();
-  const record = (account: string, stamp: number, amount: number) => {
+  const record = (
+    account: string,
+    stamp: number,
+    amount: number,
+    policy?: "exact-v2.2",
+  ) => {
     if (stamp < start || stamp > end) return;
     const points = values.get(account) ?? new Map<number, number | null>();
     const previous = points.get(stamp);
     points.set(
       stamp,
       previous === null ||
-        (previous !== undefined && Math.abs(previous - amount) > 1)
+        (previous !== undefined &&
+          Math.abs(previous - amount) > reconciliationTolerance(policy))
         ? null
         : amount,
     );
@@ -230,7 +238,7 @@ export function datedBalanceHistory(
         s.openingBalance +
           safeSum(statementRows.map((t) => t.amount)) -
           s.closingBalance!,
-      ) <= 1;
+      ) <= reconciliationTolerance(s.validationPolicy);
     if (canReconstruct) {
       const changes = new Map<number, number>();
       for (const t of statementRows) {
@@ -250,6 +258,7 @@ export function datedBalanceHistory(
           stamp === dateStamp(s.statementPeriodEnd)
             ? s.closingBalance!
             : balance,
+          s.validationPolicy,
         );
       }
     } else {
@@ -257,6 +266,7 @@ export function datedBalanceHistory(
         s.accountId,
         dateStamp(statementBalanceDate(s)),
         s.closingBalance!,
+        s.validationPolicy,
       );
     }
   }

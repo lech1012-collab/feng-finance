@@ -5,9 +5,9 @@ import {
   screen,
   waitFor,
 } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
-import { CurrencySetting } from "./CurrencySetting";
+import { CurrencySetting, CurrencyViewNotice } from "./CurrencySetting";
 import { db, initializeDatabase } from "../storage/database";
 
 beforeEach(async () => {
@@ -17,6 +17,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   cleanup();
+  vi.unstubAllGlobals();
   await db.delete();
 });
 
@@ -73,4 +74,31 @@ it("responds immediately to disabling public rate downloads and preserves that p
       screen.getByRole("checkbox", { name: "Download public ECB rates" }),
     ).not.toBeChecked(),
   );
+});
+
+it("keeps exact recovery read-only until the user requests exchange rates", async () => {
+  await db.accounts.put({
+    id: "fictitious-euro-account",
+    institution: "Revolut",
+    displayName: "Travel",
+    accountType: "current",
+    currency: "EUR",
+    maskedAccountIdentifier: "Fictitious",
+    createdAt: "2026-10-01T12:00:00Z",
+    updatedAt: "2026-10-01T12:00:00Z",
+  });
+  const fetcher = vi.fn();
+  vi.stubGlobal("fetch", fetcher);
+  const before = await db.settings.toArray();
+  render(
+    <MemoryRouter>
+      <CurrencyViewNotice currency="GBP" allowAutomaticDownload={false} />
+    </MemoryRouter>,
+  );
+  await screen.findByText(
+    "Exchange rates are needed. Enter manual rates in Settings.",
+  );
+  expect(fetcher).not.toHaveBeenCalled();
+  expect(await db.fxRates.count()).toBe(0);
+  expect(await db.settings.toArray()).toEqual(before);
 });
