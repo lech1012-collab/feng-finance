@@ -14,13 +14,12 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-13",
   points: [
-    "Barclaycard, Amex and Revolut are recognised independently of the generic parser.",
-    "Supported digital statements open a simple review without repeated amount checks.",
-    "Other banks keep generic review; Reading options opens layout correction when needed.",
+    "Short account, category and report links are easier to tap on mobile.",
+    "Statement readers and saved financial records are unchanged.",
   ],
   pleaseTest: [
-    "Import a familiar statement and check its summary before confirming.",
-    "Try another bank's statement and check its source review.",
+    "Tap Accounts, category details and report values on a narrow screen.",
+    "Check larger text and the mobile navigation while reviewing your month.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +27,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.3",
+    date: "2026-10-13",
+    points: [
+      "Barclaycard, Amex and Revolut are recognised independently of the generic parser.",
+      "Supported digital statements open a simple review without repeated amount checks.",
+      "Other banks keep generic review; Reading options opens layout correction when needed.",
+    ],
+    pleaseTest: [
+      "Import a familiar statement and check its summary before confirming.",
+      "Try another bank's statement and check its source review.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.2",
     date: "2026-10-13",

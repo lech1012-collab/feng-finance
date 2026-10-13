@@ -17,7 +17,7 @@ export type {
   RowCheck,
   TableRowKind,
 } from "../import/generic/types";
-export const APP_VERSION = "2.2.3";
+export const APP_VERSION = "2.2.4";
 export const SCHEMA_VERSION = 4;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";

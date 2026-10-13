@@ -4701,3 +4701,36 @@ textarea {
   overflow-wrap: normal;
   font-variant-numeric: tabular-nums;
 }
+
+/* A short link still needs a full touch target. Keep inline prose unchanged. */
+@media (max-width: 760px) {
+  .mobile-header .brand,
+  .icon-button,
+  .currency-view-notice > a,
+  .section-heading > a,
+  .card > a,
+  .review-link,
+  .totals dt > a,
+  .table-scroll td > a,
+  .v2-report-table a,
+  .planning-v2-object > span > a,
+  .first-import-setup a,
+  .import-result a,
+  .beta-about > p > a {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+
+  .section-heading > a,
+  .currency-view-notice > a,
+  .table-scroll td > a,
+  .v2-report-table a {
+    padding-inline: 8px;
+  }
+
+  .review-link {
+    display: flex;
+  }
+}

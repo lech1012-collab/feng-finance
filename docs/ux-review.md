@@ -112,6 +112,31 @@ and replacement are deliberate user actions rather than migration behavior.
 
 ## Automated review routes
 
+### Measured review in 2.2.4
+
+The original designer attachments from 7 and 8 October are identical. Their
+24 findings remain the review baseline; v2 features extend the screen inventory.
+The current review uses fictitious demo accounts and synthetic bank fixtures,
+with screenshots of the actual production build at 390 × 844 and 1440 × 1000
+CSS pixels. Screenshots must never contain private statements or real backups.
+
+The layout audit found short mobile links below the intended 44 × 44 CSS pixel
+touch target. Account and planning drill-downs, the uncategorized queue link,
+category report links, report values, calendar payments and About links now
+have a full touch target at mobile widths. Inline links within prose keep their
+normal text flow. Checkbox labels provide the touch target around the smaller
+checkbox glyph. The regression route checks 320, 390 and 430px widths in both
+browser engines and verifies the document itself does not overflow horizontally.
+
+The separate self-contained HTML designer handoff includes step-by-step journeys,
+page/state screenshots, measured DOM dimensions and computed typography, spacing
+and colors. It distinguishes web screenshots from OS-owned file pickers, real
+iPhone installation, safe areas and native text scaling, which require manual
+device review. Its measurements describe the recorded UI states rather than
+claiming every possible user-created content length or OS configuration was
+tested. The generated handoff and large screenshots are delivered outside the
+Git repository; no generated financial screenshot belongs in a public release.
+
 Run the normal fixture, unit, build and browser commands from the README. The
 focused Settings suite is `tests/e2e/settings-review.spec.ts`; it checks backup
 handoff metadata, restore preview and replacement gating, typed erasure, and rule

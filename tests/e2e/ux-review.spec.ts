@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "./fixtures";
+import { resolve } from "node:path";
 
 /** Fictitious source records reproduce a partially imported household without
  * requiring a real statement or relying on categories/amounts from demo mode. */
@@ -295,5 +296,96 @@ test("UX mobile: Home and transaction controls stay usable at narrow widths and 
         )
         .toMatchObject({ overflow: 0 });
     }
+  }
+});
+
+test("UX mobile: short drill-down links retain a full touch target", async ({
+  page,
+}) => {
+  await page.goto("/#/settings");
+  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await page
+    .getByRole("button", { name: "Load demo data", exact: true })
+    .click();
+  await expect(
+    page.getByText("Fictitious demo data added.", { exact: true }),
+  ).toBeVisible();
+  for (const width of [320, 390, 430]) {
+    await page.setViewportSize({ width, height: 844 });
+    for (const path of [
+      "/",
+      "/analysis",
+      "/categories/groceries",
+      "/categories/property",
+      "/property",
+      "/planning?tab=calendar",
+      "/settings",
+    ]) {
+      await page.goto(`/#${path}`);
+      await expect(page.locator("main h1").first()).toBeVisible();
+      const targets = page.locator(
+        [
+          ".mobile-header .brand",
+          ".currency-view-notice > a",
+          ".section-heading > a",
+          ".card > a",
+          ".review-link",
+          ".totals dt > a",
+          ".table-scroll td > a",
+          ".v2-report-table a",
+          ".planning-v2-object > span > a",
+          ".beta-about > p > a",
+        ].join(", "),
+      );
+      const sizes = await targets.evaluateAll((elements) =>
+        elements
+          .map((element) => {
+            const box = element.getBoundingClientRect();
+            return {
+              width: box.width,
+              height: box.height,
+              name: element.textContent ?? "Link",
+            };
+          })
+          .filter((box) => box.width > 0 && box.height > 0),
+      );
+      for (const box of sizes) {
+        expect(box.width, box.name).toBeGreaterThanOrEqual(44);
+        expect(box.height, box.name).toBeGreaterThanOrEqual(44);
+      }
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(width + 1);
+    }
+  }
+});
+
+test("UX mobile: import close and post-import shortcuts remain easy to tap", async ({
+  page,
+}) => {
+  await page.goto("/#/import");
+  await page
+    .getByLabel("Select statements", { exact: true })
+    .setInputFiles(resolve("tests/fixtures/known-bank-barclays-current.pdf"));
+  const confirm = page.getByRole("button", {
+    name: "Confirm import",
+    exact: true,
+  });
+  await expect(confirm).toBeEnabled();
+  const close = (await page
+    .getByRole("link", { name: "Close import review" })
+    .boundingBox())!;
+  expect(close.width).toBeGreaterThanOrEqual(44);
+  expect(close.height).toBeGreaterThanOrEqual(44);
+  await confirm.click();
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  for (const shortcut of await page
+    .locator(".first-import-setup a, .import-result a")
+    .all()) {
+    const box = (await shortcut.boundingBox())!;
+    expect(box.width).toBeGreaterThanOrEqual(44);
+    expect(box.height).toBeGreaterThanOrEqual(44);
   }
 });
