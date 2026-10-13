@@ -316,6 +316,22 @@ test("a one-penny digital discrepancy stays unverified until the source amount i
   test.setTimeout(180000);
   await page.goto("/#/import");
   const card = await select(page, "generic-one-penny");
+  // This fixture identifies Barclays. Its discrepancy stays in native review
+  // until the user deliberately opens layout correction.
+  await expect(card.locator(".validation")).toContainText("£0.01");
+  await expect(
+    card.getByRole("region", { name: "Statement reading and checks" }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+  const options = card.locator(
+    'details.generic-parser-details:has(> summary:text-is("Reading options"))',
+  );
+  await options.locator(":scope > summary").click();
+  await options
+    .getByRole("button", { name: "Review PDF layout", exact: true })
+    .click();
   const proof = card.getByRole("region", {
     name: "Statement reading and checks",
   });

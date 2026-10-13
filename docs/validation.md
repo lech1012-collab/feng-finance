@@ -100,14 +100,16 @@ explicitly deferred.
 
 ## Recorded v2.2.3 patch checks
 
-- Local full unit/component run: **957 passed in 117 files**. The final
-  selected-account and issuer guards then passed **97 focused tests**, including
-  five additional identity/payee regressions. Release CI runs the resulting
-  **962-test** full suite against the exact published commit.
+- The complete unit/component suite passed **962 tests in 117 files** in CI.
+  The final bank/identity changes also passed **97 focused local tests**.
+  Release CI repeats the full suite against the exact published commit.
 - **24 mobile browser cases passed** across Chromium and WebKit: all four
   recognised banks in a single-confirmation batch, HSBC generic review,
   independent card debt, inherited dates, genuine reconciliation/period warnings,
   and explicit generic source correction preserving a manual category choice.
+  **Two additional browser cases passed** for a one-penny native warning and
+  deliberate source correction in Chromium and WebKit. Confirmation remains
+  blocked until the corrected source figures match exactly.
 - Strict TypeScript/production PWA build passed; **441 precache entries**.
   Formatting, release metadata and repository guards passed; **9 Node guard
   tests** passed. Dependency audit reported **0 vulnerabilities**.
