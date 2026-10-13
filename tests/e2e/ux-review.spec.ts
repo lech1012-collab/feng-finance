@@ -389,3 +389,35 @@ test("UX mobile: import close and post-import shortcuts remain easy to tap", asy
     expect(box.height).toBeGreaterThanOrEqual(44);
   }
 });
+
+test("UX mobile: monthly review steps fit 320px with enlarged text", async ({
+  page,
+}) => {
+  await page.goto("/#/settings");
+  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await page
+    .getByRole("button", { name: "Load demo data", exact: true })
+    .click();
+  await expect(
+    page.getByText("Fictitious demo data added.", { exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 320, height: 844 });
+  await page.goto("/#/review?month=2026-09");
+  await expect(
+    page.getByRole("heading", { name: "Review September 2026", exact: true }),
+  ).toBeVisible();
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  for (const step of [
+    "1. Your month",
+    "2. What changed",
+    "3. Pots and goals",
+    "4. Housekeeping",
+  ]) {
+    await page.getByRole("button", { name: step, exact: true }).click();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
+      .toBeLessThanOrEqual(320);
+  }
+});

@@ -179,7 +179,7 @@ export function MonthReview({
     .sort()
     .at(-1);
   return (
-    <>
+    <div className="month-review-page">
       <div className="page-heading">
         <h1>Review {monthLabel(month)}</h1>
         <Link to="/analysis" className="button">
@@ -489,6 +489,6 @@ export function MonthReview({
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }

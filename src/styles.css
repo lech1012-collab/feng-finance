@@ -4570,6 +4570,31 @@ summary {
 }
 .review-steps button {
   flex: 1 1 150px;
+  min-width: min(100%, 8rem);
+  overflow-wrap: anywhere;
+}
+
+.month-review-page .insight-row,
+.month-review-page .settings-row {
+  flex-wrap: wrap;
+}
+
+.month-review-page .insight-row > span,
+.month-review-page .insight-row > strong,
+.month-review-page .settings-row > label {
+  flex: 1 1 8rem;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.month-review-page .totals > div {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.month-review-page .totals dt {
+  flex: 1 1 8rem;
+  min-width: 0;
 }
 .review-status {
   display: inline-flex;
@@ -4703,9 +4728,16 @@ textarea {
 }
 
 /* A short link still needs a full touch target. Keep inline prose unchanged. */
+.icon-button {
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
 @media (max-width: 760px) {
   .mobile-header .brand,
-  .icon-button,
   .currency-view-notice > a,
   .section-heading > a,
   .card > a,
@@ -4732,5 +4764,19 @@ textarea {
 
   .review-link {
     display: flex;
+  }
+
+  .currency-view-notice {
+    flex-wrap: wrap;
+  }
+
+  .currency-view-notice > span {
+    min-width: 0;
+    flex: 1;
+    overflow-wrap: anywhere;
+  }
+
+  .currency-view-notice > a {
+    flex-shrink: 0;
   }
 }

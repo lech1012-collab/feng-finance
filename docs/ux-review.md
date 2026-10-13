@@ -127,6 +127,9 @@ have a full touch target at mobile widths. Inline links within prose keep their
 normal text flow. Checkbox labels provide the touch target around the smaller
 checkbox glyph. The regression route checks 320, 390 and 430px widths in both
 browser engines and verifies the document itself does not overflow horizontally.
+The currency notice wraps at enlarged text sizes without shrinking its Rates or
+Update action, and long monthly-review step names wrap inside their targets.
+The import close control also keeps a full-size target on desktop.
 
 The separate self-contained HTML designer handoff includes step-by-step journeys,
 page/state screenshots, measured DOM dimensions and computed typography, spacing
