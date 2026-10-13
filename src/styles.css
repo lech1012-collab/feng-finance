@@ -4596,6 +4596,11 @@ summary {
   flex: 1 1 8rem;
   min-width: 0;
 }
+
+.month-review-page .insight-row > strong {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
 .review-status {
   display: inline-flex;
   padding: 4px 8px;

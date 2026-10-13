@@ -409,15 +409,22 @@ test("UX mobile: monthly review steps fit 320px with enlarged text", async ({
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "200%";
   });
-  for (const step of [
-    "1. Your month",
-    "2. What changed",
-    "3. Pots and goals",
-    "4. Housekeeping",
-  ]) {
-    await page.getByRole("button", { name: step, exact: true }).click();
-    await expect
-      .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
-      .toBeLessThanOrEqual(320);
+  for (const family of ["", "DejaVu Sans, sans-serif", "DejaVu Serif, serif"]) {
+    await page.evaluate((font) => {
+      document.documentElement.style.fontFamily = font;
+    }, family);
+    for (const step of [
+      "1. Your month",
+      "2. What changed",
+      "3. Pots and goals",
+      "4. Housekeeping",
+    ]) {
+      await page.getByRole("button", { name: step, exact: true }).click();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth), {
+          message: `${step} with ${family || "system font"}`,
+        })
+        .toBeLessThanOrEqual(320);
+    }
   }
 });
