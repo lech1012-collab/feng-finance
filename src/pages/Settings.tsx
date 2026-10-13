@@ -193,17 +193,18 @@ export default function Settings({ beta }: { beta?: BetaSettingsProps } = {}) {
           <input
             type="checkbox"
             checked={data?.taxEnabled ?? false}
-            onChange={(e) =>
+            onChange={(e) => {
+              const enabled = e.target.checked;
               void auditedMutation(
                 "Change property tax reports",
                 ["settings"],
                 () =>
                   db.settings.put({
                     key: "property-tax-report",
-                    value: String(e.target.checked),
+                    value: String(enabled),
                   }),
-              )
-            }
+              );
+            }}
           />
           Enable property tax summary
         </label>

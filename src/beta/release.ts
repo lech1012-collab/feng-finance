@@ -14,19 +14,27 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-13",
   points: [
-    "Short account, category and report links are easier to tap on mobile.",
+    "The optional property tax report switch now saves reliably.",
     "Statement readers and saved financial records are unchanged.",
   ],
-  pleaseTest: [
-    "Tap Accounts, category details and report values on a narrow screen.",
-    "Check larger text and the mobile navigation while reviewing your month.",
-  ],
+  pleaseTest: ["Enable property tax summary in Settings, then open Analyse."],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
 };
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.4",
+    date: "2026-10-13",
+    points: [
+      "Short account, category and report links are easier to tap on mobile.",
+      "Currency notices and monthly review stay readable with larger text.",
+    ],
+    pleaseTest: ["Review narrow screens and larger text."],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.3",
     date: "2026-10-13",

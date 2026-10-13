@@ -22,6 +22,44 @@ async function demo(page: Page) {
     page.getByText("Fictitious demo data added.", { exact: true }),
   ).toBeVisible();
 }
+
+test("property report preference saves before the controlled checkbox resets", async ({
+  page,
+}) => {
+  await demo(page);
+  const original = await transactionRecords(page);
+  const toggle = page.getByLabel("Enable property tax summary", {
+    exact: true,
+  });
+  await toggle.click();
+  await expect(toggle).toBeChecked();
+  await page.goto("/#/analysis");
+  await expect(
+    page.getByRole("heading", {
+      name: "Property income for Self Assessment",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await page.reload();
+  await expect(
+    page.getByRole("heading", {
+      name: "Property income for Self Assessment",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await settings(page);
+  await expect(toggle).toBeChecked();
+  await toggle.click();
+  await expect(toggle).not.toBeChecked();
+  await page.goto("/#/analysis");
+  await expect(
+    page.getByRole("heading", {
+      name: "Property income for Self Assessment",
+      exact: true,
+    }),
+  ).toHaveCount(0);
+  expect(await transactionRecords(page)).toEqual(original);
+});
 async function backup(page: Page) {
   const downloadPromise = page.waitForEvent("download");
   await page

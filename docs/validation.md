@@ -2,7 +2,7 @@
 
 This release implements the 8 October 2026 developer specification and its v2.2
 amendment. It remains a React/strict TypeScript/Vite/Dexie application with local
-PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.4**
+PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.5**
 uses additive IndexedDB **schema 4**. Portable JSON backup format remains
 **version 1**; supported older databases and backups are migrated without resetting
 financial records.
