@@ -2,7 +2,7 @@
 
 This release implements the 8 October 2026 developer specification and its v2.2
 amendment. It remains a React/strict TypeScript/Vite/Dexie application with local
-PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.2**
+PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.3**
 uses additive IndexedDB **schema 4**. Portable JSON backup format remains
 **version 1**; supported older databases and backups are migrated without resetting
 financial records.
@@ -35,7 +35,7 @@ The preserved live profile passed explicit update, exact financial-record and
 native safety-copy comparison, one-time release-note acknowledgement, and fresh
 offline document navigation/reload with no JavaScript errors.
 
-Version 2.2.2 restores a streamlined bank-specific route for recognised digital
+Version 2.2.2 restored a streamlined bank-specific route for recognised digital
 Barclays, Barclaycard, Amex and Revolut layouts. Selection requires exact statement
 and printed movement totals, all available running-balance anchors, valid dates
 and occurrence-preserving coverage of every financial source row. It runs before
@@ -58,6 +58,24 @@ be committed by accepting a net-zero reconciliation. UI corrections recheck the
 generic source; category, merchant, tag and confirmed-transfer edits remain direct.
 This patch changes no database or backup schema and does not relabel older imports.
 
+Version 2.2.3 removes the remaining generic prerequisite. A supported digital
+bank adapter is selected before generic profile detection, layout templates or
+numeric OCR. Its independent source snapshot checks account identity, dates,
+currency, printed gross movements, ledger occurrence counts, running balances
+and exact closing arithmetic. Bank warnings remain in the simple review instead
+of triggering generic amount verification. Genuine discrepancies still block
+confirmation until reviewed; an override remains Unverified. Unsupported layouts,
+unknown banks and scans retain generic review. Reading options explicitly opens
+that route for source corrections, which must be rechecked before committing.
+Financial source fields are read-only in native review; categories, merchant
+names and transfer choices remain editable. No database or backup migration is
+introduced, and previous imports are not relabelled.
+
+Issuer detection also accepts explicit legal footer names and issuer domains
+when a PDF logo is graphical. Counterparty bank names in ledger rows remain
+excluded. Tests deliberately spy on generic parsing/profile detection to prove
+that known bank recognition no longer calls either one.
+
 ## Implementation scope
 
 - Dated cash, card debt and manual net-worth balances with complete, partial,
@@ -79,6 +97,33 @@ See the [v2 matrix](v2-implementation.md) and
 [Privacy](privacy.md) lists expected requests; [security](security-v2.md) explains
 local-lock and encrypted-backup boundaries. Database-at-rest encryption remains
 explicitly deferred.
+
+## Recorded v2.2.3 patch checks
+
+- Local full unit/component run: **957 passed in 117 files**. The final
+  selected-account and issuer guards then passed **97 focused tests**, including
+  five additional identity/payee regressions. Release CI runs the resulting
+  **962-test** full suite against the exact published commit.
+- **24 mobile browser cases passed** across Chromium and WebKit: all four
+  recognised banks in a single-confirmation batch, HSBC generic review,
+  independent card debt, inherited dates, genuine reconciliation/period warnings,
+  and explicit generic source correction preserving a manual category choice.
+- Strict TypeScript/production PWA build passed; **441 precache entries**.
+  Formatting, release metadata and repository guards passed; **9 Node guard
+  tests** passed. Dependency audit reported **0 vulnerabilities**.
+- The full browser suite contains **170 cases**. Exact-commit CI must pass
+  every case before Pages deploys. Focused local checks do not replace this gate.
+- A preserved installed profile was checked before publication: original
+  financial fields and native migration safety records/keys remain unchanged.
+  The explicit update and cold offline launch are checked after deployment.
+
+The available original Barclays PDF passed the actual UI workflow in both
+engines against an independently recorded ledger: every date, amount and printed
+balance matched, with one confirmation, no amount acknowledgements, no JavaScript
+errors and no prohibited network requests. The other three original
+PDFs remain unavailable; their synthetic layouts cover native detection and
+signs but do not claim a fresh original-file comparison. Private statements,
+figures, screenshots and traces remain outside Git and release CI.
 
 ## Recorded v2.2 verification
 

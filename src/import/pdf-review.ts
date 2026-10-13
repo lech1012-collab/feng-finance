@@ -30,14 +30,23 @@ import type { ExtractedFile } from "./pipeline";
 import type { ImportProgress } from "./pdf-session-types";
 import { isImportAbort } from "./pdf-abort";
 import {
-  BANK_ADAPTER_PAYMENT_NOTICE,
-  proveBankAdapter,
-} from "./generic/legacy-comparison";
+  prepareBankAdapterReading,
+  type BankAdapterSource,
+} from "./bank-adapter-proof";
 
 export interface PdfReviewOptions extends GenericParseOptions {
   signal?: AbortSignal;
   progress?: (progress: ImportProgress) => void;
   skipCellOcr?: boolean;
+  /** Explicitly choose source-row correction for an otherwise supported bank. */
+  preferGeneric?: boolean;
+}
+
+interface PdfReading {
+  parsed: ParsedStatement;
+  fallback: boolean;
+  generic?: GenericParseResult;
+  bankSource?: BankAdapterSource;
 }
 
 /** Source readings and OCR alternatives live only until the import is closed. */
@@ -178,13 +187,13 @@ function legacyParsed(
   }
 }
 
-/** Established digital layouts use their proved bank reader; other layouts retain source review. */
+/** Select supported digital bank readers before attempting generic column inference. */
 export async function preparePdfReading(
   extracted: ExtractedFile,
   bank: Institution,
   account: Account | undefined,
   review: PdfReviewOptions = {},
-) {
+): Promise<PdfReading> {
   if (!extracted.extraction) {
     // In-memory callers and old synthetic fixtures keep the existing adapter API.
     const parsed = getParser(bank, extracted.rows).parse(
@@ -196,8 +205,37 @@ export async function preparePdfReading(
       fallback: false,
     };
   }
-  const profile = detectProfile(extracted.extraction.items);
   const legacy = legacyParsed(extracted.rows, bank, review);
+  const explicitGenericReview =
+    !!review.preferGeneric ||
+    !!review.mapping ||
+    !!review.template ||
+    !!Object.keys(review.actions ?? {}).length;
+  const completeDigitalSource =
+    extracted.extraction.method === "text" &&
+    !extracted.extraction.cancelled &&
+    !extracted.extraction.unreadPages.length &&
+    extracted.extraction.items.every((item) => item.parseSource === "text");
+  if (
+    legacy &&
+    bank !== "Other" &&
+    !explicitGenericReview &&
+    completeDigitalSource &&
+    getParser(bank, extracted.rows).canParse(extracted.rows)
+  ) {
+    // The original adapters own recognition, source coverage, signs and bank
+    // summary arithmetic. Generic profile hints and competing candidate rows
+    // must not turn a supported statement into a manual mapping workflow.
+    extracted.generic = undefined;
+    return {
+      ...prepareBankAdapterReading(legacy, extracted.rows, {
+        unreadPages: extracted.extraction.unreadPages,
+        warnings: extracted.warnings,
+      }),
+      fallback: true,
+    };
+  }
+  const profile = detectProfile(extracted.extraction.items);
   const options: PdfReviewOptions = {
     ...review,
     institution: bank,
@@ -226,20 +264,7 @@ export async function preparePdfReading(
     extracted.extraction.pages,
     options,
   );
-  const adapterProof =
-    !review.mapping &&
-    !review.template &&
-    !review.period &&
-    !Object.keys(review.actions ?? {}).length &&
-    !options.template &&
-    !extracted.warnings.length &&
-    extracted.extraction.method === "text" &&
-    extracted.extraction.items.every((item) => item.parseSource === "text") &&
-    bank !== "Other" &&
-    getParser(bank, extracted.rows).canParse(extracted.rows)
-      ? proveBankAdapter(legacy, generic, profile)
-      : undefined;
-  if (!adapterProof && !options.template && !options.mapping) {
+  if (!options.template && !options.mapping) {
     const matches = await db.layoutTemplates
       .where("fingerprint")
       .equals(generic.layoutFingerprint)
@@ -255,10 +280,8 @@ export async function preparePdfReading(
       );
     }
   }
-  // A proved digital bank layout does not need a second OCR reading of each
-  // amount. Unproved, changed, scanned or unknown layouts keep the full review.
-  if (!adapterProof)
-    generic = await checkNumericCells(extracted, generic, options);
+  // Changed, scanned and unknown layouts retain the complete generic review.
+  generic = await checkNumericCells(extracted, generic, options);
   if (profile)
     generic.comparison = compareLegacyTransactions(
       generic,
@@ -300,48 +323,6 @@ export async function preparePdfReading(
       options.template.id,
       generic.checks.reconciledExactly,
     );
-  if (adapterProof && legacy) {
-    const transactions = legacy.transactions.map((row, index) => ({
-      ...row,
-      parseRowId: adapterProof.sourceRows[index].rowId,
-      parseSource: "text" as const,
-      checkLevel:
-        row.balanceAfterTransaction === undefined
-          ? ("total" as const)
-          : ("balance" as const),
-    }));
-    // The selected adapter's immutable financial snapshot is separate from
-    // editable ledger categorization. Keep occurrence-preserving source IDs.
-    if (generic.comparison)
-      generic.comparison.legacyTransactions = transactions.map((row) => ({
-        ...row,
-      }));
-    return {
-      parsed: {
-        ...legacy,
-        transactions,
-        warnings: legacy.warnings.filter(
-          (warning) => warning !== BANK_ADAPTER_PAYMENT_NOTICE,
-        ),
-        validationPolicy: "exact-v2.2" as const,
-        parserMethod: "text" as const,
-        bankProfileId: profile?.id,
-        rowsBalanceChecked: transactions.filter(
-          (row) => row.checkLevel === "balance",
-        ).length,
-        rowsTotalChecked: transactions.filter(
-          (row) => row.checkLevel === "total",
-        ).length,
-        rowsNeedingReview: 0,
-        unreadPages: [],
-      },
-      generic,
-      // Existing draft validation uses the selected adapter rather than the
-      // alternative generic candidate. Exact totals, source coverage and each
-      // available running balance were proved above, without a review bypass.
-      fallback: true,
-    };
-  }
   if (!generic.parsed) {
     const message =
       generic.errorCode === "missing-period"

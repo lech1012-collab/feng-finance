@@ -84,6 +84,7 @@ export function ImportStatementReview({
     row: ImportDraft["transactions"][number],
     correction: { date?: string; amount?: number },
   ) => {
+    if (d?.bankSource) return;
     if (row.parseRowId && d?.parserReview && onSourceAction) {
       onSourceAction(row.parseRowId, {
         kind: "correct",
@@ -487,6 +488,12 @@ export function ImportStatementReview({
                   </p>
                 </div>
               )}
+              {entry.showAll && d.bankSource && (
+                <p className="hint">
+                  Dates and amounts come from the bank reader. To correct them,
+                  open Reading options and choose Review PDF layout.
+                </p>
+              )}
               {(entry.showAll ? [...d.transactions] : [...checks])
                 .sort(
                   (a, b) =>
@@ -599,6 +606,7 @@ export function ImportStatementReview({
                           disabled={busy}
                           type="date"
                           value={t.date}
+                          readOnly={!!d.bankSource}
                           onChange={(e) =>
                             correctSource(t, { date: e.target.value })
                           }
@@ -612,8 +620,10 @@ export function ImportStatementReview({
                           type="text"
                           key={`${t.id}:${t.amount}`}
                           inputMode="decimal"
+                          readOnly={!!d.bankSource}
                           defaultValue={decimalMoney(t.amount, t.currency)}
                           onBlur={(e) => {
+                            if (d.bankSource) return;
                             try {
                               const amount = parseMoney(
                                 e.target.value,

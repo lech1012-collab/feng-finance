@@ -1082,26 +1082,15 @@ test("reconciliation warning cannot be silently committed", async ({
   ).toBeDisabled();
   await expect(
     page.getByLabel(/I reviewed the source PDF and explicitly accept/),
-  ).toHaveCount(0);
+  ).toHaveCount(1);
+  await expect(page.locator(".generic-import-review")).toHaveCount(0);
   await page
-    .getByRole("button", { name: "Import anyway…", exact: true })
-    .click();
-  const override = page.getByRole("dialog", {
-    name: "Import an unverified statement?",
-    exact: true,
-  });
-  const acceptUnverified = override.getByRole("button", {
-    name: "Import unverified statement",
-    exact: true,
-  });
-  await expect(acceptUnverified).toBeDisabled();
-  await override
-    .getByLabel(
-      "I checked the original statement and accept importing these unverified figures.",
-    )
+    .getByLabel(/I reviewed the source PDF and explicitly accept/)
     .check();
-  await acceptUnverified.click();
-  await expect(override).toHaveCount(0);
+  const extractionWarning = page.getByLabel(
+    /I compared the extracted rows with the source file/,
+  );
+  if (await extractionWarning.count()) await extractionWarning.check();
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeEnabled();
@@ -1486,34 +1475,25 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     amex.getByText("6 Sep to 5 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
-    amex.getByText(/A transaction date is outside the statement period/),
+    amex.getByText(
+      /transaction dates? (?:is|fall) outside the statement period/,
+    ),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  // Both printed dates are outside this period, so this deliberately changed
-  // layout retains generic source review rather than the recognised fast path.
-  await expect(amex.locator(".generic-import-review")).toBeVisible();
+  // Out-of-period dates remain an explicit native warning; they do not require
+  // reviewing every amount through the generic parser.
+  await expect(amex.locator(".generic-import-review")).toHaveCount(0);
   await amex
-    .getByRole("button", { name: "Import anyway…", exact: true })
-    .click();
-  const unverified = page.getByRole("dialog", {
-    name: "Import an unverified statement?",
-    exact: true,
-  });
-  const acceptUnverified = unverified.getByRole("button", {
-    name: "Import unverified statement",
-    exact: true,
-  });
-  await expect(acceptUnverified).toBeDisabled();
-  await unverified
     .getByLabel(
-      "I checked the original statement and accept importing these unverified figures.",
+      "I reviewed the source PDF and explicitly accept this unverified statement.",
       { exact: true },
     )
     .check();
-  await acceptUnverified.click();
-  await expect(unverified).not.toBeVisible();
+  await amex
+    .getByLabel(/I compared the extracted rows with the source file/)
+    .check();
   await expect(
     page.getByRole("heading", { name: "Revolut detected" }),
   ).toBeVisible();
@@ -1523,15 +1503,12 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     revolut.getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
-  const revolutProof = revolut.locator(".generic-import-review");
   await expect(
     revolut.locator(
-      '.generic-parser-details:has(> summary:text-is("Alternative column reading"))',
+      '.generic-parser-details:has(> summary:text-is("Reading options"))',
     ),
   ).not.toHaveAttribute("open");
-  await expect(revolutProof).toContainText("Statement figures match exactly");
-  await expect(revolutProof).toContainText("6 balance-checked");
-  await expect(revolutProof).toContainText("0 need review");
+  await expect(revolut.locator(".generic-import-review")).toHaveCount(0);
   await expect(
     revolut.getByLabel(/I compared the extracted rows with the source file/),
   ).toHaveCount(0);

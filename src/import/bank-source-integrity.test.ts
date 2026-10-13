@@ -1,10 +1,13 @@
-import { afterAll, beforeEach, describe, expect, it } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { db, initializeDatabase } from "../storage/database";
 import { clearLocalData } from "../storage/backup";
 import type { ImportDraft } from "../domain/models";
 import { genericFixture } from "./generic/fixtures";
 import { groupedBarclaysItems } from "../tests/barclays-grouped";
 import { reconstructRows } from "./layout";
+import { statementMovements } from "./movements";
+import { getParser } from "../parsers";
+import { accounts } from "../tests/helpers";
 import {
   commitDraft,
   draftReconciliation,
@@ -37,6 +40,8 @@ function statement(hash = "bank-source-original"): ExtractedFile {
 async function provedDraft() {
   const draft = await prepareDraft(statement());
   expect(draft.parserFallback).toBe(true);
+  expect(draft.bankSource).toBeDefined();
+  expect(draft.parserReview).toBeUndefined();
   expect(draftReconciliation(draft)).toMatchObject({
     status: "reconciled",
     difference: 0,
@@ -53,6 +58,34 @@ afterAll(async () => {
 });
 
 describe("proved bank source integrity after review edits", () => {
+  it("requires a readable account identifier for verification but permits explicit unverified import into a selected compatible account", async () => {
+    const file = statement();
+    const parser = getParser("Barclays", file.rows);
+    const parsed = parser.parse(file.rows);
+    vi.spyOn(parser, "parse").mockReturnValue({
+      ...parsed,
+      accountIdentifier: undefined,
+    });
+    const draft = await prepareDraft(file, undefined, accounts[0]);
+    expect(draft.bankSource?.reconciledExactly).toBe(false);
+    expect(draftReconciliation(draft).status).toBe("warning");
+    expect(() => validateDraft(draft, false)).toThrow(/reconciliation|review/i);
+    draft.reviewedWarnings = true;
+    await commitDraft(draft, true);
+    expect(
+      (await db.statements.get(draft.statement.id))?.validationOverride,
+    ).toBe(true);
+    expect(await db.transactions.count()).toBe(3);
+  });
+
+  it("rejects changing an identified account even if the transactions and balances still agree", async () => {
+    const draft = await provedDraft();
+    draft.account.maskedAccountIdentifier = "•••• 9876";
+    expect(draftReconciliation(draft).status).toBe("warning");
+    await expect(commitDraft(draft, true)).rejects.toThrow("Source readings");
+    expect(await db.transactions.count()).toBe(0);
+  });
+
   it("blocks offsetting credit and debit changes even when the net still reconciles", async () => {
     const draft = await provedDraft();
     draft.transactions[0].amount += 1;
@@ -154,9 +187,13 @@ describe("proved bank source integrity after review edits", () => {
   });
   it("checks independently printed gross figures even when source balances still match", async () => {
     const draft = await provedDraft();
-    const checks = draft.parserReview!.checks;
-    checks.printedMoneyIn = checks.calculatedMoneyIn + 1;
-    checks.printedMoneyOut = checks.calculatedMoneyOut + 1;
+    const checks = draft.bankSource!;
+    const movement = statementMovements(
+      draft.transactions,
+      draft.statement.currency,
+    );
+    checks.printedMoneyIn = movement.moneyIn + 1;
+    checks.printedMoneyOut = movement.moneyOut + 1;
     expect(draftReconciliation(draft)).toMatchObject({
       status: "warning",
       difference: 0,
@@ -185,7 +222,19 @@ describe("proved bank source integrity after review edits", () => {
     };
     const original = await prepareDraft(file);
     expect(original.parserFallback).toBe(true);
-    const purchase = original.transactions[0];
+    expect(original.bankSource).toBeDefined();
+    expect(original.parserReview).toBeUndefined();
+    const genericReview = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true, skipCellOcr: true },
+    );
+    expect(genericReview.bankSource).toBeUndefined();
+    const purchase = genericReview.transactions[0];
     expect(purchase.date).toBe("2026-09-03");
     expect(purchase.description).toContain("ON 01 SEP");
     const corrected = await prepareDraft(
@@ -196,6 +245,7 @@ describe("proved bank source integrity after review edits", () => {
       [],
       undefined,
       {
+        preferGeneric: true,
         skipCellOcr: true,
         actions: {
           [purchase.parseRowId!]: {
@@ -239,7 +289,19 @@ describe("proved bank source integrity after review edits", () => {
     const file = statement();
     const original = await prepareDraft(file);
     expect(original.parserFallback).toBe(true);
-    const row = original.transactions[1];
+    expect(original.bankSource).toBeDefined();
+    expect(original.parserReview).toBeUndefined();
+    const genericReview = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true, skipCellOcr: true },
+    );
+    expect(genericReview.bankSource).toBeUndefined();
+    const row = genericReview.transactions[1];
     const corrected = await prepareDraft(
       file,
       undefined,
@@ -248,6 +310,7 @@ describe("proved bank source integrity after review edits", () => {
       [],
       undefined,
       {
+        preferGeneric: true,
         skipCellOcr: true,
         actions: {
           [row.parseRowId!]: {

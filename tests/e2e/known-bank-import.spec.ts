@@ -3,8 +3,8 @@ import { test, expect, type Page } from "./fixtures";
 
 const fixture = (name: string) =>
   resolve(`tests/fixtures/known-bank-${name}.pdf`);
-const alternativeReadingSelector =
-  'details.generic-parser-details:has(> summary:text-is("Alternative column reading"))';
+const readingOptionsSelector =
+  'details.generic-parser-details:has(> summary:text-is("Reading options"))';
 
 interface StoredTransaction {
   statementId: string;
@@ -18,6 +18,7 @@ interface StoredTransaction {
   parseRowId?: string;
   parseSource?: string;
   checkLevel?: string;
+  categoryId?: string;
 }
 interface StoredStatement {
   id: string;
@@ -159,12 +160,12 @@ test("recognised digital Barclays, Barclaycard, Amex and Revolut import together
     await expect(
       card.getByText("✓ Statement reconciled", { exact: true }),
     ).toBeVisible();
-    const alternative = card.locator(alternativeReadingSelector);
+    const alternative = card.locator(readingOptionsSelector);
     await expect(alternative).toHaveCount(1);
     await expect(alternative).not.toHaveAttribute("open");
     await expect(
       card.getByRole("region", { name: "Statement reading and checks" }),
-    ).not.toBeVisible();
+    ).toHaveCount(0);
     await expect(
       card.getByLabel(/I compared the extracted rows with the source file/),
     ).toHaveCount(0);
@@ -263,7 +264,7 @@ test("an unknown HSBC statement retains the generic source-reading workflow", as
   await expect(
     card.getByRole("heading", { name: "Other detected", exact: true }),
   ).toBeVisible();
-  await expect(card.locator(alternativeReadingSelector)).toHaveCount(0);
+  await expect(card.locator(readingOptionsSelector)).toHaveCount(0);
   const proof = card.getByRole("region", {
     name: "Statement reading and checks",
   });
@@ -303,19 +304,82 @@ test("a known-bank transaction that contradicts printed balances still requires 
   await expect(
     card.getByRole("heading", { name: "Barclays detected", exact: true }),
   ).toBeVisible();
-  await expect(card.locator(alternativeReadingSelector)).toHaveCount(0);
-  const proof = card.getByRole("region", {
-    name: "Statement reading and checks",
-  });
-  await expect(proof).toBeVisible();
-  await expect(proof).toContainText("This statement is not verified yet");
-  await expect(proof).toContainText("£1.00");
+  await expect(card.locator(readingOptionsSelector)).not.toHaveAttribute(
+    "open",
+  );
+  await expect(card.locator(".validation")).toContainText("£1.00");
   await expect(
-    proof.getByRole("button", { name: "Accept extracted values" }).first(),
-  ).toBeVisible();
+    card.getByRole("region", { name: "Statement reading and checks" }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
   expect((await records(page)).transactions).toHaveLength(0);
   expect((await records(page)).statements).toHaveLength(0);
+});
+
+test("a bank-reader source correction opens generic review only on request and rechecks the corrected values", async ({
+  page,
+}) => {
+  test.setTimeout(150000);
+  await select(page, ["barclays-malformed"]);
+  const card = await openCard(page, "barclays-malformed");
+  await card.getByRole("button", { name: /All transactions/ }).click();
+  const nativeRow = card
+    .locator(".review-row")
+    .filter({ hasText: "FICTIONAL GROCER" });
+  await nativeRow.locator("summary").click();
+  await expect(nativeRow.getByLabel("Date", { exact: true })).toHaveAttribute(
+    "readonly",
+  );
+  await expect(
+    nativeRow.getByRole("textbox", { name: /Amount for/ }),
+  ).toHaveAttribute("readonly");
+  await nativeRow
+    .getByLabel("Category", { exact: true })
+    .selectOption("shopping");
+  const options = card.locator(readingOptionsSelector);
+  await options.locator(":scope > summary").click();
+  await options
+    .getByRole("button", { name: "Review PDF layout", exact: true })
+    .click();
+  const proof = card.getByRole("region", {
+    name: "Statement reading and checks",
+  });
+  await expect(proof).toBeVisible();
+  await expect(proof).toContainText("This statement is not verified yet");
+  const row = proof.locator(".generic-review-row").filter({
+    has: page.locator("summary strong", { hasText: "FICTIONAL GROCER" }),
+  });
+  await row
+    .getByRole("button", { name: "Correct this row", exact: true })
+    .click();
+  await row.getByLabel("Amount (GBP)", { exact: true }).fill("-80.00");
+  await row
+    .getByRole("button", { name: "Save correction", exact: true })
+    .click();
+  await expect(proof).toContainText("Statement figures match exactly");
+  const confirm = page.getByRole("button", {
+    name: "Confirm import",
+    exact: true,
+  });
+  await expect(confirm).toBeEnabled();
+  await confirm.click();
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  const saved = await records(page);
+  expect(
+    saved.transactions
+      .map((transaction) => transaction.amount)
+      .sort((a, b) => a - b),
+  ).toEqual([-8000, 200000]);
+  expect(saved.statements[0]).toMatchObject({
+    validationStatus: "reconciled",
+    validationDifference: 0,
+  });
+  expect(
+    saved.transactions.find((transaction) => transaction.amount === -8000)
+      ?.categoryId,
+  ).toBe("shopping");
 });

@@ -129,18 +129,25 @@ describe("PDF review pipeline integrity", () => {
       statementDate: "2026-10-04",
     });
     expect(draftReconciliation(draft).status).toBe("reconciled");
-    expect(draft.parserReview?.checks).toMatchObject({
-      calculatedMoneyIn: 90500,
-      calculatedMoneyOut: 11468,
-    });
+    expect(draft.parserReview).toBeUndefined();
+    expect(draft.bankSource?.reconciledExactly).toBe(true);
     expect(
       draft.warnings.some((warning) =>
         warning.includes("issue date but no period start"),
       ),
     ).toBe(true);
+    const layoutReview = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true, skipCellOcr: true },
+    );
     const template = await savePdfLayout(
       file,
-      draft.parserReview!,
+      layoutReview.parserReview!,
       "Two card panels",
     );
     expect(
@@ -234,6 +241,15 @@ describe("PDF review pipeline integrity", () => {
     const file = source("T1");
     const draft = await prepareDraft(file);
     expect(draft.parserFallback).toBe(true);
+    const layoutReview = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true, skipCellOcr: true },
+    );
     const deliberate = await prepareDraft(
       file,
       undefined,
@@ -242,7 +258,7 @@ describe("PDF review pipeline integrity", () => {
       [],
       undefined,
       {
-        mapping: draft.parserReview!.mapping,
+        mapping: layoutReview.parserReview!.mapping,
         skipCellOcr: true,
       },
     );
@@ -342,10 +358,17 @@ describe("PDF review pipeline integrity", () => {
           skipCellOcr: true,
         },
       );
-      expect(draft.parserReview?.checks.reconciliation.difference).toBe(0);
-      expect(draft.parserReview?.checks.moneyInDifference).toBe(-1);
-      expect(draft.parserReview?.checks.moneyOutDifference).toBe(-1);
-      expect(draft.parserFallback).toBe(false);
+      expect(draftReconciliation(draft).difference).toBe(0);
+      expect(draft.bankSource).toMatchObject({
+        printedMoneyIn: 20001,
+        printedMoneyOut: 12551,
+        reconciledExactly: false,
+      });
+      expect(draft.bankSource?.sourceCoverageIssues.join(" ")).toContain(
+        "printed summary",
+      );
+      expect(draft.parserFallback).toBe(true);
+      expect(draft.parserReview).toBeUndefined();
       expect(draftReconciliation(draft).status).toBe("warning");
       expect(() =>
         validateDraft({ ...draft, reviewedWarnings: true }, false),
@@ -679,7 +702,15 @@ describe("PDF review pipeline integrity", () => {
   it("accepts cell OCR automatically only when the individual balance matches exactly", async () => {
     const file = source("T11");
     const read = cells(file, "100.00");
-    const draft = await prepareDraft(file);
+    const draft = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true },
+    );
     expect(read).toHaveBeenCalledOnce();
     expect(draft.transactions[1].amount).toBe(-10000);
     expect(draft.transactions[1]).toMatchObject({
@@ -731,7 +762,15 @@ describe("PDF review pipeline integrity", () => {
         }),
       ),
     } as unknown as PdfImportSession;
-    const draft = await prepareDraft(file);
+    const draft = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true },
+    );
     expect(draft.parserFallback).toBe(false);
     expect(draft.transactions.map((row) => row.amount)).toEqual([
       20000, -10000, -2550,
@@ -787,7 +826,15 @@ describe("PDF review pipeline integrity", () => {
   it("retains a conflicting OCR alternative instead of silently adopting it", async () => {
     const file = source("T11");
     cells(file, "999.00");
-    const draft = await prepareDraft(file);
+    const draft = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true },
+    );
     expect(draft.transactions[1].amount).toBe(-10001);
     expect(draftReconciliation(draft).status).toBe("warning");
     const row = draft.parserReview!.rowChecks[1];
@@ -819,7 +866,15 @@ describe("PDF review pipeline integrity", () => {
         .fn()
         .mockRejectedValue(new DOMException("Cancelled", "AbortError")),
     } as unknown as PdfImportSession;
-    const draft = await prepareDraft(file);
+    const draft = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      { preferGeneric: true },
+    );
     expect(draft.transactions[1].amount).toBe(-10001);
     expect(file.generic?.rowChecks).toHaveLength(3);
   });

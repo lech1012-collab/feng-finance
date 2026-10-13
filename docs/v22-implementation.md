@@ -31,12 +31,15 @@ serializes canvas/OCR operations to bound mobile memory.
 
 The generic parser reconstructs rows using font-aware vertical tolerances and
 columns using positions and headers. Bank profiles provide hints, while the
-Barclays, Barclaycard, Amex and Revolut adapters are preferred for recognised
-digital layouts only after exact totals, balance anchors and every source-row
-occurrence agree. This avoids repeated amount review and unnecessary numeric OCR.
-Unknown banks, changed or unproved layouts, scanned pages and explicit mapping
-or source corrections retain the generic review. A known issuer alone cannot
-bypass validation. The parser never fabricates a
+Barclays, Barclaycard, Amex and Revolut adapters recognise digital statements
+before generic profile or column inference. Their independent source snapshots
+check exact totals, balance anchors and every source-row occurrence. This avoids
+repeated amount review and unnecessary numeric OCR. Genuine bank warnings stay
+in the simple review and require explicit acceptance without triggering generic
+amount checks. Unknown banks, unsupported layouts and scanned pages retain
+generic review. Reading options deliberately opens that route for corrections,
+which are rechecked against the PDF. A known issuer alone cannot bypass
+validation. The parser never fabricates a
 zero amount or today's date to make an unread row importable.
 
 | Requirement       | Implementation                                                                                                                                                                                                                            |

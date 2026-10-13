@@ -420,6 +420,7 @@ export async function prepareDraft(
   return {
     account,
     parserReview: pdfReading?.generic,
+    bankSource: pdfReading?.bankSource,
     parserFallback: pdfReading?.fallback,
     statement: {
       id: sid,
@@ -470,30 +471,27 @@ export async function prepareDraft(
   };
 }
 /** Selected bank-reader facts are held only in the current PDF review session. */
-function selectedBankSource(draft: ImportDraft) {
+function matchesBankSource(draft: ImportDraft) {
+  const source = draft.bankSource?.parsed;
+  if (!source) return true;
   if (
-    !draft.parserFallback ||
-    !draft.statement.bankProfileId ||
-    draft.statement.validationPolicy !== "exact-v2.2"
-  )
-    return undefined;
-  return draft.parserReview?.comparison?.legacyTransactions ?? [];
-}
-function matchesBankSource(
-  draft: ImportDraft,
-  source: ParsedStatement["transactions"],
-) {
-  const statementSource = draft.parserReview?.parsed;
-  if (
-    !statementSource ||
-    !source.length ||
-    source.length !== draft.transactions.length ||
-    draft.statement.openingBalance !== statementSource.openingBalance ||
-    draft.statement.closingBalance !== statementSource.closingBalance ||
-    draft.statement.currency !== statementSource.currency ||
-    draft.statement.statementPeriodStart !== statementSource.periodStart ||
-    draft.statement.statementPeriodEnd !== statementSource.periodEnd ||
-    source.some((row) => !row.parseRowId) ||
+    !source.transactions.length ||
+    source.transactions.length !== draft.transactions.length ||
+    draft.statement.openingBalance !== source.openingBalance ||
+    draft.statement.closingBalance !== source.closingBalance ||
+    draft.statement.currency !== source.currency ||
+    draft.statement.statementPeriodStart !== source.periodStart ||
+    draft.statement.statementPeriodEnd !== source.periodEnd ||
+    draft.statement.institution !== source.institution ||
+    draft.account.institution !== source.institution ||
+    (draft.account.accountType === "credit" ||
+      draft.account.accountType === "credit_card") !==
+      (source.accountType === "credit" ||
+        source.accountType === "credit_card") ||
+    draft.account.currency !== source.currency ||
+    (source.accountIdentifier !== undefined &&
+      draft.account.maskedAccountIdentifier !== source.accountIdentifier) ||
+    source.transactions.some((row) => !row.parseRowId) ||
     draft.transactions.some((row) => !row.parseRowId)
   )
     return false;
@@ -502,10 +500,11 @@ function matchesBankSource(
   );
   if (
     normalized.size !== draft.transactions.length ||
-    new Set(source.map((row) => row.parseRowId)).size !== source.length
+    new Set(source.transactions.map((row) => row.parseRowId)).size !==
+      source.transactions.length
   )
     return false;
-  return source.every((original) => {
+  return source.transactions.every((original) => {
     const row = normalized.get(original.parseRowId);
     return (
       row !== undefined &&
@@ -538,7 +537,7 @@ export function draftReconciliation(draft: ImportDraft) {
     )
   )
     validation.status = "warning";
-  const bankSource = selectedBankSource(draft);
+  const bankSource = draft.bankSource;
   if (bankSource) {
     // Duplicates declined for addition still participate in source arithmetic,
     // just like transfers: the bank's Money in/out figures describe all rows.
@@ -546,9 +545,10 @@ export function draftReconciliation(draft: ImportDraft) {
       draft.transactions,
       draft.statement.currency,
     );
-    const checks = draft.parserReview?.checks;
+    const checks = bankSource;
     if (
-      !matchesBankSource(draft, bankSource) ||
+      !matchesBankSource(draft) ||
+      !bankSource.reconciledExactly ||
       (checks?.printedMoneyIn !== undefined &&
         movements.moneyIn !== checks.printedMoneyIn) ||
       (checks?.printedMoneyOut !== undefined &&
@@ -660,8 +660,8 @@ export async function refreshReviewedDraft(
 }
 export function validateDraft(draft: ImportDraft, overrideValidation: boolean) {
   const validation = draftReconciliation(draft);
-  const bankSource = selectedBankSource(draft);
-  if (bankSource && !matchesBankSource(draft, bankSource))
+  const bankSource = draft.bankSource;
+  if (bankSource && !matchesBankSource(draft))
     throw new Error(
       "Source readings changed during review. Recheck the corrected PDF rows before importing.",
     );

@@ -39,31 +39,20 @@ async function importStatement(page: Page, name: string) {
     await expect(acknowledgement).toBeVisible();
   if (name === "amex-uk-layout")
     await expect(
-      card.getByText(/A transaction date is outside the statement period/),
+      card.getByText(
+        /transaction dates? (?:is|fall) outside the statement period/,
+      ),
     ).toBeVisible();
   if (name === "amex-uk-layout") {
     await expect(confirm).toBeDisabled();
-    await expect(card.locator(".generic-import-review")).toBeVisible();
+    await expect(card.locator(".generic-import-review")).toHaveCount(0);
     await card
-      .getByRole("button", { name: "Import anyway…", exact: true })
-      .click();
-    const dialog = page.getByRole("dialog", {
-      name: "Import an unverified statement?",
-      exact: true,
-    });
-    const accept = dialog.getByRole("button", {
-      name: "Import unverified statement",
-      exact: true,
-    });
-    await expect(accept).toBeDisabled();
-    await dialog
       .getByLabel(
-        "I checked the original statement and accept importing these unverified figures.",
+        "I reviewed the source PDF and explicitly accept this unverified statement.",
         { exact: true },
       )
       .check();
-    await accept.click();
-    await expect(dialog).not.toBeVisible();
+    await acknowledgement.check();
   } else if (await acknowledgement.count()) {
     await expect(confirm).toBeDisabled();
     await acknowledgement.check();

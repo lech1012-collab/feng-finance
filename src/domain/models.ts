@@ -1,3 +1,4 @@
+import type { BankAdapterSource } from "../import/bank-adapter-proof";
 import type {
   TransactionParserMetadata,
   StatementParserMetadata,
@@ -16,7 +17,7 @@ export type {
   RowCheck,
   TableRowKind,
 } from "../import/generic/types";
-export const APP_VERSION = "2.2.2";
+export const APP_VERSION = "2.2.3";
 export const SCHEMA_VERSION = 4;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";
@@ -258,6 +259,8 @@ export interface DraftTransaction extends Transaction {
 export interface ImportDraft {
   /** Source evidence exists only during this import, never in portable records. */
   parserReview?: GenericParseResult;
+  /** Original supported-bank facts, detached from editable draft rows. */
+  bankSource?: BankAdapterSource;
   parserFallback?: boolean;
   statement: Statement;
   account: Account;

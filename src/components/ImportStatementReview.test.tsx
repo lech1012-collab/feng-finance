@@ -206,7 +206,7 @@ describe("import review corrections", () => {
     expect(corrected.amount).toBe(draft.transactions[0].amount);
   });
 
-  it("rechecks financial edits through source rows after automatic bank recognition, while leaving unchanged amounts alone", async () => {
+  it("protects native financial readings from unrechecked edits while keeping categorization editable", async () => {
     const fixture = genericFixture("T1");
     const draft = await prepareDraft({
       rows: reconstructRows(
@@ -248,6 +248,12 @@ describe("import review corrections", () => {
     const input = screen.getByLabelText(`Amount for ${row.description}`, {
       exact: true,
     });
+    expect(input).toHaveAttribute("readonly");
+    const date = screen.getAllByLabelText("Date", { exact: true })[0];
+    expect(date).toHaveAttribute("readonly");
+    expect(
+      screen.getByText(/To correct them, open Reading options/),
+    ).toBeInTheDocument();
     fireEvent.blur(input, {
       target: { value: decimalMoney(row.amount, row.currency) },
     });
@@ -255,23 +261,18 @@ describe("import review corrections", () => {
     fireEvent.blur(input, {
       target: { value: decimalMoney(row.amount + 1, row.currency) },
     });
-    expect(onSourceAction).toHaveBeenLastCalledWith(row.parseRowId, {
-      kind: "correct",
-      date: row.date,
-      description: row.description,
-      amount: row.amount + 1,
-      balanceAfterTransaction: row.balanceAfterTransaction,
-    });
-    expect(patch.mock.calls.some(([change]) => change.draft)).toBe(false);
-    fireEvent.change(screen.getAllByLabelText("Date", { exact: true })[0], {
+    fireEvent.change(date, {
       target: { value: "2026-09-04" },
     });
-    expect(onSourceAction).toHaveBeenLastCalledWith(row.parseRowId, {
-      kind: "correct",
-      date: "2026-09-04",
-      description: row.description,
+    expect(onSourceAction).not.toHaveBeenCalled();
+    expect(patch.mock.calls.some(([change]) => change.draft)).toBe(false);
+    fireEvent.change(screen.getAllByLabelText("Category", { exact: true })[0], {
+      target: { value: "salary" },
+    });
+    expect(patch.mock.calls.at(-1)?.[0].draft.transactions[0]).toMatchObject({
+      categoryId: "salary",
       amount: row.amount,
-      balanceAfterTransaction: row.balanceAfterTransaction,
+      date: row.date,
     });
   });
 });

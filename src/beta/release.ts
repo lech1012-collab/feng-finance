@@ -14,9 +14,9 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-13",
   points: [
-    "Barclays, Barclaycard, Amex and Revolut use their validated bank readers automatically.",
-    "Familiar statements no longer need repeated amount confirmation.",
-    "Unfamiliar or changed layouts keep column mapping and source review.",
+    "Barclaycard, Amex and Revolut are recognised independently of the generic parser.",
+    "Supported digital statements open a simple review without repeated amount checks.",
+    "Other banks keep generic review; Reading options opens layout correction when needed.",
   ],
   pleaseTest: [
     "Import a familiar statement and check its summary before confirming.",
@@ -28,6 +28,19 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.2",
+    date: "2026-10-13",
+    points: [
+      "Restored bank readers for layouts also proved by the generic reader.",
+      "Improved Barclays wrapped-footer handling and source correction checks.",
+    ],
+    pleaseTest: [
+      "Import a familiar statement and check its summary before confirming.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.1",
     date: "2026-10-12",

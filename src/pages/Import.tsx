@@ -18,7 +18,7 @@ import {
 } from "../import/review-model";
 import { ImportStatementReview } from "../components/ImportStatementReview";
 import { validatePeriod } from "../parsers/period";
-import { id } from "../domain/normalize";
+import { id, transactionKey } from "../domain/normalize";
 import type { ImportDraft } from "../domain/models";
 import { statementBalanceDate } from "../analytics/statement-balances";
 import { CsvMappingPanel } from "../components/CsvMappingPanel";
@@ -254,8 +254,34 @@ export default function ImportPage({
             row,
           ]),
         );
+        // Native and generic readings have independent source-row IDs. Preserve
+        // a manual choice only for the same uniquely identified occurrence,
+        // including page, booking date and printed balance, when switching.
+        const occurrenceKey = (row: ImportDraft["transactions"][number]) =>
+          JSON.stringify([
+            transactionKey({ ...row, accountId: "" }),
+            row.bookingDate,
+            row.balanceAfterTransaction,
+            row.sourcePage,
+            row.occurrence,
+          ]);
+        const sameAccount =
+          entry.draft.account.institution === draft.account.institution &&
+          entry.draft.account.accountType === draft.account.accountType &&
+          entry.draft.account.currency === draft.account.currency &&
+          entry.draft.account.maskedAccountIdentifier ===
+            draft.account.maskedAccountIdentifier;
+        const occurrences = new Map<string, ImportDraft["transactions"]>();
+        if (sameAccount)
+          for (const row of entry.draft.transactions) {
+            const key = occurrenceKey(row);
+            occurrences.set(key, [...(occurrences.get(key) ?? []), row]);
+          }
         draft.transactions = draft.transactions.map((row) => {
-          const old = prior.get(row.parseRowId ?? row.transactionFingerprint);
+          const matches = occurrences.get(occurrenceKey(row));
+          const old =
+            prior.get(row.parseRowId ?? row.transactionFingerprint) ??
+            (matches?.length === 1 ? matches[0] : undefined);
           if (!old) return row;
           return {
             ...row,
@@ -994,9 +1020,40 @@ export default function ImportPage({
                   void reparse(changed, false, true);
                 }}
                 sourceReview={(() => {
+                  if (entry.skip || entry.state === "saved") return undefined;
+                  if (entry.draft?.bankSource) {
+                    return (
+                      <details className="generic-parser-details">
+                        <summary>Reading options</summary>
+                        <p>
+                          This statement uses its bank reader. If a date or
+                          amount looks wrong, review the PDF layout to correct
+                          the source reading and check the figures again.
+                        </p>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            const changed: FileReview = {
+                              ...entry,
+                              pdfReviewOptions: {
+                                ...entry.pdfReviewOptions,
+                                preferGeneric: true,
+                              },
+                            };
+                            patchEntry(entry.id, {
+                              pdfReviewOptions: changed.pdfReviewOptions,
+                            });
+                            void reparse(changed, false, true);
+                          }}
+                        >
+                          Review PDF layout
+                        </button>
+                      </details>
+                    );
+                  }
                   const result = sourceReview(entry);
-                  if (!result || entry.skip || entry.state === "saved")
-                    return undefined;
+                  if (!result) return undefined;
                   const review = (
                     <GenericImportReview
                       result={result}

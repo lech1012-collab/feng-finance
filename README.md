@@ -24,7 +24,11 @@ Settings → About and feedback.
 Recognised digital layouts from Barclays current accounts, Barclaycard, American
 Express and Revolut use their bank-specific readers first. When source rows,
 balances and printed totals agree, review the summary and confirm once. The
-generic PDF parser handles unfamiliar banks and changed layouts.
+generic PDF parser handles unfamiliar banks, unsupported layouts and scanned
+statements. Native bank recognition does not require a generic profile or a
+second generic reading of every row. Genuine native warnings remain in the
+simple review. **Reading options → Review PDF layout** deliberately switches
+to generic source correction if an amount or date needs changing.
 Every layout still needs its own arithmetic checks; synthetic fixtures do not
 certify every real statement variant. Questionable rows remain visible for
 correction, and an unverified import requires an explicit override.

@@ -7,7 +7,11 @@ export class RevolutStatementParser extends BaseParser {
   institution = "Revolut" as const;
   canParse(rows: TextRow[]) {
     return (
-      rows.some((r) => /REVOLUT/i.test(r.text)) &&
+      rows.some((r) =>
+        /REVOLUT|^BIC\s*:?\s*REVO(?:GB|LT)[A-Z0-9]{2}(?:[A-Z0-9]{3})?\b/i.test(
+          r.text.trim(),
+        ),
+      ) &&
       rows.some((r) =>
         /account statement|IBAN|account transactions from/i.test(r.text),
       )
