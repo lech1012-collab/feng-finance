@@ -7,6 +7,9 @@ import { clearLocalData } from "../storage/backup";
 import { prepareDraft } from "../import/pipeline";
 import { importBlockers, type FileReview } from "../import/review-model";
 import { bankRows } from "../tests/helpers";
+import { genericFixture } from "../import/generic/fixtures";
+import { reconstructRows } from "../import/layout";
+import { decimalMoney } from "../domain/money";
 
 beforeEach(async () => {
   cleanup();
@@ -201,5 +204,74 @@ describe("import review corrections", () => {
     expect(corrected.categoryId).toBeUndefined();
     expect(corrected.subcategoryId).toBeUndefined();
     expect(corrected.amount).toBe(draft.transactions[0].amount);
+  });
+
+  it("rechecks financial edits through source rows after automatic bank recognition, while leaving unchanged amounts alone", async () => {
+    const fixture = genericFixture("T1");
+    const draft = await prepareDraft({
+      rows: reconstructRows(
+        fixture.items.map((item) => ({ ...item, y: item.y + item.height })),
+      ),
+      hash: "recognised-source-correction",
+      filename: "fictional-recognised.pdf",
+      method: "embedded-text",
+      warnings: [],
+      extraction: {
+        ...fixture,
+        quality: [],
+        pageCount: fixture.pages.length,
+        completedPages: fixture.pages.map((page) => page.page),
+        unreadPages: [],
+        cancelled: false,
+        method: "text",
+      },
+    });
+    expect(draft.parserFallback).toBe(true);
+    const entry = { ...(await reviewEntry()), draft, showAll: true };
+    const patch = vi.fn();
+    const onSourceAction = vi.fn();
+    render(
+      <MemoryRouter>
+        <ImportStatementReview
+          entry={entry}
+          accounts={[]}
+          categories={await db.categories.toArray()}
+          history={[]}
+          busy={false}
+          patch={patch}
+          reparse={() => undefined}
+          onSourceAction={onSourceAction}
+        />
+      </MemoryRouter>,
+    );
+    const row = draft.transactions[0];
+    const input = screen.getByLabelText(`Amount for ${row.description}`, {
+      exact: true,
+    });
+    fireEvent.blur(input, {
+      target: { value: decimalMoney(row.amount, row.currency) },
+    });
+    expect(onSourceAction).not.toHaveBeenCalled();
+    fireEvent.blur(input, {
+      target: { value: decimalMoney(row.amount + 1, row.currency) },
+    });
+    expect(onSourceAction).toHaveBeenLastCalledWith(row.parseRowId, {
+      kind: "correct",
+      date: row.date,
+      description: row.description,
+      amount: row.amount + 1,
+      balanceAfterTransaction: row.balanceAfterTransaction,
+    });
+    expect(patch.mock.calls.some(([change]) => change.draft)).toBe(false);
+    fireEvent.change(screen.getAllByLabelText("Date", { exact: true })[0], {
+      target: { value: "2026-09-04" },
+    });
+    expect(onSourceAction).toHaveBeenLastCalledWith(row.parseRowId, {
+      kind: "correct",
+      date: "2026-09-04",
+      description: row.description,
+      amount: row.amount,
+      balanceAfterTransaction: row.balanceAfterTransaction,
+    });
   });
 });

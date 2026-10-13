@@ -84,15 +84,11 @@ export function ImportStatementReview({
     row: ImportDraft["transactions"][number],
     correction: { date?: string; amount?: number },
   ) => {
-    if (
-      row.parseRowId &&
-      d?.parserReview &&
-      !d.parserFallback &&
-      onSourceAction
-    ) {
+    if (row.parseRowId && d?.parserReview && onSourceAction) {
       onSourceAction(row.parseRowId, {
         kind: "correct",
         date: correction.date ?? row.date,
+        ...(row.bookingDate ? { bookingDate: row.bookingDate } : {}),
         description: row.description,
         amount: correction.amount ?? row.amount,
         balanceAfterTransaction: row.balanceAfterTransaction,
@@ -629,10 +625,11 @@ export function ImportStatementReview({
                                   (id) => id !== t.id,
                                 );
                               patch({ invalidAmounts });
+                              if (d.parserFallback && amount === t.amount)
+                                return;
                               if (
                                 t.parseRowId &&
                                 d.parserReview &&
-                                !d.parserFallback &&
                                 onSourceAction
                               ) {
                                 correctSource(t, { amount });

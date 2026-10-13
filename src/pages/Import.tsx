@@ -1031,9 +1031,11 @@ export default function ImportPage({
                     <details className="generic-parser-details">
                       <summary>Alternative column reading</summary>
                       <p>
-                        The bank-specific reader produced the reconciled figures
-                        above. This alternative reading needs checking. Changing
-                        its mapping or rows selects it for this import.
+                        The bank-specific reader checked this recognised
+                        statement automatically. Column mapping and source-row
+                        corrections are available here if you need them.
+                        Changing the mapping or rows selects that reading for
+                        this import.
                       </p>
                       {review}
                     </details>
@@ -1051,7 +1053,8 @@ export default function ImportPage({
           (entry) =>
             !entry.skip &&
             (entry.error ||
-              (sourceReview(entry) &&
+              (!entry.draft?.parserFallback &&
+                sourceReview(entry) &&
                 !sourceReview(entry)?.checks.reconciledExactly)),
         ) && (
           <section className="card" aria-label="Help with a failed import">

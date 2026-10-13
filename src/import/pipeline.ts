@@ -51,6 +51,7 @@ import type {
   ImportProgress,
 } from "./pdf-session-types";
 import { firstRealImportAt } from "../beta/policy";
+import { statementMovements } from "./movements";
 import { retainImportDiagnostics } from "../storage/import-diagnostics";
 function applyCategory(
   transaction: Transaction,
@@ -468,6 +469,55 @@ export async function prepareDraft(
     duplicateOverride: false,
   };
 }
+/** Selected bank-reader facts are held only in the current PDF review session. */
+function selectedBankSource(draft: ImportDraft) {
+  if (
+    !draft.parserFallback ||
+    !draft.statement.bankProfileId ||
+    draft.statement.validationPolicy !== "exact-v2.2"
+  )
+    return undefined;
+  return draft.parserReview?.comparison?.legacyTransactions ?? [];
+}
+function matchesBankSource(
+  draft: ImportDraft,
+  source: ParsedStatement["transactions"],
+) {
+  const statementSource = draft.parserReview?.parsed;
+  if (
+    !statementSource ||
+    !source.length ||
+    source.length !== draft.transactions.length ||
+    draft.statement.openingBalance !== statementSource.openingBalance ||
+    draft.statement.closingBalance !== statementSource.closingBalance ||
+    draft.statement.currency !== statementSource.currency ||
+    draft.statement.statementPeriodStart !== statementSource.periodStart ||
+    draft.statement.statementPeriodEnd !== statementSource.periodEnd ||
+    source.some((row) => !row.parseRowId) ||
+    draft.transactions.some((row) => !row.parseRowId)
+  )
+    return false;
+  const normalized = new Map(
+    draft.transactions.map((row) => [row.parseRowId, row]),
+  );
+  if (
+    normalized.size !== draft.transactions.length ||
+    new Set(source.map((row) => row.parseRowId)).size !== source.length
+  )
+    return false;
+  return source.every((original) => {
+    const row = normalized.get(original.parseRowId);
+    return (
+      row !== undefined &&
+      row.amount === original.amount &&
+      row.date === original.date &&
+      row.bookingDate === original.bookingDate &&
+      row.currency === original.currency &&
+      row.balanceAfterTransaction === original.balanceAfterTransaction &&
+      row.sourcePage === original.sourcePage
+    );
+  });
+}
 export function draftReconciliation(draft: ImportDraft) {
   const validation = reconcileWithPolicy(
     draft.statement.openingBalance,
@@ -488,6 +538,24 @@ export function draftReconciliation(draft: ImportDraft) {
     )
   )
     validation.status = "warning";
+  const bankSource = selectedBankSource(draft);
+  if (bankSource) {
+    // Duplicates declined for addition still participate in source arithmetic,
+    // just like transfers: the bank's Money in/out figures describe all rows.
+    const movements = statementMovements(
+      draft.transactions,
+      draft.statement.currency,
+    );
+    const checks = draft.parserReview?.checks;
+    if (
+      !matchesBankSource(draft, bankSource) ||
+      (checks?.printedMoneyIn !== undefined &&
+        movements.moneyIn !== checks.printedMoneyIn) ||
+      (checks?.printedMoneyOut !== undefined &&
+        movements.moneyOut !== checks.printedMoneyOut)
+    )
+      validation.status = "warning";
+  }
   const evidence = !draft.parserFallback
     ? draft.parserReview?.checks
     : undefined;
@@ -592,6 +660,11 @@ export async function refreshReviewedDraft(
 }
 export function validateDraft(draft: ImportDraft, overrideValidation: boolean) {
   const validation = draftReconciliation(draft);
+  const bankSource = selectedBankSource(draft);
+  if (bankSource && !matchesBankSource(draft, bankSource))
+    throw new Error(
+      "Source readings changed during review. Recheck the corrected PDF rows before importing.",
+    );
   if (draft.parserReview && !draft.parserFallback) {
     const sourceTransactions = draft.parserReview.parsed?.transactions ?? [];
     if (

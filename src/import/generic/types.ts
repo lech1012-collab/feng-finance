@@ -163,6 +163,7 @@ export type RowReviewAction =
   | {
       kind: "correct";
       date: ISODate;
+      bookingDate?: ISODate;
       description: string;
       amount: number;
       balanceAfterTransaction?: number;

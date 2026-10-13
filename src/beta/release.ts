@@ -12,11 +12,15 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-12",
-  points: ["What's new closes reliably after you acknowledge an update."],
+  date: "2026-10-13",
+  points: [
+    "Barclays, Barclaycard, Amex and Revolut use their validated bank readers automatically.",
+    "Familiar statements no longer need repeated amount confirmation.",
+    "Unfamiliar or changed layouts keep column mapping and source review.",
+  ],
   pleaseTest: [
-    "Update from Home, read What's new and dismiss it once.",
-    "Check that your accounts and transactions remain available offline.",
+    "Import a familiar statement and check its summary before confirming.",
+    "Try another bank's statement and check its source review.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -24,6 +28,17 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.1",
+    date: "2026-10-12",
+    points: ["What's new closes reliably after you acknowledge an update."],
+    pleaseTest: [
+      "Update from Home, read What's new and dismiss it once.",
+      "Check that your accounts and transactions remain available offline.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.0",
     date: "2026-10-12",

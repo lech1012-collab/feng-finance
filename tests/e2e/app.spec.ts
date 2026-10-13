@@ -8,6 +8,7 @@ import {
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { startStaticHost, type LocalHost } from "./static-host";
+import { PARSER_VERSION } from "../../src/parsers/interface";
 const test = base.extend<{ offlineHost: LocalHost }>({
   offlineHost: async ({}, use) => {
     const host = await startStaticHost();
@@ -1485,12 +1486,14 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     amex.getByText("6 Sep to 5 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText(/1 transaction dates fall outside/),
+    amex.getByText(/A transaction date is outside the statement period/),
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await amex.getByText("Alternative column reading", { exact: true }).click();
+  // Both printed dates are outside this period, so this deliberately changed
+  // layout retains generic source review rather than the recognised fast path.
+  await expect(amex.locator(".generic-import-review")).toBeVisible();
   await amex
     .getByRole("button", { name: "Import anyway…", exact: true })
     .click();
@@ -1520,10 +1523,12 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     revolut.getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
-  const revolutProof = revolut.getByRole("region", {
-    name: "Statement reading and checks",
-    exact: true,
-  });
+  const revolutProof = revolut.locator(".generic-import-review");
+  await expect(
+    revolut.locator(
+      '.generic-parser-details:has(> summary:text-is("Alternative column reading"))',
+    ),
+  ).not.toHaveAttribute("open");
   await expect(revolutProof).toContainText("Statement figures match exactly");
   await expect(revolutProof).toContainText("6 balance-checked");
   await expect(revolutProof).toContainText("0 need review");
@@ -2131,7 +2136,7 @@ test("Barclays blank dates retain every grouped transaction across pages", async
     openingBalance: 100000,
     closingBalance: 105000,
     validationStatus: "reconciled",
-    parserVersion: "2.2.0",
+    parserVersion: PARSER_VERSION,
     validationPolicy: "exact-v2.2",
   });
   expect(

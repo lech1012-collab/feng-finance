@@ -127,6 +127,8 @@ const sectionRE =
 const issuerBannerRE = /^(?:Barclays|Barclaycard|American Express|Revolut)$/i;
 const currencyStatementTitleRE =
   /^(?:(?:GBP|EUR|USD|CHF|AUD|CAD|NZD|HKD|SGD|JPY|KWD)\s+Statement|Statement(?:\s+(?:of\s+account|in))?\s+(?:GBP|EUR|USD|CHF|AUD|CAD|NZD|HKD|SGD|JPY|KWD))$/i;
+const wrappedRegulatoryFooterRE =
+  /^(?:and\s+(?:the\s+)?)?(?:Prudential Regulation Authority|Financial Conduct Authority)\s*\(\s*Financial Services Register (?:No\.?|number)\s*:?\s*\d+\s*\)\.?\s+Page\s+\d+(?:\s+(?:of|\/)\s+\d+)?$/i;
 function headerItems(row: PositionedRow) {
   const entries: {
     item: ExtractedTextItem;
@@ -520,8 +522,22 @@ export function reconstructTable(
         /^(?:opening balance|closing balance|start balance|end balance|previous (?:closing )?balance|new balance|balance (?:brought|carried) forward|your (?:previous|new) balance)/i.test(
           withoutDate,
         );
+      const previousSourceRow = result.at(-1);
+      // A wrapped regulatory disclosure can put its second line in the date
+      // band and its page number in a numeric band. Recognise only the exact
+      // disclosure, beside an established footer in the bottom page margin.
+      // The whole-line match rejects dates, amounts and corrupt numeric cells.
+      const wrappedRegulatoryFooter =
+        row.y >= page.height * 0.9 &&
+        previousSourceRow?.kind === "footer" &&
+        previousSourceRow.rect.page === page.page &&
+        row.y >= previousSourceRow.rect.y &&
+        row.y - (previousSourceRow.rect.y + previousSourceRow.rect.height) <=
+          12 &&
+        wrappedRegulatoryFooterRE.test(row.text);
       const subtotal = !hasDate && subtotalRE.test(row.text),
-        footer = !hasDate && footerRE.test(row.text),
+        footer =
+          (!hasDate && footerRE.test(row.text)) || wrappedRegulatoryFooter,
         sectionHeading = !hasDate && sectionRE.test(row.text);
       if (sectionHeading) {
         section = row.text;

@@ -368,12 +368,14 @@ function evaluate(
       reading.balanceAfterTransaction *= balanceSign;
     reading.id = readingIdentity(row.id, reading);
     const action = options.actions?.[row.id];
+    const sourceBookingDate = reading.bookingDate;
     if (action?.kind === "accept" && accepted?.has(row.id))
       reading = { ...accepted.get(row.id)! };
     if (action?.kind === "correct") {
       reading = {
         ...reading,
         date: action.date,
+        bookingDate: action.bookingDate ?? reading.bookingDate,
         description: normalizeDescription(action.description),
         merchant: normalizeMerchant(action.description),
         amount: action.amount,
@@ -383,7 +385,16 @@ function evaluate(
       };
       reading.id = readingIdentity(row.id, reading);
     }
-    if (reading.date) previousDate = reading.date;
+    if (reading.date)
+      // A bank reader may retain a purchase date from the description and the
+      // ledger date from the sole Date column. Preserve that ledger date for
+      // subsequent blank-date rows when correcting this transaction.
+      previousDate =
+        action?.kind === "correct" &&
+        action.bookingDate !== undefined &&
+        sourceBookingDate === undefined
+          ? action.bookingDate
+          : reading.date;
     else if (reading.rawDate) previousDate = undefined;
     const excluded = action?.kind === "exclude";
     const issues: RowCheck["issues"] = [];

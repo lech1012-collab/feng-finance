@@ -5,8 +5,6 @@ import type {
   TextRow,
 } from "../domain/models";
 import { id } from "../domain/normalize";
-import { reconcileWithPolicy } from "../domain/reconcile";
-import { parseDate } from "../domain/dates";
 import { getParser } from "../parsers";
 import { PARSER_VERSION } from "../parsers/interface";
 import { retainImportDiagnostics } from "../storage/import-diagnostics";
@@ -31,7 +29,10 @@ import type {
 import type { ExtractedFile } from "./pipeline";
 import type { ImportProgress } from "./pdf-session-types";
 import { isImportAbort } from "./pdf-abort";
-import { statementMovements } from "./movements";
+import {
+  BANK_ADAPTER_PAYMENT_NOTICE,
+  proveBankAdapter,
+} from "./generic/legacy-comparison";
 
 export interface PdfReviewOptions extends GenericParseOptions {
   signal?: AbortSignal;
@@ -177,7 +178,7 @@ function legacyParsed(
   }
 }
 
-/** Bank adapters remain a conservative comparison path while layout parsing broadens support. */
+/** Established digital layouts use their proved bank reader; other layouts retain source review. */
 export async function preparePdfReading(
   extracted: ExtractedFile,
   bank: Institution,
@@ -225,7 +226,20 @@ export async function preparePdfReading(
     extracted.extraction.pages,
     options,
   );
-  if (!options.template && !options.mapping) {
+  const adapterProof =
+    !review.mapping &&
+    !review.template &&
+    !review.period &&
+    !Object.keys(review.actions ?? {}).length &&
+    !options.template &&
+    !extracted.warnings.length &&
+    extracted.extraction.method === "text" &&
+    extracted.extraction.items.every((item) => item.parseSource === "text") &&
+    bank !== "Other" &&
+    getParser(bank, extracted.rows).canParse(extracted.rows)
+      ? proveBankAdapter(legacy, generic, profile)
+      : undefined;
+  if (!adapterProof && !options.template && !options.mapping) {
     const matches = await db.layoutTemplates
       .where("fingerprint")
       .equals(generic.layoutFingerprint)
@@ -241,7 +255,10 @@ export async function preparePdfReading(
       );
     }
   }
-  generic = await checkNumericCells(extracted, generic, options);
+  // A proved digital bank layout does not need a second OCR reading of each
+  // amount. Unproved, changed, scanned or unknown layouts keep the full review.
+  if (!adapterProof)
+    generic = await checkNumericCells(extracted, generic, options);
   if (profile)
     generic.comparison = compareLegacyTransactions(
       generic,
@@ -283,105 +300,45 @@ export async function preparePdfReading(
       options.template.id,
       generic.checks.reconciledExactly,
     );
-  const deliberateReading =
-    !!review.mapping ||
-    !!review.template ||
-    !!Object.keys(review.actions ?? {}).length;
-  const legacyMovements =
-    legacy && statementMovements(legacy.transactions, legacy.currency);
-  const legacyExact =
-    legacy &&
-    reconcileWithPolicy(
-      legacy.openingBalance,
-      legacy.closingBalance,
-      legacy.transactions.map((row) => row.amount),
-      "exact-v2.2",
-    ).status === "reconciled" &&
-    (generic.checks.printedMoneyIn === undefined ||
-      legacyMovements!.moneyIn === generic.checks.printedMoneyIn) &&
-    (generic.checks.printedMoneyOut === undefined ||
-      legacyMovements!.moneyOut === generic.checks.printedMoneyOut);
-  // Preserve proven adapters for layouts whose new candidate is incomplete. A mismatch is explicit review.
-  const malformedSource = generic.rowChecks.some((row) => {
-    if (row.reviewAction?.kind === "exclude") return false;
-    if (
-      row.issues.some((issue) =>
-        ["invalid-amount", "missing-description"].includes(issue),
-      )
-    )
-      return true;
-    if (!row.issues.includes("invalid-date")) return false;
-    try {
-      parseDate(selected(row)?.date ?? "");
-      return false;
-    } catch {
-      return true;
-    }
-  });
-  // Never revert an OCR number already proved by its individual printed
-  // running balance to a stale adapter reading whose net errors cancel.
-  const legacyReadings = [...(legacy?.transactions ?? [])];
-  const provedOcrMismatch = generic.rowChecks.some((row) => {
-    if (row.parseSource !== "ocr" || row.difference !== 0 || row.issues.length)
-      return false;
-    const reading = selected(row);
-    const match = legacyReadings.findIndex(
-      (transaction) =>
-        transaction.sourcePage === row.rect.page &&
-        transaction.date === reading?.date &&
-        transaction.bookingDate === reading?.bookingDate &&
-        transaction.amount === reading?.amount &&
-        transaction.balanceAfterTransaction ===
-          reading?.balanceAfterTransaction,
-    );
-    if (match < 0) return true;
-    legacyReadings.splice(match, 1);
-    return false;
-  });
-  const fallback =
-    !malformedSource &&
-    !provedOcrMismatch &&
-    !deliberateReading &&
-    !!legacyExact &&
-    !generic.checks.reconciledExactly &&
-    !extracted.extraction.unreadPages.length &&
-    (!generic.parsed || generic.comparison?.legacyStatus === "different") &&
-    !options.template;
-  if (fallback && legacy) {
-    const sources = new Set(
-      extracted.extraction.items.map((item) => item.parseSource),
-    );
-    const parserMethod = sources.has("ocr")
-      ? sources.has("text")
-        ? ("text+ocr" as const)
-        : ("ocr" as const)
-      : ("text" as const);
+  if (adapterProof && legacy) {
+    const transactions = legacy.transactions.map((row, index) => ({
+      ...row,
+      parseRowId: adapterProof.sourceRows[index].rowId,
+      parseSource: "text" as const,
+      checkLevel:
+        row.balanceAfterTransaction === undefined
+          ? ("total" as const)
+          : ("balance" as const),
+    }));
+    // The selected adapter's immutable financial snapshot is separate from
+    // editable ledger categorization. Keep occurrence-preserving source IDs.
+    if (generic.comparison)
+      generic.comparison.legacyTransactions = transactions.map((row) => ({
+        ...row,
+      }));
     return {
       parsed: {
         ...legacy,
+        transactions,
+        warnings: legacy.warnings.filter(
+          (warning) => warning !== BANK_ADAPTER_PAYMENT_NOTICE,
+        ),
         validationPolicy: "exact-v2.2" as const,
-        parserMethod,
+        parserMethod: "text" as const,
         bankProfileId: profile?.id,
-        rowsTotalChecked: legacy.transactions.length,
+        rowsBalanceChecked: transactions.filter(
+          (row) => row.checkLevel === "balance",
+        ).length,
+        rowsTotalChecked: transactions.filter(
+          (row) => row.checkLevel === "total",
+        ).length,
         rowsNeedingReview: 0,
-        transactions: legacy.transactions.map((row, index) => ({
-          ...row,
-          parseRowId: `legacy-${index}`,
-          parseSource:
-            extracted.extraction!.method === "text"
-              ? ("text" as const)
-              : ("ocr" as const),
-          checkLevel:
-            extracted.extraction!.method === "text"
-              ? ("total" as const)
-              : ("ocr" as const),
-        })),
-        warnings: [
-          ...legacy.warnings,
-          "The bank-specific reader was retained because the new layout reader produced a different result. Compare the extracted transactions with the PDF before importing; Map columns is available to review the layout.",
-        ],
+        unreadPages: [],
       },
       generic,
+      // Existing draft validation uses the selected adapter rather than the
+      // alternative generic candidate. Exact totals, source coverage and each
+      // available running balance were proved above, without a review bypass.
       fallback: true,
     };
   }

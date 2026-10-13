@@ -2,7 +2,7 @@
 
 This release implements the 8 October 2026 developer specification and its v2.2
 amendment. It remains a React/strict TypeScript/Vite/Dexie application with local
-PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.1**
+PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.2**
 uses additive IndexedDB **schema 4**. Portable JSON backup format remains
 **version 1**; supported older databases and backups are migrated without resetting
 financial records.
@@ -29,6 +29,35 @@ suppresses stale preferences only after acknowledgement succeeds; failed saves
 remain retryable and About can still reopen release notes. This patch changes no
 financial calculations, parser version, database schema or migration.
 
+Version 2.2.1 subsequently passed [868 unit/component tests and 162 browser cases](https://github.com/lech1012-collab/feng-finance/actions/runs/38286536435)
+and [Pages deployment](https://github.com/lech1012-collab/feng-finance/actions/runs/38288425757).
+The preserved live profile passed explicit update, exact financial-record and
+native safety-copy comparison, one-time release-note acknowledgement, and fresh
+offline document navigation/reload with no JavaScript errors.
+
+Version 2.2.2 restores a streamlined bank-specific route for recognised digital
+Barclays, Barclaycard, Amex and Revolut layouts. Selection requires exact statement
+and printed movement totals, all available running-balance anchors, valid dates
+and occurrence-preserving coverage of every financial source row. It runs before
+numeric-cell OCR or saved-layout inference. Unknown banks, unproved or changed
+layouts, OCR and deliberate mapping/corrections retain generic source review.
+The weaker net-only legacy fallback has been removed.
+
+A wrapped regulatory footer in the available original Barclays PDF caused a
+false source row and unnecessary amount checks. A narrowly bounded footer rule
+fixes it without ignoring similar merchant text or malformed financial values.
+The original PDF was independently compared locally with the final draft and
+committed ledger; no original PDF, extracted financial values or private screenshots
+enter the repository. Earlier original Amex, Revolut and Barclaycard PDF bytes are
+unavailable in this workspace, so their preserved synthetic layouts are tested;
+those results do not claim a fresh run of the unavailable original files.
+
+Bank-reader financial edits retain source-snapshot and printed-gross checks.
+Offsetting amount errors, changed dates/balances and missing occurrences cannot
+be committed by accepting a net-zero reconciliation. UI corrections recheck the
+generic source; category, merchant, tag and confirmed-transfer edits remain direct.
+This patch changes no database or backup schema and does not relabel older imports.
+
 ## Implementation scope
 
 - Dated cash, card debt and manual net-worth balances with complete, partial,
@@ -53,21 +82,31 @@ explicitly deferred.
 
 ## Recorded v2.2 verification
 
-Checks on 12 October 2026 use fictitious data only. Focused passing checks below
+Automated checks on 12–13 October 2026 use fictitious data only. The separate
+private original-PDF comparison stays local. Focused passing checks below
 do not substitute for a consolidated run against the final release commit.
 
-| Check                                      | Recorded result                                                                                                                                                                                                                                   |
-| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Unit/component suite                       | **868 tests passed in 111 files** locally for v2.2.1, including three release-dialog regressions. v2.2.0 CI passed 865 tests in 110 files. The patch release gate repeats the full suite.                                                         |
-| Production build                           | Passed strict TypeScript and Vite; **441 precache entries**, approximately **22.5 MiB**. The final source is rebuilt in release CI.                                                                                                               |
-| Beta browser acceptance                    | **18 passed** across Chromium and WebKit: notice acknowledgement, native picker gesture, installation policy, feedback/privacy and safe update lifecycle.                                                                                         |
-| Migration and local OCR browser acceptance | **14 passed** across Chromium and WebKit: original keys/PIN/receipt bytes preserved, exact recovery, stopped-origin OCR, source crops, cancellation and one-penny correction.                                                                     |
-| Financial write/update guards              | **10 passed** in three focused files, including held and rejected writes, concurrent writes and audit/closure behavior.                                                                                                                           |
-| Full Chromium/WebKit browser suite         | **162 cases passed** in v2.2.0 CI. Patch release CI repeats every case against its own production build and blocks Pages on any failure.                                                                                                          |
-| Dependency audit                           | `npm audit --audit-level=moderate`: **0 vulnerabilities**. Repeat if dependencies change.                                                                                                                                                         |
-| Repository/release guards                  | Repository and release metadata checks passed; **9** Node guard tests passed. The release-tag CI job requires matching package, application and changelog versions.                                                                               |
-| GitHub Pages and live upgrade              | v2.2.0 is deployed after exact-commit CI. The preserved fictitious profile updated explicitly from **v1.9.2 / schema 2** to **v2.2.0 / schema 4**. Patch publication is followed by explicit v2.2.1 update, record comparison and offline launch. |
-| Physical iPhone/Safari acceptance          | Manual; browser emulation does not certify installation, Files, Face ID, VoiceOver, eviction or device timing.                                                                                                                                    |
+| Check                                      | Recorded result                                                                                                                                                                                                                                         |
+| ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Unit/component suite                       | **909 tests passed in 114 files** locally for v2.2.2. v2.2.1 CI passed 868 tests in 111 files. The patch release gate repeats the full suite.                                                                                                           |
+| Production build                           | Passed strict TypeScript and Vite; **441 precache entries**, approximately **22.5 MiB**. The final source is rebuilt in release CI.                                                                                                                     |
+| Beta browser acceptance                    | **18 passed** across Chromium and WebKit: notice acknowledgement, native picker gesture, installation policy, feedback/privacy and safe update lifecycle.                                                                                               |
+| Migration and local OCR browser acceptance | **14 passed** across Chromium and WebKit: original keys/PIN/receipt bytes preserved, exact recovery, stopped-origin OCR, source crops, cancellation and one-penny correction.                                                                           |
+| Financial write/update guards              | **10 passed** in three focused files, including held and rejected writes, concurrent writes and audit/closure behavior.                                                                                                                                 |
+| Full Chromium/WebKit browser suite         | **168 cases configured** for v2.2.2, including six new known-bank/generic/error workflows. v2.2.1 CI passed all 162 prior cases. Patch release CI repeats every case against its own production build and blocks Pages on any failure.                  |
+| Dependency audit                           | `npm audit --audit-level=moderate`: **0 vulnerabilities**. Repeat if dependencies change.                                                                                                                                                               |
+| Repository/release guards                  | Repository and release metadata checks passed; **9** Node guard tests passed. The release-tag CI job requires matching package, application and changelog versions.                                                                                     |
+| GitHub Pages and live upgrade              | v2.2.1 passed exact-commit CI and deployment. The preserved fictitious profile retained original **v1.9.2 / schema 2** records after migration to schema 4 and explicit v2.2.1 update/offline launch. v2.2.2 publication retains the same release gate. |
+| Physical iPhone/Safari acceptance          | Manual; browser emulation does not certify installation, Files, Face ID, VoiceOver, eviction or device timing.                                                                                                                                          |
+
+The v2.2.2 targeted browser checks passed **six new routing cases** and **14
+existing affected cases** across Chromium and WebKit: supported-bank batch import
+with one confirmation, HSBC generic review, card debt, inherited dates,
+out-of-period rows, failed reconciliation and one-penny correction. The available
+original Barclays PDF also matched every independent ledger date, amount and
+printed balance through the actual UI in both engines. One confirmation returned
+Home without amount acknowledgements or prohibited requests. The other original
+PDF bytes remain unavailable; no private source data enters CI or the repository.
 
 The browser suite independently compares PDF rows, native signs, gross Money
 in/Money out, opening/closing balances and resulting analytics. It covers
@@ -114,7 +153,7 @@ implemented.
 ## Final release checks
 
 1. Run the consolidated unit suite and strict build on the final source, then all
-   162 browser cases in both engines. Record exact totals and resolve failures.
+   168 browser cases in both engines. Record exact totals and resolve failures.
 2. Verify upgrades, exact recovery, portable backups, encrypted backups and receipt
    references. Invalid/newer backups must fail before any replacement write.
 3. Independently compare imported rows and gross movements with synthetic source
@@ -130,10 +169,10 @@ implemented.
    without private fixtures, create its matching version tag and deploy only static
    assets from that exact commit.
 8. Update a preserved older tab/profile using the explicit update control. Verify
-   v2.2.1/schema 4, untouched prior financial records, pre-migration safety recovery,
+   v2.2.2/schema 4, untouched prior financial records, pre-migration safety recovery,
    complete offline assets, one-time release-note acknowledgement and an offline
    relaunch. A safety snapshot created during the v2.2.0 migration retains that
-   original version metadata during the schema-neutral v2.2.1 patch.
+   original version metadata during schema-neutral patches.
 9. Complete the [physical iPhone checklist](iphone-checklist.md) before making
    device-specific installation, performance or accessibility claims.
 

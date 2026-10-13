@@ -80,7 +80,7 @@ afterAll(async () => {
 });
 
 describe("PDF review pipeline integrity", () => {
-  it("imports and reuses a layout for both actual Barclaycard reading panels without losing any purchases or refund", async () => {
+  it("imports both actual Barclaycard panels automatically and supports an explicitly selected saved layout", async () => {
     const makeCard = (hash: string): ExtractedFile => {
       const items = generatedCard.items.map((item) => ({
         ...item,
@@ -116,7 +116,11 @@ describe("PDF review pipeline integrity", () => {
       undefined,
       { skipCellOcr: true },
     );
-    expect(draft.parserFallback).toBe(false);
+    expect(draft.parserFallback).toBe(true);
+    expect(draft.statement.rowsNeedingReview).toBe(0);
+    expect(
+      draft.warnings.some((warning) => warning.includes("new layout reader")),
+    ).toBe(false);
     expect(draft.transactions).toHaveLength(6);
     expect(draft.statement).toMatchObject({
       openingBalance: -90000,
@@ -152,13 +156,101 @@ describe("PDF review pipeline integrity", () => {
       undefined,
       [],
       undefined,
-      { skipCellOcr: true },
+      { skipCellOcr: true, template },
     );
     expect(reused.statement.parserMethod).toBe("template");
     expect(reused.transactions).toHaveLength(6);
     expect(draftReconciliation(reused).status).toBe("reconciled");
     await commitDraft({ ...draft, reviewedWarnings: true });
     expect(await db.transactions.count()).toBe(6);
+  });
+  it("automatically uses a proved digital Barclays layout without numeric OCR or row acknowledgements", async () => {
+    const file = source("T1");
+    const readCells = cells(file, "999.99");
+    const draft = await prepareDraft(file);
+    expect(draft.parserFallback).toBe(true);
+    expect(draft.statement).toMatchObject({
+      bankProfileId: "barclays-current",
+      parserMethod: "text",
+      rowsBalanceChecked: 3,
+      rowsTotalChecked: 0,
+      rowsNeedingReview: 0,
+      validationStatus: "reconciled",
+      validationDifference: 0,
+    });
+    expect(readCells).not.toHaveBeenCalled();
+    expect(draft.warnings).toEqual([]);
+    expect(draft.transactions).toHaveLength(3);
+    await commitDraft(draft);
+    expect(await db.transactions.count()).toBe(3);
+  });
+  it("imports a proved Revolut card-payment row without an obsolete extraction warning or automatic transfer classification", async () => {
+    const items = layoutItems("revolut").map((item) => ({
+      ...item,
+      fontSize: item.height,
+      parseSource: "text" as const,
+    }));
+    const pages = [1, 2, 3].map((page) => ({
+      page,
+      width: 620,
+      height: 850,
+      rotation: 0,
+    }));
+    const file: ExtractedFile = {
+      rows: reconstructRows(items),
+      hash: "proved-revolut-card-payment",
+      filename: "fictitious-revolut.pdf",
+      method: "embedded-text",
+      warnings: [],
+      extraction: {
+        items,
+        pages,
+        quality: [],
+        pageCount: 3,
+        completedPages: [1, 2, 3],
+        unreadPages: [],
+        cancelled: false,
+        method: "text",
+      },
+    };
+    const draft = await prepareDraft(file);
+    expect(draft.parserFallback).toBe(true);
+    expect(draft.warnings).toEqual([]);
+    expect(draftReconciliation(draft).status).toBe("reconciled");
+    const payment = draft.transactions.find((row) =>
+      row.description.includes("AMERICAN EXP"),
+    )!;
+    expect(payment).toMatchObject({
+      amount: -16000,
+      type: "expense",
+      isTransfer: false,
+      checkLevel: "balance",
+    });
+    // Transfer exclusion remains a user's confirmed financial decision.
+    await commitDraft(draft);
+    expect(await db.transactions.count()).toBe(6);
+  });
+  it("retains generic source review when the user deliberately chooses a layout or row reading", async () => {
+    const file = source("T1");
+    const draft = await prepareDraft(file);
+    expect(draft.parserFallback).toBe(true);
+    const deliberate = await prepareDraft(
+      file,
+      undefined,
+      undefined,
+      undefined,
+      [],
+      undefined,
+      {
+        mapping: draft.parserReview!.mapping,
+        skipCellOcr: true,
+      },
+    );
+    expect(deliberate.parserFallback).toBe(false);
+    expect(deliberate.statement.parserMethod).toBe("user_mapping");
+    expect(deliberate.transactions.map((row) => row.amount)).toEqual(
+      draft.transactions.map((row) => row.amount),
+    );
   });
   it("retains stronger exact running-balance evidence when a net-reconciled legacy reader omits opposite movements", async () => {
     const file = source("T5GBP");
@@ -732,7 +824,7 @@ describe("PDF review pipeline integrity", () => {
     expect(file.generic?.rowChecks).toHaveLength(3);
   });
   it("saves a private layout with one representative column set and rechecks every reuse", async () => {
-    const file = source("T1");
+    const file = source("T6");
     const draft = await prepareDraft(
       file,
       undefined,
@@ -750,7 +842,7 @@ describe("PDF review pipeline integrity", () => {
     expect(template.columnRoles).toHaveLength(5);
     expect(template.fingerprint).not.toMatch(/FICTIONAL|2026|2222|1,000/);
     const reused = await prepareDraft(
-      source("T1", "new-template-hash"),
+      source("T6", "new-template-hash"),
       undefined,
       undefined,
       undefined,
@@ -760,7 +852,11 @@ describe("PDF review pipeline integrity", () => {
     );
     expect(reused.statement.layoutTemplateId).toBe(template.id);
     expect(reused.statement.parserMethod).toBe("template");
-    const wrong = source("T11", "changed-template-hash");
+    const wrong = source("T6", "changed-template-hash");
+    wrong.extraction!.items.find(
+      (item) => item.page === 1 && item.x === 320 && item.y === 240,
+    )!.text = "100.01";
+    wrong.rows = reconstructRows(wrong.extraction!.items);
     const changed = await prepareDraft(
       wrong,
       undefined,

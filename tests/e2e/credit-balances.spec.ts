@@ -39,11 +39,11 @@ async function importStatement(page: Page, name: string) {
     await expect(acknowledgement).toBeVisible();
   if (name === "amex-uk-layout")
     await expect(
-      card.getByText(/1 transaction dates fall outside/),
+      card.getByText(/A transaction date is outside the statement period/),
     ).toBeVisible();
   if (name === "amex-uk-layout") {
     await expect(confirm).toBeDisabled();
-    await card.getByText("Alternative column reading", { exact: true }).click();
+    await expect(card.locator(".generic-import-review")).toBeVisible();
     await card
       .getByRole("button", { name: "Import anyway…", exact: true })
       .click();

@@ -6,7 +6,7 @@ Files are read on the device. Their contents are never sent to the hosting serve
 
 ## PDF
 
-Digital PDFs use positional PDF.js extraction and the existing independent Barclays, Barclaycard, American Express and Revolut adapters. Scanned pages use local OCR. Financial validation, low-confidence review and explicit reconciliation overrides remain mandatory.
+Digital PDFs use positional PDF.js extraction. Recognised Barclays, Barclaycard, American Express and Revolut layouts use their independent bank readers when every financial source occurrence, balance anchor and independent movement total agrees. The normal workflow is select PDFs, check the summary and confirm once. Unknown banks such as HSBC, unfamiliar layouts and unproved readings use the generic source review and column mapping. Scanned pages use local OCR. Genuine extraction errors, missing pages and reconciliation differences still require review or an explicit unverified import.
 
 ## CSV
 

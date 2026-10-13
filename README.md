@@ -21,8 +21,10 @@ demo data**, then install it from Safari's Share menu → Add to Home Screen →
 Installation help, storage status, What's new, Privacy and Send feedback are in
 Settings → About and feedback.
 
-Initial layout hints cover Barclays current accounts, Barclaycard, American
-Express and Revolut. The generic PDF parser also tries unfamiliar statements.
+Recognised digital layouts from Barclays current accounts, Barclaycard, American
+Express and Revolut use their bank-specific readers first. When source rows,
+balances and printed totals agree, review the summary and confirm once. The
+generic PDF parser handles unfamiliar banks and changed layouts.
 Every layout still needs its own arithmetic checks; synthetic fixtures do not
 certify every real statement variant. Questionable rows remain visible for
 correction, and an unverified import requires an explicit override.
@@ -262,9 +264,12 @@ scripts/              Static runtime assets and generated synthetic PDF fixtures
 Routing uses hash URLs, so static hosting needs no application server rewrite.
 PDF.js runs its own worker; OCR uses a local Tesseract worker and English model.
 Bank detection uses several signals. Text is reconstructed from positions into
-rows and columns before the generic parser compares candidate column and sign
+rows and columns. Bank-specific readers are preferred only when the detected
+issuer, every financial occurrence, printed balances and movement totals agree.
+Unfamiliar or unproved layouts use the generic parser's competing column and sign
 readings. Bank profiles supply hints; running balances and printed totals supply
-proof. Separate bank adapters remain available for local regression comparisons.
+proof. Explicit column mappings and source corrections always use that generic
+review. A proved digital bank layout does not trigger numeric OCR unnecessarily.
 Wrapped descriptions, repeated dates, signs, totals and statement periods have
 regression fixtures. Local OCR handles unusable text, with numeric-cell retry
 where arithmetic identifies a suspect value. Row-level review retains source
@@ -388,7 +393,7 @@ or traces containing financial records. Generated fixtures and demo data are
 fictitious. If a real layout exposes a bug, create a synthetic regression and
 extend its profile or parser tests without weakening validation. To add a bank,
 provide detection/header/sign hints and synthetic period/layout/balance tests;
-the generic parser must continue to decide from source evidence.
+both the bank reader and generic fallback must continue to require source evidence.
 
 CI checks tracked repository paths. Where no custom hook is configured, npm also
 installs a pre-commit guard. PDFs and CSVs may only be committed under
