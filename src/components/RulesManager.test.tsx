@@ -252,6 +252,7 @@ describe("search, tags and report controls", () => {
       screen.getByRole("rowheader", { name: "Entertainment" }),
     ).toBeVisible();
     expect(screen.getByText("−£3.49")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Edit report" }));
     fireEvent.change(screen.getByLabelText("Report name"), {
       target: { value: "My categories" },
     });
