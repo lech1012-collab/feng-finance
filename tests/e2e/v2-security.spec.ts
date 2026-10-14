@@ -105,6 +105,9 @@ test("app lock hides finances after background timeout and remains usable at 320
   await settingsSection(page, "security");
   const security = page.locator("#security");
   await security
+    .getByRole("button", { name: "Set up app lock", exact: true })
+    .click();
+  await security
     .getByLabel("Choose a 6-digit app PIN", { exact: true })
     .fill("628391");
   await security.getByLabel("Confirm PIN", { exact: true }).fill("628391");
