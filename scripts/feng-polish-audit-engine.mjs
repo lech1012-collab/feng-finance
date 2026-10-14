@@ -201,6 +201,8 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       r.height <= 0
     )
       return false;
+    for (let p = e.parentElement; p; p = p.parentElement)
+      if (Number(cs(p).opacity) === 0) return false;
     if (e.closest("details:not([open])") && !e.closest("summary")) return false;
     if (s.clip !== "auto" && s.clip !== "none") return false;
     if (s.clipPath !== "none" && (r.width <= 2 || r.height <= 2)) return false;
@@ -280,6 +282,26 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       {
         documentWidth: document.documentElement.scrollWidth,
         viewportWidth: innerWidth,
+        overflowCandidates: all
+          .filter(
+            (e) =>
+              visible(e) &&
+              e.getBoundingClientRect().right > innerWidth + 1 &&
+              !e.matches("body,main"),
+          )
+          .sort(
+            (a, b) =>
+              b.getBoundingClientRect().right - a.getBoundingClientRect().right,
+          )
+          .slice(0, 20)
+          .map((e) => ({
+            selector: selector(e),
+            text: text(e),
+            rect: rect(e),
+            whiteSpace: cs(e).whiteSpace,
+            minWidth: cs(e).minWidth,
+            overflowX: cs(e).overflowX,
+          })),
       },
       "documentWidth <= viewportWidth + 1",
     );
@@ -294,7 +316,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
   const moneyPattern =
     /(?:[+−-]\s*)?(?:≈\s*)?(?:£|€|US\$|\$|CHF\s|GBP\s|EUR\s)\s?\d[\d,]*(?:\.\d{1,2})?(?:[kKmM])?/gu;
   const datePattern =
-    /\b(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+)?\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep(?:t)?|Oct|Nov|Dec)(?:\s+\d{4})?\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/gu;
+    /\b\d{1,2}(?:\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep(?:t)?|Oct|Nov|Dec))?\s+to\s+\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep(?:t)?|Oct|Nov|Dec)(?:\s+\d{4})?\b|\b(?:(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)\s+)?\d{1,2}\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep(?:t)?|Oct|Nov|Dec)(?:\s+\d{4})?\b|\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}\/\d{1,2}\/\d{2,4}\b/gu;
   const atomic = (e) =>
     e.matches(
       'button,a,label,summary,legend,dt,dd,th,td,h1,h2,h3,h4,h5,h6,time,strong,b,small,[class*="amount"],[class*="merchant"],[class*="name"],[class*="label"],[class*="title"],[class*="status"],[class*="chip"]',
@@ -470,7 +492,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       (average < 8 || (data.lines.length >= 3 && r.width < 120))
     ) {
       if (
-        compoundFields.length >= 2 &&
+        compoundFields.length + (ownText(e) ? 1 : 0) >= 2 &&
         compoundFields.every((c) => !c.querySelector("br"))
       )
         except(
@@ -479,7 +501,15 @@ export function collectGeometry({ mobile, setupId, stateId }) {
           {
             width: round(r.width),
             lines,
-            fields: compoundFields.map(selector),
+            fields: [
+              ...(ownText(e)
+                ? [{ selector: selector(e), kind: "direct-text" }]
+                : []),
+              ...compoundFields.map((c) => ({
+                selector: selector(c),
+                kind: "child-field",
+              })),
+            ],
           },
           "Separate stacked fields, measured individually below, are not wrapped lines of one label (for example calendar day number and daily total).",
         );
@@ -996,11 +1026,24 @@ export function collectGeometry({ mobile, setupId, stateId }) {
   const bordered = all.filter(
     (e) =>
       visible(e) &&
-      !e.matches("button,a,input,select,textarea,svg,path,rect,circle") &&
+      !e.matches("button,input,select,textarea,svg,path,rect,circle") &&
+      (!e.matches("a") ||
+        e.matches(
+          ".transaction-row,.settings-row,.list-row,.category-row,.insight-row,.upcoming-row,[data-list-row]",
+        )) &&
       !e.closest("svg") &&
       (e.matches('hr,[role="separator"]') ||
         hasBorder(cs(e), "Top") ||
-        hasBorder(cs(e), "Bottom")),
+        hasBorder(cs(e), "Bottom") ||
+        ((hasBorder(cs(e), "Left") || hasBorder(cs(e), "Right")) &&
+          e.parentElement &&
+          ["flex", "inline-flex", "grid"].includes(
+            cs(e.parentElement).display,
+          )) ||
+        (e.getBoundingClientRect().height <= 4 &&
+          e.getBoundingClientRect().width > 20 &&
+          !text(e) &&
+          cs(e).backgroundColor !== "rgba(0, 0, 0, 0)")),
   );
   for (const e of bordered) {
     const s = cs(e),
@@ -1015,6 +1058,54 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     if (outline) continue; // Four-sided outlines are not between-row divider lines.
     const parent = e.parentElement;
     if (!parent) continue;
+    const verticalBorderOnly =
+      !hasBorder(s, "Top") &&
+      !hasBorder(s, "Bottom") &&
+      (hasBorder(s, "Left") || hasBorder(s, "Right"));
+    if (verticalBorderOnly) {
+      const sameRow = [...parent.children].filter(
+        (p) =>
+          visible(p) &&
+          Math.min(p.getBoundingClientRect().bottom, r.bottom) >
+            Math.max(p.getBoundingClientRect().top, r.top),
+      );
+      const rowHeight = Math.max(
+        ...sameRow.map((p) => p.getBoundingClientRect().height),
+      );
+      measurements.dividers++;
+      if (r.height < rowHeight - tolerance)
+        add(
+          "vertical-line-short",
+          e,
+          {
+            height: round(r.height),
+            rowContentHeight: round(rowHeight),
+            neighbours: sameRow.map(selector),
+          },
+          "vertical border runs the full row height",
+        );
+      continue;
+    }
+    if (
+      e.matches('[aria-orientation="vertical"]') ||
+      (isSeparator && r.height > r.width && r.width <= 4)
+    ) {
+      const parentHeight =
+        parent.getBoundingClientRect().height -
+        (parseFloat(cs(parent).paddingTop) || 0) -
+        (parseFloat(cs(parent).paddingBottom) || 0) -
+        (parseFloat(cs(parent).borderTopWidth) || 0) -
+        (parseFloat(cs(parent).borderBottomWidth) || 0);
+      measurements.dividers++;
+      if (Math.abs(r.height - parentHeight) > tolerance)
+        add(
+          "vertical-line-short",
+          e,
+          { height: round(r.height), rowContentHeight: round(parentHeight) },
+          "full row content height",
+        );
+      continue;
+    }
     const pr = contentBounds(parent),
       gapLeft = r.left - pr.left,
       gapRight = pr.right - r.right;
@@ -1039,6 +1130,29 @@ export function collectGeometry({ mobile, setupId, stateId }) {
         { childIndex: children.indexOf(e), visibleChildren: children.length },
         "only between rows",
       );
+    if (!isSeparator) {
+      const boundaryParent = parent.matches(".swipe-transaction")
+        ? parent.parentElement
+        : parent;
+      const boundaryNode = parent.matches(".swipe-transaction") ? parent : e;
+      const siblings = [...boundaryParent.children].filter((p) => visible(p));
+      const atTop = hasBorder(s, "Top") && siblings[0] === boundaryNode;
+      const atBottom =
+        hasBorder(s, "Bottom") && siblings.at(-1) === boundaryNode;
+      if (
+        (atTop || atBottom) &&
+        boundaryParent.closest(".card,.section-card,[data-section-card]")
+      )
+        add(
+          "divider-at-edge",
+          e,
+          {
+            edge: atTop ? "first top border" : "last bottom border",
+            container: selector(boundaryParent),
+          },
+          "row separator only between rows",
+        );
+    }
     if (
       isSeparator &&
       ["flex", "inline-flex"].includes(cs(parent).display) &&
@@ -1250,6 +1364,8 @@ export function collectElementInventory() {
       e.closest("[inert],[hidden]")
     )
       return false;
+    for (let p = e.parentElement; p; p = p.parentElement)
+      if (Number(getComputedStyle(p).opacity) === 0) return false;
     if (
       (s.clip !== "auto" && s.clip !== "none") ||
       r.right <= 0 ||
@@ -1429,7 +1545,13 @@ async function auditReachability(page, setup, context) {
       const visible = (e) => {
         const r = e.getBoundingClientRect(),
           s = getComputedStyle(e);
+        const opaqueAncestors = (() => {
+          for (let p = e.parentElement; p; p = p.parentElement)
+            if (Number(getComputedStyle(p).opacity) === 0) return false;
+          return true;
+        })();
         return (
+          opaqueAncestors &&
           r.width > 0 &&
           r.height > 0 &&
           s.display !== "none" &&
@@ -1695,7 +1817,17 @@ export async function renderAuditReport({
       )
         screenshot = resolve(dirname(input), screenshot);
       rows.push({
-        ...audit,
+        schema: audit.schema,
+        setup: audit.setup || row.setup,
+        state: audit.state || row.id,
+        title: audit.title || row.title,
+        route: audit.route || row.metrics?.route,
+        issues: audit.issues || [],
+        counts: audit.counts || { high: 0, medium: 0, low: 0 },
+        exceptions: audit.exceptions || [],
+        measurements: audit.measurements,
+        // Element inventory is retained in elements.csv / state JSON. Duplicating
+        // every CSV row in the HTML would make a complete 7-setup report unusable.
         phase,
         screenshot: screenshot.startsWith("/")
           ? relative(dirname(resolve(output)), screenshot)

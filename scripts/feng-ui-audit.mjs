@@ -240,6 +240,8 @@ if (!args.includes("--report-only")) {
     metadata: {
       url,
       phase,
+      releaseGateSource:
+        "Feng-Release-Readiness-Review.md, section 7 (Release gate)",
       source:
         "Extended UX-designer feng-ui-audit.mjs; WebKit mobile / Chromium desktop; fictitious demo only",
     },
@@ -268,6 +270,8 @@ if (!args.includes("--report-only")) {
     output: report,
     metadata: {
       url,
+      releaseGateSource:
+        "Feng-Release-Readiness-Review.md, section 7 (Release gate)",
       source: "Extended UX-designer feng-ui-audit.mjs",
       date: new Date().toISOString(),
       beforeComplete: b.complete,

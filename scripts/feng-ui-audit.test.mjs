@@ -52,6 +52,12 @@ test("Range detects wrapped date and squeezed label", async () => {
   assert.ok(has(r, "date-wrap"));
   assert.ok(has(r, "text-squeezed"));
 });
+test("An entire statement date range stays on one line", async () => {
+  const r = await inspect(
+    '<time style="display:block;width:110px">1 to <span style="white-space:nowrap">30 Sep 2026</span></time>',
+  );
+  assert.ok(has(r, "date-wrap"));
+});
 test("Min-content and ancestor clipping detect sibling squeeze", async () => {
   const r = await inspect(
     '<div class="flex"><strong id="label">Nationwide</strong><span class="amount">£12,345.67</span></div>',
@@ -129,11 +135,45 @@ test("Original copy checks detect ISO, numeric dates and em dashes", async () =>
   assert.ok(has(r, "copy-numeric-date"));
   assert.ok(has(r, "copy-em-dash"));
 });
+test("Background-only divider and final row border are measured", async () => {
+  const r = await inspect(
+    '<section class="card"><p>Heading</p><div class="separator"></div><a class="list-row" href="#">Final row</a></section>',
+    ".separator{height:2px;width:50%;background:#777}.list-row{display:block;height:52px;border-bottom:1px solid #777}",
+  );
+  assert.ok(has(r, "divider-short"));
+  assert.ok(has(r, "divider-at-edge"));
+});
+test("A vertical separator is tested against the row height, not horizontal width", async () => {
+  const r = await inspect(
+    '<div style="display:flex;height:64px"><span>Label</span><div role="separator" aria-orientation="vertical" style="height:24px;width:2px;background:#777"></div><span>Value</span></div>',
+  );
+  assert.ok(has(r, "vertical-line-short"));
+  assert.ok(!has(r, "divider-short"));
+});
+test("Border-only vertical separators run the full neighbouring row height", async () => {
+  const r = await inspect(
+    '<div style="display:flex;align-items:center"><span style="height:64px">Label</span><span style="border-left:1px solid #777;height:24px;padding-left:8px">Value</span></div>',
+  );
+  assert.ok(has(r, "vertical-line-short"));
+  assert.ok(!has(r, "divider-short"));
+});
 test("Independent hit areas that overlap are reported", async () => {
   const r = await inspect(
     '<button>First</button><button style="margin-left:-20px">Second</button>',
   );
   assert.ok(has(r, "control-overlap"));
+});
+test("Transparent hover controls are checked when they actually become visible", async () => {
+  const hidden = await inspect(
+    '<div style="opacity:0"><button style="font-size:11px;min-height:20px;min-width:20px">Hidden hover action</button></div>',
+  );
+  assert.ok(!has(hidden, "text-font"));
+  assert.ok(!has(hidden, "target-size"));
+  const shown = await inspect(
+    '<div style="opacity:1"><button style="font-size:11px;min-height:20px;min-width:20px">Visible hover action</button></div>',
+  );
+  assert.ok(has(shown, "text-font"));
+  assert.ok(has(shown, "target-size"));
 });
 test("Fixed footer coverage is detected and the original scroll position restored", async () => {
   const context = await browser.newContext({
