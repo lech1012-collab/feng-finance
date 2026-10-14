@@ -6,7 +6,11 @@ import { mergeTags, saveTag, tagTransactions } from "../storage/tags";
 import { undoChange } from "../storage/audit";
 import { authorizeMonthEdit } from "../storage/month-review";
 import type { Tag, Transaction } from "../domain/models";
+import { ChevronRight } from "lucide-react";
+import { Sheet } from "./Sheet";
+import { ListRow, SectionCard } from "./UIPrimitives";
 import "./v2-rules.css";
+import "./transaction-polish.css";
 
 export function TagPicker({
   value,
@@ -80,7 +84,7 @@ export function TagPicker({
       </div>
       {filtered.length ? (
         filtered.map((tag) => (
-          <label className="tag-option" key={tag.id}>
+          <label className="tag-option tag-chip-target" key={tag.id}>
             <input
               type="checkbox"
               checked={value.includes(tag.id)}
@@ -92,8 +96,19 @@ export function TagPicker({
                 )
               }
             />
-            <span className="tag-dot" style={{ backgroundColor: tag.colour }} />
-            {tag.name}
+            <span className="tag-chip-visual">
+              <span
+                className="tag-dot"
+                style={{ backgroundColor: tag.colour }}
+                aria-hidden="true"
+              />
+              <span>{tag.name}</span>
+              {value.includes(tag.id) && (
+                <span className="tag-chip-check" aria-hidden="true">
+                  ✓
+                </span>
+              )}
+            </span>
           </label>
         ))
       ) : (
@@ -115,168 +130,232 @@ export function TagPicker({
 export function TagManager() {
   const tags = useLiveQuery(() => db.tags.toArray(), [], []);
   const [editing, setEditing] = useState<Tag>();
+  const [formOpen, setFormOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [name, setName] = useState("");
   const [colour, setColour] = useState("#A99BD6");
   const [mergeTarget, setMergeTarget] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [changeId, setChangeId] = useState("");
+  const formId = useId();
+  const close = () => {
+    setFormOpen(false);
+    setEditing(undefined);
+    setName("");
+    setMergeTarget("");
+    setError("");
+  };
   async function perform(
     operation: () => Promise<{ changeId: string }>,
     success: string,
   ) {
     setError("");
+    setBusy(true);
     try {
       const result = await operation();
+      if (!result.changeId) return false;
       setChangeId(result.changeId);
       setMessage(success);
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Tags could not be updated.");
       return false;
+    } finally {
+      setBusy(false);
     }
   }
   return (
-    <section className="card" id="tags">
-      <h2>Tags</h2>
-      <p className="muted">
-        Group spending across categories, such as a holiday or home project.
-      </p>
-      <form
-        onSubmit={(e) => {
-          e.preventDefault();
-          void perform(
-            () =>
-              saveTag({
-                id: editing?.id,
-                name,
-                colour,
-                archived: editing?.archived ?? false,
-              }),
-            "Tag saved.",
-          ).then((saved) => {
-            if (saved) {
-              setEditing(undefined);
-              setName("");
-            }
-          });
-        }}
-        className="v2-inline-form"
-      >
-        <label>
-          Tag name
-          <input
-            value={name}
-            maxLength={100}
-            required
-            onChange={(e) => setName(e.target.value)}
-          />
-        </label>
-        <label>
-          Colour
-          <span className="colour-presets">
-            {[
-              "#6EA8FF",
-              "#A99BD6",
-              "#F08A7E",
-              "#E7C46A",
-              "#A6B3C6",
-              "#D994B8",
-              "#8A9EC5",
-              "#CC9C79",
-            ].map((c) => (
-              <button
-                aria-label={`Tag colour ${c}`}
-                aria-pressed={colour === c}
-                type="button"
-                key={c}
-                style={{ background: c }}
-                onClick={() => setColour(c)}
-              >
-                {colour === c ? "✓" : ""}
-              </button>
-            ))}
-          </span>
-        </label>
-        <button className="primary" type="submit">
-          {editing ? "Save tag" : "Create tag"}
-        </button>
-        {editing && (
+    <>
+      <SectionCard
+        id="tags"
+        title="Tags"
+        description="Group spending across categories, such as a holiday or home project."
+        actions={
           <button
             type="button"
             onClick={() => {
               setEditing(undefined);
               setName("");
+              setColour("#A99BD6");
+              setMergeTarget("");
+              setError("");
+              setFormOpen(true);
             }}
           >
-            Cancel
+            Add tag
           </button>
-        )}
-      </form>
-      {tags.map((tag) => (
-        <div className="settings-row" key={tag.id}>
-          <span>
-            <span className="tag-dot" style={{ backgroundColor: tag.colour }} />
-            {tag.name}
-            {tag.archived ? " (archived)" : ""}
-          </span>
-          <div className="v2-row-actions">
-            <button
+        }
+      >
+        {tags.length ? (
+          tags.map((tag) => (
+            <ListRow
+              key={tag.id}
+              title={tag.name}
+              icon={
+                <span
+                  className="tag-dot"
+                  style={{ backgroundColor: tag.colour }}
+                />
+              }
+              meta={tag.archived ? "Archived" : undefined}
+              amount={<ChevronRight size={16} aria-hidden="true" />}
               onClick={() => {
                 setEditing(tag);
                 setName(tag.name);
                 setColour(tag.colour);
+                setMergeTarget("");
+                setError("");
+                setFormOpen(true);
               }}
-            >
-              Edit
-            </button>
+            />
+          ))
+        ) : (
+          <p className="muted">No tags yet. Add one for a trip or project.</p>
+        )}
+        {error && !formOpen && (
+          <p role="alert" className="notice warning">
+            {error}
+          </p>
+        )}
+      </SectionCard>
+      {formOpen && (
+        <Sheet
+          title={editing ? "Edit tag" : "Add tag"}
+          onClose={close}
+          footer={
             <button
-              onClick={() =>
-                void perform(
-                  () => saveTag({ ...tag, archived: !tag.archived }),
-                  tag.archived ? "Tag restored." : "Tag archived.",
-                )
-              }
+              className="primary"
+              type="submit"
+              form={formId}
+              disabled={busy}
             >
-              {tag.archived ? "Restore" : "Archive"}
+              {editing ? "Save tag" : "Create tag"}
             </button>
-          </div>
-        </div>
-      ))}
-      {editing && tags.length > 1 && (
-        <div className="v2-inline-form">
-          <label>
-            Merge {editing.name} into
-            <select
-              value={mergeTarget}
-              onChange={(e) => setMergeTarget(e.target.value)}
-            >
-              <option value="">Choose another tag</option>
-              {tags
-                .filter((t) => t.id !== editing.id && !t.archived)
-                .map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.name}
-                  </option>
-                ))}
-            </select>
-          </label>
-          <button
-            disabled={!mergeTarget}
-            onClick={() =>
-              void perform(async () => {
-                const matches = await db.transactions
-                  .filter((t) => (t.tags ?? []).includes(editing.id))
-                  .toArray();
-                if (!(await authorizeMonthEdit(matches)))
-                  return { changeId: "" };
-                return mergeTags(editing.id, mergeTarget);
-              }, "Tags merged. Transactions and rules updated.")
-            }
+          }
+        >
+          <form
+            id={formId}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void perform(
+                () =>
+                  saveTag({
+                    id: editing?.id,
+                    name,
+                    colour,
+                    archived: editing?.archived ?? false,
+                  }),
+                "Tag saved.",
+              ).then((saved) => {
+                if (saved) {
+                  close();
+                }
+              });
+            }}
           >
-            Merge tags
-          </button>
-        </div>
+            <label>
+              Tag name
+              <input
+                value={name}
+                maxLength={100}
+                required
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label className="tag-colour-control">
+              Colour
+              <span className="colour-presets">
+                {[
+                  "#6EA8FF",
+                  "#A99BD6",
+                  "#F08A7E",
+                  "#E7C46A",
+                  "#A6B3C6",
+                  "#D994B8",
+                  "#8A9EC5",
+                  "#CC9C79",
+                ].map((c) => (
+                  <button
+                    aria-label={`Tag colour ${c}`}
+                    aria-pressed={colour === c}
+                    type="button"
+                    key={c}
+                    style={{ background: c }}
+                    onClick={() => setColour(c)}
+                  >
+                    {colour === c ? "✓" : ""}
+                  </button>
+                ))}
+              </span>
+            </label>
+          </form>
+          {editing && tags.length > 1 && (
+            <details className="tag-merge-options">
+              <summary>Merge tags</summary>
+              <label>
+                Merge {editing.name} into
+                <select
+                  value={mergeTarget}
+                  onChange={(e) => setMergeTarget(e.target.value)}
+                >
+                  <option value="">Choose another tag</option>
+                  {tags
+                    .filter((t) => t.id !== editing.id && !t.archived)
+                    .map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <button
+                type="button"
+                disabled={!mergeTarget || busy}
+                onClick={() =>
+                  void perform(async () => {
+                    const matches = await db.transactions
+                      .filter((t) => (t.tags ?? []).includes(editing.id))
+                      .toArray();
+                    if (!(await authorizeMonthEdit(matches)))
+                      return { changeId: "" };
+                    return mergeTags(editing.id, mergeTarget);
+                  }, "Tags merged. Transactions and rules updated.").then(
+                    (saved) => {
+                      if (saved) close();
+                    },
+                  )
+                }
+              >
+                Merge tags
+              </button>
+            </details>
+          )}
+          {editing && (
+            <div className="tag-management-actions">
+              <button
+                type="button"
+                className={editing.archived ? undefined : "danger"}
+                disabled={busy}
+                onClick={() =>
+                  void perform(
+                    () => saveTag({ ...editing, archived: !editing.archived }),
+                    editing.archived ? "Tag restored." : "Tag archived.",
+                  ).then((saved) => {
+                    if (saved) close();
+                  })
+                }
+              >
+                {editing.archived ? "Restore tag" : "Archive tag"}
+              </button>
+            </div>
+          )}
+          {error && (
+            <p role="alert" className="notice warning">
+              {error}
+            </p>
+          )}
+        </Sheet>
       )}
       {message && (
         <Toast
@@ -293,12 +372,7 @@ export function TagManager() {
           }
         />
       )}
-      {error && (
-        <p role="alert" className="notice warning">
-          {error}
-        </p>
-      )}
-    </section>
+    </>
   );
 }
 
@@ -310,48 +384,83 @@ export function BulkTagPicker({
   const [tags, setTags] = useState<string[]>([]);
   const [message, setMessage] = useState("");
   const [changeId, setChangeId] = useState("");
+  const [open, setOpen] = useState(false);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const label = `Tag ${transactionIds.length} transaction${transactionIds.length === 1 ? "" : "s"}`;
   return (
-    <div className="card">
-      <TagPicker value={tags} onChange={setTags} />
-      <button
-        disabled={!tags.length || !transactionIds.length}
-        onClick={async () => {
-          try {
-            const rows = (await db.transactions.bulkGet(transactionIds)).filter(
-              (t): t is Transaction => !!t,
-            );
-            if (!(await authorizeMonthEdit(rows))) return;
-            const change = await tagTransactions(transactionIds, tags);
-            setChangeId(change.changeId);
-            setMessage(
-              `${change.result} transaction${change.result === 1 ? "" : "s"} tagged.`,
-            );
-          } catch (e) {
-            setMessage(
-              e instanceof Error ? e.message : "Tags could not be added.",
-            );
-          }
-        }}
-      >
-        Tag {transactionIds.length} transaction
-        {transactionIds.length === 1 ? "" : "s"}
-      </button>
-      {message && (
-        <p role="status">
-          {message}{" "}
-          {changeId && (
+    <>
+      <SectionCard title={`${transactionIds.length} selected`}>
+        <button
+          type="button"
+          disabled={!transactionIds.length}
+          onClick={() => {
+            setError("");
+            setOpen(true);
+          }}
+        >
+          {label}
+        </button>
+      </SectionCard>
+      {open && (
+        <Sheet
+          title="Tag selected transactions"
+          onClose={() => setOpen(false)}
+          footer={
             <button
+              type="button"
+              className="primary"
+              disabled={busy || !tags.length || !transactionIds.length}
               onClick={async () => {
-                await undoChange(changeId);
-                setMessage("Tagging undone.");
-                setChangeId("");
+                setError("");
+                setBusy(true);
+                try {
+                  const rows = (
+                    await db.transactions.bulkGet(transactionIds)
+                  ).filter((t): t is Transaction => !!t);
+                  if (!(await authorizeMonthEdit(rows))) return;
+                  const change = await tagTransactions(transactionIds, tags);
+                  setChangeId(change.changeId);
+                  setMessage(
+                    `${change.result} transaction${change.result === 1 ? "" : "s"} tagged.`,
+                  );
+                  setOpen(false);
+                } catch (e) {
+                  setError(
+                    e instanceof Error ? e.message : "Tags could not be added.",
+                  );
+                } finally {
+                  setBusy(false);
+                }
               }}
             >
-              Undo
+              {label}
             </button>
+          }
+        >
+          <TagPicker value={tags} onChange={setTags} />
+          {error && (
+            <p role="alert" className="notice warning">
+              {error}
+            </p>
           )}
-        </p>
+        </Sheet>
       )}
-    </div>
+      {message && (
+        <Toast
+          id={changeId || message}
+          message={message}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  setMessage("");
+                  setChangeId("");
+                }
+              : undefined
+          }
+        />
+      )}
+    </>
   );
 }
