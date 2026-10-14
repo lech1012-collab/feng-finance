@@ -2,7 +2,7 @@ import { ZodError } from "zod";
 import { BackupFileTooLargeError } from "./backup-limits";
 
 const unsupportedBackup =
-  "This is not a supported Feng Finance backup. Choose a JSON file exported using Export Feng Finance Backup. Your existing data has not been changed.";
+  "This is not a supported Feng Finance backup. Choose a file created using Save backup in Settings. Your existing data has not been changed.";
 
 export class UnsupportedBackupVersionError extends Error {
   constructor() {
@@ -72,6 +72,11 @@ export function backupErrorMessage(
   }
 
   if (error instanceof Error) {
+    if (
+      error.message ===
+      "The password is incorrect or the backup is damaged. No data has changed."
+    )
+      return error.message;
     if (operation === "validate" && error.name === "NotReadableError")
       return "The backup file could not be read. Save or download it locally in Files, then choose it again. Your existing data has not been changed.";
     if (error.message === "Backup exceeds the 50 MB limit.")

@@ -231,8 +231,11 @@ export function GenericImportReview({
           )}
         </details>
       )}
-      <details className="generic-parser-details">
-        <summary>How these rows were checked</summary>
+      <details
+        className="generic-parser-details"
+        open={result.status !== "parsed"}
+      >
+        <summary>Reading details</summary>
         <p>
           {result.checks.totalCheckedRows
             ? "The statement totals match, but this statement has no running balance to prove each individual row."
@@ -266,27 +269,28 @@ export function GenericImportReview({
             </select>
           </label>
         )}
+        <button
+          type="button"
+          disabled={busy}
+          aria-expanded={showMapping}
+          onClick={() => setShowMapping((show) => !show)}
+        >
+          {showMapping
+            ? "Close column mapping"
+            : result.errorCode === "template-changed"
+              ? "Check mapping"
+              : "Map columns"}
+        </button>
+        {showMapping && (
+          <GenericColumnMapping
+            currency={currency}
+            result={result}
+            busy={busy}
+            onMapping={onMapping}
+            onSaveTemplate={onSaveTemplate}
+          />
+        )}
       </details>
-      <button
-        type="button"
-        disabled={busy}
-        aria-expanded={showMapping}
-        onClick={() => setShowMapping((show) => !show)}
-      >
-        {showMapping
-          ? "Close column mapping"
-          : result.errorCode === "template-changed"
-            ? "Check mapping"
-            : "Map columns"}
-      </button>
-      {showMapping && (
-        <GenericColumnMapping
-          result={result}
-          busy={busy}
-          onMapping={onMapping}
-          onSaveTemplate={onSaveTemplate}
-        />
-      )}
       {needsOverride && (
         <div className="generic-override">
           <p>

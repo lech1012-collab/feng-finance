@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { SuggestedRules } from "./SuggestedRules";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -18,7 +19,7 @@ import { cashFlow, categorySpending } from "../analytics/calculations";
 import { reportingPeriod, reportingPeriodLabel } from "../domain/period";
 import { formatUkDate, monthLabel, monthOffset } from "../domain/dates";
 import { money, parseMoney, decimalMoney, safeSum } from "../domain/money";
-import { download, exportBackupFile } from "../storage/backup";
+import { download } from "../storage/backup";
 import {
   localToday,
   monthReviewCalendar,
@@ -182,8 +183,8 @@ export function MonthReview({
     <div className="month-review-page">
       <div className="page-heading">
         <h1>Review {monthLabel(month)}</h1>
-        <Link to="/analysis" className="button">
-          Close review
+        <Link to="/analysis" className="icon-button" aria-label="Close review">
+          <span aria-hidden="true">×</span>
         </Link>
       </div>
       <p className="muted">
@@ -202,7 +203,10 @@ export function MonthReview({
               aria-pressed={step === i}
               onClick={() => setStep(i)}
             >
-              {i + 1}. {name}
+              <span aria-hidden="true">●</span>
+              <span className="sr-only">
+                {i + 1}. {name}
+              </span>
             </button>
           ),
         )}
@@ -252,8 +256,11 @@ export function MonthReview({
               className="insight-row"
               to={`/categories/${c.id}?month=${month}`}
             >
-              <span>{c.name}</span>
-              <strong>{money(c.difference!, currency, true)} vs average</strong>
+              <span>
+                {c.name}
+                <small>vs usual spending</small>
+              </span>
+              <strong>{money(c.difference!, currency, true)}</strong>
             </Link>
           ))}
           {!changes.length && (
@@ -400,31 +407,9 @@ export function MonthReview({
           ) : (
             <p>Your backup is newer than the latest import.</p>
           )}
-          <button
-            disabled={busy}
-            onClick={() =>
-              void run(exportBackupFile, "Backup prepared. Save it in Files.")
-            }
-          >
-            Export backup
-          </button>
-          <button
-            disabled={busy}
-            onClick={() =>
-              void run(async () => {
-                const config = readReminderConfig(
-                  data.settings.find((s) => s.key === REMINDER_KEY)?.value,
-                );
-                download(
-                  monthReviewCalendar(config, month, localToday()),
-                  "text/calendar",
-                  "feng-finance-monthly-review.ics",
-                );
-              }, "Calendar reminder ready. Open it in your calendar and enable alerts.")
-            }
-          >
-            Remind me next month
-          </button>
+          <Link className="button" to="/settings?section=backup&save=1#backup">
+            Save backup
+          </Link>
           <h3>{data.closed ? "Month closed" : "Close this month"}</h3>
           <p>
             {reviewCount
@@ -433,61 +418,80 @@ export function MonthReview({
                 ? "All transactions reviewed and accounts verified."
                 : "Complete verified statement coverage is required to close."}
           </p>
-          {data.closed ? (
-            <button
-              disabled={busy}
-              onClick={() =>
-                void run(async () => {
-                  if (!window.confirm("Reopen this closed month?")) return;
-                  const result = await reopenMonths([month]);
-                  setChangeId(result.changeId);
-                }, "Month reopened.")
-              }
-            >
-              Reopen month
-            </button>
-          ) : (
-            <button
-              className="primary"
-              disabled={busy || !coverage.complete || reviewCount > 0}
-              onClick={() =>
-                void run(async () => {
-                  const result = await closeMonth(month, currency);
-                  setChangeId(result.changeId);
-                }, "Month closed. Later edits will ask you to reopen; linked refunds update automatically.")
-              }
-            >
-              Close month
-            </button>
-          )}
         </section>
       )}
-      <div className="actions">
+      <div className="actions review-footer">
+        <span>Step {step + 1} of 4</span>
         {step > 0 && <button onClick={() => setStep(step - 1)}>Back</button>}
         {step < 3 && (
           <button className="primary" onClick={() => setStep(step + 1)}>
             Continue
           </button>
         )}
-      </div>
-      {error && <p role="alert">{error}</p>}
-      {notice && (
-        <div className="notice" role="status">
-          {notice}
-          {changeId && (
+        {step === 3 && (
+          <>
+            {data.closed ? (
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void run(async () => {
+                    if (!window.confirm("Reopen this closed month?")) return;
+                    const result = await reopenMonths([month]);
+                    setChangeId(result.changeId);
+                  }, "Month reopened.")
+                }
+              >
+                Reopen month
+              </button>
+            ) : (
+              <button
+                className="primary"
+                disabled={busy || !coverage.complete || reviewCount > 0}
+                onClick={() =>
+                  void run(async () => {
+                    const result = await closeMonth(month, currency);
+                    setChangeId(result.changeId);
+                  }, "Month closed. Later edits will ask you to reopen; linked refunds update automatically.")
+                }
+              >
+                Close {monthLabel(month).split(" ")[0]}
+              </button>
+            )}
             <button
               disabled={busy}
               onClick={() =>
                 void run(async () => {
-                  await undoChange(changeId);
-                  setChangeId("");
-                }, "Change undone.")
+                  const config = readReminderConfig(
+                    data.settings.find((s) => s.key === REMINDER_KEY)?.value,
+                  );
+                  download(
+                    monthReviewCalendar(config, month, localToday()),
+                    "text/calendar",
+                    "feng-finance-monthly-review.ics",
+                  );
+                }, "Calendar reminder ready. Open it in your calendar and enable alerts.")
               }
             >
-              Undo
+              Remind me next month
             </button>
-          )}
-        </div>
+          </>
+        )}
+      </div>
+      {error && <p role="alert">{error}</p>}
+      {notice && (
+        <Toast
+          id={changeId || notice}
+          message={notice}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  setChangeId("");
+                  setNotice("");
+                }
+              : undefined
+          }
+        />
       )}
     </div>
   );

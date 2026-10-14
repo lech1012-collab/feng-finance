@@ -329,18 +329,22 @@ describe("generic PDF evidence review", () => {
     ).toHaveAttribute("tabindex", "0");
   });
 
-  it("keeps the table accessible when metadata cannot yet produce a parsed statement", () => {
+  it("keeps column samples accessible when metadata cannot yet produce a parsed statement", () => {
     const result = resultFixture();
     result.status = "identity-required";
     result.parsed = undefined;
     result.errorCode = "missing-period";
     const { container } = show(result);
     fireEvent.click(screen.getByRole("button", { name: "Map columns" }));
-    expect(screen.getByRole("table")).toBeInTheDocument();
+    expect(
+      screen.getByRole("region", { name: "Column preview, page 1" }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Import anyway…" }),
     ).toBeDisabled();
-    expect(container.querySelector("td")?.textContent).toBe("5 Sep");
+    expect(
+      container.querySelector(".generic-mapping-column li")?.textContent,
+    ).toBe("5 Sep");
   });
 
   it("labels credit-card proof as totals only and does not claim individual row proof", () => {

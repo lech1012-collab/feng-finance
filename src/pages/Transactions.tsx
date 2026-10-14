@@ -1,3 +1,7 @@
+import { displayAccountName } from "../domain/presentation";
+import { Sheet } from "../components/Sheet";
+import { Link } from "react-router-dom";
+import { Toast } from "../components/Toast";
 import { ManualTransactionEditor } from "../components/ManualTransactionEditor";
 import { AdvancedSearch, queryFromParams } from "../components/AdvancedSearch";
 import { BulkTagPicker } from "../components/TagManager";
@@ -70,6 +74,11 @@ export default function Transactions({
   const [params] = useSearchParams();
   const [toReview, setToReview] = useState(params.get("review") === "1");
   const [queryIds, setQueryIds] = useState<Set<string>>();
+  const [activeQuery, setActiveQuery] = useState<{
+    query: string;
+    conditions: import("../domain/models").RuleCondition[];
+    match: "all" | "any";
+  }>();
   const [reviewChangeId, setReviewChangeId] = useState("");
   const [reviewError, setReviewError] = useState("");
   const [sorting, setSorting] = useState<Transaction>();
@@ -82,15 +91,6 @@ export default function Transactions({
   const [queueBusy, setQueueBusy] = useState(false);
   const movingQueue = useRef(false);
   const queueKey = JSON.stringify(queueIds);
-  const queueRecords = useLiveQuery(
-    async () => ({
-      key: queueKey,
-      rows: (await db.transactions.bulkGet(queueIds)).filter(
-        (row): row is Transaction => !!row && needsCategory(row),
-      ),
-    }),
-    [queueKey],
-  );
   const [railDrag, setRailDrag] = useState<{
     ids: string[];
     pointerId: number;
@@ -142,7 +142,7 @@ export default function Transactions({
   const [account, setAccount] = useState(params.get("account") ?? "");
   const [category, setCategory] = useState(params.get("category") ?? "");
   const [type, setType] = useState(params.get("type") ?? "");
-  const [uncategorized, setUncategorized] = useState(
+  const [uncategorized, setUncategorised] = useState(
     params.has("uncategorized") || category === "uncategorized",
   );
   const [property, setProperty] = useState(params.get("property") === "1");
@@ -150,6 +150,8 @@ export default function Transactions({
   const [max, setMax] = useState(params.get("max") ?? "");
   const [page, setPage] = useState(0);
   const [advanced, setAdvanced] = useState(params.get("advanced") === "1");
+  const [viewsTarget, setViewsTarget] = useState<HTMLElement | null>(null);
+  const [actionsTarget, setActionsTarget] = useState<HTMLElement | null>(null);
   const data = useLiveQuery(async () => {
     const accounts = await db.accounts.toArray();
     const statements = await db.statements.toArray();
@@ -225,6 +227,16 @@ export default function Transactions({
       rates: await db.fxRates.toArray(),
     };
   }, [from, to, currency, allDates, selectedMonth, params.get("flow")]);
+  const queueRecords = useLiveQuery(
+    () =>
+      db.transaction("r", db.transactions, async () => ({
+        key: queueKey,
+        rows: (await db.transactions.bulkGet(queueIds)).filter(
+          (row): row is Transaction => !!row && needsCategory(row),
+        ),
+      })),
+    [queueKey, data],
+  );
   const searchItems = useMemo(
     () =>
       data && params.get("reporting") === "1"
@@ -720,8 +732,11 @@ export default function Transactions({
     uncategorized: uncategorized ? "1" : "",
     property: property ? "1" : "",
     advanced: advanced ? "1" : "",
-    query: params.get("query") ?? "",
-    conditions: params.get("conditions") ?? "",
+    query: activeQuery?.query ?? params.get("query") ?? "",
+    conditions: activeQuery
+      ? JSON.stringify(activeQuery.conditions)
+      : (params.get("conditions") ?? ""),
+    queryMatch: activeQuery?.match ?? params.get("queryMatch") ?? "",
     transferKind: params.get("transferKind") ?? "",
     flow: params.get("flow") ?? "",
     accountScope: params.get("accountScope") ?? "",
@@ -741,23 +756,11 @@ export default function Transactions({
   const feedback = (
     <>
       {receipt && (
-        <div className="category-feedback" role="status">
-          <span>
-            {receipt.categoryName} ·{" "}
-            {receipt.learning?.length === 1
-              ? `${displayMerchant({ merchant: receipt.learning[0].merchant, description: receipt.learning[0].merchant })} on ${data?.accounts.find((a) => a.id === receipt.learning![0].accountId)?.institution ?? "this account"}`
-              : `${receipt.learning?.length ?? 1} merchant${(receipt.learning?.length ?? 1) === 1 ? "" : "s"}`}
-            {receipt.after.length > (receipt.selectedIds?.length ?? 1)
-              ? ` · also applied to ${receipt.after.length - (receipt.selectedIds?.length ?? 1)} matching payment${receipt.after.length - (receipt.selectedIds?.length ?? 1) === 1 ? "" : "s"}`
-              : ""}
-            {receipt.rule
-              ? ". Future matching payments will follow."
-              : ". Saved on this device."}
-          </span>
-          <button disabled={undoBusy} onClick={() => void undo()}>
-            Undo
-          </button>
-        </div>
+        <Toast
+          id={receipt.changeId ?? receipt.after[0]?.updatedAt}
+          message={`${receipt.categoryName} · ${receipt.learning?.length === 1 ? displayMerchant({ merchant: receipt.learning[0].merchant, description: receipt.learning[0].merchant }) : `${receipt.selectedIds?.length ?? 1} payments`}. Future matching payments will follow.`}
+          undo={() => undo()}
+        />
       )}
       {receipt?.splitRuleOffer && (
         <SplitRuleOffer
@@ -784,6 +787,17 @@ export default function Transactions({
             : "Loading transactions…"}
         </span>
       </div>
+      {(toReview || uncategorized) && filtered.length > 0 && (
+        <div className="sorting-queue">
+          <span>
+            {filtered.length} transaction{filtered.length === 1 ? "" : "s"} to
+            sort
+          </span>
+          <button className="primary" onClick={() => beginSort(filtered[0])}>
+            Start sorting
+          </button>
+        </div>
+      )}
       {data && (
         <div
           className="account-filter-chips"
@@ -806,7 +820,7 @@ export default function Transactions({
               ? data.balanceEvidence[snapshot.statement.id]
               : undefined;
             const reported = Number.isSafeInteger(snapshot.balance);
-            const card = a.accountType === "credit";
+            const card = ["credit", "credit_card"].includes(a.accountType);
             const value = reported
               ? money(
                   card ? Math.abs(snapshot.balance!) : snapshot.balance!,
@@ -832,7 +846,7 @@ export default function Transactions({
                 }}
               >
                 <strong>
-                  {a.institution} · {a.maskedAccountIdentifier}
+                  {displayAccountName(a) || `${a.institution} account`}
                 </strong>
                 <span>
                   {`${value}${kind}${snapshot.asOfDate ? ` · ${displayDate(snapshot.asOfDate)}` : " · No statement"}${reported && evidence?.status !== "reconciled" ? " · Reported · Unverified" : reported && !snapshot.current ? " · Older statement" : ""}`}
@@ -842,7 +856,15 @@ export default function Transactions({
           })}
         </div>
       )}
-      <ManualTransactionEditor />
+      <div className="transaction-tools">
+        <ManualTransactionEditor />
+        <Link className="button" to="/accounts">
+          Accounts
+        </Link>
+        <Link className="button" to="/settings?section=tags">
+          Tags
+        </Link>
+      </div>
       <section className="card filters">
         <div className="search-line">
           <label className="search-input">
@@ -859,11 +881,22 @@ export default function Transactions({
               }}
             />
           </label>
+          {search && (
+            <button
+              className="icon-button"
+              aria-label="Clear search"
+              onClick={() => {
+                setSearch("");
+                reset();
+              }}
+            >
+              ×
+            </button>
+          )}
           <button
             aria-expanded={advanced}
             onClick={() => {
               setAdvanced(!advanced);
-              if (advanced) setQueryIds(undefined);
             }}
           >
             <SlidersHorizontal size={17} />
@@ -876,8 +909,7 @@ export default function Transactions({
           aria-label="Transaction category filters"
         >
           {[
-            { id: "review", name: "To review" },
-            { id: "uncategorized", name: "Uncategorized" },
+            { id: "uncategorized", name: "Uncategorised" },
             { id: "groceries", name: "Groceries" },
             { id: "income", name: "Income" },
             { id: "property", name: "Property" },
@@ -904,7 +936,7 @@ export default function Transactions({
                 setCategory(
                   !clear && ["groceries", "salary"].includes(c.id) ? c.id : "",
                 );
-                setUncategorized(!clear && c.id === "uncategorized");
+                setUncategorised(!clear && c.id === "uncategorized");
                 setToReview(!clear && c.id === "review");
                 setType(!clear && c.id === "income" ? "income" : "");
                 setProperty(!clear && c.id === "property");
@@ -941,6 +973,21 @@ export default function Transactions({
             </button>
           ))}
         </div>
+        <p className="filter-context">
+          {allDates ? "All imported dates" : displayDateRange(from, to)}
+        </p>
+        <div ref={setViewsTarget} className="saved-view-chips" />
+      </section>
+      <Sheet
+        open={advanced}
+        title="Filters"
+        onClose={() => setAdvanced(false)}
+        footer={
+          <button className="primary" onClick={() => setAdvanced(false)}>
+            Show {filtered.length} transactions
+          </button>
+        }
+      >
         <div
           className="date-scope"
           role="group"
@@ -971,32 +1018,36 @@ export default function Transactions({
             ? ` · ${data?.categories.find((c) => c.id === category)?.name ?? ""}`
             : ""}
         </p>
-        {advanced && (
+        {true && (
           <div className="form-grid">
-            <label>
-              From
-              <input
-                type="date"
-                value={from}
-                onChange={(e) => {
-                  setAllDates(false);
-                  setFrom(e.target.value);
-                  reset();
-                }}
-              />
-            </label>
-            <label>
-              To
-              <input
-                type="date"
-                value={to}
-                onChange={(e) => {
-                  setAllDates(false);
-                  setTo(e.target.value);
-                  reset();
-                }}
-              />
-            </label>
+            {!allDates && (
+              <label>
+                From
+                <input
+                  type="date"
+                  value={from}
+                  onChange={(e) => {
+                    setAllDates(false);
+                    setFrom(e.target.value);
+                    reset();
+                  }}
+                />
+              </label>
+            )}
+            {!allDates && (
+              <label>
+                To
+                <input
+                  type="date"
+                  value={to}
+                  onChange={(e) => {
+                    setAllDates(false);
+                    setTo(e.target.value);
+                    reset();
+                  }}
+                />
+              </label>
+            )}
             <label>
               Category
               <select
@@ -1004,16 +1055,18 @@ export default function Transactions({
                 value={category}
                 onChange={(e) => {
                   setCategory(e.target.value);
-                  setUncategorized(e.target.value === "uncategorized");
+                  setUncategorised(e.target.value === "uncategorized");
                   if (e.target.value === "uncategorized") setAllDates(true);
                   reset();
                 }}
               >
                 <option value="">All categories</option>
-                <option value="uncategorized">Uncategorized</option>
+                <option value="uncategorized">Uncategorised</option>
                 {data?.categories.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.parentId ? "↳ " : ""}
+                    {c.parentId
+                      ? `${data?.categories.find((parent) => parent.id === c.parentId)?.name ?? "Category"} · `
+                      : ""}
                     {c.name}
                     {c.archived ? " (archived)" : ""}
                   </option>
@@ -1040,7 +1093,7 @@ export default function Transactions({
             </label>
           </div>
         )}
-        {advanced && (
+        {true && (
           <>
             <div className="form-grid">
               <label>
@@ -1055,7 +1108,9 @@ export default function Transactions({
                 >
                   <option value="">All types</option>
                   {["income", "expense", "transfer"].map((v) => (
-                    <option key={v}>{v}</option>
+                    <option key={v} value={v}>
+                      {v[0].toUpperCase() + v.slice(1)}
+                    </option>
                   ))}
                 </select>
               </label>
@@ -1084,62 +1139,45 @@ export default function Transactions({
                 />
               </label>
             </div>
-            <div className="actions">
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={uncategorized}
-                  onChange={(e) => {
-                    setUncategorized(e.target.checked);
-                    setCategory(e.target.checked ? "uncategorized" : "");
-                    if (e.target.checked) setAllDates(true);
-                    reset();
-                  }}
-                />
-                Uncategorized only
-              </label>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={property}
-                  onChange={(e) => {
-                    setProperty(e.target.checked);
-                    reset();
-                  }}
-                />
-                Property only
-              </label>
-            </div>
+            <label className="switch-row">
+              <span>Needs review</span>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={toReview}
+                onChange={(e) => {
+                  setToReview(e.target.checked);
+                  reset();
+                }}
+              />
+            </label>
           </>
         )}
-      </section>
-      {data && advanced && (
-        <AdvancedSearch
-          transactions={searchItems}
-          sourceTransactions={data.items}
-          accounts={data.accounts}
-          categories={data.categories}
-          tags={data.tags}
-          currency={currency}
-          {...queryFromParams(params)}
-          onChange={(rows) => setQueryIds(new Set(rows.map((t) => t.id)))}
-        />
-      )}
+        {data && (
+          <AdvancedSearch
+            onQueryStateChange={setActiveQuery}
+            viewsTarget={viewsTarget}
+            actionsTarget={actionsTarget}
+            onOpen={() => setAdvanced(true)}
+            onViewSaved={() => setAdvanced(false)}
+            exportTransactions={filtered}
+            transactions={searchItems}
+            sourceTransactions={data.items}
+            accounts={data.accounts}
+            categories={data.categories}
+            tags={data.tags}
+            currency={currency}
+            {...queryFromParams(params)}
+            onChange={(rows) => setQueryIds(new Set(rows.map((t) => t.id)))}
+          />
+        )}
+      </Sheet>
       <TransferReview />
-      {(toReview || uncategorized) && filtered.length > 0 && (
-        <div className="sorting-queue">
-          <span>
-            {filtered.length} transaction{filtered.length === 1 ? "" : "s"} to
-            sort
-          </span>
-          <button className="primary" onClick={() => beginSort(filtered[0])}>
-            Start sorting
-          </button>
-        </div>
-      )}
-      {filtered.length > 0 && (
-        <div className="actions">
+      <details className="transaction-menu">
+        <summary>More transaction actions</summary>
+        <div className="actions" ref={setActionsTarget}>
           <button
+            disabled={!filtered.length}
             onClick={async () => {
               try {
                 if (!(await authorizeMonthEdit(filtered))) return;
@@ -1157,22 +1195,17 @@ export default function Transactions({
           >
             Mark filtered transactions reviewed
           </button>
-          {reviewChangeId && (
-            <button
-              onClick={() =>
-                void undoChange(reviewChangeId)
-                  .then(() => setReviewChangeId(""))
-                  .catch((e) =>
-                    setReviewError(
-                      e instanceof Error ? e.message : "Undo unavailable.",
-                    ),
-                  )
-              }
-            >
-              Undo review
-            </button>
-          )}
         </div>
+      </details>
+      {reviewChangeId && (
+        <Toast
+          id={reviewChangeId}
+          message="Transactions marked reviewed."
+          undo={async () => {
+            await undoChange(reviewChangeId);
+            setReviewChangeId("");
+          }}
+        />
       )}
       {reviewError && <p role="alert">{reviewError}</p>}
       {selectedIds.length > 0 && <BulkTagPicker transactionIds={selectedIds} />}
@@ -1191,7 +1224,7 @@ export default function Transactions({
               }
             }}
           >
-            Categorize selected
+            Categorise selected
           </button>
         </div>
       )}
@@ -1257,7 +1290,7 @@ export default function Transactions({
             <SwipeTransaction
               key={t.id}
               transaction={t}
-              accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId)?.institution ?? "Account"}, ${money(t.amount, t.currency, true)}`}
+              accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId) ? displayAccountName(data.accounts.find((a) => a.id === t.accountId)!) : "Account"}, ${money(t.amount, t.currency, true)}`}
               returnTo={returnTo}
               selected={selectedIds.includes(t.id)}
               onSelect={(event) => selectRow(t, event)}
@@ -1274,9 +1307,13 @@ export default function Transactions({
             >
               <div className="transaction-description">
                 <strong>{displayMerchant(t)}</strong>
-                {!t.isReviewed && (
-                  <span className="review-status">To review</span>
-                )}
+                {!t.isReviewed &&
+                  (t.categoryId ||
+                    t.isTransfer ||
+                    t.kind === "refund" ||
+                    t.kind === "split_parent") && (
+                    <span className="review-status">To review</span>
+                  )}
                 {t.kind === "split_parent" && (
                   <span className="transaction-status">
                     Split ·{" "}
@@ -1329,15 +1366,16 @@ export default function Transactions({
                 )}
                 {t.categorySource && (
                   <small className="transaction-origin">
-                    {t.categorySource === "manual" ? "you" : "rule"}
+                    {t.categorySource === "manual" ? "Set by you" : "Rule"}
                   </small>
                 )}
                 <span>
                   {displayDate(t.date)} ·{" "}
-                  {
-                    data?.accounts.find((a) => a.id === t.accountId)
-                      ?.institution
-                  }
+                  {data?.accounts.find((a) => a.id === t.accountId)
+                    ? displayAccountName(
+                        data.accounts.find((a) => a.id === t.accountId)!,
+                      )
+                    : "Account"}
                 </span>
               </div>
               <strong
@@ -1355,7 +1393,21 @@ export default function Transactions({
           ))}
           {data && !items.length && (
             <div className="empty">
-              <h2>No transactions found</h2>
+              <h2>
+                {search
+                  ? `No transactions match “${search}”`
+                  : "No transactions found"}
+              </h2>
+              {search && (
+                <button
+                  onClick={() => {
+                    setSearch("");
+                    reset();
+                  }}
+                >
+                  Clear search
+                </button>
+              )}
               <p>Adjust the filters or import a statement for this period.</p>
             </div>
           )}
@@ -1364,6 +1416,7 @@ export default function Transactions({
           <aside
             ref={categoryRail}
             className="category-rail card"
+            tabIndex={0}
             aria-label="Category drop targets"
           >
             <h2>Categories</h2>
@@ -1487,23 +1540,25 @@ export default function Transactions({
               )}
         </div>
       )}
-      <div className="pagination">
-        <button
-          disabled={currentPage === 0}
-          onClick={() => setPage(currentPage - 1)}
-        >
-          Previous
-        </button>
-        <span>
-          Page {currentPage + 1} of {totalPages}
-        </span>
-        <button
-          disabled={currentPage + 1 >= totalPages}
-          onClick={() => setPage(currentPage + 1)}
-        >
-          Next
-        </button>
-      </div>
+      {totalPages > 1 && (
+        <div className="pagination">
+          <button
+            disabled={currentPage === 0}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            Previous
+          </button>
+          <span>
+            Page {currentPage + 1} of {totalPages}
+          </span>
+          <button
+            disabled={currentPage + 1 >= totalPages}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            Next
+          </button>
+        </div>
+      )}
       {railConflict && (
         <CategoryConflictDialog
           oldCategory={

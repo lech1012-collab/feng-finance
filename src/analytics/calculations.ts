@@ -36,7 +36,7 @@ export function categorySpending(
   return [...map]
     .map(([id, amount]) => ({
       id,
-      name: categories.find((c) => c.id === id)?.name ?? "Uncategorized",
+      name: categories.find((c) => c.id === id)?.name ?? "Uncategorised",
       color: categoryColor(id),
       amount,
       percent: total ? (amount / total) * 100 : 0,

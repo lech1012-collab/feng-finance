@@ -54,7 +54,7 @@ it("reveals the top suggestion and More on a left swipe without saving until cho
   expect(quick).not.toHaveBeenCalled();
   expect(categorize).not.toHaveBeenCalled();
   fireEvent.click(
-    screen.getByRole("button", { name: "Categorize as Groceries" }),
+    screen.getByRole("button", { name: "Categorise as Groceries" }),
   );
   expect(quick).toHaveBeenCalledWith("groceries");
 });
@@ -104,13 +104,13 @@ it("disables same-row hover actions during object drag and restores them on Esca
     pointerId: 1,
   });
   expect(row.parentElement).toHaveClass("is-dragging");
-  expect(screen.getByRole("button", { name: "Categorize" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Categorise" })).toBeDisabled();
   expect(
     screen.getByRole("button", { name: "Select Waitrose" }),
   ).toBeDisabled();
   fireEvent.keyDown(window, { key: "Escape" });
   expect(row.parentElement).not.toHaveClass("is-dragging");
-  expect(screen.getByRole("button", { name: "Categorize" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Categorise" })).toBeEnabled();
   pointer(row, "pointerup", 220, 100, "mouse");
   fireEvent.click(row);
   expect(categorize).not.toHaveBeenCalled();

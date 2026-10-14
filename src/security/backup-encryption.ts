@@ -1,5 +1,8 @@
 import type { Backup } from "../domain/models";
-import { MAX_BACKUP_FILE_BYTES } from "../storage/backup-limits";
+import {
+  BackupFileTooLargeError,
+  MAX_BACKUP_FILE_BYTES,
+} from "../storage/backup-limits";
 import {
   decodeBase64,
   deriveKey,
@@ -159,13 +162,12 @@ export async function decodeBackupUpload(
   file: File,
   password?: string,
 ): Promise<unknown> {
-  if (file.size > MAX_BACKUP_FILE_BYTES)
-    throw new Error("This backup exceeds the 100 MB import limit.");
+  if (file.size > MAX_BACKUP_FILE_BYTES) throw new BackupFileTooLargeError();
   let input: unknown;
   try {
     input = JSON.parse(await file.text()) as unknown;
   } catch {
-    throw new Error("This file is not a valid Feng backup.");
+    throw new SyntaxError("This file is not a valid Feng backup.");
   }
   const header = encryptedBackupHeader(input);
   if (!header) return input;

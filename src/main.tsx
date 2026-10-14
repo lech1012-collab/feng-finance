@@ -1,6 +1,7 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
+import "./ux-review.css";
 try {
   document.documentElement.dataset.theme =
     localStorage.getItem("feng-theme") === "light" ? "light" : "dark";

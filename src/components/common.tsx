@@ -2,6 +2,34 @@ import { useSwipe } from "./useSwipe";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { monthLabel, monthOffset } from "../domain/dates";
 import { money } from "../domain/money";
+export function RangeControl({
+  value,
+  onChange,
+  label = "Time range",
+}: {
+  value: number | string;
+  onChange: (value: number) => void;
+  label?: string;
+}) {
+  return (
+    <div
+      className="segmented-control range-control"
+      role="group"
+      aria-label={label}
+    >
+      {[1, 3, 6, 12].map((n) => (
+        <button
+          key={n}
+          aria-pressed={String(value) === String(n)}
+          aria-label={`${n} month${n === 1 ? "" : "s"}`}
+          onClick={() => onChange(n)}
+        >
+          <span>{n}M</span>
+        </button>
+      ))}
+    </div>
+  );
+}
 export function MonthPicker({
   month,
   onChange,
@@ -96,8 +124,9 @@ export function Metric({
           unavailable
         ) : (
           <>
-            {approximate ? "≈ " : ""}
-            <Amount value={value} currency={currency} />
+            <span className="amount">
+              {money(value, currency, false, approximate)}
+            </span>
             {partial ? "*" : ""}
           </>
         )}

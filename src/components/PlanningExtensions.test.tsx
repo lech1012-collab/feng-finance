@@ -53,7 +53,7 @@ it("creates a £540 irregular-cost pot, confirms October's £90 contribution and
       { month: "2026-10", amountMinor: 9000 },
     ]),
   );
-  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
   await waitFor(async () =>
     expect((await db.pots.toArray())[0].contributions).toEqual([]),
   );
@@ -77,10 +77,8 @@ it("opens expected calendar items as editable recurring objects and keeps origin
   fireEvent.click(
     await screen.findByRole("button", { name: /4 Oct(?: 2026)?, 1 payment/ }),
   );
-  fireEvent.click(screen.getByRole("button", { name: "NETFLIX" }));
-  expect(screen.getByLabelText(/^Expected signed amount \(GBP\)/)).toHaveValue(
-    "-3.49",
-  );
+  fireEvent.click(screen.getByRole("button", { name: "Netflix" }));
+  expect(screen.getByLabelText(/^Expected amount \(GBP\)/)).toHaveValue("3.49");
   fireEvent.click(screen.getByRole("button", { name: "Confirm series" }));
   await waitFor(async () => expect(await db.recurringSeries.count()).toBe(1));
 });
@@ -161,12 +159,9 @@ it("saving a new scenario selects it so a second save updates instead of duplica
     </MemoryRouter>,
   );
   await screen.findByRole("heading", { name: "What if?" });
-  fireEvent.change(
-    screen.getByRole("textbox", { name: /Signed amount \(GBP\)/ }),
-    {
-      target: { value: "-100" },
-    },
-  );
+  fireEvent.change(screen.getByRole("textbox", { name: /Amount \(GBP\)/ }), {
+    target: { value: "-100" },
+  });
   fireEvent.click(screen.getByRole("button", { name: "Add adjustment" }));
   fireEvent.change(screen.getByLabelText("Scenario name"), {
     target: { value: "Holiday" },

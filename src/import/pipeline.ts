@@ -1,3 +1,4 @@
+import { localToday } from "../analytics/reminders";
 import type {
   ImportDraft,
   Institution,
@@ -399,6 +400,11 @@ export async function prepareDraft(
     });
   }
   const warnings = [
+    ...(parsed.periodEnd > localToday()
+      ? [
+          "The statement ends in the future. Check its dates against the PDF before importing; future balances cannot verify today's finances.",
+        ]
+      : []),
     ...extracted.warnings,
     ...parsed.warnings.map((warning) =>
       warning ===

@@ -1,3 +1,4 @@
+import { selectPeriod, settingsSection } from "./flows";
 import { acknowledgeBeta, expect, test as base, type Page } from "./fixtures";
 import { startStaticHost, type LocalHost } from "./static-host";
 
@@ -205,9 +206,13 @@ test("reporting totals reconcile native currencies and lead to source payments o
   await seed(page, true, offlineHost.origin);
   await expect(page.locator(".month-income strong")).toHaveText("≈ £3,000.00");
   await expect(page.locator(".month-spending strong")).toHaveText("≈ £242.85");
-  await expect(page.locator(".month-net strong")).toHaveText("≈ +£2,757.15");
+  await expect(page.locator(".month-net strong")).toHaveText("+≈£2,757.15");
   await expect(page.locator(".position-summary")).toContainText("≈ £5,471.35");
-  await expect(page.locator(".position-summary")).toContainText("€1,880.00");
+  await page.goto(`${offlineHost.origin}/#/accounts`);
+  await expect(page.locator(".account-overview-list")).toContainText(
+    "€1,880.00",
+  );
+  await page.goto(`${offlineHost.origin}/#/`);
   const original = await records(page, "transactions");
   expect(original.find((t) => t.id === "report-euro-food")).toMatchObject({
     amount: -12000,
@@ -217,14 +222,12 @@ test("reporting totals reconcile native currencies and lead to source payments o
   await expect(page.locator(".transaction-list .transaction-row")).toHaveCount(
     3,
   );
-  await expect(page.locator(".transaction-list")).toContainText("-€120.00");
+  await expect(page.locator(".transaction-list")).toContainText("−€120.00");
   await expect(page.locator(".transaction-list")).not.toContainText(
     "Fictitious salary",
   );
   await page.goto(`${offlineHost.origin}/#/analysis`);
-  await page
-    .getByRole("combobox", { name: "Period", exact: true })
-    .selectOption("1");
+  await selectPeriod(page, "1");
   await expect(page.locator(".metric-strip")).toContainText("≈ £242.85");
   await expect(page.locator(".metric-strip")).toContainText("≈ £3,000.00");
   await page.goto(`${offlineHost.origin}/#/`);
@@ -251,13 +254,15 @@ test("closing a reviewed month and changing its date range require explicit reop
   for (let step = 0; step < 3; step++)
     await page.getByRole("button", { name: "Continue", exact: true }).click();
   await expect(
-    page.getByRole("button", { name: "Close month", exact: true }),
+    page.getByRole("button", { name: "Close September", exact: true }),
   ).toBeEnabled();
-  await page.getByRole("button", { name: "Close month", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Close September", exact: true })
+    .click();
   await expect
     .poll(async () => (await records(page, "monthCloses")).length)
     .toBe(1);
-  await page.goto("/#/settings");
+  await settingsSection(page, "period");
   const period = page.locator("section.card").filter({
     has: page.getByRole("heading", { name: "Your month", exact: true }),
   });
@@ -276,9 +281,7 @@ test("closing a reviewed month and changing its date range require explicit reop
   await expect
     .poll(async () => (await records(page, "monthCloses")).length)
     .toBe(0);
-  await period
-    .getByRole("button", { name: "Undo month change", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(
     period.getByRole("combobox", { name: "Starts on", exact: true }),
   ).toHaveValue("calendar");
@@ -418,6 +421,10 @@ test("first run and the main pages fit narrow screens and large text without ove
         )
         .toEqual({ fits: true });
       if (route === "/analysis") {
+        await page.goto("/#/analysis?view=reports");
+        await page
+          .getByRole("button", { name: "Edit report", exact: true })
+          .click();
         const taxYear = page.getByRole("combobox", {
           name: "UK tax year",
           exact: true,
@@ -429,6 +436,12 @@ test("first run and the main pages fit narrow screens and large text without ove
           }),
           `${width}px ${route}: the tax-year choice must fit inside its field`,
         ).toBe(true);
+      }
+      if (route === "/analysis") {
+        await page
+          .getByRole("button", { name: "Close Edit report", exact: true })
+          .click();
+        await page.goto("/#/analysis");
       }
       const navigation = page.locator(".mobile-navigation");
       await expect(navigation).toBeVisible();
@@ -443,7 +456,7 @@ test("first run and the main pages fit narrow screens and large text without ove
       const order = await navigation.locator("a").allTextContents();
       expect(order.map((s) => s.trim())).toEqual([
         "Import",
-        "Transactions",
+        "Activity",
         "Home",
         "Analyse",
         "Planning",
@@ -531,12 +544,12 @@ test("manual cash wallets include movements older than the chart history", async
       }),
   );
   await page.reload();
+  await page.goto("/#/accounts");
   const wallet = page
-    .locator(".balance-account")
+    .locator(".account-overview-row")
     .filter({ hasText: "Old cash wallet" });
-  await expect(wallet.locator(".balance-account-value strong")).toHaveText(
-    "£110.00",
-  );
+  await expect(wallet.locator("strong").last()).toHaveText("£110.00");
+  await page.goto("/#/");
   await expect(
     page
       .locator(".position-metrics > a")

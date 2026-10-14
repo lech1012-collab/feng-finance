@@ -281,7 +281,7 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
   );
   await screen.findByRole(
     "button",
-    { name: "Uncategorized 2" },
+    { name: "Uncategorised 2" },
     { timeout: 8000 },
   );
   expect(screen.getByText("Waitrose")).toBeVisible();
@@ -300,7 +300,7 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
       within(screen.getByRole("dialog")).getByRole("region", {
         name: "Suggested categories",
       }),
-    ).getByRole("button", { name: "Categorize as Groceries" });
+    ).getByRole("button", { name: "Categorise as Groceries" });
   // The explanation can appear before the asynchronous queue/evidence refresh
   // settles. Wait for the actual enabled shortcut, use the current board, and
   // focus its button before sending a keyboard event through the live DOM.
@@ -327,14 +327,12 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
   expect(
     await screen.findByRole(
       "button",
-      { name: "Uncategorized 1" },
+      { name: "Uncategorised 1" },
       { timeout: 8000 },
     ),
   ).toBeVisible();
   expect(
-    screen.getByText(
-      /Waitrose on Barclays.*Future matching payments will follow/,
-    ),
+    screen.getByText(/Groceries.*Waitrose.*Future matching payments/),
   ).toBeVisible();
   expect(
     within(screen.getByRole("dialog")).getByText("1 of 1 to sort"),
@@ -366,7 +364,7 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
     within(screen.getByRole("dialog")).getByText("Waitrose"),
   ).toBeVisible();
   expect(
-    await screen.findByRole("button", { name: "Uncategorized 2" }),
+    await screen.findByRole("button", { name: "Uncategorised 2" }),
   ).toBeVisible();
 }, 15000);
 
@@ -435,7 +433,7 @@ it("restores all backfilled queue entries on Undo and can sort them again", asyn
   expect(within(dialog).getByText("1 of 3 to sort")).toBeVisible();
   await act(async () => {
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "Categorize as Groceries" }),
+      within(dialog).getByRole("button", { name: "Categorise as Groceries" }),
     );
     await waitFor(() => expect(saveCategory).toHaveBeenCalledTimes(1));
     await saveCategory.mock.results[0].value;
@@ -461,7 +459,7 @@ it("restores all backfilled queue entries on Undo and can sort them again", asyn
   await act(async () => {
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Categorize as Groceries",
+        name: "Categorise as Groceries",
       }),
     );
     await waitFor(() => expect(saveCategory).toHaveBeenCalledTimes(2));
@@ -549,7 +547,7 @@ it("keeps skipped cards deferred when Undo reopens a completed sorting queue", a
   await act(async () => {
     fireEvent.click(
       within(screen.getByRole("dialog")).getByRole("button", {
-        name: "Categorize as Groceries",
+        name: "Categorise as Groceries",
       }),
     );
     await waitFor(() => expect(saveCategory).toHaveBeenCalledTimes(1));
@@ -557,7 +555,7 @@ it("keeps skipped cards deferred when Undo reopens a completed sorting queue", a
   });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
   await act(async () => {
-    fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
     await undoCategory.mock.results[0].value;
   });
   await waitFor(() =>
@@ -595,7 +593,7 @@ it("keeps transaction detail navigation inside the board until a category save c
   );
   const dialog = await screen.findByRole("dialog", {}, { timeout: 8000 });
   fireEvent.click(
-    within(dialog).getByRole("button", { name: "Categorize as Groceries" }),
+    within(dialog).getByRole("button", { name: "Categorise as Groceries" }),
   );
   const details = within(dialog).getByRole("link", {
     name: "View transaction details",
@@ -645,7 +643,7 @@ it("asks once about a learned rule conflict and can categorize just this payment
     { timeout: 8000 },
   );
   fireEvent.click(
-    within(dialog).getByRole("button", { name: "Categorize as Shopping" }),
+    within(dialog).getByRole("button", { name: "Categorise as Shopping" }),
   );
   const conflict = await within(dialog).findByRole("region", {
     name: "Saved rule conflict",
@@ -695,7 +693,7 @@ it("updating the conflicting auto rule changes its default and Undo restores the
     { timeout: 8000 },
   );
   fireEvent.click(
-    within(dialog).getByRole("button", { name: "Categorize as Shopping" }),
+    within(dialog).getByRole("button", { name: "Categorise as Shopping" }),
   );
   const conflict = await within(dialog).findByRole("region", {
     name: "Saved rule conflict",
@@ -711,7 +709,7 @@ it("updating the conflicting auto rule changes its default and Undo restores the
   expect(await db.rules.filter((rule) => !!rule.auto).count()).toBe(1);
   expect((await db.rules.get(rulesBefore[0].id))?.categoryId).toBe("shopping");
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
-  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
   await waitFor(
     async () =>
       expect(await db.rules.get(rulesBefore[0].id)).toEqual(rulesBefore[0]),

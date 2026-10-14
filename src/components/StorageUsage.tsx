@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -29,7 +30,11 @@ export function StorageUsage() {
       <h2>Device storage</h2>
       {usage ? (
         <>
-          <p>Attachments: {formatStorageBytes(usage.attachmentBytes)}</p>
+          <p>
+            {usage.attachmentBytes === 0
+              ? "No attachments"
+              : `Attachments: ${formatStorageBytes(usage.attachmentBytes)}`}
+          </p>
           {usage.usedBytes !== undefined && usage.quotaBytes !== undefined && (
             <>
               <p>
@@ -59,8 +64,8 @@ export function StorageUsage() {
       )}
       <p className="muted">
         {persistent
-          ? "Persistent storage is enabled. Keep a backup in case this device is lost or browser data is cleared."
-          : "Your browser may clear local data when storage runs low. Request persistent storage and keep regular backups."}
+          ? "Protected. Keep a backup in case this device is lost or browser data is cleared."
+          : "Not protected. Your browser may clear data when storage runs low. Install Feng, request protection and keep a backup."}
       </p>
       {!persistent && (
         <button
@@ -72,8 +77,8 @@ export function StorageUsage() {
               setPersistent(granted);
               setNotice(
                 granted
-                  ? "Persistent storage enabled."
-                  : "Your browser did not grant persistent storage. Keep your backups safe.",
+                  ? "Protected. Keep a backup in case this device is lost."
+                  : "Your browser declined storage protection. Keep your backups safe.",
               );
             } catch {
               setNotice(
@@ -87,7 +92,7 @@ export function StorageUsage() {
           Protect local storage
         </button>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && <Toast message={notice} />}
     </section>
   );
 }

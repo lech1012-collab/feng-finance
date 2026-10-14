@@ -110,3 +110,17 @@ export function formatDateRange(from: string, to: string) {
   });
   return `${first} to ${last}`.replace(/\bSept\b/g, "Sep");
 }
+
+export function formatLocalDateTime(value: string) {
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) return "Build date unavailable";
+  return date
+    .toLocaleString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    })
+    .replace(/\bSept\b/g, "Sep");
+}

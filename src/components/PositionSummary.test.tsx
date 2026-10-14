@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PositionSummary } from "./PositionSummary";
@@ -70,23 +70,27 @@ it("shows dated card debt but leaves cash and net position unavailable when no c
   expect(screen.getByRole("link", { name: /Cash/ })).toHaveTextContent(
     "Not imported",
   );
-  expect(screen.getByRole("link", { name: /Net position/ })).toHaveTextContent(
+  expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
     "Unavailable",
   );
-  expect(screen.getByText(/as of 2 Oct 2026/)).toBeVisible();
-  expect(screen.getByText("Debt owed")).toBeVisible();
+  expect(screen.getByRole("link", { name: "1 accounts ›" })).toHaveAttribute(
+    "href",
+    "/accounts",
+  );
 });
 it("does not attribute an October issue-date balance to September", () => {
   view("2026-09");
   expect(screen.getByRole("link", { name: /Card debt/ })).toHaveTextContent(
     "Unknown",
   );
-  expect(screen.getByRole("link", { name: /Net position/ })).toHaveTextContent(
+  expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
     "Unavailable",
   );
 });
 it("retains the card's single dated chart point with a debt label instead of fabricating a trend", () => {
   const rendered = view("2026-10", true);
+  expect(screen.queryByRole("img")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Account breakdown" }));
   expect(
     screen.getByRole("img", { name: /Verified daily account balances/ }),
   ).toBeVisible();
@@ -115,11 +119,13 @@ it("a removed stored card row invalidates debt and net while keeping the reporte
   expect(screen.getByRole("link", { name: /Card debt/ })).toHaveTextContent(
     "Unknown",
   );
-  expect(screen.getByRole("link", { name: /Net position/ })).toHaveTextContent(
+  expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
     "Unavailable",
   );
-  expect(screen.getByText("Unverified reported balance")).toBeVisible();
-  expect(screen.getByText(/Stored transactions do not match/)).toBeVisible();
+  expect(screen.getByRole("link", { name: "1 accounts ›" })).toHaveAttribute(
+    "href",
+    "/accounts",
+  );
 });
 const openingRow = transaction({
   id: "september-salary",
@@ -167,12 +173,8 @@ it("uses the first statement's verified August opening point for September's mon
 });
 it("does not invent an earlier quarterly baseline or use an opening point from corrupted rows", () => {
   const first = openingView(3);
-  expect(
-    screen.getByText("No comparable verified balances for this range"),
-  ).toBeVisible();
+  expect(screen.queryByText(/% vs/)).not.toBeInTheDocument();
   first.unmount();
   openingView(1, [{ ...openingRow, amount: 99900 }]);
-  expect(
-    screen.getByText("No comparable verified balances for this range"),
-  ).toBeVisible();
+  expect(screen.queryByText(/% vs/)).not.toBeInTheDocument();
 });

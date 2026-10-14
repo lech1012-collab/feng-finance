@@ -1,3 +1,6 @@
+import { Sheet, SheetFooter } from "./Sheet";
+import { Toast } from "./Toast";
+import { formatUkDate } from "../domain/dates";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Rule, RuleAction, RuleCondition } from "../domain/models";
@@ -61,7 +64,6 @@ function RuleEditor({
   onClose: () => void;
   onSaved: (message: string, changeId: string) => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
   const accounts = useLiveQuery(() => db.accounts.toArray(), [], []);
   const categories = useLiveQuery(
     () => db.categories.filter((c) => !c.archived && !c.parentId).toArray(),
@@ -87,9 +89,7 @@ function RuleEditor({
     [JSON.stringify(rule)],
     [],
   );
-  useEffect(() => {
-    dialog.current?.showModal();
-  }, []);
+
   const updateAction = (index: number, patch: Partial<RuleAction>) =>
     setRule({
       ...rule,
@@ -100,21 +100,14 @@ function RuleEditor({
   const currency =
     accounts.find((a) => a.id === initial.accountId)?.currency ?? "GBP";
   return (
-    <dialog
-      ref={dialog}
-      className="v2-editor"
-      onCancel={onClose}
-      aria-label={initial.id.startsWith("new-") ? "Create rule" : "Edit rule"}
+    <Sheet
+      title={initial.id.startsWith("new-") ? "Create rule" : "Edit rule"}
+      onClose={() => {
+        if (!busy) onClose();
+      }}
     >
-      <header>
-        <h2 id="rule-editor-title">
-          {initial.id.startsWith("new-") ? "Create rule" : "Edit rule"}
-        </h2>
-        <button onClick={onClose} aria-label="Close rule editor">
-          Close
-        </button>
-      </header>
       <form
+        id="rule-form"
         onSubmit={async (e) => {
           e.preventDefault();
           setBusy(true);
@@ -173,17 +166,6 @@ function RuleEditor({
               <option value="all">All conditions</option>
               <option value="any">Any condition</option>
             </select>
-          </label>
-          <label>
-            Priority
-            <input
-              type="number"
-              step="1"
-              value={rule.priority}
-              onChange={(e) =>
-                setRule({ ...rule, priority: Number(e.target.value) })
-              }
-            />
           </label>
         </div>
         <ConditionEditor
@@ -422,7 +404,7 @@ function RuleEditor({
               setRule({ ...rule, stopProcessing: e.target.checked })
             }
           />
-          Stop processing further rules
+          Don't apply other rules after this one
         </label>
         <label className="v2-check">
           <input
@@ -466,15 +448,27 @@ function RuleEditor({
             {error}
           </p>
         )}
-        <button className="primary" type="submit" disabled={busy}>
-          {busy ? "Saving…" : "Save rule"}
-        </button>
+        <SheetFooter>
+          <button
+            className="primary"
+            form="rule-form"
+            type="submit"
+            disabled={busy}
+          >
+            {busy ? "Saving…" : "Save rule"}
+          </button>
+        </SheetFooter>
       </form>
-    </dialog>
+    </Sheet>
   );
 }
 
-export function RulesManager() {
+const isAuto = (rule: Rule) => !!rule.auto || rule.createdFrom === "auto";
+const ruleOrder = (a: Rule, b: Rule) =>
+  Number(isAuto(a)) - Number(isAuto(b)) || b.priority - a.priority;
+export function RulesManager({
+  initialRuleId,
+}: { initialRuleId?: string } = {}) {
   const rules = useLiveQuery(
     () => db.rules.filter((r) => !r.builtIn).toArray(),
     [],
@@ -483,6 +477,56 @@ export function RulesManager() {
   const categories = useLiveQuery(() => db.categories.toArray(), [], []);
   const accounts = useLiveQuery(() => db.accounts.toArray(), [], []);
   const [editing, setEditing] = useState<Rule>();
+  const [dragged, setDragged] = useState<string>();
+  const initialOpened = useRef("");
+  useEffect(() => {
+    if (initialRuleId && initialOpened.current !== initialRuleId) {
+      const rule = rules.find((r) => r.id === initialRuleId);
+      if (rule) {
+        setEditing(rule);
+        initialOpened.current = initialRuleId;
+      }
+    }
+  }, [initialRuleId, rules]);
+  const reorder = async (moving: string, destination: string, offset = 0) => {
+    const ordered = [...rules].sort(ruleOrder);
+    const current = ordered.findIndex((r) => r.id === moving),
+      target = ordered.findIndex((r) => r.id === destination);
+    if (
+      current >= 0 &&
+      target >= 0 &&
+      isAuto(ordered[current]) !== isAuto(ordered[target])
+    ) {
+      setError(
+        "Explicit rules run before remembered defaults. Reorder rules within their group.",
+      );
+      return;
+    }
+    if (current < 0 || target < 0 || (current === target && !offset)) return;
+    const next = [...ordered];
+    const [rule] = next.splice(current, 1);
+    next.splice(Math.max(0, Math.min(next.length, target + offset)), 0, rule);
+    try {
+      const result = await auditedMutation(
+        "Reorder rules",
+        ["rules"],
+        async () => {
+          for (let i = 0; i < next.length; i++)
+            await db.rules.update(next[i].id, {
+              priority: 101 + next.length - i,
+            });
+        },
+      );
+      setChangeId(result.changeId);
+      setMessage(
+        "Rule order saved. Explicit rules run before remembered defaults.",
+      );
+    } catch (e) {
+      setError(
+        e instanceof Error ? e.message : "Rule order could not be saved.",
+      );
+    }
+  };
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [changeId, setChangeId] = useState("");
@@ -499,7 +543,7 @@ export function RulesManager() {
   return (
     <section className="card" id="categorization-rules">
       <div className="v2-filter-header">
-        <h2>Categorization rules</h2>
+        <h2>Categorisation rules</h2>
         <button
           className="primary"
           onClick={() =>
@@ -525,7 +569,7 @@ export function RulesManager() {
       </div>
       <p className="muted">
         Your manual choices become defaults. Explicit rules run before Auto
-        rules; higher priorities run first within each group.
+        rules; drag to change the order within each group.
       </p>
       <div className="v2-row-actions">
         <button
@@ -569,126 +613,148 @@ export function RulesManager() {
           />
         </label>
       </div>
-      {[...rules]
-        .sort((a, b) => b.priority - a.priority)
-        .map((rule) => (
-          <div className="settings-row" key={rule.id}>
-            <div>
-              <strong>{rule.name}</strong>
-              {(rule.auto || rule.createdFrom === "auto") && (
-                <span className="count-chip">Auto</span>
-              )}
-              <div className="muted">
-                Priority {rule.priority}
-                {rule.singleUse ? " · Once" : ""}
-                {rule.enabled === false ? " · Paused" : ""}
-                {rule.stats
-                  ? ` · ${rule.stats.hits} ${rule.stats.hits === 1 ? "match" : "matches"}`
-                  : ""}
-              </div>
-            </div>
-            <p className="muted">
-              {rule.actions
-                ?.map((a) =>
-                  a.type === "category"
-                    ? (categories.find((c) => c.id === a.categoryId)?.name ??
-                      "Category")
-                    : a.type === "rename"
-                      ? `Name: ${a.merchant}`
-                      : a.type === "kind"
-                        ? a.kind?.replaceAll("_", " ")
-                        : a.type === "split"
-                          ? "Split by percentage"
-                          : a.type === "reviewed"
-                            ? "Mark reviewed"
-                            : a.type === "tag"
-                              ? "Add tags"
-                              : "Link recurring series",
-                )
-                .filter(Boolean)
-                .join(" · ") ??
-                (rule.type === "transfer"
-                  ? "Transfer"
-                  : categories.find((c) => c.id === rule.categoryId)?.name)}
-              <br />
-              {rule.conditions?.find((c) => c.field === "accountId")
-                ? (accounts.find(
-                    (a) =>
-                      a.id ===
-                      rule.conditions?.find((c) => c.field === "accountId")
-                        ?.value,
-                  )?.displayName ?? "Selected accounts")
-                : rule.accountId
-                  ? (accounts.find((a) => a.id === rule.accountId)
-                      ?.displayName ?? "Selected account")
-                  : "All accounts"}
-            </p>
-            <div className="v2-row-actions">
-              <button onClick={() => setEditing(rule)}>Edit</button>
+      {[...rules].sort(ruleOrder).map((rule, index, ordered) => (
+        <div
+          className="settings-row rule-list-row"
+          key={rule.id}
+          draggable
+          onDragStart={() => setDragged(rule.id)}
+          onDragEnd={() => setDragged(undefined)}
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (dragged) void reorder(dragged, rule.id);
+          }}
+        >
+          <div>
+            <strong>{rule.name}</strong>
+            <span className="rule-order-controls">
               <button
-                onClick={async () => {
-                  try {
-                    const result = await auditedMutation(
-                      rule.enabled === false ? "Enable rule" : "Pause rule",
-                      ["rules"],
-                      async () =>
-                        db.rules.update(rule.id, {
-                          enabled: rule.enabled === false,
-                        }),
-                    );
-                    setChangeId(result.changeId);
-                    setMessage("Rule updated.");
-                  } catch {
-                    setError("The rule could not be updated.");
-                  }
-                }}
+                aria-label={`Move ${rule.name} up`}
+                disabled={index === 0}
+                onClick={() => void reorder(rule.id, ordered[index - 1].id)}
               >
-                {rule.enabled === false ? "Enable" : "Pause"}
+                ↑
               </button>
               <button
-                onClick={async () => {
-                  try {
-                    const result = await auditedMutation(
-                      "Delete rule",
-                      ["rules"],
-                      async () => deleteRule(rule),
-                    );
-                    setChangeId(result.changeId);
-                    setMessage("Rule deleted. Existing transactions kept.");
-                  } catch {
-                    setError("The rule could not be deleted.");
-                  }
-                }}
+                aria-label={`Move ${rule.name} down`}
+                disabled={index === ordered.length - 1}
+                onClick={() => void reorder(rule.id, ordered[index + 1].id)}
               >
-                Delete
+                ↓
               </button>
+            </span>
+            {(rule.auto || rule.createdFrom === "auto") && (
+              <span className="count-chip">Auto</span>
+            )}
+            <div className="muted">
+              {rule.stats?.lastHit || rule.lastUsedAt
+                ? `Last used ${formatUkDate((rule.stats?.lastHit ?? rule.lastUsedAt!).slice(0, 10))}`
+                : "Not used yet"}
+              {rule.singleUse ? " · Once" : ""}
+              {rule.enabled === false ? " · Paused" : ""}
+              {rule.stats
+                ? ` · ${rule.stats.hits} ${rule.stats.hits === 1 ? "match" : "matches"}`
+                : " · 0 matches"}
             </div>
           </div>
-        ))}
-      {!rules.length && (
-        <p className="muted">Your first categorization creates an auto rule.</p>
-      )}
-      {message && (
-        <p className="notice" role="status">
-          {message}{" "}
-          {changeId && (
+          <p className="muted">
+            {rule.actions
+              ?.map((a) =>
+                a.type === "category"
+                  ? (categories.find((c) => c.id === a.categoryId)?.name ??
+                    "Category")
+                  : a.type === "rename"
+                    ? `Name: ${a.merchant}`
+                    : a.type === "kind"
+                      ? a.kind?.replaceAll("_", " ")
+                      : a.type === "split"
+                        ? "Split by percentage"
+                        : a.type === "reviewed"
+                          ? "Mark reviewed"
+                          : a.type === "tag"
+                            ? "Add tags"
+                            : "Link recurring series",
+              )
+              .filter(Boolean)
+              .join(" · ") ??
+              (rule.type === "transfer"
+                ? "Transfer"
+                : categories.find((c) => c.id === rule.categoryId)?.name)}
+            <br />
+            {rule.conditions?.find((c) => c.field === "accountId")
+              ? (accounts.find(
+                  (a) =>
+                    a.id ===
+                    rule.conditions?.find((c) => c.field === "accountId")
+                      ?.value,
+                )?.displayName ?? "Selected accounts")
+              : rule.accountId
+                ? (accounts.find((a) => a.id === rule.accountId)?.displayName ??
+                  "Selected account")
+                : "All accounts"}
+          </p>
+          <div className="v2-row-actions">
+            <button onClick={() => setEditing(rule)}>Edit</button>
             <button
               onClick={async () => {
                 try {
-                  await undoChange(changeId);
-                  setChangeId("");
-                  setMessage("Rule change undone.");
-                } catch (e) {
-                  setError(
-                    e instanceof Error ? e.message : "Undo is unavailable.",
+                  const result = await auditedMutation(
+                    rule.enabled === false ? "Enable rule" : "Pause rule",
+                    ["rules"],
+                    async () =>
+                      db.rules.update(rule.id, {
+                        enabled: rule.enabled === false,
+                      }),
                   );
+                  setChangeId(result.changeId);
+                  setMessage("Rule updated.");
+                } catch {
+                  setError("The rule could not be updated.");
                 }
               }}
             >
-              Undo
+              {rule.enabled === false ? "Enable" : "Pause"}
             </button>
-          )}
+            <button
+              onClick={async () => {
+                try {
+                  const result = await auditedMutation(
+                    "Delete rule",
+                    ["rules"],
+                    async () => deleteRule(rule),
+                  );
+                  setChangeId(result.changeId);
+                  setMessage("Rule deleted. Existing transactions kept.");
+                } catch {
+                  setError("The rule could not be deleted.");
+                }
+              }}
+            >
+              Delete
+            </button>
+          </div>
+        </div>
+      ))}
+      {!rules.length && (
+        <p className="muted">
+          Your first categorisation creates a remembered default.
         </p>
+      )}
+      {message && (
+        <Toast
+          id={changeId || message}
+          message={message}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  setChangeId("");
+                  setMessage("");
+                }
+              : undefined
+          }
+        />
       )}
       {error && (
         <p className="notice warning" role="alert">

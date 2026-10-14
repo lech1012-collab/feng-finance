@@ -118,12 +118,7 @@ export default function Planning({
           </p>
         </div>
       </div>
-      {data.transactions.some((t) => t.isDemo) && (
-        <p className="demo-note">
-          Fictitious demo data is included in this plan.
-        </p>
-      )}
-      <div className="card">
+      <div className="planning-period-row">
         <MonthPicker month={month} onChange={setMonth} />
         <p className="coverage-note">
           {reportingPeriodLabel(month, data.settings, data.transactions)} ·{" "}
@@ -269,11 +264,19 @@ export default function Planning({
                       </div>
                       <div>
                         <span>Expected income · next {horizon} days</span>
-                        <strong>{money(forecast.income, currency)}</strong>
+                        <strong>
+                          {forecast.income === undefined
+                            ? "Rate needed"
+                            : money(forecast.income, currency)}
+                        </strong>
                       </div>
                       <div>
                         <span>Expected bills · next {horizon} days</span>
-                        <strong>{money(forecast.bills, currency)}</strong>
+                        <strong>
+                          {forecast.bills === undefined
+                            ? "Rate needed"
+                            : money(forecast.bills, currency)}
+                        </strong>
                       </div>
                     </div>
                     <div
@@ -443,10 +446,23 @@ export default function Planning({
                         </div>
                         <strong
                           className={
-                            p.amount < 0 ? "payment-out" : "payment-in"
+                            p.originalAmount < 0 ? "payment-out" : "payment-in"
                           }
                         >
-                          {money(p.amount, currency, true)}
+                          {p.amount === undefined ? (
+                            <>
+                              Rate needed
+                              <small>
+                                {money(
+                                  p.originalAmount,
+                                  p.originalCurrency,
+                                  true,
+                                )}
+                              </small>
+                            </>
+                          ) : (
+                            money(p.amount, currency, true, forecast.converted)
+                          )}
                         </strong>
                       </Link>
                     </li>

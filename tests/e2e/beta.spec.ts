@@ -1,3 +1,4 @@
+import { settingsSection } from "./flows";
 import { test as base, expect, type Page } from "@playwright/test";
 import { acknowledgeBeta } from "./fixtures";
 import { startStaticHost, type LocalHost } from "./static-host";
@@ -163,7 +164,9 @@ test("first launch explains privacy before requesting storage and demo survives 
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".demo-banner")).toBeVisible();
+  await expect(
+    page.locator(".header-demo").filter({ visible: true }),
+  ).toBeVisible();
   await expect.poll(() => setting(page, "storagePersisted")).toBe("true");
   expect(
     await page.evaluate(() =>
@@ -177,7 +180,9 @@ test("first launch explains privacy before requesting storage and demo survives 
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await expect(notice).toHaveCount(0);
-  await expect(page.locator(".demo-banner")).toBeVisible();
+  await expect(
+    page.locator(".header-demo").filter({ visible: true }),
+  ).toBeVisible();
   await expect(
     page.getByRole("dialog", { name: "What's new in Feng" }),
   ).toHaveCount(0);
@@ -225,7 +230,9 @@ test("import acknowledgement opens Files before asynchronous storage permission 
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".demo-banner")).toHaveCount(0);
+  await expect(
+    page.locator(".header-demo").filter({ visible: true }),
+  ).toHaveCount(0);
   await expect.poll(() => setting(page, "betaNoticeAcceptedVersion")).toBe("1");
 });
 
@@ -284,7 +291,7 @@ test("installed iPhone mode keeps installation metadata and suppresses the Safar
   await expect(
     page.getByRole("region", { name: "Install Feng", exact: true }),
   ).toHaveCount(0);
-  await page.goto("/#/settings");
+  await settingsSection(page, "about");
   await page.getByText("Install help", { exact: true }).click();
   await expect(
     page.getByText("Feng is already installed. Open it from your Home Screen."),
@@ -350,10 +357,21 @@ test("existing Safari imports warn about separate storage and retain their overd
   );
   const download = page.waitForEvent("download");
   await backupNotice.getByRole("button", { name: "Save backup" }).click();
+  const backupSheet = page.getByRole("dialog", {
+    name: "Save backup",
+    exact: true,
+  });
+  await backupSheet
+    .getByRole("switch", { name: /Protect with a password/ })
+    .uncheck();
+  await backupSheet
+    .getByRole("button", { name: "Save backup", exact: true })
+    .click();
   expect((await download).suggestedFilename()).toMatch(
     /^feng-finance-backup-.*\.json$/,
   );
   await expect(backupNotice).toHaveCount(0);
+  await page.goto("/#/");
   await page.reload();
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),
@@ -390,13 +408,13 @@ test("first-launch notice fits narrow iPhones and large text without hiding eith
   }
 });
 
-test("Settings feedback includes a warning and only technical details when no destination is configured", async ({
+test("Settings feedback opens the configured email and includes only technical details", async ({
   page,
 }) => {
   await page.goto("/#/");
   await acknowledgeBeta(page);
   await addOldRealImport(page);
-  await page.goto("/#/settings");
+  await settingsSection(page, "about");
   await page
     .getByRole("button", { name: "Send feedback", exact: true })
     .click();
@@ -407,17 +425,20 @@ test("Settings feedback includes a warning and only technical details when no de
   await expect(feedback).toContainText(
     "Please don't send real statements or screenshots showing real figures.",
   );
-  await expect(feedback).toContainText(
-    "A feedback form or email address has not been configured",
+  await expect(feedback.getByRole("link", { name: /Open/ })).toHaveAttribute(
+    "href",
+    /^mailto:lech1012@googlemail\.com\?/,
   );
-  const context = await feedback
-    .getByLabel("Technical details to copy", { exact: true })
-    .inputValue();
+  const destination = await feedback
+    .getByRole("link", { name: "Open email", exact: true })
+    .getAttribute("href");
+  const context =
+    new URLSearchParams(destination!.split("?")[1]).get("body") ?? "";
   expect(context).toContain("Feng");
   expect(context).not.toMatch(
     /WAITROSE|fictitious-beta|4321|2026-09-20|\b10\.00\b/,
   );
-  await expect(feedback.getByRole("link", { name: /Open/ })).toHaveCount(0);
+
   await feedback.getByRole("button", { name: "Close feedback" }).click();
   await expect(
     page.getByRole("button", { name: "Send feedback", exact: true }),

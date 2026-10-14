@@ -1,3 +1,5 @@
+import { createPortal } from "react-dom";
+import { Toast } from "./Toast";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type {
@@ -21,6 +23,7 @@ export function queryFromParams(params: URLSearchParams): {
   initialQuery: string;
   initialConditions: RuleCondition[];
   initialError?: string;
+  initialMatch?: "all" | "any";
 } {
   const initialQuery = (params.get("query") ?? "").slice(0, 500);
   try {
@@ -28,7 +31,13 @@ export function queryFromParams(params: URLSearchParams): {
     if (text.length > 16000) throw new Error("The saved filter is too large.");
     const initialConditions: RuleCondition[] = JSON.parse(text);
     validateConditions(initialConditions);
-    return { initialQuery, initialConditions };
+    return {
+      initialQuery,
+      initialConditions,
+      ...(params.get("queryMatch") === "any"
+        ? { initialMatch: "any" as const }
+        : {}),
+    };
   } catch {
     return {
       initialQuery,
@@ -50,6 +59,13 @@ export function AdvancedSearch({
   initialQuery = "",
   initialConditions = [],
   initialError = "",
+  viewsTarget,
+  actionsTarget,
+  onOpen,
+  exportTransactions,
+  onViewSaved,
+  onQueryStateChange,
+  initialMatch = "all",
 }: {
   transactions: Transaction[];
   sourceTransactions?: Transaction[];
@@ -61,6 +77,17 @@ export function AdvancedSearch({
   initialQuery?: string;
   initialConditions?: RuleCondition[];
   initialError?: string;
+  viewsTarget?: HTMLElement | null;
+  actionsTarget?: HTMLElement | null;
+  onOpen?: () => void;
+  exportTransactions?: Transaction[];
+  onViewSaved?: () => void;
+  initialMatch?: "all" | "any";
+  onQueryStateChange?: (state: {
+    query: string;
+    conditions: RuleCondition[];
+    match: "all" | "any";
+  }) => void;
 }) {
   const views = useLiveQuery(() => db.savedViews.toArray(), [], []);
   const [query, setQuery] = useState(initialQuery);
@@ -80,7 +107,7 @@ export function AdvancedSearch({
     }
   };
   const [conditions, setConditions] = useState<RuleCondition[]>(readInitial);
-  const [match, setMatch] = useState<"all" | "any">("all");
+  const [match, setMatch] = useState<"all" | "any">(initialMatch);
   const [advanced, setAdvanced] = useState(false);
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
@@ -93,12 +120,19 @@ export function AdvancedSearch({
     initialQuery,
     initialConditions,
     initialError,
+    initialMatch,
   ]);
   useEffect(() => {
     setQuery(initialQuery);
     setConditions(readInitial());
     setError(initialError);
+    setMatch(initialMatch);
   }, [initialKey]);
+  const stateCallback = useRef(onQueryStateChange);
+  stateCallback.current = onQueryStateChange;
+  useEffect(() => {
+    stateCallback.current?.({ query, conditions, match });
+  }, [query, JSON.stringify(conditions), match]);
   const matched = useMemo(
     () => filterTransactions(transactions, conditions, match),
     [transactions, JSON.stringify(conditions), match],
@@ -153,7 +187,7 @@ export function AdvancedSearch({
           transactionsCsv(
             [
               ...new Map(
-                matched
+                (exportTransactions ?? matched)
                   .flatMap((t) => {
                     const source = sourceById.get(t.id) ?? t;
                     return source.kind === "split_parent"
@@ -203,24 +237,48 @@ export function AdvancedSearch({
         placeholder="Try amzn <10 2026 or tag:lisbon"
         onChange={(e) => setText(e.target.value)}
       />
-      {!!views.length && (
-        <div className="v2-row-actions" aria-label="Saved transaction views">
-          {views
-            .filter((v) => v.pinned)
-            .map((v) => (
-              <button
-                key={v.id}
-                onClick={() => {
-                  setConditions(v.conditions);
-                  setMatch(v.match);
-                  setQuery(v.query ?? "");
-                }}
-              >
-                {v.name}
-              </button>
-            ))}
-        </div>
-      )}
+      {!!views.length &&
+        (viewsTarget ? (
+          createPortal(
+            <div
+              className="v2-row-actions"
+              aria-label="Saved transaction views"
+            >
+              {views
+                .filter((v) => v.pinned)
+                .map((v) => (
+                  <button
+                    key={v.id}
+                    onClick={() => {
+                      setConditions(v.conditions);
+                      setMatch(v.match);
+                      setQuery(v.query ?? "");
+                    }}
+                  >
+                    {v.name}
+                  </button>
+                ))}
+            </div>,
+            viewsTarget,
+          )
+        ) : (
+          <div className="v2-row-actions" aria-label="Saved transaction views">
+            {views
+              .filter((v) => v.pinned)
+              .map((v) => (
+                <button
+                  key={v.id}
+                  onClick={() => {
+                    setConditions(v.conditions);
+                    setMatch(v.match);
+                    setQuery(v.query ?? "");
+                  }}
+                >
+                  {v.name}
+                </button>
+              ))}
+          </div>
+        ))}
       {advanced && (
         <>
           <label>
@@ -264,6 +322,7 @@ export function AdvancedSearch({
                   });
                   setChangeId(saved.changeId);
                   setMessage("View saved as a quick filter.");
+                  onViewSaved?.();
                 } catch (error) {
                   setError(
                     error instanceof Error
@@ -377,9 +436,31 @@ export function AdvancedSearch({
           {result.length === 1 ? "transaction" : "transactions"}
         </p>
         <div className="v2-row-actions">
-          <button onClick={download} disabled={!result.length}>
-            Export these transactions
-          </button>
+          {actionsTarget ? (
+            createPortal(
+              <>
+                <button
+                  onClick={() => {
+                    setAdvanced(true);
+                    onOpen?.();
+                  }}
+                >
+                  Create rule from filter
+                </button>
+                <button
+                  onClick={download}
+                  disabled={!(exportTransactions ?? result).length}
+                >
+                  Export these transactions
+                </button>
+              </>,
+              actionsTarget,
+            )
+          ) : (
+            <button onClick={download} disabled={!result.length}>
+              Export these transactions
+            </button>
+          )}
           {conditions.length > 0 && (
             <button
               onClick={() => {
@@ -394,28 +475,19 @@ export function AdvancedSearch({
         </div>
       </div>
       {message && (
-        <p role="status" className="notice">
-          {message}{" "}
-          {changeId && (
-            <button
-              onClick={async () => {
-                try {
+        <Toast
+          id={changeId || message}
+          message={message}
+          undo={
+            changeId
+              ? async () => {
                   await undoChange(changeId);
-                  setMessage("Change undone.");
+                  setMessage("");
                   setChangeId("");
-                } catch (error) {
-                  setError(
-                    error instanceof Error
-                      ? error.message
-                      : "Undo is unavailable.",
-                  );
                 }
-              }}
-            >
-              Undo
-            </button>
-          )}
-        </p>
+              : undefined
+          }
+        />
       )}
       {error && (
         <p className="notice warning" role="alert">

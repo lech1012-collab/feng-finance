@@ -54,8 +54,8 @@ it("responds immediately to disabling public rate downloads and preserves that p
       <CurrencySetting />
     </MemoryRouter>,
   );
-  const toggle = await screen.findByRole("checkbox", {
-    name: "Download public ECB rates",
+  const toggle = await screen.findByRole("switch", {
+    name: "Download daily rates (ECB)",
   });
   await waitFor(() => expect(toggle).toBeChecked());
   fireEvent.click(toggle);
@@ -71,7 +71,7 @@ it("responds immediately to disabling public rate downloads and preserves that p
   );
   await waitFor(() =>
     expect(
-      screen.getByRole("checkbox", { name: "Download public ECB rates" }),
+      screen.getByRole("switch", { name: "Download daily rates (ECB)" }),
     ).not.toBeChecked(),
   );
 });
@@ -95,9 +95,9 @@ it("keeps exact recovery read-only until the user requests exchange rates", asyn
       <CurrencyViewNotice currency="GBP" allowAutomaticDownload={false} />
     </MemoryRouter>,
   );
-  await screen.findByText(
-    "Exchange rates are needed. Enter manual rates in Settings.",
-  );
+  await screen.findByRole("link", {
+    name: "Exchange rates needed. Open currency settings.",
+  });
   expect(fetcher).not.toHaveBeenCalled();
   expect(await db.fxRates.count()).toBe(0);
   expect(await db.settings.toArray()).toEqual(before);

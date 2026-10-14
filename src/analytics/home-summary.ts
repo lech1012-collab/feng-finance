@@ -1,8 +1,9 @@
-import type { Account, Setting, Transaction } from "../domain/models";
+import type { Account, FxRate, Setting, Transaction } from "../domain/models";
 import { monthOffset } from "../domain/dates";
 import { safeSum } from "../domain/money";
 import { financialType } from "../domain/transaction-type";
 import { readReminderConfig, REMINDER_KEY } from "./reminders";
+import { convertMinor, projectedReportingTransactions } from "./fx";
 
 /** Transfer labels use account identity, not amount similarity. A card payment
  * can be recognized on either side of a stored transfer pair. */
@@ -105,5 +106,49 @@ export function homeDataHealth(settings: Setting[], today: string) {
         settings.find((s) => s.key === "backup:importsSinceExport")?.value ?? 0,
       ) >= 2,
     reviewDate: config.enabled ? reviewDate : undefined,
+  };
+}
+
+/** Missing conversions remain unknown, rather than appearing as zero transfers. */
+export function excludedReportingFlows(
+  transactions: Transaction[],
+  accounts: Account[],
+  month: string,
+  currency: string,
+  rates: FxRate[],
+  range?: [string, string],
+) {
+  const rows = transactions.filter(
+    (t) =>
+      financialType(t) === "transfer" &&
+      (range
+        ? t.date >= range[0] && t.date < range[1]
+        : t.date.startsWith(month)),
+  );
+  const totals = excludedFlows(
+    projectedReportingTransactions(rows, currency, rates).transactions,
+    accounts,
+    month,
+    currency,
+    range,
+  );
+  const missing = new Set(
+    rows
+      .filter(
+        (t) => !convertMinor(t.amount, t.currency, currency, t.date, rates),
+      )
+      .map((t) => transferKind(t, accounts, transactions)),
+  );
+  const originals = [...new Set(rows.map((row) => row.currency))].map(
+    (native) => ({
+      currency: native,
+      ...excludedFlows(rows, accounts, month, native, range),
+    }),
+  );
+  return {
+    internal: missing.has("internal") ? undefined : totals.internal,
+    card: missing.has("card") ? undefined : totals.card,
+    count: rows.length,
+    originals,
   };
 }

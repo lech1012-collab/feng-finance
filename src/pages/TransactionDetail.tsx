@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { displayAccountName } from "../domain/presentation";
+import { Toast } from "../components/Toast";
+import { undoChange } from "../storage/audit";
+import { useEffect, useRef, useState } from "react";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -99,7 +102,7 @@ function Editor({
     /^\/transactions(?:\?|$)/.test(location.state.returnTo)
       ? location.state.returnTo
       : "/transactions";
-  const [merchant, setMerchant] = useState(t.merchant);
+  const [merchant, setMerchant] = useState(displayMerchant(t));
   const [category, setCategory] = useState(t.categoryId ?? "");
   const [subcategory, setSubcategory] = useState(t.subcategoryId ?? "");
   const [type, setType] = useState(financialType(t));
@@ -108,7 +111,37 @@ function Editor({
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Rule>();
-  const save = async (decision?: CategoryConflictDecision) => {
+  const [receipt, setReceipt] = useState<string>();
+  type Patch = Pick<
+    Transaction,
+    "merchant" | "categoryId" | "subcategoryId" | "type" | "tags"
+  >;
+  const [pendingPatch, setPendingPatch] = useState<Patch>();
+  const displayedVersion = useRef(t.updatedAt);
+  useEffect(() => {
+    if (displayedVersion.current === t.updatedAt) return;
+    displayedVersion.current = t.updatedAt;
+    setMerchant(displayMerchant(t));
+    setCategory(t.categoryId ?? "");
+    setSubcategory(t.subcategoryId ?? "");
+    setType(financialType(t));
+    setTags(t.tags ?? []);
+  }, [t.updatedAt]);
+  const save = async (
+    decision?: CategoryConflictDecision,
+    override: Partial<Patch> = {},
+  ) => {
+    const patch: Patch =
+      decision && pendingPatch
+        ? pendingPatch
+        : {
+            merchant: merchant.trim(),
+            categoryId: category || undefined,
+            subcategoryId: subcategory || undefined,
+            type,
+            tags,
+            ...override,
+          };
     setBusy(true);
     setError("");
     try {
@@ -116,12 +149,13 @@ function Editor({
         const conflicting = conflictingCategoryRule(
           t,
           {
-            categoryId: category || undefined,
-            isTransfer: type === "transfer",
+            categoryId: patch.categoryId,
+            isTransfer: patch.type === "transfer",
           },
           await db.rules.toArray(),
         );
         if (conflicting) {
+          setPendingPatch(patch);
           setConflict(conflicting);
           return;
         }
@@ -131,20 +165,19 @@ function Editor({
             .filter((row) => row.transferPairId === t.transferPairId)
             .toArray()
         : [t];
-      if (!(await authorizeMonthEdit(affected))) return;
-      await editTransaction(
-        t.id,
-        {
-          merchant: merchant.trim(),
-          categoryId: category || undefined,
-          subcategoryId: subcategory || undefined,
-          type,
-          tags,
-        },
-        undefined,
-        { learn: decision !== "once" },
-      );
-      navigate(returnTo);
+      if (!(await authorizeMonthEdit(affected))) {
+        setMerchant(displayMerchant(t));
+        setCategory(t.categoryId ?? "");
+        setSubcategory(t.subcategoryId ?? "");
+        setType(financialType(t));
+        setTags(t.tags ?? []);
+        setError("Changes were not saved because the month remains closed.");
+        return;
+      }
+      const result = await editTransaction(t.id, patch, undefined, {
+        learn: decision !== "once",
+      });
+      setReceipt(result.changeId);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Changes could not be saved.");
     } finally {
@@ -154,19 +187,20 @@ function Editor({
   return (
     <>
       <Link className="back-link" to={returnTo}>
-        Back to transactions
+        ‹ Transactions
       </Link>
       <section className="card detail-card">
         <p className="eyebrow">
-          {displayDate(t.date)} · {account?.institution}
+          {displayDate(t.date)} ·{" "}
+          {account ? displayAccountName(account) : "Account"}
         </p>
         <h1 className="detail-amount">{money(t.amount, t.currency, true)}</h1>
         {t.currency !== reportingCurrency && (
           <p className="coverage-note">
             {conversion ? (
               <>
-                Reporting amount ≈{" "}
-                {money(conversion.amount, reportingCurrency, true)} · 1{" "}
+                Reporting amount{" "}
+                {money(conversion.amount, reportingCurrency, true, true)} · 1{" "}
                 {t.currency} = {conversion.rate} {reportingCurrency} ·{" "}
                 {displayDate(conversion.date)} ·{" "}
                 {conversion.source === "manual" ? "Manual rate" : "ECB rate"}
@@ -185,8 +219,8 @@ function Editor({
         {(rule || t.categorySource) && (
           <p className="category-origin-note">
             {t.categorySource === "manual"
-              ? "Categorized by you"
-              : "Categorized by rule"}
+              ? "Categorised by you"
+              : "Categorised by rule"}
             {rule
               ? `: ${rule.pattern} on ${account?.institution ?? "this account"} → ${rule.type === "transfer" ? "Transfer" : (categories.find((c) => c.id === rule.categoryId)?.name ?? "Category")}`
               : ""}
@@ -201,72 +235,100 @@ function Editor({
             )}
           </p>
         )}
-        <dl className="detail-meta">
-          <div>
-            <dt>Account</dt>
-            <dd>
-              {account?.displayName} · {account?.maskedAccountIdentifier}
-            </dd>
-          </div>
-          <div>
-            <dt>Statement</dt>
-            <dd>
-              {t.source === "manual"
-                ? "Manual entry"
-                : (statement?.sourceFilename ?? "Source statement unavailable")}
-            </dd>
-          </div>
-          {t.parentId && (
+        <div className="detail-action-row">
+          <TransactionAccuracy transaction={t} categories={categories} />
+          {t.kind !== "split_parent" &&
+            !(t.kind === "refund" && t.refundAllocations?.length) && (
+              <>
+                <details>
+                  <summary>Add tag</summary>
+                  <TagPicker
+                    value={tags}
+                    onChange={(value) => {
+                      setTags(value);
+                      void save(undefined, { tags: value });
+                    }}
+                  />
+                </details>
+              </>
+            )}
+        </div>
+        <details className="detail-source">
+          <summary>Source</summary>
+          <dl className="detail-meta">
             <div>
-              <dt>Original transaction</dt>
+              <dt>Account</dt>
               <dd>
-                <Link to={`/transactions/${t.parentId}`}>
-                  View split parent
-                </Link>
+                {account ? displayAccountName(account) : "Account"} ·{" "}
+                {account?.maskedAccountIdentifier}
               </dd>
             </div>
-          )}
-          <div>
-            <dt>Source page</dt>
-            <dd>{t.sourcePage}</dd>
-          </div>
-          <div>
-            <dt>Source check</dt>
-            <dd>
-              {t.checkLevel === "balance"
-                ? "Checked against running balance"
-                : t.checkLevel === "total"
-                  ? "Checked against statement total"
-                  : t.checkLevel === "ocr"
-                    ? "Read from an image"
-                    : t.checkLevel === "manual_override"
-                      ? "Imported as unverified"
-                      : t.checkLevel === "review"
-                        ? "Needs review"
-                        : "Original import check"}
-            </dd>
-          </div>
-          <div>
-            <dt>Transfer status</dt>
-            <dd>
-              {t.transferPairId
-                ? "Linked to another account"
-                : t.isTransfer
-                  ? `${t.kind === "card_repayment" ? "Card repayment" : "Transfer"} · other side not in Feng`
-                  : "Not a transfer"}
-            </dd>
-          </div>
-        </dl>
-        <TransactionAccuracy transaction={t} categories={categories} />
+            <div>
+              <dt>Statement</dt>
+              <dd>
+                {t.source === "manual"
+                  ? "Manual entry"
+                  : (statement?.sourceFilename ??
+                    "Source statement unavailable")}
+              </dd>
+            </div>
+            {t.parentId && (
+              <div>
+                <dt>Original transaction</dt>
+                <dd>
+                  <Link to={`/transactions/${t.parentId}`}>
+                    View split parent
+                  </Link>
+                </dd>
+              </div>
+            )}
+            <div>
+              <dt>Source page</dt>
+              <dd>{t.sourcePage}</dd>
+            </div>
+            <div>
+              <dt>Source check</dt>
+              <dd>
+                {t.checkLevel === "balance"
+                  ? "Checked against running balance"
+                  : t.checkLevel === "total"
+                    ? "Checked against statement total"
+                    : t.checkLevel === "ocr"
+                      ? "Read from an image"
+                      : t.checkLevel === "manual_override"
+                        ? "Imported as unverified"
+                        : t.checkLevel === "review"
+                          ? "Needs review"
+                          : "Original import check"}
+              </dd>
+            </div>
+            <div>
+              <dt>Transfer status</dt>
+              <dd>
+                {t.transferPairId
+                  ? "Linked to another account"
+                  : t.isTransfer
+                    ? `${t.kind === "card_repayment" ? "Card repayment" : "Transfer"} · other side not in Feng`
+                    : "Not a transfer"}
+              </dd>
+            </div>
+          </dl>
+        </details>
         {t.kind !== "split_parent" &&
           !(t.kind === "refund" && t.refundAllocations?.length) && (
             <>
               <div className="form-grid">
                 <label>
-                  Merchant
+                  Display name
                   <input
+                    disabled={busy}
                     value={merchant}
                     onChange={(e) => setMerchant(e.target.value)}
+                    onBlur={(event) => {
+                      const nextName = event.currentTarget.value.trim();
+                      if (nextName && nextName !== displayMerchant(t))
+                        void save(undefined, { merchant: nextName });
+                    }}
                     maxLength={500}
                   />
                 </label>
@@ -274,9 +336,22 @@ function Editor({
                   Transaction type
                   <select
                     aria-label="Transaction type"
+                    disabled={busy}
                     value={type}
                     onChange={(e) => {
-                      setType(e.target.value as Transaction["type"]);
+                      const next = e.target.value as Transaction["type"];
+                      setType(next);
+                      void save(undefined, {
+                        type: next,
+                        categoryId:
+                          next === "transfer"
+                            ? undefined
+                            : category || undefined,
+                        subcategoryId:
+                          next === "transfer"
+                            ? undefined
+                            : subcategory || undefined,
+                      });
                       if (e.target.value === "transfer") {
                         setCategory("");
                         setSubcategory("");
@@ -285,12 +360,13 @@ function Editor({
                   >
                     {["income", "expense", "transfer"].map((v) => (
                       <option
+                        value={v}
                         key={v}
                         disabled={
                           v !== "transfer" && v !== amountType(t.amount)
                         }
                       >
-                        {v}
+                        {v[0].toUpperCase() + v.slice(1)}
                       </option>
                     ))}
                   </select>
@@ -299,15 +375,20 @@ function Editor({
                   Category
                   <select
                     aria-label="Category"
-                    disabled={type === "transfer"}
+                    disabled={busy || type === "transfer"}
                     value={category}
                     onChange={(e) => {
                       setCategory(e.target.value);
                       setSubcategory("");
                       setType(amountType(t.amount));
+                      void save(undefined, {
+                        categoryId: e.target.value || undefined,
+                        subcategoryId: undefined,
+                        type: amountType(t.amount),
+                      });
                     }}
                   >
-                    <option value="">Uncategorized</option>
+                    <option value="">Uncategorised</option>
                     {categories
                       .filter(
                         (c) =>
@@ -324,48 +405,51 @@ function Editor({
                       ))}
                   </select>
                 </label>
-                <label>
-                  Subcategory
-                  <select
-                    aria-label="Subcategory"
-                    disabled={!category || type === "transfer"}
-                    value={subcategory}
-                    onChange={(e) => setSubcategory(e.target.value)}
-                  >
-                    <option value="">None</option>
-                    {categories
-                      .filter(
-                        (c) =>
-                          c.parentId === category &&
-                          (!c.archived || c.id === subcategory),
-                      )
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <TagPicker value={tags} onChange={setTags} />
+                {category !== "property" &&
+                  categories.some((c) => c.parentId === category) && (
+                    <label>
+                      Subcategory
+                      <select
+                        aria-label="Subcategory"
+                        disabled={busy || !category || type === "transfer"}
+                        value={subcategory}
+                        onChange={(e) => {
+                          setSubcategory(e.target.value);
+                          void save(undefined, {
+                            subcategoryId: e.target.value || undefined,
+                          });
+                        }}
+                      >
+                        <option value="">None</option>
+                        {categories
+                          .filter(
+                            (c) =>
+                              c.parentId === category &&
+                              (!c.archived || c.id === subcategory),
+                          )
+                          .map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.name}
+                            </option>
+                          ))}
+                      </select>
+                    </label>
+                  )}
               </div>
-              <p className="coverage-note">
-                Money in counts as income; money out counts as spending. Salary
-                is income when its statement amount is positive. Categories
-                never reverse amounts. Transfers are excluded from net cash flow
-                but still move account balances.
-              </p>
+              <p className="coverage-note">Changes save automatically.</p>
+              <details>
+                <summary>How this counts</summary>
+                <p>
+                  Money in counts as income; money out counts as spending.
+                  Transfers move account balances and are excluded from cash
+                  flow. A refund reduces the original spending.
+                </p>
+              </details>
               {error && (
                 <p role="alert" className="warning-text">
                   {error}
                 </p>
               )}
-              <button
-                className="primary"
-                onClick={() => void save()}
-                disabled={busy}
-              >
-                Save changes
-              </button>
             </>
           )}
       </section>
@@ -414,6 +498,16 @@ function Editor({
         </section>
       )}
       <AttachmentManager transactionId={t.id} />
+      {receipt && (
+        <Toast
+          id={receipt}
+          message="Transaction updated."
+          undo={async () => {
+            await undoChange(receipt);
+            setReceipt(undefined);
+          }}
+        />
+      )}
       {conflict && (
         <CategoryConflictDialog
           oldCategory={
@@ -431,9 +525,14 @@ function Editor({
             type === "transfer"
               ? "Transfer"
               : (categories.find((item) => item.id === category)?.name ??
-                "Uncategorized")
+                "Uncategorised")
           }
-          onCancel={() => setConflict(undefined)}
+          onCancel={() => {
+            setConflict(undefined);
+            setPendingPatch(undefined);
+            setCategory(t.categoryId ?? "");
+            setType(financialType(t));
+          }}
           onDecision={(decision) => {
             setConflict(undefined);
             void save(decision);

@@ -129,8 +129,7 @@ test("explicit AMZN amount rule previews, updates one purchase and Undo restores
   page,
 }) => {
   await seed(page);
-  await page.goto("/#/settings");
-  await page.locator("#rules > summary").click();
+  await page.goto("/#/settings?section=rules");
   const manager = page.locator("#categorization-rules");
   await manager
     .getByRole("button", { name: "Create rule", exact: true })
@@ -174,7 +173,7 @@ test("explicit AMZN amount rule previews, updates one purchase and Undo restores
     categoryId: "shopping",
     amount: -2499,
   });
-  await manager.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect
     .poll(async () => (await transactionRecord(page, "query-small"))?.merchant)
     .toBe("AMZN DIGITAL");
@@ -219,13 +218,17 @@ test("text query saves a reusable view and Analyse saves a category report", asy
     .fill("Small Amazon purchases");
   await search.getByRole("button", { name: "Save view", exact: true }).click();
   await expect(
-    search.getByRole("button", { name: "Small Amazon purchases", exact: true }),
+    page.getByRole("button", { name: "Small Amazon purchases", exact: true }),
   ).toBeVisible();
-  await page.goto("/#/analysis");
+  await page.goto("/#/analysis?view=reports");
   const report = page.locator("#report-builder");
+  await report
+    .getByRole("button", { name: "Edit report", exact: true })
+    .click();
   await report
     .getByRole("combobox", { name: "Group by", exact: true })
     .selectOption("merchant");
+  await page.getByRole("button", { name: "View report", exact: true }).click();
   await report
     .getByLabel("Report name", { exact: true })
     .fill("Merchant totals");
@@ -236,13 +239,17 @@ test("text query saves a reusable view and Analyse saves a category report", asy
     report.getByRole("button", { name: "Merchant totals", exact: true }),
   ).toBeVisible();
   await report
+    .getByRole("button", { name: "Edit report", exact: true })
+    .click();
+  await report
     .getByRole("combobox", { name: "Group by", exact: true })
     .selectOption("tag");
+  await page.getByRole("button", { name: "View report", exact: true }).click();
   await expect(
     report.getByRole("rowheader", { name: "Lisbon trip", exact: true }),
   ).toBeVisible();
   await expect(report.getByRole("row", { name: /Lisbon trip/ })).toContainText(
-    "-£24.99",
+    "−£24.99",
   );
   await report.getByRole("link", { name: "Lisbon trip", exact: true }).click();
   await expect(

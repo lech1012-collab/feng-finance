@@ -48,12 +48,10 @@ it("cancel leaves closed months and period unchanged; confirming and Undo restor
     await screen.findByText("Month preference saved. 1 month reopened."),
   ).toBeInTheDocument();
   expect(await db.monthCloses.count()).toBe(0);
-  fireEvent.click(screen.getByRole("button", { name: /^Undo month change$/ }));
-  expect(
-    await screen.findByText(
-      "Month preference and previous closed snapshots restored.",
-    ),
-  ).toBeInTheDocument();
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+  await waitFor(async () =>
+    expect(await db.settings.get("period:start")).toBeUndefined(),
+  );
   expect(await db.monthCloses.toArray()).toEqual(before);
   expect(await db.settings.get("period:start")).toBeUndefined();
 });

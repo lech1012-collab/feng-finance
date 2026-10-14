@@ -175,7 +175,7 @@ describe("search, tags and report controls", () => {
     fireEvent.change(screen.getByLabelText("Tag"), {
       target: { value: "trip" },
     });
-    expect(screen.getByText("-£60.00")).toBeVisible();
+    expect(screen.getByText("−£60.00")).toBeVisible();
     expect(screen.getByRole("rowheader", { name: "Travel" })).toBeVisible();
     expect(screen.getByText(/6 transactions/)).toBeVisible();
   });
@@ -251,7 +251,7 @@ describe("search, tags and report controls", () => {
     expect(
       screen.getByRole("rowheader", { name: "Entertainment" }),
     ).toBeVisible();
-    expect(screen.getByText("-£3.49")).toBeVisible();
+    expect(screen.getByText("−£3.49")).toBeVisible();
     fireEvent.change(screen.getByLabelText("Report name"), {
       target: { value: "My categories" },
     });

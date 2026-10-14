@@ -6,6 +6,9 @@ import { auditedMutation } from "../storage/audit";
 import { currencyPrecision } from "../domain/money";
 import { downloadEcbRates, workingDayAge } from "../analytics/fx";
 import { formatUkDate } from "../domain/dates";
+import { localToday } from "../analytics/reminders";
+import { convertMinor } from "../analytics/fx";
+import { Toast } from "./Toast";
 
 export function useGlobalCurrency() {
   const setting = useLiveQuery(() => db.settings.get("currency"), []);
@@ -75,6 +78,7 @@ export function CurrencySetting() {
     ]),
   ];
   const last = data?.rates
+    .filter((rate) => rate.date <= localToday())
     .map((r) => r.date)
     .sort()
     .at(-1);
@@ -105,9 +109,11 @@ export function CurrencySetting() {
         Totals convert all accounts. Statements and account details keep their
         original currency.
       </p>
-      <label className="check">
+      <label className="switch-row">
+        <span>Download daily rates (ECB)</span>
         <input
           type="checkbox"
+          role="switch"
           checked={requestedEnabled ?? data?.enabled ?? true}
           disabled={busy}
           onChange={(e) => {
@@ -116,7 +122,9 @@ export function CurrencySetting() {
             void run(async () => {
               try {
                 await auditedMutation(
-                  "Change rate downloads",
+                  enabled
+                    ? "Turned on rate downloads"
+                    : "Turned off rate downloads",
                   ["settings"],
                   () =>
                     db.settings.put({
@@ -131,20 +139,21 @@ export function CurrencySetting() {
             }, "Rate preference saved.");
           }}
         />
-        Download public ECB rates
       </label>
       <p className="muted">
         No personal data is sent.
         {last
-          ? ` Rates as of ${formatUkDate(last)}.`
+          ? ` Cached rates: ${formatUkDate(last)}.`
           : " No rates downloaded yet."}
       </p>
-      <button
-        disabled={busy || !navigator.onLine}
-        onClick={() => void run(refreshRates, "Exchange rates updated.")}
-      >
-        {busy ? "Updating…" : "Update rates"}
-      </button>
+      {(requestedEnabled ?? data?.enabled ?? true) && (
+        <button
+          disabled={busy || !navigator.onLine}
+          onClick={() => void run(refreshRates, "Exchange rates updated.")}
+        >
+          {busy ? "Updating…" : "Update rates"}
+        </button>
+      )}
       <details>
         <summary>Enter a manual rate</summary>
         <div className="form-grid">
@@ -216,7 +225,7 @@ export function CurrencySetting() {
         </button>
       </details>
       {error && <p role="alert">{error}</p>}
-      {notice && <p role="status">{notice}</p>}
+      {notice && <Toast message={notice} />}
     </section>
   );
 }
@@ -240,13 +249,14 @@ export function CurrencyViewNotice({
   const [failed, setFailed] = useState(false);
   const foreign = (data?.accounts ?? []).filter((a) => a.currency !== currency);
   const last = data?.rates
+    .filter((rate) => rate.date <= localToday())
     .map((r) => r.date)
     .sort()
     .at(-1);
   const enabled = !data?.settings.some(
     (s) => s.key === "fx:download" && s.value === "false",
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   useEffect(() => {
     if (
       !data ||
@@ -266,23 +276,19 @@ export function CurrencyViewNotice({
   }, [!!data, foreign.length, enabled, today, allowAutomaticDownload]);
   if (!foreign.length) return null;
   const stale = last && workingDayAge(last, today) > 3;
+  const missing = foreign.some(
+    (account) =>
+      !convertMinor(1, account.currency, currency, today, data?.rates ?? []),
+  );
+  if (!stale && !missing && !failed) return null;
   return (
-    <aside
-      className={`currency-view-notice ${stale || !last ? "warning" : ""}`}
-      aria-label="Reporting conversion"
+    <Link
+      className="header-status"
+      to="/settings?section=currency#global-currency"
+      aria-label="Exchange rates needed. Open currency settings."
+      title="Exchange rates are needed. Enter manual rates in Settings."
     >
-      <span>
-        {!last
-          ? !enabled || !allowAutomaticDownload
-            ? "Exchange rates are needed. Enter manual rates in Settings."
-            : failed
-              ? "Rates unavailable. Add a manual rate or reconnect; converted totals are unverified."
-              : "Feng will download daily exchange rates. No personal data is sent."
-          : `≈ ${currency} reporting · ${stale ? "Unverified · " : ""}rates from ${formatUkDate(last)}${!navigator.onLine ? " · cached offline" : ""}`}
-      </span>
-      <Link to="/settings#global-currency">
-        {stale || !last ? "Update" : "Rates"}
-      </Link>
-    </aside>
+      ≈<span className="sr-only">Rates needed</span>
+    </Link>
   );
 }

@@ -1,4 +1,10 @@
 import {
+  selectPeriod,
+  saveReadableBackup,
+  settingsSection,
+  loadDemoUi,
+} from "./flows";
+import {
   test as base,
   expect,
   type Locator,
@@ -18,6 +24,10 @@ const test = base.extend<{ offlineHost: LocalHost }>({
       await host.stop();
     }
   },
+});
+test.beforeEach(async ({ page }) => {
+  // October synthetic statements are historical, not future imports requiring override.
+  await page.clock.setFixedTime(new Date("2026-11-08T12:00:00Z"));
 });
 async function gotoRoute(page: Page, path: string) {
   const origin = page.url().startsWith("http")
@@ -79,7 +89,7 @@ async function expectTransactionCount(page: Page, count: number) {
 async function closeCategorySheet(page: Page) {
   const dialog = page.getByRole("dialog", { name: "Where does this belong?" });
   if (await dialog.isVisible())
-    await dialog.getByRole("button", { name: "Close categorization" }).click();
+    await dialog.getByRole("button", { name: "Close categorisation" }).click();
 }
 async function openStatementCard(page: Page, bank: string) {
   await expect(page.locator(".import-review-list")).toBeVisible({
@@ -103,19 +113,19 @@ test("manual category memory survives deleting imports and reimporting the same 
   const dialog = page.getByRole("dialog");
   await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   await dialog
-    .getByRole("button", { name: "Categorize as Childcare", exact: true })
+    .getByRole("button", { name: "Categorise as Childcare", exact: true })
     .click();
   await expect(
     page.getByText(/Future matching payments will follow/).first(),
   ).toBeVisible();
-  await page.getByRole("button", { name: /^Uncategorized \d+$/ }).click();
+  await page.getByRole("button", { name: /^Uncategorised \d+$/ }).click();
   const categorizedRow = page.getByRole("link", { name: /HAMM&FULH CTAX/i });
   await expect(categorizedRow.locator(".transaction-status")).toHaveText(
     "Childcare",
   );
   await expect(categorizedRow.locator(".transaction-icon")).toHaveCount(0);
   await expect(page.getByText("Categorized", { exact: true })).toHaveCount(0);
-  await gotoRoute(page, "/settings");
+  await settingsSection(page, "danger");
   await page
     .getByLabel("I understand my imported transaction history will be deleted.")
     .check();
@@ -140,7 +150,7 @@ test("manual category memory survives deleting imports and reimporting the same 
     .selectOption("utilities");
   await confirmImport(page);
   await expect(page.locator(".position-summary")).toContainText("£845.00");
-  await gotoRoute(page, "/settings");
+  await settingsSection(page, "danger");
   await page
     .getByLabel("I understand my imported transaction history will be deleted.")
     .check();
@@ -175,7 +185,7 @@ test("Salary and Income filters agree with cash flow and verified balance", asyn
   await page.getByRole("link", { name: /FICTIONAL EMPLOYER/i }).click();
   await page
     .getByRole("dialog")
-    .getByRole("button", { name: "Categorize as Salary", exact: true })
+    .getByRole("button", { name: "Categorise as Salary", exact: true })
     .click();
   await expect(page.getByRole("dialog").locator(".sorting-card")).toContainText(
     "Fictional Income",
@@ -282,6 +292,12 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
   await expect(
     page.getByRole("textbox", { name: "Selected month", exact: true }),
   ).toHaveValue("2026-09");
+  if (
+    !(await page
+      .getByRole("dialog", { name: "Monthly budget", exact: true })
+      .isVisible())
+  )
+    await page.getByRole("button", { name: "Set budget", exact: true }).click();
   await page
     .getByLabel("Monthly rollover budget amount", { exact: true })
     .fill("100");
@@ -294,12 +310,10 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
   const groceries = page.locator(".budget-card").filter({
     has: page.getByRole("button", { name: "Groceries", exact: true }),
   });
-  await expect(groceries).toContainText("-£10.00 left");
+  await expect(groceries).toContainText("−£10.00 overspent");
   await gotoRoute(page, "/settings");
   const backupEvent = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const backup = await backupEvent;
   const bytes = await readFile((await backup.path())!);
   expect(JSON.parse(bytes.toString()).budgets).toContainEqual(
@@ -311,13 +325,11 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
       rollover: "surplus",
     }),
   );
-  await page
-    .getByLabel("Restore Feng Finance Backup", { exact: true })
-    .setInputFiles({
-      name: "plan-backup.json",
-      mimeType: "application/json",
-      buffer: bytes,
-    });
+  await page.getByLabel("Choose Feng backup", { exact: true }).setInputFiles({
+    name: "plan-backup.json",
+    mimeType: "application/json",
+    buffer: bytes,
+  });
   await page.getByLabel(/I understand that this replaces/).check();
   await page
     .getByRole("button", { name: "Replace data with backup", exact: true })
@@ -339,6 +351,9 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
   await expect(
     page.getByRole("combobox", { name: "Carry into next month", exact: true }),
   ).toHaveValue("surplus");
+  await page
+    .getByRole("button", { name: "Close Monthly budget", exact: true })
+    .click();
   await page.getByRole("button", { name: "Next month", exact: true }).click();
   await expect(
     page.getByRole("textbox", { name: "Selected month", exact: true }),
@@ -398,7 +413,7 @@ test("verified deeper insights, statement reminders and private calendar export"
   await expect(page.locator(".deeper-insights")).toContainText(
     "Larger payment to JOHN LEWIS",
   );
-  await gotoRoute(page, "/settings");
+  await settingsSection(page, "reminders");
   await page
     .getByRole("combobox", {
       name: "Monthly statement review day",
@@ -507,8 +522,8 @@ test("desktop rows drag onto the persistent category rail, cancel safely and und
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     2,
   );
-  await expect(page.locator(".category-feedback")).toContainText("Utilities");
-  await expect(page.locator(".category-feedback")).toContainText(
+  await expect(page.locator(".ux-toast")).toContainText("Utilities");
+  await expect(page.locator(".ux-toast")).toContainText(
     "Future matching payments will follow",
   );
   await page.getByRole("button", { name: "Undo", exact: true }).click();
@@ -591,13 +606,13 @@ test("desktop rows drag onto the persistent category rail, cancel safely and und
   await expect(transfer).toHaveClass(/drop-target/);
   await page.mouse.up();
   await expect(row).toHaveCount(0);
-  await expect(page.locator(".category-feedback")).toContainText("Transfer");
+  await expect(page.locator(".ux-toast")).toContainText("Transfer");
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
     .getByRole("link", { name: "Home", exact: true })
     .click();
-  await expect(page.locator(".month-net strong")).toHaveText("-£50.00");
+  await expect(page.locator(".month-net strong")).toHaveText("−£50.00");
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
@@ -641,6 +656,7 @@ async function offlineInstalled(page: Page) {
 test("PDF import, drill-down, correction, learned rule and duplicate protection", async ({
   page,
 }) => {
+  await page.clock.setFixedTime(new Date("2026-11-08T12:00:00Z"));
   // Exercise a slow lazy-loaded editor: the prior screen can remain interactive
   // during the route transition and has its own Category filter.
   await page.route("**/assets/TransactionDetail-*.js", async (route) => {
@@ -670,7 +686,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(page.getByRole("link", { name: /John Lewis/i })).toBeVisible();
   await page.getByRole("link", { name: /John Lewis/i }).click();
   await expect(
-    page.getByRole("button", { name: "Save changes", exact: true }),
+    page.getByRole("heading", { name: /John Lewis/i }),
   ).toBeVisible();
   await page
     .getByRole("combobox", { name: "Category", exact: true })
@@ -681,18 +697,16 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await expect(page.getByLabel(/Always categorize this merchant/)).toHaveCount(
     0,
   );
-  await page.getByRole("button", { name: "Save changes" }).click();
+  await expect(page.locator(".ux-toast")).toContainText("Transaction updated");
+  await page.getByRole("link", { name: "‹ Transactions", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
-  await gotoRoute(page, "/settings");
-  await page
-    .locator("summary")
-    .filter({ hasText: "Categorization & transfer rules" })
-    .click();
+  await settingsSection(page, "rules");
   await expect(
     page.getByText("JOHN LEWIS LONDON STORE → Household", { exact: true }),
   ).toBeVisible();
+  await settingsSection(page, "danger");
   await page
     .getByLabel("I understand my imported transaction history will be deleted.")
     .check();
@@ -812,7 +826,7 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   );
   await page.goto(offlineHost.origin);
   await acknowledgeBeta(page);
-  await gotoRoute(page, "/settings");
+  await settingsSection(page, "transfers");
   await expect(
     page.getByRole("combobox", { name: "Transfer matching", exact: true }),
   ).toHaveValue("manual");
@@ -858,8 +872,8 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   ).toBeVisible();
   await confirmImport(page);
   await expectTransactionCount(page, 21);
-  await expect(page.locator(".month-net strong")).toHaveText("≈ +£5,521.37");
-  await gotoRoute(page, "/settings");
+  await expect(page.locator(".month-net strong")).toHaveText("+≈£5,521.37");
+  await settingsSection(page, "currency");
   await page
     .getByRole("combobox", { name: "Reporting currency", exact: true })
     .selectOption("EUR");
@@ -867,7 +881,7 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
     page.getByRole("combobox", { name: "Reporting currency", exact: true }),
   ).toHaveValue("EUR");
   await gotoRoute(page, "/");
-  await expect(page.locator(".month-net strong")).toHaveText("≈ +€11,042.74");
+  await expect(page.locator(".month-net strong")).toHaveText("+≈€11,042.74");
   await expect(page.locator(".month-income strong")).toHaveText("≈ €14,200.00");
   await expect(page.locator(".month-spending strong")).toHaveText(
     "≈ €3,157.26",
@@ -877,14 +891,12 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   // this private origin proves a real cached reload without weakening the check.
   await offlineHost.stop();
   await page.reload();
-  await expect(page.locator(".month-net strong")).toHaveText("≈ +€11,042.74");
+  await expect(page.locator(".month-net strong")).toHaveText("+≈€11,042.74");
   await context.setOffline(true);
   await expect(
-    page.getByRole("complementary", {
-      name: "Reporting conversion",
-      exact: true,
-    }),
-  ).toContainText("cached offline");
+    page.getByRole("button", { name: /Offline. Feng works offline/ }),
+  ).toBeVisible();
+  await expect(page.locator(".month-net strong")).toHaveText("+≈€11,042.74");
   await context.setOffline(false);
   for (const route of [
     "/transactions?month=2026-09",
@@ -908,7 +920,7 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
       await expect(page.locator(".transaction-row")).toHaveCount(21);
       await expect(
         page.locator(".transaction-row").filter({ hasText: "RESTAURANT" }),
-      ).toContainText("-€34.56");
+      ).toContainText("−€34.56");
       await expect(
         page.locator(".transaction-row").filter({ hasText: "SIEMENS" }),
       ).toContainText("+£5,000.00");
@@ -916,9 +928,7 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
   }
   await gotoRoute(page, "/settings");
   const downloadPromise = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const backupPath = await (await downloadPromise).path();
   expect(backupPath).not.toBeNull();
   const backup = JSON.parse(await readFile(backupPath!, "utf8"));
@@ -950,11 +960,12 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
       method: "GET",
       body: null,
     });
+  await settingsSection(page, "currency");
   await page
     .getByRole("combobox", { name: "Reporting currency", exact: true })
     .selectOption("GBP");
   await gotoRoute(page, "/");
-  await expect(page.locator(".month-net strong")).toHaveText("≈ +£5,521.37");
+  await expect(page.locator(".month-net strong")).toHaveText("+≈£5,521.37");
 });
 
 test("Barclaycard issue date, two reading columns and repayment exclusion", async ({
@@ -996,7 +1007,7 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
   // An unlinked merchant refund awaits its original purchase; it is not income.
-  await expect(page.locator(".month-net strong")).toHaveText("-£114.68*");
+  await expect(page.locator(".month-net strong")).toHaveText("−£114.68*");
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
@@ -1005,7 +1016,7 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await expect(page.getByRole("link", { name: /\+£900\.00/ })).toContainText(
     "Transfer",
   );
-  await expect(page.getByRole("link", { name: /-£900\.00/ })).toContainText(
+  await expect(page.getByRole("link", { name: /−£900\.00/ })).toContainText(
     "Transfer",
   );
 });
@@ -1095,32 +1106,30 @@ test("reconciliation warning cannot be silently committed", async ({
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeEnabled();
   await confirmImport(page);
-  await gotoRoute(page, "/settings");
-  await page
-    .locator("summary")
-    .filter({ hasText: "Statement history" })
-    .click();
-  await expect(
-    page.getByText(/Barclays · 30 Sep · 1 new transaction · warning/),
-  ).toBeVisible();
+  await settingsSection(page, "statements");
+  await expect(page.locator(".statement-history")).toContainText(
+    "1 transaction",
+  );
+  await expect(page.locator(".statement-history")).toContainText("Unverified");
 });
 test("backup, destructive confirmation, restore and demo deletion", async ({
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
-  await gotoRoute(page, "/settings");
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await settingsSection(page, "currency");
+  await page
+    .getByLabel("Download daily rates (ECB)", { exact: true })
+    .uncheck();
   await expect(
     page.getByRole("status").filter({ hasText: "Rate preference saved." }),
   ).toBeVisible();
+  await settingsSection(page, "demo");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
   await expectTransactionCount(page, 176);
   const downloadEvent = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const path = await (await downloadEvent).path();
   expect(path).toBeTruthy();
   const bytes = await readFile(path!);
@@ -1152,16 +1161,18 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
         rate.base === "EUR" && rate.quote === "GBP",
     ),
   ).toBe(true);
+  await settingsSection(page, "demo");
+  page.once("dialog", (dialog) => dialog.accept());
   await page
     .getByRole("button", { name: "Delete demo data", exact: true })
     .click();
   await expectTransactionCount(page, 0);
-  await expect(page.locator(".demo-banner")).toHaveCount(0);
+  await expect(
+    page.locator(".header-demo").filter({ visible: true }),
+  ).toHaveCount(0);
   // Deleting the demo removes its planning, transfer and valuation records too.
   const emptyDownload = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const emptyPath = await (await emptyDownload).path();
   const emptyBackup = JSON.parse(await readFile(emptyPath!, "utf8"));
   for (const table of [
@@ -1177,23 +1188,21 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
     "fxRates",
   ])
     expect(emptyBackup[table]).toHaveLength(0);
-  await page
-    .getByLabel("Restore Feng Finance Backup", { exact: true })
-    .setInputFiles({
-      name: "backup.json",
-      mimeType: "application/json",
-      buffer: bytes,
-    });
+  await page.getByLabel("Choose Feng backup", { exact: true }).setInputFiles({
+    name: "backup.json",
+    mimeType: "application/json",
+    buffer: bytes,
+  });
   await expect(
     page
       .locator(".settings-preview .restore-count")
-      .filter({ hasText: "accounts" })
+      .filter({ hasText: "Accounts" })
       .locator("dd"),
   ).toHaveText("8");
   await expect(
     page
       .locator(".settings-preview .restore-count")
-      .filter({ hasText: "transactions" })
+      .filter({ hasText: "Transactions" })
       .locator("dd"),
   ).toHaveText("176");
   await expect(
@@ -1209,9 +1218,9 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
       .getByRole("status")
       .filter({ hasText: "Backup restored successfully." }),
   ).toBeVisible();
-  await expect(page.locator(".demo-banner")).toContainText(
-    "fictitious financial data",
-  );
+  await expect(
+    page.locator(".header-demo").filter({ visible: true }),
+  ).toBeVisible();
 });
 
 test("offline launch, local PDF import, backup and no financial upload", async ({
@@ -1247,9 +1256,7 @@ test("offline launch, local PDF import, backup and no financial upload", async (
   await confirmImport(page);
   await gotoRoute(page, "/settings");
   const event = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup" })
-    .click();
+  await saveReadableBackup(page);
   expect((await event).suggestedFilename()).toMatch(
     /feng-finance-backup-.*\.json/,
   );
@@ -1269,7 +1276,7 @@ test("scanned PDF uses bundled OCR and exact source checks offline", async ({
   await expect(
     page.getByRole("heading", { name: "Barclays detected" }),
   ).toBeVisible({ timeout: 90000 });
-  await expect(page.getByText(/Local OCR/).first()).toBeVisible();
+  await expect(page.getByText(/Read from images/).first()).toBeVisible();
   const proof = page.getByRole("region", {
     name: "Statement reading and checks",
   });
@@ -1286,9 +1293,7 @@ test("scanned PDF uses bundled OCR and exact source checks offline", async ({
   await confirmImport(page);
   await gotoRoute(page, "/settings");
   const downloaded = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const backupPath = await (await downloaded).path();
   const backup = JSON.parse(await readFile(backupPath!, "utf8"));
   expect(backup.transactions).toHaveLength(1);
@@ -1311,11 +1316,14 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
-  await gotoRoute(page, "/settings");
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await settingsSection(page, "currency");
+  await page
+    .getByLabel("Download daily rates (ECB)", { exact: true })
+    .uncheck();
   await expect(
     page.getByRole("status").filter({ hasText: "Rate preference saved." }),
   ).toBeVisible();
+  await settingsSection(page, "demo");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
@@ -1324,7 +1332,9 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
   await expect(
     page.getByRole("status").filter({ hasText: "Fictitious demo data added." }),
   ).toBeVisible();
-  await expect(page.locator(".demo-banner")).toBeVisible();
+  await expect(
+    page.locator(".header-demo").filter({ visible: true }),
+  ).toBeVisible();
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
@@ -1349,7 +1359,7 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     .getByRole("link", { name: "Analyse", exact: true })
     .click();
   await expect(
-    page.getByRole("heading", { name: "Potential recurring costs" }),
+    page.getByRole("heading", { name: "Analyse", exact: true }),
   ).toBeVisible();
   await page
     .getByRole("navigation", { name: "Main navigation" })
@@ -1360,16 +1370,15 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     name: "Transaction category filters",
   });
   await expect(quick.getByRole("button")).toHaveText([
-    "To review 2",
-    "Uncategorized 2",
-    /Groceries\s*2/,
-    /Income\s*2/,
+    "Uncategorised 2",
+    /Groceries\s*3/,
+    /Income\s*3/,
     /Property\s*4/,
     /Salary\s*1/,
   ]);
   for (const [name, count] of [
-    ["Groceries", 2],
-    ["Income", 2],
+    ["Groceries", 3],
+    ["Income", 3],
     ["Property", 4],
     ["Salary", 1],
   ] as const) {
@@ -1377,24 +1386,21 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     await expect(page.locator(".transaction-row")).toHaveCount(count);
   }
   await quick.getByRole("button", { name: "Salary", exact: true }).click();
-  // September has 25 source payments; the five extra demo scenarios are in October.
-  await expect(page.locator(".transaction-row")).toHaveCount(25);
+  // All 30 September demo source payments are historical; the extra scenarios are in the completed month.
+  await expect(page.locator(".transaction-row")).toHaveCount(30);
   await expect(
     page
       .locator(".transaction-row")
       .filter({ hasText: "FICTITIOUS EURO CAFE" }),
-  ).toContainText("-€45.99");
+  ).toContainText("−€45.99");
   await quick
-    .getByRole("button", { name: "Uncategorized 2", exact: true })
+    .getByRole("button", { name: "Uncategorised 2", exact: true })
     .click();
   await expect(page.locator(".transaction-row")).toHaveCount(2);
   await expect(page.locator(".transaction-row .transaction-status")).toHaveText(
     ["Needs category", "Needs category"],
   );
-  await expect(page.locator(".transaction-row .review-status")).toHaveText([
-    "To review",
-    "To review",
-  ]);
+  await expect(page.locator(".transaction-row .review-status")).toHaveCount(0);
   await page.screenshot({
     path: `test-results/dashboard-${test.info().project.name}.png`,
     fullPage: true,
@@ -1409,6 +1415,7 @@ test("service worker update is explicit and preserves stored records", async ({
   await page.goto(offlineHost.origin + "/#/settings");
   await acknowledgeBeta(page);
   await offlineInstalled(page);
+  await settingsSection(page, "demo");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
@@ -1505,7 +1512,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   ).toBeVisible();
   await expect(
     revolut.locator(
-      '.generic-parser-details:has(> summary:text-is("Reading options"))',
+      '.generic-parser-details:has(> summary:text-is("Reading details"))',
     ),
   ).not.toHaveAttribute("open");
   await expect(revolut.locator(".generic-import-review")).toHaveCount(0);
@@ -1518,10 +1525,10 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeEnabled();
   await expect(
-    revolut.locator(".review-metrics > div").filter({ hasText: "Money in" }),
+    revolut.locator(".totals > div").filter({ hasText: "Money in" }),
   ).toContainText("£950.00");
   await expect(
-    revolut.locator(".review-metrics > div").filter({ hasText: "Money out" }),
+    revolut.locator(".totals > div").filter({ hasText: "Money out" }),
   ).toContainText("£510.00");
   // These fictional statements contain different repayment amounts, so there
   // is no pair to infer. Explicitly mark the known own-card movements instead.
@@ -1541,7 +1548,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await revolut.getByRole("button", { name: /All transactions/ }).click();
   const revolutPayment = revolut
     .locator(".review-row")
-    .filter({ hasText: "To AMERICAN EXP 9999" });
+    .filter({ hasText: /American.*Exp|Amex/i });
   if (
     !(await revolutPayment.evaluate(
       (element) => (element as HTMLDetailsElement).open,
@@ -1553,7 +1560,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     .selectOption("transfer");
   // Marking transfers changes analytics only, not the statement's raw totals.
   await expect(
-    revolut.locator(".review-metrics > div").filter({ hasText: "Money out" }),
+    revolut.locator(".totals > div").filter({ hasText: "Money out" }),
   ).toContainText("£510.00");
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
@@ -1562,9 +1569,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   // and native statement debt while leaving its verification explicitly false.
   await gotoRoute(page, "/settings");
   const downloaded = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const backupPath = await (await downloaded).path();
   const backup = JSON.parse(await readFile(backupPath!, "utf8"));
   const amexStatement = backup.statements.find(
@@ -1631,7 +1636,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await openImport(page);
   await selectStatement(page, "revolut-uk-layout");
   await expect(
-    page.locator(".review-metrics > div").filter({ hasText: "Money out" }),
+    page.locator(".totals > div").filter({ hasText: "Money out" }),
   ).toContainText("£510.00");
   await expect(
     page.getByText("This statement has already been imported.", {
@@ -1651,16 +1656,20 @@ test("dark default, persistent appearance and mobile layouts without overlapping
 }) => {
   test.setTimeout(120000);
   await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
-  await gotoRoute(page, "/settings");
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await settingsSection(page, "currency");
+  await page
+    .getByLabel("Download daily rates (ECB)", { exact: true })
+    .uncheck();
   await expect(
     page.getByRole("status").filter({ hasText: "Rate preference saved." }),
   ).toBeVisible();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await settingsSection(page, "demo");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
   await expectTransactionCount(page, 176);
+  await settingsSection(page, "appearance");
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
@@ -1790,9 +1799,7 @@ test("dark default, persistent appearance and mobile layouts without overlapping
     document.documentElement.style.fontFamily = "";
   });
   await gotoRoute(page, "/analysis");
-  await page
-    .getByRole("combobox", { name: "Period", exact: true })
-    .selectOption("custom");
+  await selectPeriod(page, "custom");
   await page.getByLabel("From", { exact: true }).fill("2026-09-30");
   await page.getByLabel("To", { exact: true }).fill("2026-09-01");
   await expect(page.getByText(/Choose a valid date range/)).toBeVisible();
@@ -1814,10 +1821,7 @@ test("personal rule corrections update existing transactions and future imports 
   ).toBeVisible();
   await confirmImport(page);
   await gotoRoute(page, "/settings");
-  await page
-    .locator("summary")
-    .filter({ hasText: "Categorization & transfer rules" })
-    .click();
+  await page.getByRole("link", { name: "Rules", exact: true }).click();
   const manager = page.locator("#categorization-rules");
   await manager
     .getByRole("button", { name: "Create rule", exact: true })
@@ -1840,7 +1844,7 @@ test("personal rule corrections update existing transactions and future imports 
   ).toBeChecked();
   await editor.getByRole("button", { name: "Save rule", exact: true }).click();
   await expect(
-    manager
+    page
       .getByRole("status")
       .filter({ hasText: "1 existing transaction updated. Rule saved." }),
   ).toBeVisible();
@@ -1871,7 +1875,7 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await confirmImport(page);
-  await expect(page.locator(".month-net strong")).toHaveText("-£65.00");
+  await expect(page.locator(".month-net strong")).toHaveText("−£65.00");
   await page
     .getByRole("link", { name: /3 transactions need a category/ })
     .click();
@@ -1882,7 +1886,7 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
   await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
   await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   const target = dialog.getByRole("button", {
-    name: "Categorize as Groceries",
+    name: "Categorise as Groceries",
     exact: true,
   });
   await target.scrollIntoViewIfNeeded();
@@ -1895,20 +1899,20 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
   });
   await page.mouse.up();
   await expect(dialog.locator(".sorting-card")).toContainText("Another Shop");
-  await expect(page.locator(".category-feedback")).toContainText("Groceries");
-  await expect(page.locator(".category-feedback")).toContainText(
-    /also applied to 1 matching payments?/,
+  await expect(page.locator(".ux-toast")).toContainText("Groceries");
+  await expect(page.locator(".ux-toast")).toContainText(
+    /Future matching payments will follow/,
   );
   await expect(page.getByRole("link", { name: /CORNER SHOP/i })).toHaveCount(0);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
   await expect(dialog.getByLabel(/Remember this merchant/)).toHaveCount(0);
   await dialog
-    .getByRole("button", { name: "Categorize as Cleaning", exact: true })
+    .getByRole("button", { name: "Categorise as Cleaning", exact: true })
     .click();
   await expect(dialog.locator(".sorting-card")).toContainText("Another Shop");
   await dialog
-    .getByRole("button", { name: "Categorize as Shopping", exact: true })
+    .getByRole("button", { name: "Categorise as Shopping", exact: true })
     .click();
   await expect(dialog).toHaveCount(0);
   await expect(
@@ -1919,7 +1923,7 @@ test("swipe, drag-to-category, grouped sorting, undo and remembered future impor
     .filter({ visible: true })
     .getByRole("link", { name: "Home", exact: true })
     .click();
-  await expect(page.locator(".month-net strong")).toHaveText("-£65.00");
+  await expect(page.locator(".month-net strong")).toHaveText("−£65.00");
   await expect(
     page.getByRole("link", { name: /Cleaning £50.00/ }),
   ).toBeVisible();
@@ -1954,20 +1958,20 @@ test("uncategorized card tap, cancelled drag, keyboard categorization and month 
   await page.mouse.move(5, 5, { steps: 12 });
   await page.mouse.up();
   await expect(dialog.locator(".sorting-card")).toContainText("Another Shop");
-  await dialog.getByRole("button", { name: "Close categorization" }).click();
+  await dialog.getByRole("button", { name: "Close categorisation" }).click();
   const row = page.getByRole("link", { name: /ANOTHER SHOP/i });
   await row.focus();
   await page.keyboard.press("c");
   await expect(dialog).toBeVisible();
   const category = dialog.getByRole("button", {
-    name: "Categorize as Shopping",
+    name: "Categorise as Shopping",
     exact: true,
   });
   await category.focus();
   await page.keyboard.press("Enter");
   await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
   await closeCategorySheet(page);
-  await expect(page.locator(".category-feedback")).toContainText("Shopping");
+  await expect(page.locator(".ux-toast")).toContainText("Shopping");
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
@@ -2009,24 +2013,26 @@ test("subscription notification centre supports review, cancellation plans and p
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-08T12:00:00Z"));
-  await gotoRoute(page, "/settings");
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
+  await settingsSection(page, "currency");
+  await page
+    .getByLabel("Download daily rates (ECB)", { exact: true })
+    .uncheck();
   await expect(
     page.getByRole("status").filter({ hasText: "Rate preference saved." }),
   ).toBeVisible();
   await gotoRoute(page, "/");
   await page.getByRole("button", { name: /Try fictitious demo data/ }).click();
   await expectTransactionCount(page, 176);
-  await expect(page.locator(".demo-banner")).toContainText(
-    "fictitious financial data",
-  );
+  await expect(
+    page.locator(".header-demo").filter({ visible: true }),
+  ).toBeVisible();
   // Home shows the three most urgent tasks. The seeded transfer and statement
   // gaps can outrank recurring review, which remains available at its route.
   await gotoRoute(page, "/subscriptions");
   await expect(
-    page.getByRole("heading", { name: "Subscription review", exact: true }),
+    page.getByRole("heading", { name: "Subscriptions and bills", exact: true }),
   ).toBeVisible();
-  const netflix = page.getByRole("article", { name: "NETFLIX", exact: true });
+  const netflix = page.getByRole("article", { name: /Netflix/i });
   await expect(netflix).toBeVisible();
   await expect(netflix).toContainText("£14.99");
   await expect(netflix).toContainText("£179.88 / year");
@@ -2041,26 +2047,26 @@ test("subscription notification centre supports review, cancellation plans and p
   await page.mouse.move(box.x + 25, box.y + 30, { steps: 12 });
   await page.mouse.up();
   await expect(
-    netflix.getByRole("button", { name: "Cancel next", exact: true }),
+    netflix.getByRole("button", { name: "Plan to cancel", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
     netflix.getByText("Finish cancellation with the provider"),
   ).toBeVisible();
+  await netflix.getByText("More status options", { exact: true }).click();
   await netflix
     .getByRole("button", { name: "I cancelled", exact: true })
     .click();
   await page
     .getByRole("button", { name: "Cancellation plans", exact: true })
     .click();
-  await expect(
-    netflix.getByRole("button", { name: "I cancelled", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
+  await expect(netflix).toContainText("Marked cancelled by you");
   await page.reload();
   await page.getByRole("button", { name: "All detected", exact: true }).click();
+  await netflix.getByText("More status options", { exact: true }).click();
   await expect(
     netflix.getByRole("button", { name: "I cancelled", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await netflix.locator("summary").click();
+  await netflix.getByText(/View .*charges? and source evidence/).click();
   await expect(netflix.locator(".subscription-evidence").first()).toBeVisible();
   await netflix.getByRole("button", { name: "Review", exact: true }).click();
   await expect(
@@ -2089,9 +2095,7 @@ test("Barclays blank dates retain every grouped transaction across pages", async
   await confirmImport(page);
   await gotoRoute(page, "/settings");
   const downloaded = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const path = await (await downloaded).path();
   const backup = JSON.parse(await readFile(path!, "utf8"));
   expect(
@@ -2138,6 +2142,7 @@ test("category overview, income shares, central Home navigation and page palette
     await route.continue();
   });
   await gotoRoute(page, "/settings");
+  await settingsSection(page, "demo");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
@@ -2148,7 +2153,7 @@ test("category overview, income shares, central Home navigation and page palette
     .click();
   await expect(
     page.locator('nav[aria-label="Main navigation"] a:visible'),
-  ).toHaveText(["Import", "Transactions", "Home", "Analyse", "Planning"]);
+  ).toHaveText(["Import", "Activity", "Home", "Analyse", "Planning"]);
   await expect(page.locator(".property-card")).toHaveCount(0);
   const palette = () =>
     page
@@ -2217,6 +2222,8 @@ test("category overview, income shares, central Home navigation and page palette
 test("navigation consistently selects the owning section for every route", async ({
   page,
 }) => {
+  // This journey opens eleven pages and checks browser back/forward history.
+  test.setTimeout(120000);
   await page.goto("/");
   await page.getByRole("button", { name: "Try fictitious demo data" }).click();
   await page.locator(".category-row").filter({ hasText: "Shopping" }).click();
@@ -2240,12 +2247,12 @@ test("navigation consistently selects the owning section for every route", async
   for (const [path, label, palette] of [
     ["/", "Home", "home"],
     ["/import", "Import", "import"],
-    ["/transactions", "Transactions", "transactions"],
-    ["/transactions/missing", "Transactions", "transactions"],
+    ["/transactions", "Activity", "transactions"],
+    ["/transactions/missing", "Activity", "transactions"],
     ["/analysis", "Analyse", "analysis"],
     ["/planning", "Planning", "planning"],
     ["/property", "Analyse", "analysis"],
-    ["/subscriptions", "Analyse", "analysis"],
+    ["/subscriptions", "Planning", "planning"],
     ["/categories/shopping?month=2026-09", "Analyse", "analysis"],
     ["/settings", "Settings", "settings"],
     ["/unknown", "Home", "home"],
@@ -2305,13 +2312,18 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   await expect(
     page.getByText("Browse all categories", { exact: true }),
   ).toHaveCount(0);
-  const balanceCard = page.locator(".position-summary");
+  const balanceCard = page.locator("section.card").filter({
+    has: page.getByRole("heading", { name: "Balance history", exact: true }),
+  });
   await expect(
     balanceCard.getByRole("group", { name: "Balance comparison period" }),
   ).toHaveCount(1);
-  await expect(balanceCard.locator(".balance-change")).toContainText(
+  await expect(page.locator(".position-summary .balance-change")).toContainText(
     "-6.5% vs last month",
   );
+  await page
+    .getByRole("button", { name: "Account breakdown", exact: true })
+    .click();
   await expect(
     page.locator(".position-history g[data-account-id] path").first(),
   ).toHaveAttribute("d", /[HV]/);
@@ -2334,7 +2346,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   ).toHaveCount(0);
   await page
     .locator(".category-row")
-    .filter({ hasText: "Uncategorized" })
+    .filter({ hasText: "Uncategorised" })
     .click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
@@ -2352,12 +2364,12 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   const dialog = page.getByRole("dialog");
   await expect(
     dialog.getByRole("button", {
-      name: "Categorize as Mortgage / financing",
+      name: "Categorise as Mortgage / financing",
       exact: true,
     }),
   ).toHaveCount(0);
   await dialog
-    .getByRole("button", { name: "Categorize as Property", exact: true })
+    .getByRole("button", { name: "Categorise as Property", exact: true })
     .click();
   await expect(dialog.locator(".sorting-card")).toContainText("Corner Shop");
   await closeCategorySheet(page);
@@ -2373,7 +2385,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   await filters.getByRole("button", { name: "Property", exact: true }).click();
   await expect(page.getByRole("link", { name: /ANOTHER SHOP/i })).toBeVisible();
   await expect(page.locator(".transaction-status.categorized")).toHaveCount(1);
-  await filters.getByRole("button", { name: /^Uncategorized \d+$/ }).click();
+  await filters.getByRole("button", { name: /^Uncategorised \d+$/ }).click();
   await expect(page.getByRole("link", { name: /ANOTHER SHOP/i })).toHaveCount(
     0,
   );
@@ -2399,7 +2411,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   ).toBeVisible();
 });
 
-test("Uncategorized queue spans imported months and saves immediately disappear", async ({
+test("Uncategorised queue spans imported months and saves immediately disappear", async ({
   page,
 }) => {
   await openImport(page);
@@ -2411,11 +2423,15 @@ test("Uncategorized queue spans imported months and saves immediately disappear"
   await gotoRoute(page, "/transactions");
   await page
     .getByRole("group", { name: "Transaction category filters" })
-    .getByRole("button", { name: /^Uncategorized \d+$/ })
+    .getByRole("button", { name: /^Uncategorised \d+$/ })
     .click();
+  await page.getByRole("button", { name: "Filters", exact: true }).click();
   await expect(
     page.getByRole("button", { name: "All dates", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .getByRole("button", { name: "Close Filters", exact: true })
+    .click();
   await expect(page.locator(".transaction-status.uncategorized")).toHaveCount(
     4,
   );
@@ -2428,7 +2444,8 @@ test("Uncategorized queue spans imported months and saves immediately disappear"
   await page
     .getByRole("combobox", { name: "Category", exact: true })
     .selectOption("shopping");
-  await page.getByRole("button", { name: "Save changes", exact: true }).click();
+  await expect(page.locator(".ux-toast")).toContainText("Transaction updated");
+  await page.getByRole("link", { name: "‹ Transactions", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();

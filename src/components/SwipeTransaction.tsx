@@ -75,7 +75,7 @@ export function SwipeTransaction({
               setRevealed(false);
               if (suggestion) onQuickCategorize?.(suggestion.id);
             }}
-            aria-label={`Categorize as ${suggestion?.name}`}
+            aria-label={`Categorise as ${suggestion?.name}`}
           >
             {suggestion?.name}
           </button>
@@ -212,11 +212,11 @@ export function SwipeTransaction({
             Select
           </button>
           <button
-            title="Categorize (C)"
+            title="Categorise (C)"
             disabled={isDragging}
             onClick={onCategorize}
           >
-            Categorize
+            Categorise
           </button>
         </div>
       )}

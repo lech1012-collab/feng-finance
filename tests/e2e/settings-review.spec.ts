@@ -1,3 +1,4 @@
+import { saveReadableBackup, settingsSection, loadDemoUi } from "./flows";
 import { expect, test, type Page, acknowledgeBeta } from "./fixtures";
 import { readFile } from "node:fs/promises";
 
@@ -8,19 +9,7 @@ async function settings(page: Page) {
   ).toBeVisible();
 }
 async function demo(page: Page) {
-  await settings(page);
-  // Keep the full-database restore assertions deterministic. The public-rate
-  // download has its own privacy workflow and must not write during this one.
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Rate preference saved." }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Load demo data", exact: true })
-    .click();
-  await expect(
-    page.getByText("Fictitious demo data added.", { exact: true }),
-  ).toBeVisible();
+  await loadDemoUi(page);
 }
 
 test("property report preference saves before the controlled checkbox resets", async ({
@@ -28,12 +17,13 @@ test("property report preference saves before the controlled checkbox resets", a
 }) => {
   await demo(page);
   const original = await transactionRecords(page);
+  await settingsSection(page, "reports");
   const toggle = page.getByLabel("Enable property tax summary", {
     exact: true,
   });
   await toggle.click();
   await expect(toggle).toBeChecked();
-  await page.goto("/#/analysis");
+  await page.goto("/#/analysis?view=reports");
   await expect(
     page.getByRole("heading", {
       name: "Property income for Self Assessment",
@@ -47,11 +37,11 @@ test("property report preference saves before the controlled checkbox resets", a
       exact: true,
     }),
   ).toBeVisible();
-  await settings(page);
+  await settingsSection(page, "reports");
   await expect(toggle).toBeChecked();
   await toggle.click();
   await expect(toggle).not.toBeChecked();
-  await page.goto("/#/analysis");
+  await page.goto("/#/analysis?view=reports");
   await expect(
     page.getByRole("heading", {
       name: "Property income for Self Assessment",
@@ -62,9 +52,7 @@ test("property report preference saves before the controlled checkbox resets", a
 });
 async function backup(page: Page) {
   const downloadPromise = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const download = await downloadPromise;
   const path = await download.path();
   if (!path) throw new Error("Backup download was unavailable.");
@@ -151,20 +139,18 @@ test("Settings backup metadata and restore preview explain replacement before co
     `${parsed.transactions.length} transactions`,
   );
   await expect(
-    page.getByText(
-      "Backup prepared for download. Save it in Files or iCloud Drive.",
-      { exact: true },
-    ),
+    page.getByRole("status").filter({ hasText: "Backup ready:" }),
   ).toBeVisible();
   const recordsBeforePreview = await localRecords(page);
-  await page
-    .getByLabel("Restore Feng Finance Backup", { exact: true })
-    .setInputFiles({
-      name: file.filename,
-      mimeType: "application/json",
-      buffer: Buffer.from(file.contents),
-    });
-  const preview = page.locator(".restore-warning");
+  await page.getByLabel("Choose Feng backup", { exact: true }).setInputFiles({
+    name: file.filename,
+    mimeType: "application/json",
+    buffer: Buffer.from(file.contents),
+  });
+  const preview = page.getByRole("dialog", {
+    name: "Restore backup",
+    exact: true,
+  });
   const counts = preview.getByLabel("Backup contents");
   for (const { count, label } of [
     { count: parsed.accounts.length, label: "account" },
@@ -176,7 +162,7 @@ test("Settings backup metadata and restore preview explain replacement before co
     },
   ]) {
     const term = counts.getByRole("term").filter({
-      hasText: new RegExp(`^${count === 1 ? label : `${label}s`}$`),
+      hasText: new RegExp(`^${label}s$`, "i"),
     });
     await expect(term).toBeVisible();
     await expect(term.locator("..").locator("dd")).toHaveText(String(count));
@@ -236,6 +222,7 @@ test("Settings backup metadata and restore preview explain replacement before co
   });
   await page.setViewportSize({ width: 390, height: 844 });
   expect(await localRecords(page)).toEqual(recordsBeforePreview);
+  await preview.getByText("Backup details", { exact: true }).click();
   await expect(preview).toContainText("Backup version 1");
   await expect(preview).toContainText("will be replaced");
   const replace = preview.getByRole("button", {
@@ -284,13 +271,11 @@ test("Malformed, incompatible and inconsistent backups show safe recovery messag
       message: "This backup contains inconsistent or missing financial records",
     },
   ]) {
-    await page
-      .getByLabel("Restore Feng Finance Backup", { exact: true })
-      .setInputFiles({
-        name: "synthetic-invalid-backup.json",
-        mimeType: "application/json",
-        buffer: Buffer.from(invalid.contents),
-      });
+    await page.getByLabel("Choose Feng backup", { exact: true }).setInputFiles({
+      name: "synthetic-invalid-backup.json",
+      mimeType: "application/json",
+      buffer: Buffer.from(invalid.contents),
+    });
     const error = page.getByRole("alert");
     await expect(error).toContainText(invalid.message);
     await expect(error).toContainText(
@@ -309,6 +294,7 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
 }) => {
   await demo(page);
   const file = await backup(page);
+  await settingsSection(page, "danger");
   const wipe = page.getByRole("button", {
     name: "Erase everything",
     exact: true,
@@ -328,18 +314,19 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
     page.getByRole("dialog", { name: "Welcome to Feng" }),
   ).toBeVisible();
   await acknowledgeBeta(page);
-  await expect(page.locator("#backup")).toContainText(
-    "Save your 0 transactions",
-  );
+  await settingsSection(page, "danger");
   await expect(phrase).toHaveValue("");
-  await page
-    .getByLabel("Restore Feng Finance Backup", { exact: true })
-    .setInputFiles({
-      name: file.filename,
-      mimeType: "application/json",
-      buffer: Buffer.from(file.contents),
-    });
-  const preview = page.locator(".restore-warning");
+  await settingsSection(page, "backup");
+  await expect(page.locator("#backup")).toContainText("No backup saved yet.");
+  await page.getByLabel("Choose Feng backup", { exact: true }).setInputFiles({
+    name: file.filename,
+    mimeType: "application/json",
+    buffer: Buffer.from(file.contents),
+  });
+  const preview = page.getByRole("dialog", {
+    name: "Restore backup",
+    exact: true,
+  });
   await preview
     .getByLabel(
       "I understand that this replaces all existing data on this device.",
@@ -351,12 +338,11 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
   await expect(
     page.getByText("Backup restored successfully.", { exact: true }),
   ).toBeVisible();
-  await expect(page.locator("#backup")).not.toContainText(
-    "Save your 0 transactions",
-  );
-  await expect(page.locator(".backup-status")).toContainText(
-    "Last backup export:",
-  );
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  await settingsSection(page, "backup");
+  await expect(page.locator(".backup-status")).toContainText("Last backup:");
 });
 
 test("Personal rules preview scope and can be edited or deleted without touching unmatched payments", async ({
@@ -365,7 +351,7 @@ test("Personal rules preview scope and can be edited or deleted without touching
   await demo(page);
   const before = await transactionRecords(page);
   expect(before.length).toBeGreaterThan(0);
-  await page.locator("#rules > summary").click();
+  await settingsSection(page, "rules");
   const manager = page.locator("#categorization-rules");
   await manager
     .getByRole("button", { name: "Create rule", exact: true })

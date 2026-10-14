@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { auditedMutation } from "../storage/audit";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
@@ -81,8 +82,9 @@ export function Reminders({
       </div>
       {settings && (
         <>
-          <label className="check">
+          <label className="switch-row">
             <input
+              role="switch"
               type="checkbox"
               checked={config.enabled}
               onChange={(e) => void save({ enabled: e.target.checked })}
@@ -161,7 +163,7 @@ export function Reminders({
           {reminders.length - 4 === 1 ? "" : "s"}
         </Link>
       )}
-      {notice && <p role="status">{notice}</p>}
+      {notice && <Toast message={notice} />}
       {error && <p role="alert">{error}</p>}
     </section>
   );

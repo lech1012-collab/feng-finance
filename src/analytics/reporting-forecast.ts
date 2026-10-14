@@ -10,6 +10,27 @@ import { safeSum } from "../domain/money";
 import { planningForecast } from "./planning";
 import { convertMinor } from "./fx";
 
+type NativeForecast = ReturnType<typeof planningForecast>;
+export interface ReportingUpcomingPayment extends Omit<
+  NativeForecast["upcoming"][number],
+  "amount"
+> {
+  amount: number | undefined;
+  originalAmount: number;
+  originalCurrency: string;
+  missingRate: boolean;
+}
+export interface ReportingForecast extends Omit<
+  NativeForecast,
+  "upcoming" | "income" | "bills"
+> {
+  upcoming: ReportingUpcomingPayment[];
+  income: number | undefined;
+  bills: number | undefined;
+  converted: boolean;
+  rateDates: string[];
+}
+
 /** Each native-currency ledger reconciles independently before any reporting conversion.
  * Forecast conversions use the latest cached rate, clearly an assumption for future dates. */
 export function reportingPlanningForecast(
@@ -22,7 +43,7 @@ export function reportingPlanningForecast(
   horizon: 30 | 60 | 90,
   rates: FxRate[],
   series: RecurringSeries[] = [],
-) {
+): ReportingForecast {
   const currencies = [
     ...new Set(
       accounts.filter((a) => a.tracking !== "manual").map((a) => a.currency),
@@ -31,21 +52,29 @@ export function reportingPlanningForecast(
   if (
     currencies.length <= 1 &&
     (!currencies.length || currencies[0] === currency)
-  )
+  ) {
+    const forecast = planningForecast(
+      transactions,
+      accounts,
+      statements,
+      settings,
+      currency,
+      today,
+      horizon,
+      series,
+    );
     return {
-      ...planningForecast(
-        transactions,
-        accounts,
-        statements,
-        settings,
-        currency,
-        today,
-        horizon,
-        series,
-      ),
+      ...forecast,
+      upcoming: forecast.upcoming.map((p) => ({
+        ...p,
+        originalAmount: p.amount,
+        originalCurrency: currency,
+        missingRate: false,
+      })),
       converted: false,
       rateDates: [] as string[],
     };
+  }
   const groups = currencies.map((native) => ({
     native,
     forecast: planningForecast(
@@ -76,12 +105,19 @@ export function reportingPlanningForecast(
   const bills = safeSum(
     groups.map((g) => conversion(g.forecast.bills, g.native)),
   );
-  const upcoming = groups
+  const upcoming: ReportingUpcomingPayment[] = groups
     .flatMap((g) =>
-      g.forecast.upcoming.map((p) => ({
-        ...p,
-        amount: conversion(p.amount, g.native),
-      })),
+      g.forecast.upcoming.map((p) => {
+        const value = convertMinor(p.amount, g.native, currency, today, rates);
+        if (!value) missingRate = true;
+        return {
+          ...p,
+          amount: value?.amount,
+          originalAmount: p.amount,
+          originalCurrency: g.native,
+          missingRate: !value,
+        };
+      }),
     )
     .sort((a, b) => a.date.localeCompare(b.date));
   const reason = missingRate
@@ -124,6 +160,7 @@ export function reportingPlanningForecast(
       : [];
   const anchor = points.length
     ? {
+        stamp: Date.parse(`${points[0].date}T00:00:00Z`),
         date: points[0].date,
         total: points[0].balance,
         balances: {} as Record<string, number | null>,
@@ -146,9 +183,9 @@ export function reportingPlanningForecast(
     anchor,
     baselineMonths,
     points,
-    income,
-    bills,
-    dailyVariable,
+    income: missingRate ? undefined : income,
+    bills: missingRate ? undefined : bills,
+    dailyVariable: missingRate ? undefined : dailyVariable,
     converted: true,
     rateDates: [...rateDates],
   };

@@ -1,3 +1,5 @@
+import { Sheet, SheetFooter } from "./Sheet";
+import { Toast } from "./Toast";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Account } from "../domain/models";
@@ -27,19 +29,19 @@ const labels: Record<string, string> = {
   other_liability: "Other liability",
 };
 export function ManualAccountEditor({ currency }: { currency: string }) {
-  const data = useLiveQuery(
-    async () => ({
-      accounts: (await db.accounts.toArray()).filter(
-        (a) =>
-          a.tracking === "manual" &&
-          (manualAccountTypes as readonly Account["accountType"][]).includes(
-            a.accountType,
-          ),
-      ),
+  const data = useLiveQuery(async () => {
+    const accounts = (await db.accounts.toArray()).filter(
+      (a) =>
+        a.tracking === "manual" &&
+        (manualAccountTypes as readonly Account["accountType"][]).includes(
+          a.accountType,
+        ),
+    );
+    return {
+      accounts,
       valuations: await db.valuations.toArray(),
-    }),
-    [],
-  );
+    };
+  }, []);
   const [editing, setEditing] = useState(false),
     [id, setId] = useState<string | undefined>(),
     [name, setName] = useState("");
@@ -143,285 +145,301 @@ export function ManualAccountEditor({ currency }: { currency: string }) {
         </div>
       )}
       {editing && (
-        <form
-          className="planning-v2-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            setBusy(true);
-            setError("");
-            void (async () => {
-              try {
-                let amount = parseMoney(value, accountCurrency),
-                  valuationNote = note;
-                if (estimate) {
-                  const result = estimateMortgage(
-                    amount,
-                    Number(apr),
-                    Number(term),
-                    Number(elapsed),
-                  );
-                  amount = result.valueMinor;
-                  valuationNote = `Estimated monthly amortisation · ${Number(elapsed)} payment${Number(elapsed) === 1 ? "" : "s"} · ${money(result.paymentMinor, accountCurrency)} per month${note ? ` · ${note}` : ""}`;
-                }
-                const result = await saveManualAccount({
-                  id,
-                  name,
-                  type,
-                  currency: accountCurrency,
-                  date,
-                  valueMinor: amount,
-                  note: valuationNote,
-                  includeInNetWorth: include,
-                  apr: apr ? Number(apr) : undefined,
-                  minPaymentMinor: minimum
-                    ? parseMoney(minimum, accountCurrency)
-                    : undefined,
-                  valuationReminderDays: Number(reminderDays),
-                });
-                setChange(result.changeId);
-                setMessage("Account valuation saved.");
-                setEditing(false);
-              } catch (e) {
-                setError(
-                  e instanceof Error
-                    ? e.message
-                    : "Could not save this account.",
-                );
-              } finally {
-                setBusy(false);
-              }
-            })();
+        <Sheet
+          title={id ? "Update valuation" : "Add asset or liability"}
+          onClose={() => {
+            if (!busy) setEditing(false);
           }}
         >
-          <label>
-            Name
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <label>
-            Type
-            <select
-              value={type}
-              onChange={(e) => {
-                setType(e.target.value as Account["accountType"]);
-                setReminderDays(e.target.value === "property" ? "180" : "90");
-                setEstimate(false);
-              }}
-            >
-              {manualAccountTypes.map((t) => (
-                <option key={t} value={t}>
-                  {labels[t]}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Currency
-            <select
-              disabled={!!id}
-              value={accountCurrency}
-              onChange={(e) => setCurrency(e.target.value)}
-            >
-              {[
-                ...new Set([
-                  currency,
-                  accountCurrency,
-                  "GBP",
-                  "EUR",
-                  "USD",
-                  "CHF",
-                ]),
-              ].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-            {id && (
-              <small>
-                Valuation history keeps its original currency. Add another
-                account for a different currency.
-              </small>
-            )}
-          </label>
-          <label>
-            Value as of
-            <input
-              type="date"
-              required
-              value={date}
-              max={localToday()}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </label>
-          <label>
-            {estimate
-              ? "Original principal"
-              : liabilityTypes.has(type)
-                ? "Amount owed"
-                : "Account value"}
-            <input
-              required
-              inputMode="decimal"
-              value={value}
-              onChange={(e) => setValue(e.target.value)}
-            />
-          </label>
-          {liabilityTypes.has(type) && (
-            <>
-              <label>
-                APR %
-                <input
-                  inputMode="decimal"
-                  value={apr}
-                  onChange={(e) => setApr(e.target.value)}
-                  placeholder="Optional"
-                />
-              </label>
-              <label>
-                Minimum monthly payment
-                <input
-                  inputMode="decimal"
-                  value={minimum}
-                  onChange={(e) => setMinimum(e.target.value)}
-                  placeholder="Default: 1% plus interest, or £25"
-                />
-              </label>
-            </>
-          )}
-          {type === "mortgage" && (
-            <>
-              <label className="check">
-                <input
-                  type="checkbox"
-                  checked={estimate}
-                  onChange={(e) => setEstimate(e.target.checked)}
-                />
-                Estimate from original principal
-              </label>
-              {estimate && (
-                <>
-                  <label>
-                    Original term in months
-                    <input
-                      type="number"
-                      min={1}
-                      max={600}
-                      required
-                      value={term}
-                      onChange={(e) => setTerm(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Payments already made
-                    <input
-                      type="number"
-                      min={0}
-                      required
-                      value={elapsed}
-                      onChange={(e) => setElapsed(e.target.value)}
-                    />
-                  </label>
-                  <p className="muted">
-                    Monthly interest with penny rounding. Marked Estimated until
-                    you enter a statement value.
-                  </p>
-                </>
-              )}
-            </>
-          )}
-          <label>
-            Remind me to update after (days)
-            <input
-              type="number"
-              required
-              min={1}
-              max={3650}
-              value={reminderDays}
-              onChange={(e) => setReminderDays(e.target.value)}
-            />
-          </label>
-          <label>
-            Note
-            <textarea value={note} onChange={(e) => setNote(e.target.value)} />
-          </label>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={include}
-              onChange={(e) => setInclude(e.target.checked)}
-            />
-            Include in net worth
-          </label>
-          <div className="actions">
-            <button disabled={busy} type="submit">
-              Save valuation
-            </button>
-            <button
-              disabled={busy}
-              type="button"
-              onClick={() => setEditing(false)}
-            >
-              Cancel
-            </button>
-            {id && (
-              <button
-                disabled={busy}
-                type="button"
-                onClick={() => {
-                  if (
-                    !window.confirm(
-                      "Delete this manual account and its valuation history? You can undo this change.",
-                    )
-                  )
-                    return;
-                  setBusy(true);
-                  void deleteManualAccount(id)
-                    .then((r) => {
-                      setChange(r.changeId);
-                      setMessage("Manual account deleted.");
-                      setEditing(false);
-                    })
-                    .catch((e) =>
-                      setError(
-                        e instanceof Error
-                          ? e.message
-                          : "Could not delete this account.",
-                      ),
-                    )
-                    .finally(() => setBusy(false));
+          <form
+            id="manual-account-form"
+            className="planning-v2-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setBusy(true);
+              setError("");
+              void (async () => {
+                try {
+                  let amount = parseMoney(value, accountCurrency),
+                    valuationNote = note;
+                  if (estimate) {
+                    const result = estimateMortgage(
+                      amount,
+                      Number(apr),
+                      Number(term),
+                      Number(elapsed),
+                    );
+                    amount = result.valueMinor;
+                    valuationNote = `Estimated monthly amortisation · ${Number(elapsed)} payment${Number(elapsed) === 1 ? "" : "s"} · ${money(result.paymentMinor, accountCurrency)} per month${note ? ` · ${note}` : ""}`;
+                  }
+                  const result = await saveManualAccount({
+                    id,
+                    name,
+                    type,
+                    currency: accountCurrency,
+                    date,
+                    valueMinor: amount,
+                    note: valuationNote,
+                    includeInNetWorth: include,
+                    apr: apr ? Number(apr) : undefined,
+                    minPaymentMinor: minimum
+                      ? parseMoney(minimum, accountCurrency)
+                      : undefined,
+                    valuationReminderDays: Number(reminderDays),
+                  });
+                  setChange(result.changeId);
+                  setMessage("Account valuation saved.");
+                  setEditing(false);
+                } catch (e) {
+                  setError(
+                    e instanceof Error
+                      ? e.message
+                      : "Could not save this account.",
+                  );
+                } finally {
+                  setBusy(false);
+                }
+              })();
+            }}
+          >
+            <label>
+              Name
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label>
+              Type
+              <select
+                value={type}
+                onChange={(e) => {
+                  setType(e.target.value as Account["accountType"]);
+                  setReminderDays(e.target.value === "property" ? "180" : "90");
+                  setEstimate(false);
                 }}
               >
-                Delete account
-              </button>
+                {manualAccountTypes.map((t) => (
+                  <option key={t} value={t}>
+                    {labels[t]}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Currency
+              <select
+                disabled={!!id}
+                value={accountCurrency}
+                onChange={(e) => setCurrency(e.target.value)}
+              >
+                {[
+                  ...new Set([
+                    currency,
+                    accountCurrency,
+                    "GBP",
+                    "EUR",
+                    "USD",
+                    "CHF",
+                  ]),
+                ].map((c) => (
+                  <option key={c}>{c}</option>
+                ))}
+              </select>
+              {id && (
+                <small>
+                  Valuation history keeps its original currency. Add another
+                  account for a different currency.
+                </small>
+              )}
+            </label>
+            <label>
+              Value as of
+              <input
+                type="date"
+                required
+                value={date}
+                max={localToday()}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </label>
+            <label>
+              {estimate
+                ? "Original principal"
+                : liabilityTypes.has(type)
+                  ? "Amount owed"
+                  : "Account value"}
+              <input
+                required
+                inputMode="decimal"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+              />
+            </label>
+            {liabilityTypes.has(type) && (
+              <>
+                <label>
+                  APR %
+                  <input
+                    inputMode="decimal"
+                    value={apr}
+                    onChange={(e) => setApr(e.target.value)}
+                    placeholder="Optional"
+                  />
+                </label>
+                <label>
+                  Minimum monthly payment
+                  <input
+                    inputMode="decimal"
+                    value={minimum}
+                    onChange={(e) => setMinimum(e.target.value)}
+                    placeholder={
+                      type === "mortgage" || type === "loan"
+                        ? "Enter the actual monthly payment"
+                        : "Optional card estimate"
+                    }
+                  />
+                </label>
+              </>
             )}
-          </div>
-        </form>
+            {type === "mortgage" && (
+              <>
+                <label className="check">
+                  <input
+                    type="checkbox"
+                    checked={estimate}
+                    onChange={(e) => setEstimate(e.target.checked)}
+                  />
+                  Estimate from original principal
+                </label>
+                {estimate && (
+                  <>
+                    <label>
+                      Original term in months
+                      <input
+                        type="number"
+                        min={1}
+                        max={600}
+                        required
+                        value={term}
+                        onChange={(e) => setTerm(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Payments already made
+                      <input
+                        type="number"
+                        min={0}
+                        required
+                        value={elapsed}
+                        onChange={(e) => setElapsed(e.target.value)}
+                      />
+                    </label>
+                    <p className="muted">
+                      Monthly interest with penny rounding. Marked Estimated
+                      until you enter a statement value.
+                    </p>
+                  </>
+                )}
+              </>
+            )}
+            <label>
+              Remind me to update after (days)
+              <input
+                type="number"
+                required
+                min={1}
+                max={3650}
+                value={reminderDays}
+                onChange={(e) => setReminderDays(e.target.value)}
+              />
+            </label>
+            <label>
+              Note
+              <textarea
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+              />
+            </label>
+            <label className="switch-row">
+              <input
+                role="switch"
+                type="checkbox"
+                checked={include}
+                onChange={(e) => setInclude(e.target.checked)}
+              />
+              Include in net worth
+            </label>
+            <SheetFooter>
+              <div className="actions">
+                <button
+                  className="primary"
+                  disabled={busy}
+                  form="manual-account-form"
+                  type="submit"
+                >
+                  Save valuation
+                </button>
+                <button
+                  disabled={busy}
+                  type="button"
+                  onClick={() => setEditing(false)}
+                >
+                  Cancel
+                </button>
+                {id && (
+                  <button
+                    disabled={busy}
+                    type="button"
+                    onClick={() => {
+                      if (
+                        !window.confirm(
+                          "Delete this manual account and its valuation history? You can undo this change.",
+                        )
+                      )
+                        return;
+                      setBusy(true);
+                      void deleteManualAccount(id)
+                        .then((r) => {
+                          setChange(r.changeId);
+                          setMessage("Manual account deleted.");
+                          setEditing(false);
+                        })
+                        .catch((e) =>
+                          setError(
+                            e instanceof Error
+                              ? e.message
+                              : "Could not delete this account.",
+                          ),
+                        )
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    Delete account
+                  </button>
+                )}
+              </div>
+            </SheetFooter>
+            {error && <p role="alert">{error}</p>}
+          </form>
+        </Sheet>
       )}
       {error && <p role="alert">{error}</p>}
       {message && (
-        <p role="status">
-          {message}{" "}
-          {change && (
-            <button
-              onClick={() =>
-                void undoChange(change)
-                  .then(() => {
-                    setChange("");
-                    setMessage("Change undone.");
-                  })
-                  .catch((e) =>
-                    setError(
-                      e instanceof Error ? e.message : "Could not undo.",
-                    ),
-                  )
-              }
-            >
-              Undo
-            </button>
-          )}
-        </p>
+        <Toast
+          id={change || message}
+          message={message}
+          undo={
+            change
+              ? async () => {
+                  await undoChange(change);
+                  setChange("");
+                  setMessage("");
+                }
+              : undefined
+          }
+        />
       )}
     </section>
   );

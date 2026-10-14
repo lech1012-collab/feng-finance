@@ -12,18 +12,33 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-13",
+  date: "2026-10-14",
   points: [
-    "The optional property tax report switch now saves reliably.",
-    "Statement readers and saved financial records are unchanged.",
+    "A calmer mobile layout, focused Settings and editing sheets with Undo.",
+    "One password-protected backup flow and clearer account balances.",
+    "Safer refund suggestions, debt plans and missing-rate information.",
   ],
-  pleaseTest: ["Enable property tax summary in Settings, then open Analyse."],
+  pleaseTest: [
+    "Import, sort transactions and save a protected backup.",
+    "Review small screens, large text and keyboard navigation.",
+  ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
 };
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.5",
+    date: "2026-10-13",
+    points: [
+      "The optional property tax report switch now saves reliably.",
+      "Statement readers and saved financial records are unchanged.",
+    ],
+    pleaseTest: ["Enable property tax summary in Settings, then open Analyse."],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.4",
     date: "2026-10-13",

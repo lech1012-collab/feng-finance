@@ -1,3 +1,5 @@
+import { loadDemoUi } from "./flows";
+import { selectPeriod } from "./flows";
 import { test, expect, type Locator } from "./fixtures";
 
 async function expectSignedBars(chart: Locator) {
@@ -40,19 +42,11 @@ test("cash charts paint spending below zero and retain real gaps across mobile a
   page,
 }) => {
   await page.clock.setFixedTime(new Date("2026-10-07T12:00:00Z"));
-  await page.goto("/#/settings");
-  await page
-    .getByRole("button", { name: "Load demo data", exact: true })
-    .click();
-  await expect(
-    page.getByText("Fictitious demo data added.", { exact: true }),
-  ).toBeVisible();
+  await loadDemoUi(page);
   await page.goto("/#/");
   await expectSignedBars(page.locator(".flow-card"));
   await page.goto("/#/analysis");
-  await page
-    .getByRole("combobox", { name: "Period", exact: true })
-    .selectOption("12");
+  await selectPeriod(page, "12");
   const chart = page.locator("section.card").filter({
     has: page.getByRole("heading", {
       name: "Income, expenses & net cash flow",
@@ -72,7 +66,7 @@ test("cash charts paint spending below zero and retain real gaps across mobile a
       ),
     );
   const spendingMonths = values.filter(
-    (cells) => /^-£[\d,]+\.\d{2}$/.test(cells[2]) && cells[2] !== "-£0.00",
+    (cells) => /^−£[\d,]+\.\d{2}$/.test(cells[2]) && cells[2] !== "−£0.00",
   );
   const missingMonths = values.filter((cells) => cells[0] === "No data");
   expect(spendingMonths.length).toBeGreaterThan(0);

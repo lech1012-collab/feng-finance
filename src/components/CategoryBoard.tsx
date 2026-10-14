@@ -1,3 +1,4 @@
+import { displayAccountName } from "../domain/presentation";
 import { categoryColor } from "../domain/palette";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
@@ -269,7 +270,7 @@ export function CategoryBoard({
       data-category-target={c.id}
       disabled={busy}
       onClick={() => void choose(c.id)}
-      aria-label={`Categorize as ${c.parentId ? `${categories.find((p) => p.id === c.parentId)?.name}: ` : ""}${c.name}`}
+      aria-label={`Categorise as ${c.parentId ? `${categories.find((p) => p.id === c.parentId)?.name}: ` : ""}${c.name}`}
     >
       <span
         className="category-tile-icon"
@@ -340,12 +341,14 @@ export function CategoryBoard({
         if (category) void choose(category);
       }}
     >
-      <Grip size={20} />
+      <Grip className="desktop-only" size={20} />
       <div>
         <strong>{displayMerchant(t)}</strong>
         <small>
           {displayDate(t.date)}
-          {evidence?.account ? ` · ${evidence.account.institution}` : ""}
+          {evidence?.account
+            ? ` · ${displayAccountName(evidence.account)}`
+            : ""}
         </small>
       </div>
       <strong>{money(t.amount, t.currency, true)}</strong>
@@ -369,23 +372,13 @@ export function CategoryBoard({
           </div>
           <button
             autoFocus
-            aria-label="Close categorization"
+            aria-label="Close categorisation"
             disabled={busy}
             onClick={onClose}
           >
             <X size={22} />
           </button>
         </header>
-        {queue && (
-          <div className="queue-progress">
-            <span>
-              {queue.position} of {queue.total} to sort
-            </span>
-            <button onClick={onSkip} disabled={busy}>
-              Skip
-            </button>
-          </div>
-        )}
         {sortingCard}
       </div>
       <div
@@ -514,11 +507,29 @@ export function CategoryBoard({
             </div>
           </section>
         )}
+        <h3>All categories</h3>
+        <input
+          aria-label="Find a category"
+          type="search"
+          placeholder="Find a category…"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+        <div
+          className="category-tile-grid"
+          aria-label="Categories"
+          aria-busy={busy}
+        >
+          {available
+            .filter((c) => !suggested.some((s) => s.id === c.id))
+            .map((c) => tile(c))}
+          {!available.length && <p>No matching categories.</p>}
+        </div>
         <h3>Not spending</h3>
         <button
           className={`transfer-tile ${target === TRANSFER_TARGET ? "drop-target" : ""}`}
           data-category-target={TRANSFER_TARGET}
-          aria-label="Categorize as Transfer"
+          aria-label="Categorise as Transfer"
           disabled={busy}
           onClick={() => void choose(TRANSFER_TARGET)}
         >
@@ -533,8 +544,9 @@ export function CategoryBoard({
           data-category-target={CARD_REPAYMENT_TARGET}
           disabled={busy}
           onClick={() => void choose(CARD_REPAYMENT_TARGET)}
-          aria-label="Categorize as Card repayment"
+          aria-label="Categorise as Card repayment"
         >
+          <span aria-hidden="true">↔</span>
           <span>
             <strong>Card repayment</strong>
             <small>
@@ -575,30 +587,22 @@ export function CategoryBoard({
           Add tag
         </button>
         {showTags && <TagPicker value={tags} onChange={setTags} />}
-        <h3>All categories</h3>
-        <input
-          aria-label="Find a category"
-          type="search"
-          placeholder="Find a category…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
-        <div
-          className="category-tile-grid"
-          aria-label="Categories"
-          aria-busy={busy}
-        >
-          {available
-            .filter((c) => !suggested.some((s) => s.id === c.id))
-            .map((c) => tile(c))}
-          {!available.length && <p>No matching categories.</p>}
-        </div>
         {error && (
           <p className="notice warning" role="alert">
             {error}
           </p>
         )}
       </div>
+      {queue && (
+        <div className="queue-progress">
+          <span>
+            {queue.position} of {queue.total} to sort
+          </span>
+          <button onClick={onSkip} disabled={busy}>
+            Skip
+          </button>
+        </div>
+      )}
       <Link
         className="sort-details"
         to={`/transactions/${t.id}`}

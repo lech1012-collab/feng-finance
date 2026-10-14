@@ -123,7 +123,7 @@ it("confirmed recurring edits replace inferred bills once and use their due date
     [netflix],
   );
   expect(edited.reason).toBeUndefined();
-  expect(edited.upcoming.filter((p) => p.amount < 0)).toMatchObject([
+  expect(edited.upcoming.filter((p) => p.originalAmount < 0)).toMatchObject([
     { date: "2026-10-10", amount: -2000, merchant: "Streaming" },
   ]);
   expect(edited.dailyVariable).toBe(baseline.dailyVariable);
@@ -156,7 +156,7 @@ it("a confirmed new annual bill appears once while ignored or ended series do no
     [],
     [ignored, annual],
   );
-  expect(forecast.upcoming.filter((p) => p.amount < 0)).toMatchObject([
+  expect(forecast.upcoming.filter((p) => p.originalAmount < 0)).toMatchObject([
     { merchant: "Car insurance", date: "2026-10-15", amount: -54000 },
   ]);
   const ended = reportingPlanningForecast(
@@ -170,7 +170,7 @@ it("a confirmed new annual bill appears once while ignored or ended series do no
     [],
     [{ ...netflix, endDate: "2026-10-01" }],
   );
-  expect(ended.upcoming.some((p) => p.amount < 0)).toBe(false);
+  expect(ended.upcoming.some((p) => p.originalAmount < 0)).toBe(false);
 });
 it("reconciles both native ledgers before combining reporting forecasts and does not mutate EUR originals", () => {
   const rows = [...gbp.rows, ...euros.rows];
@@ -210,6 +210,14 @@ it("missing cached FX rates prevent a total projection rather than hiding the fo
   );
   expect(forecast.reason).toContain("every account currency");
   expect(forecast.points).toEqual([]);
+  expect(forecast.income).toBeUndefined();
+  expect(forecast.bills).toBeUndefined();
+  const missing = forecast.upcoming.filter((p) => p.originalCurrency === "EUR");
+  expect(missing.length).toBeGreaterThan(0);
+  expect(missing.every((p) => p.amount === undefined && p.missingRate)).toBe(
+    true,
+  );
+  expect(missing.some((p) => p.originalAmount === -1200)).toBe(true);
 });
 it("a broken native EUR reconciliation prevents the combined forecast even when rates exist", () => {
   const statements = euros.statements.map((s) => ({

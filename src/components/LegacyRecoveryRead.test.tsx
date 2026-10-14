@@ -58,7 +58,7 @@ it("searches, opens sorting tags and prepares a split without filling missing le
   );
   await screen.findByRole(
     "button",
-    { name: "Uncategorized 1" },
+    { name: "Uncategorised 1" },
     { timeout: 8000 },
   );
   fireEvent.change(

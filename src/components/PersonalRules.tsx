@@ -16,7 +16,7 @@ export function PersonalRules() {
     <section className="card" id="personal-rules">
       <h2>Personal rules</h2>
       <p className="muted">
-        Apply your categorization choices to matching transactions and remember
+        Apply your categorisation choices to matching transactions and remember
         them for future statements.
       </p>
       <label className="button file-button">

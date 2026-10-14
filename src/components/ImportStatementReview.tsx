@@ -1,3 +1,4 @@
+import { displayMerchant } from "../domain/presentation";
 import { Link } from "react-router-dom";
 import { useState, type ReactNode } from "react";
 import {
@@ -188,9 +189,9 @@ export function ImportStatementReview({
               {d.account.displayName} · {d.account.maskedAccountIdentifier} ·{" "}
               {d.statement.currency} ·{" "}
               {d.statement.extractionMethod === "OCR"
-                ? "Local OCR"
+                ? "Read from images"
                 : d.statement.extractionMethod === "embedded-text"
-                  ? "Digital PDF"
+                  ? "Read from text"
                   : `${d.statement.extractionMethod} export`}
             </p>
             <p>
@@ -210,14 +211,6 @@ export function ImportStatementReview({
               <div>
                 <span>Transactions extracted</span>
                 <strong>{d.transactions.length}</strong>
-              </div>
-              <div>
-                <span>Money in</span>
-                <strong>{money(flow.moneyIn, d.statement.currency)}</strong>
-              </div>
-              <div>
-                <span>Money out</span>
-                <strong>{money(flow.moneyOut, d.statement.currency)}</strong>
               </div>
             </div>
             <p className="coverage-note">
@@ -438,25 +431,32 @@ export function ImportStatementReview({
                   {d.statement.extractionMethod === "OCR" && (
                     <p>
                       Every uncertain amount must be verified before importing.
-                      Categorization can wait.
+                      Categorisation can wait.
                     </p>
                   )}
                 </div>
               </div>
             )}
-            <p>
-              <strong>
-                {checks.filter((t) => t.include).length} transaction
-                {checks.filter((t) => t.include).length === 1 ? "" : "s"} to
-                check.
-              </strong>{" "}
-              {
-                d.transactions.filter(
-                  (t) => t.include && !t.categoryId && !t.isTransfer,
-                ).length
-              }{" "}
-              can be categorized later.
-            </p>
+            {checks.some((t) => t.include) && (
+              <p>
+                <strong>
+                  {checks.filter((t) => t.include).length} transactions to
+                  check.
+                </strong>
+              </p>
+            )}
+            {d.transactions.some(
+              (t) => t.include && !t.categoryId && !t.isTransfer,
+            ) && (
+              <p className="coverage-note">
+                {
+                  d.transactions.filter(
+                    (t) => t.include && !t.categoryId && !t.isTransfer,
+                  ).length
+                }{" "}
+                can be categorised later.
+              </p>
+            )}
             <section className="review-transactions">
               <h3>Review transactions</h3>
               <div
@@ -483,15 +483,14 @@ export function ImportStatementReview({
                 <div className="review-clear">
                   <CheckCircle2 size={24} />
                   <p>
-                    Amounts and dates look good. Open all transactions to make
-                    changes.
+                    Nothing to check. Open all transactions to make changes.
                   </p>
                 </div>
               )}
               {entry.showAll && d.bankSource && (
                 <p className="hint">
                   Dates and amounts come from the bank reader. To correct them,
-                  open Reading options and choose Review PDF layout.
+                  open Reading details and choose Review PDF layout.
                 </p>
               )}
               {(entry.showAll ? [...d.transactions] : [...checks])
@@ -516,7 +515,7 @@ export function ImportStatementReview({
                           {t.isTransfer
                             ? "Transfer"
                             : (categories.find((c) => c.id === t.categoryId)
-                                ?.name ?? "Uncategorized")}
+                                ?.name ?? "Uncategorised")}
                         </small>
                       </span>
                       <strong>{money(t.amount, t.currency, true)}</strong>
@@ -536,7 +535,7 @@ export function ImportStatementReview({
                             })
                           }
                         />
-                        <strong>{t.description}</strong>
+                        <strong>{displayMerchant(t)}</strong>
                       </label>
                       <span className="small-chip">
                         {entry.extracted?.format ? "Row" : "Page"}{" "}
@@ -691,7 +690,7 @@ export function ImportStatementReview({
                             })
                           }
                         >
-                          <option value="">Uncategorized</option>
+                          <option value="">Uncategorised</option>
                           {categories
                             .filter((c) => c.kind !== "income" || t.amount >= 0)
                             .map((c) => (

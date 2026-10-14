@@ -1,8 +1,8 @@
 # Feedback configuration and privacy
 
-Feedback is inactive until the owner supplies a destination. Do not invent an
-email address, publish a third-party form under someone else's account, or collect
-financial records. Settings still lets a tester copy technical details.
+The owner supplied `lech1012@googlemail.com`, now the default feedback destination.
+The static build can override it with a configured form or email. Feedback opens
+a draft; the app does not send messages or collect financial records.
 
 Configure the static build with:
 

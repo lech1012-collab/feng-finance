@@ -1,3 +1,4 @@
+import { settingsSection } from "./flows";
 import { test as base, expect, devices, type Page } from "@playwright/test";
 import { rm } from "node:fs/promises";
 import { acknowledgeBeta } from "./fixtures";
@@ -287,7 +288,7 @@ for (const version of [1, 2, 3] as const) {
     test.setTimeout(90000);
     await seedOldSchema(page, version);
     const original = await rawRecords(page);
-    await page.goto("/#/settings");
+    await settingsSection(page, "backup");
     await expect(
       page.getByLabel("6-digit app PIN", { exact: true }),
     ).toBeVisible();
@@ -315,8 +316,13 @@ for (const version of [1, 2, 3] as const) {
     ).toBeVisible();
     await acknowledgeBeta(page);
     await expect(
-      page.getByRole("heading", { name: "Settings", exact: true }),
+      page.getByRole("heading", {
+        name: "Backup and restore",
+        level: 1,
+        exact: true,
+      }),
     ).toBeVisible();
+    await settingsSection(page, "backup");
     const recovery = page.locator("#previous-data");
     await expect(
       recovery.getByRole("heading", { name: "Previous data" }),
@@ -361,19 +367,25 @@ for (const version of [1, 2, 3] as const) {
     await recovery
       .getByRole("button", { name: "Restore previous data", exact: true })
       .click();
+    const restoreSheet = page.getByRole("dialog", {
+      name: "Restore previous data",
+      exact: true,
+    });
     await expect(
-      recovery.getByRole("button", {
+      restoreSheet.getByRole("button", {
         name: "Restore previous data",
         exact: true,
       }),
     ).toBeDisabled();
-    await recovery.getByRole("button", { name: "Cancel", exact: true }).click();
+    await restoreSheet
+      .getByRole("button", { name: "Cancel", exact: true })
+      .click();
     expect(await rawRecords(page)).toEqual(edited);
     await recovery
       .getByRole("button", { name: "Restore previous data", exact: true })
       .click();
-    await recovery.getByRole("checkbox").check();
-    await recovery
+    await restoreSheet.getByRole("checkbox").check();
+    await restoreSheet
       .getByRole("button", { name: "Restore previous data", exact: true })
       .click();
     await expect(

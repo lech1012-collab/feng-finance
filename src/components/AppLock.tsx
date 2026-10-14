@@ -159,20 +159,27 @@ export function AppLock({ children }: { children: ReactNode }) {
           }}
         >
           <label htmlFor="unlock-pin">6-digit app PIN</label>
-          <input
-            id="unlock-pin"
-            type="password"
-            inputMode="numeric"
-            pattern="[0-9]{6}"
-            maxLength={6}
-            autoComplete="off"
-            autoFocus
-            value={pin}
-            onChange={(event) =>
-              setPin(event.target.value.replaceAll(/\D/g, ""))
-            }
-            disabled={busy}
-          />
+          <div className="pin-entry">
+            <div className="pin-slots" aria-hidden="true">
+              {Array.from({ length: 6 }, (_, i) => (
+                <span key={i}>{i < pin.length ? "●" : ""}</span>
+              ))}
+            </div>
+            <input
+              id="unlock-pin"
+              type="password"
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              autoComplete="off"
+              autoFocus
+              value={pin}
+              onChange={(event) =>
+                setPin(event.target.value.replaceAll(/\D/g, ""))
+              }
+              disabled={busy}
+            />
+          </div>
           <button
             className="primary"
             disabled={busy || pin.length !== 6}
@@ -183,6 +190,16 @@ export function AppLock({ children }: { children: ReactNode }) {
         </form>
         {error && <p role="alert">{error}</p>}
         <p className="muted">Your PIN stays on this device.</p>
+        <details>
+          <summary>Forgot PIN?</summary>
+          <p>
+            Feng cannot recover your PIN. If Face ID or Touch ID was set up, use
+            it to unlock. Otherwise your records can only be recovered from a
+            backup: open Feng in a fresh browser profile, or clear this site's
+            browser data, then restore your backup. Clearing browser data
+            permanently removes the records on this device.
+          </p>
+        </details>
       </main>
     );
   return (

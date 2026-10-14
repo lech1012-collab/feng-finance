@@ -78,31 +78,45 @@ export function SecuritySettings() {
         >
           <label>
             Choose a 6-digit app PIN
-            <input
-              type="password"
-              inputMode="numeric"
-              pattern="[0-9]{6}"
-              maxLength={6}
-              autoComplete="new-password"
-              value={pin}
-              onChange={(event) =>
-                setPin(event.target.value.replaceAll(/\D/g, ""))
-              }
-              disabled={busy}
-            />
+            <span className="pin-entry">
+              <span className="pin-slots" aria-hidden="true">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <span key={i}>{i < pin.length ? "●" : ""}</span>
+                ))}
+              </span>
+              <input
+                type="password"
+                inputMode="numeric"
+                pattern="[0-9]{6}"
+                maxLength={6}
+                autoComplete="new-password"
+                value={pin}
+                onChange={(event) =>
+                  setPin(event.target.value.replaceAll(/\D/g, ""))
+                }
+                disabled={busy}
+              />
+            </span>
           </label>
           <label>
             Confirm PIN
-            <input
-              type="password"
-              inputMode="numeric"
-              maxLength={6}
-              value={confirmation}
-              onChange={(event) =>
-                setConfirmation(event.target.value.replaceAll(/\D/g, ""))
-              }
-              disabled={busy}
-            />
+            <span className="pin-entry">
+              <span className="pin-slots" aria-hidden="true">
+                {Array.from({ length: 6 }, (_, i) => (
+                  <span key={i}>{i < confirmation.length ? "●" : ""}</span>
+                ))}
+              </span>
+              <input
+                type="password"
+                inputMode="numeric"
+                maxLength={6}
+                value={confirmation}
+                onChange={(event) =>
+                  setConfirmation(event.target.value.replaceAll(/\D/g, ""))
+                }
+                disabled={busy}
+              />
+            </span>
           </label>
           <label>
             Lock after being away
@@ -187,15 +201,22 @@ export function SecuritySettings() {
             >
               <label>
                 Current PIN
-                <input
-                  type="password"
-                  inputMode="numeric"
-                  maxLength={6}
-                  value={pin}
-                  onChange={(event) =>
-                    setPin(event.target.value.replaceAll(/\D/g, ""))
-                  }
-                />
+                <span className="pin-entry">
+                  <span className="pin-slots" aria-hidden="true">
+                    {Array.from({ length: 6 }, (_, i) => (
+                      <span key={i}>{i < pin.length ? "●" : ""}</span>
+                    ))}
+                  </span>
+                  <input
+                    type="password"
+                    inputMode="numeric"
+                    maxLength={6}
+                    value={pin}
+                    onChange={(event) =>
+                      setPin(event.target.value.replaceAll(/\D/g, ""))
+                    }
+                  />
+                </span>
               </label>
               <button disabled={busy || pin.length !== 6}>
                 Disable app lock

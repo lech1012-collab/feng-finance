@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
 import { db } from "../storage/database";
@@ -88,8 +89,9 @@ export function PeriodSetting() {
           </select>
         </label>
       )}
-      <label className="check">
+      <label className="switch-row">
         <input
+          role="switch"
           type="checkbox"
           checked={autoClose}
           onChange={(e) =>
@@ -110,24 +112,21 @@ export function PeriodSetting() {
         Home, budgets and reviews use the same date range. Payday uses Salary
         entries, otherwise the last weekday.
       </p>
-      {changeId && (
-        <button
-          disabled={busy}
-          onClick={() =>
-            void undoChange(changeId)
-              .then(() => {
-                setChangeId("");
-                setNotice(
-                  "Month preference and previous closed snapshots restored.",
-                );
-              })
-              .catch(() => setError("A newer change must be undone first."))
+      {notice && (
+        <Toast
+          id={changeId || notice}
+          message={notice}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  setChangeId("");
+                  setNotice("");
+                }
+              : undefined
           }
-        >
-          Undo month change
-        </button>
+        />
       )}
-      {notice && <p role="status">{notice}</p>}
       {error && <p role="alert">{error}</p>}
     </section>
   );

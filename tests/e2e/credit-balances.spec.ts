@@ -1,3 +1,4 @@
+import { saveReadableBackup, settingsSection, loadDemoUi } from "./flows";
 import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -77,6 +78,9 @@ async function assertSingleClosingPoint(
   date: string,
   balance: string,
 ) {
+  await page
+    .getByRole("button", { name: "Account breakdown", exact: true })
+    .click();
   const points = page.locator(".position-history circle");
   await expect(points).toHaveCount(1);
   await expect(points.locator("title")).toContainText(
@@ -87,6 +91,7 @@ async function assertSingleClosingPoint(
     page.locator(".position-history [data-total-position]"),
   ).toHaveCount(0);
   await expect(page.locator(".balance-periods")).toHaveCount(0);
+  await page.getByText("How balances work", { exact: true }).click();
   await expect(
     page.getByText(/Issue-date-only cards show their dated balance/),
   ).toBeVisible();
@@ -105,18 +110,15 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
     "£109.68",
   );
   await expect(positionMetric(page, "Cash")).toContainText("Not imported");
-  await expect(positionMetric(page, "Net position")).toContainText(
-    "Unavailable",
-  );
-  await expect(page.locator(".balance-account-value")).toContainText(
-    "Debt owed",
-  );
-  await expect(page.locator(".balance-account-main")).toContainText(
-    "as of 4 Oct 2026",
-  );
-  await expect(page.locator(".balance-account-value")).not.toContainText(
-    "Unverified",
-  );
+  await expect(positionMetric(page, "Net worth")).toContainText("Unavailable");
+  await page.goto("/#/accounts");
+  const cardAccount = page
+    .locator(".account-overview-row")
+    .filter({ hasText: "4444" });
+  await expect(cardAccount).toContainText("£109.68");
+  await expect(cardAccount).toContainText("Debt owed");
+  await expect(cardAccount).toContainText("As of 4 Oct · Verified");
+  await page.goto("/#/");
   // A reconciled closing sum does not turn inferred transaction coverage into
   // verified monthly coverage, or invent daily balances between purchases.
   await expect(page.locator(".month-summary")).toContainText(
@@ -158,7 +160,6 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
 
   await page.getByLabel("Selected month").fill("2026-09");
   await expect(positionMetric(page, "Card debt")).toContainText("Unknown");
-  await expect(page.locator(".balance-account-value")).toContainText("Unknown");
   await expect(page.locator(".position-history circle")).toHaveCount(0);
   await expect(
     page.locator(".position-history title").filter({ hasText: "4 Oct 2026" }),
@@ -177,9 +178,9 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   await page.goto("/#/transactions?month=2026-10&allDates=1");
   const accountChip = page
     .getByRole("group", { name: "Filter by account" })
-    .getByRole("button", { name: /Barclays.*4444/ });
+    .getByRole("button", { name: /Barclaycard/ });
   await expect(accountChip).toContainText("£109.68 debt");
-  await expect(accountChip).not.toContainText("-£109.68");
+  await expect(accountChip).not.toContainText("−£109.68");
   await expect(accountChip).not.toContainText("Unverified");
 });
 
@@ -191,13 +192,16 @@ test("Amex dates outside the period preserve reported debt while remaining unver
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
     "Unknown",
   );
-  await expect(page.locator(".balance-account-main")).toContainText(
-    "as of 5 Oct 2026",
-  );
-  await expect(page.locator(".balance-account-value")).toContainText("£160.00");
-  await expect(page.locator(".balance-account-value")).toContainText(
-    "Unverified reported balance",
-  );
+  await page.goto("/#/accounts");
+  const cardAccount = page
+    .locator(".account-overview-row")
+    .filter({ hasText: "0444" });
+  await expect(cardAccount).toContainText("As of 5 Oct · Unverified");
+  await expect(cardAccount).toContainText("£160.00");
+  await page.goto("/#/");
+  await page
+    .getByRole("button", { name: "Account breakdown", exact: true })
+    .click();
   await expect(page.locator(".month-summary")).toContainText(
     "Monthly history is not fully verified",
   );
@@ -214,18 +218,16 @@ test("Amex dates outside the period preserve reported debt while remaining unver
   await page.goto("/#/transactions?month=2026-10&allDates=1");
   const accountChip = page
     .getByRole("group", { name: "Filter by account" })
-    .getByRole("button", { name: /American Express.*0444/ });
+    .getByRole("button", { name: /Amex/ });
   await expect(accountChip).toContainText("£160.00 debt");
-  await expect(accountChip).not.toContainText("-£160.00");
+  await expect(accountChip).not.toContainText("−£160.00");
   await expect(accountChip).toContainText("Reported · Unverified");
   await page.reload();
   await expect(accountChip).toContainText("£160.00 debt");
   await expect(accountChip).toContainText("Reported · Unverified");
   await page.goto("/#/settings");
   const downloaded = page.waitForEvent("download");
-  await page
-    .getByRole("button", { name: "Export Feng Finance Backup", exact: true })
-    .click();
+  await saveReadableBackup(page);
   const backupPath = await (await downloaded).path();
   const backup = JSON.parse(await readFile(backupPath!, "utf8"));
   expect(backup.statements).toHaveLength(1);
@@ -258,9 +260,9 @@ test("a missing stored card row retains the reported balance but removes verifie
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
     "£109.68",
   );
-  await expect(
-    positionMetric(page, "Net position").locator("strong"),
-  ).toHaveText("£845.32");
+  await expect(positionMetric(page, "Net worth").locator("strong")).toHaveText(
+    "£845.32",
+  );
 
   const affectedRows = await page.evaluate(
     () =>
@@ -311,15 +313,20 @@ test("a missing stored card row retains the reported balance but removes verifie
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
     "Unknown",
   );
-  await expect(
-    positionMetric(page, "Net position").locator("strong"),
-  ).toHaveText("Unavailable");
+  await expect(positionMetric(page, "Net worth").locator("strong")).toHaveText(
+    "Unavailable",
+  );
+  await page.goto("/#/accounts");
   const reportedCard = page
-    .locator(".balance-account")
+    .locator(".account-overview-row")
     .filter({ hasText: "4444" });
   await expect(reportedCard).toContainText("£109.68");
-  await expect(reportedCard).toContainText("Unverified reported balance");
+  await expect(reportedCard).toContainText("Unverified");
   await expect(reportedCard).toContainText("Stored transactions do not match");
+  await page.goto("/#/");
+  await page
+    .getByRole("button", { name: "Account breakdown", exact: true })
+    .click();
   await expect(page.locator(".month-summary")).toContainText(
     "Monthly history is not fully verified",
   );
@@ -339,7 +346,7 @@ test("a missing stored card row retains the reported balance but removes verifie
   await page.goto("/#/transactions?month=2026-10&allDates=1");
   const accountChip = page
     .getByRole("group", { name: "Filter by account" })
-    .getByRole("button", { name: /Barclays.*4444/ });
+    .getByRole("button", { name: /Barclaycard/ });
   await expect(accountChip).toContainText("£109.68 debt");
   await expect(accountChip).toContainText("Reported · Unverified");
 });

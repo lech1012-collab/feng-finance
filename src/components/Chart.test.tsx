@@ -103,7 +103,7 @@ it("renders positive SVG dimensions with spending below zero and income above it
   expect(incomeY + incomeHeight).toBeCloseTo(zero);
   expect(spendingY).toBeCloseTo(zero);
   expect(spendingY + spendingHeight).toBeGreaterThan(zero);
-  expect(screen.getAllByRole("row")[1]).toHaveTextContent("-£50.00");
+  expect(screen.getAllByRole("row")[1]).toHaveTextContent("−£50.00");
 });
 
 it("keeps partial spending visible without inventing missing income or net bars", () => {
@@ -176,7 +176,7 @@ it("normalizes negative income geometry without changing its signed value", () =
   expect(income).not.toBeNull();
   expect(Number(income.getAttribute("height"))).toBeGreaterThan(0);
   expect(Number(income.getAttribute("y"))).toBeCloseTo(zero);
-  expect(screen.getAllByRole("row")[1]).toHaveTextContent("-£50.00");
+  expect(screen.getAllByRole("row")[1]).toHaveTextContent("−£50.00");
 });
 
 it("keeps card-only partial income and net unavailable in the accessible values", () => {
@@ -197,7 +197,7 @@ it("keeps card-only partial income and net unavailable in the accessible values"
   );
   const row = screen.getAllByRole("row")[1];
   expect(within(row).getAllByText("Not imported")).toHaveLength(2);
-  expect(row).toHaveTextContent("-£1,357.90");
+  expect(row).toHaveTextContent("−£1,357.90");
   expect(row).not.toHaveTextContent("£0.00");
   expect(
     screen.getByText("* Partial month · from imported accounts only."),
@@ -226,7 +226,7 @@ it("identifies unverified contributions while showing the same partial totals as
   );
   const row = screen.getAllByRole("row")[1];
   expect(row).toHaveTextContent("Partial · verification incomplete");
-  expect(row).toHaveTextContent("-£70.00");
+  expect(row).toHaveTextContent("−£70.00");
   expect(
     screen.getByText(
       "Statements with incomplete date or balance verification are included in partial months. Comparisons need verified dates and balances.",

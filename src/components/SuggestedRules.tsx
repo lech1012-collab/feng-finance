@@ -16,7 +16,7 @@ export function SuggestedRules({
   const [message, setMessage] = useState("");
   const [changeId, setChangeId] = useState("");
   return (
-    <section aria-label="Suggested categorization rules">
+    <section aria-label="Suggested categorisation rules">
       <h3>Suggested rules</h3>
       {suggestions.length ? (
         suggestions.map((s) => (
@@ -51,7 +51,7 @@ export function SuggestedRules({
           </div>
         ))
       ) : (
-        <p className="muted">Your categorization defaults are up to date.</p>
+        <p className="muted">Your rules are up to date.</p>
       )}
       {message && (
         <p role="status">

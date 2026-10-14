@@ -11,7 +11,7 @@ import {
   ReferenceArea,
 } from "recharts";
 import { useId, useState } from "react";
-import { money, currencyPrecision } from "../domain/money";
+import { compactMoney, money, currencyPrecision } from "../domain/money";
 import type { MonthCoverage } from "../analytics/coverage";
 
 export interface CashChartPoint {
@@ -135,8 +135,8 @@ export function CashChart({
             {data.filter(missing).map((point, index) => (
               <ReferenceArea
                 key={`${point.month ?? point.label}-${index}`}
-                x1={point.label}
-                x2={point.label}
+                x1={point.label.replace("Sept", "Sep")}
+                x2={point.label.replace("Sept", "Sep")}
                 fill={`url(#${hatchId})`}
                 fillOpacity={0.25}
                 stroke="none"
@@ -167,18 +167,19 @@ export function CashChart({
               tick={{ fontSize: 13, fill: "var(--muted)" }}
               tickFormatter={(label) => {
                 const point = data.find((item) => item.label === label);
-                return `${String(label)}${point?.coverage?.status === "Partial" ? "*" : ""}`;
+                const short = String(label)
+                  .replace(/\bSept\b/g, "Sep")
+                  .replace(/^([A-Za-z]{3})[a-z]+/, "$1");
+                return `${short}${point?.coverage?.status === "Partial" ? "*" : ""}`;
               }}
             />
             <YAxis
+              width="auto"
               tickLine={false}
               axisLine={false}
               tick={{ fontSize: 13, fill: "var(--muted)" }}
               tickFormatter={(v) => {
-                const n = Number(v) / factor;
-                return Math.abs(n) >= 1000
-                  ? `${+(n / 1000).toFixed(1)}k`
-                  : String(Math.round(n));
+                return compactMoney(Number(v), currency);
               }}
             />
             <Tooltip
@@ -189,7 +190,7 @@ export function CashChart({
                 return (
                   <div className="chart-tooltip">
                     <strong>
-                      {point.label}
+                      {point.label.replace("Sept", "Sep")}
                       {point.coverage ? ` · ${point.coverage.status}` : ""}
                     </strong>
                     {missing(point) ? (
@@ -306,14 +307,14 @@ export function CashChart({
                 <button
                   className="chart-month-gap"
                   key={index}
-                  aria-label={`${point.label}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`}
+                  aria-label={`${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`}
                   onClick={() =>
                     setSelectedGap(
-                      `${point.label}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`,
+                      `${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`,
                     )
                   }
                 >
-                  {point.label}
+                  {point.label.replace("Sept", "Sep")}
                 </button>
               ) : (
                 <span
@@ -324,7 +325,7 @@ export function CashChart({
                       : ""
                   }
                 >
-                  {point.label}
+                  {point.label.replace("Sept", "Sep")}
                   {point.coverage?.status === "Partial" ? "*" : ""}
                 </span>
               ),
@@ -352,48 +353,55 @@ export function CashChart({
       {showValues && (
         <details className="chart-data">
           <summary>View chart values</summary>
-          <table>
-            <thead>
-              <tr>
-                <th>Month</th>
-                {data.some((point) => point.coverage) && <th>Coverage</th>}
-                <th>{property ? "Property net" : "Income"}</th>
-                {!property && (
-                  <>
-                    <th>Spending</th>
-                    <th>Net</th>
-                  </>
-                )}
-              </tr>
-            </thead>
-            <tbody>
-              {data.map((d, i) => (
-                <tr key={i}>
-                  <th>{d.label}</th>
-                  {data.some((point) => point.coverage) && (
-                    <td>
-                      {d.coverage?.status ?? "Unavailable"}
-                      {d.coverage?.hasUnverifiedStatements &&
-                        d.coverage.status === "Partial" &&
-                        " · verification incomplete"}
-                    </td>
-                  )}
-                  <td>{value(property ? d.property : d.income, d)}</td>
+          <div
+            className="table-scroll"
+            role="region"
+            aria-label="Cash flow values"
+            tabIndex={0}
+          >
+            <table>
+              <thead>
+                <tr>
+                  <th>Month</th>
+                  {data.some((point) => point.coverage) && <th>Coverage</th>}
+                  <th>{property ? "Property net" : "Income"}</th>
                   {!property && (
                     <>
-                      <td>
-                        {value(
-                          d.expenses === null ? null : -Math.abs(d.expenses),
-                          d,
-                        )}
-                      </td>
-                      <td>{value(d.net, d)}</td>
+                      <th>Spending</th>
+                      <th>Net</th>
                     </>
                   )}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {data.map((d, i) => (
+                  <tr key={i}>
+                    <th>{d.label}</th>
+                    {data.some((point) => point.coverage) && (
+                      <td>
+                        {d.coverage?.status ?? "Unavailable"}
+                        {d.coverage?.hasUnverifiedStatements &&
+                          d.coverage.status === "Partial" &&
+                          " · verification incomplete"}
+                      </td>
+                    )}
+                    <td>{value(property ? d.property : d.income, d)}</td>
+                    {!property && (
+                      <>
+                        <td>
+                          {value(
+                            d.expenses === null ? null : -Math.abs(d.expenses),
+                            d,
+                          )}
+                        </td>
+                        <td>{value(d.net, d)}</td>
+                      </>
+                    )}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </details>
       )}
     </div>

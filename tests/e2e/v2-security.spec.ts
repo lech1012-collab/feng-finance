@@ -1,3 +1,4 @@
+import { settingsSection, loadDemoUi } from "./flows";
 import {
   devices,
   expect,
@@ -57,18 +58,7 @@ async function settingsWithDemo(page: Page, origin = "") {
   await expect(
     page.getByRole("heading", { name: "Settings", exact: true }),
   ).toBeVisible();
-  // Financial backup/lock assertions must not race the optional public-rate
-  // refresh. Its real HTTP request is covered by the reporting privacy test.
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
-  await expect(
-    page.getByRole("status").filter({ hasText: "Rate preference saved." }),
-  ).toBeVisible();
-  await page
-    .getByRole("button", { name: "Load demo data", exact: true })
-    .click();
-  await expect(
-    page.getByText("Fictitious demo data added.", { exact: true }),
-  ).toBeVisible();
+  await loadDemoUi(page);
 }
 async function records(page: Page, names: string[]) {
   return page.evaluate(
@@ -112,6 +102,7 @@ test("app lock hides finances after background timeout and remains usable at 320
   page,
 }, testInfo) => {
   await settingsWithDemo(page);
+  await settingsSection(page, "security");
   const security = page.locator("#security");
   await security
     .getByLabel("Choose a 6-digit app PIN", { exact: true })
@@ -169,7 +160,13 @@ test("encrypted backups expose no financial text and wrong-password/cancel resto
   page,
 }, testInfo) => {
   await settingsWithDemo(page);
-  const panel = page.locator("#encrypted-backup");
+  await settingsSection(page, "backup");
+  await page.getByRole("button", { name: "Save backup", exact: true }).click();
+  const panel = page.locator("main");
+  const saveSheet = page.getByRole("dialog", {
+    name: "Save backup",
+    exact: true,
+  });
   await panel
     .getByLabel("Backup password", { exact: true })
     .fill("synthetic secret phrase 2026");
@@ -177,8 +174,8 @@ test("encrypted backups expose no financial text and wrong-password/cancel resto
     .getByLabel("Confirm backup password", { exact: true })
     .fill("synthetic secret phrase 2026");
   const downloading = page.waitForEvent("download");
-  await panel
-    .getByRole("button", { name: "Export encrypted backup", exact: true })
+  await saveSheet
+    .getByRole("button", { name: "Save backup", exact: true })
     .click();
   const downloaded = await downloading,
     path = await downloaded.path();
@@ -193,7 +190,7 @@ test("encrypted backups expose no financial text and wrong-password/cancel resto
     encryption: "AES-256-GCM",
     iterations: 600000,
   });
-  await expect(panel.getByText(/Encrypted backup ready/)).toBeVisible();
+  await expect(page.getByRole("status")).toContainText("Backup ready:");
   const tables = [
     "accounts",
     "statements",
@@ -282,8 +279,13 @@ test("notes and compressed image/PDF attachments work offline with no financial 
   await manager
     .getByLabel("Private note", { exact: true })
     .fill("Fictitious travel receipt, privately stored.");
-  await manager.getByRole("button", { name: "Save note", exact: true }).click();
-  await expect(manager.getByRole("status")).toContainText("Note saved.");
+  await page.evaluate(() => {
+    if (document.activeElement instanceof HTMLElement)
+      document.activeElement.blur();
+  });
+  await expect(
+    page.getByRole("status").filter({ hasText: "Note saved." }),
+  ).toBeVisible();
   await manager
     .getByLabel("Choose transaction attachment", { exact: true })
     .setInputFiles({
@@ -330,7 +332,7 @@ test("notes and compressed image/PDF attachments work offline with no financial 
   await expect(
     manager.getByText("1 of 5 attachments.", { exact: false }),
   ).toBeVisible();
-  await manager.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(
     manager.getByText("2 of 5 attachments.", { exact: false }),
   ).toBeVisible();

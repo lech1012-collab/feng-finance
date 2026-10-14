@@ -12,6 +12,7 @@ import {
 import { redactedDiagnosticsText } from "../beta/diagnostics-redaction";
 import "./accuracy.css";
 import "./feedback.css";
+import { formatLocalDateTime } from "../domain/dates";
 
 export interface FeedbackProps {
   configuration: ReleaseConfiguration;
@@ -100,12 +101,19 @@ function FeedbackDialog({
         </div>
         <div>
           <dt>Build date</dt>
-          <dd>{context.buildDate}</dd>
+          <dd>{formatLocalDateTime(context.buildDate)}</dd>
         </div>
         <div>
           <dt>Device</dt>
           <dd>
-            {context.deviceType} · {context.operatingSystem}
+            {context.deviceType === "iphone"
+              ? "iPhone"
+              : context.deviceType === "ipad"
+                ? "iPad"
+                : context.deviceType === "desktop"
+                  ? "Desktop"
+                  : "Mobile"}{" "}
+            · {context.operatingSystem}
           </dd>
         </div>
         <div>
@@ -116,6 +124,9 @@ function FeedbackDialog({
           <dt>Display</dt>
           <dd>
             {context.displayMode} · {context.screenWidth}px
+            {context.displayMode === "tab" && (
+              <small>Install Feng for the best experience.</small>
+            )}
           </dd>
         </div>
       </dl>

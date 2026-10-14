@@ -22,12 +22,12 @@ export function currencyPrecision(currency: string) {
 export function parseMoney(raw: string, currency = "GBP"): number {
   const p = currencyPrecision(currency);
   const source = raw.trim();
-  const negative = /^-|^\(|\bDR\s*$/i.test(source);
+  const negative = /^[-−]|^\(|\bDR\s*$/i.test(source);
   const credit = /\bCR\s*$/i.test(source);
   const clean = source
     .replace(/(?:GBP|EUR|USD|CHF|AUD|CAD|NZD|HKD|SGD|JPY|KWD|CR|DR)/gi, "")
     .replace(/[£€$¥\s()]/g, "")
-    .replace(/^[+-]/, "");
+    .replace(/^[+−-]/, "");
   // Accept grouped English amounts; reject ambiguous decimal/localized formats.
   if (
     !new RegExp(
@@ -48,7 +48,12 @@ export function decimalMoney(minor: number, currency = "GBP") {
   const factor = BigInt(10 ** p);
   return `${minor < 0 ? "-" : ""}${value / factor}${p ? "." + String(value % factor).padStart(p, "0") : ""}`;
 }
-export function money(minor: number, currency = "GBP", signed = false) {
+export function money(
+  minor: number,
+  currency = "GBP",
+  signed = false,
+  approximate = false,
+) {
   const p = currencyPrecision(currency);
   const value = BigInt(minor);
   const factor = BigInt(10 ** p);
@@ -64,10 +69,20 @@ export function money(minor: number, currency = "GBP", signed = false) {
     maximumFractionDigits: p,
     signDisplay: signed && minor !== 0 ? "always" : "auto",
   });
-  return formatter
+  const formatted = formatter
     .formatToParts(whole === 0n && minor < 0 ? -0 : whole)
-    .map((part) => (part.type === "fraction" ? fraction : part.value))
+    .map((part) =>
+      part.type === "fraction"
+        ? fraction
+        : part.type === "minusSign"
+          ? "−"
+          : part.value,
+    )
     .join("");
+  if (!approximate) return formatted;
+  return /^[+−]/.test(formatted)
+    ? `${formatted[0]}≈${formatted.slice(1)}`
+    : `≈ ${formatted}`;
 }
 export function safeSum(values: number[]) {
   return values.reduce((s, x) => {
@@ -76,4 +91,15 @@ export function safeSum(values: number[]) {
       throw new Error("Financial total exceeds safe precision.");
     return total;
   }, 0);
+}
+
+/** Display-only rounding for crowded chart/calendar labels, never stored values. */
+export function compactMoney(minor: number, currency = "GBP") {
+  const value = minor / 10 ** currencyPrecision(currency);
+  const symbol =
+    new Intl.NumberFormat("en-GB", { style: "currency", currency })
+      .formatToParts(0)
+      .find((part) => part.type === "currency")?.value ?? currency;
+  const magnitude = Math.abs(value);
+  return `${value < 0 ? "−" : ""}${symbol}${magnitude >= 1000 ? `${+(magnitude / 1000).toFixed(1)}k` : Math.round(magnitude)}`;
 }

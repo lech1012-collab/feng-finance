@@ -1,3 +1,6 @@
+import { Sheet, SheetFooter } from "./Sheet";
+import { Toast } from "./Toast";
+import { localToday } from "../analytics/reminders";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -18,7 +21,7 @@ export function ManualTransactionEditor({
   }));
   const [open, setOpen] = useState(false);
   const [account, setAccount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
+  const [date, setDate] = useState(localToday());
   const [description, setDescription] = useState("");
   const [direction, setDirection] = useState<"out" | "in">("out");
   const [amount, setAmount] = useState("");
@@ -95,11 +98,12 @@ export function ManualTransactionEditor({
         Add manual transaction
       </button>
       {open && (
-        <section
-          className="card accuracy-editor"
-          aria-label="Manual transaction"
+        <Sheet
+          title="Manual transaction"
+          onClose={() => {
+            if (!busy) setOpen(false);
+          }}
         >
-          <h2>Manual transaction</h2>
           <p className="coverage-note">
             Record cash or a payment before its statement arrives. Matching
             statement rows can replace it without counting it twice.
@@ -168,7 +172,7 @@ export function ManualTransactionEditor({
                 value={category}
                 onChange={(event) => setCategory(event.target.value)}
               >
-                <option value="">Uncategorized</option>
+                <option value="">Uncategorised</option>
                 {data?.categories
                   .filter(
                     (item) =>
@@ -207,37 +211,27 @@ export function ManualTransactionEditor({
               {error}
             </p>
           )}
-          <button
-            className="primary"
-            disabled={busy || !date || !description.trim() || !amount}
-            onClick={() => void save()}
-          >
-            Save manual transaction
-          </button>
-        </section>
+          <SheetFooter>
+            <button
+              className="primary"
+              disabled={busy || !date || !description.trim() || !amount}
+              onClick={() => void save()}
+            >
+              Save manual transaction
+            </button>
+          </SheetFooter>
+        </Sheet>
       )}
       {receipt && (
-        <div role="status" className="notice">
-          Manual transaction saved ·{" "}
-          {money(receipt.amount, receipt.currency, true)}.{" "}
-          <button
-            onClick={async () => {
-              try {
-                await undoChange(receipt.changeId);
-                setReceipt(undefined);
-                await onSaved?.();
-              } catch (exception) {
-                setError(
-                  exception instanceof Error
-                    ? exception.message
-                    : "Undo failed.",
-                );
-              }
-            }}
-          >
-            Undo
-          </button>
-        </div>
+        <Toast
+          id={receipt.changeId}
+          message={`Manual transaction saved · ${money(receipt.amount, receipt.currency, true)}`}
+          undo={async () => {
+            await undoChange(receipt.changeId);
+            setReceipt(undefined);
+            await onSaved?.();
+          }}
+        />
       )}
       {!open && error && (
         <p role="alert" className="notice warning">

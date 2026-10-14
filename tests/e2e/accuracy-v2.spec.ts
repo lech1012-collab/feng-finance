@@ -199,7 +199,7 @@ test("split editor blocks an unallocated penny and refund updates the closed pur
     split.getByRole("button", { name: "Save split", exact: true }),
   ).toBeDisabled();
   await expect(
-    split.getByText("£0.01 unallocated", { exact: true }),
+    split.getByText("Remaining £0.01", { exact: true }),
   ).toBeVisible();
   await split.getByLabel("Split amount 2", { exact: true }).fill("15.00");
   await split.getByRole("button", { name: "Save split", exact: true }).click();
@@ -208,10 +208,10 @@ test("split editor blocks an unallocated penny and refund updates the closed pur
     "Split · 2 lines",
   );
   await expect(page.locator(".accuracy-split-summary")).toContainText(
-    "-£45.00",
+    "−£45.00",
   );
   await expect(page.locator(".accuracy-split-summary")).toContainText(
-    "-£15.00",
+    "−£15.00",
   );
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect
@@ -265,7 +265,7 @@ test("manual transfer confirmation excludes both card-payment sides and offers o
       async () => (await record(page, "transactions", "accuracy-credit"))?.kind,
     )
     .toBe("card_repayment");
-  await review.getByRole("button", { name: "Undo", exact: true }).click();
+  await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect
     .poll(
       async () =>
@@ -291,7 +291,7 @@ test("manual entries save to the selected account and can be removed with Undo",
   await page
     .getByRole("button", { name: "Add manual transaction", exact: true })
     .click();
-  const editor = page.getByRole("region", {
+  const editor = page.getByRole("dialog", {
     name: "Manual transaction",
     exact: true,
   });
@@ -309,8 +309,8 @@ test("manual entries save to the selected account and can be removed with Undo",
   await editor
     .getByRole("button", { name: "Save manual transaction", exact: true })
     .click();
-  const notice = page.locator(".manual-entry [role=status]");
-  await expect(notice).toContainText("-£12.34");
+  const notice = page.locator(".ux-toast");
+  await expect(notice).toContainText("−£12.34");
   await notice.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(notice).toHaveCount(0);
 });

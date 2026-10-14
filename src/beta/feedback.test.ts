@@ -20,7 +20,7 @@ describe("private beta feedback", () => {
     expect(context).toEqual({
       ...release,
       deviceType: "iphone",
-      operatingSystem: "iOS 18.6",
+      operatingSystem: "iOS",
       browser: "Safari 18.6",
       displayMode: "tab",
       screenWidth: 390,

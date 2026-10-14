@@ -98,7 +98,7 @@ describe("beta lifecycle components", () => {
     expect(save).not.toHaveBeenCalled();
   });
 
-  it("marks separate storage acknowledged only after a successful backup", async () => {
+  it("opens the backup wizard without falsely acknowledging a backup or separate storage", async () => {
     const save = vi.fn().mockResolvedValue(undefined);
     const backup = vi.fn().mockResolvedValue(undefined);
     render(
@@ -111,14 +111,13 @@ describe("beta lifecycle components", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: "Save backup" }));
+    await waitFor(() => expect(backup).toHaveBeenCalledOnce());
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "I understand" }));
     await waitFor(() =>
       expect(save).toHaveBeenCalledWith([
         { key: "separateStorageWarningSeen", value: "true" },
       ]),
-    );
-    expect(backup).toHaveBeenCalledOnce();
-    expect(backup.mock.invocationCallOrder[0]).toBeLessThan(
-      save.mock.invocationCallOrder[0],
     );
   });
 

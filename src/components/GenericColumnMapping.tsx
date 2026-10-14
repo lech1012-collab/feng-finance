@@ -1,3 +1,4 @@
+import { money } from "../domain/money";
 import { useEffect, useState } from "react";
 import type { ColumnRole, LayoutMapping } from "../import/generic/types";
 import {
@@ -11,12 +12,13 @@ export function GenericColumnMapping({
   busy,
   onMapping,
   onSaveTemplate,
+  currency = "GBP",
 }: Pick<
   GenericImportReviewProps,
-  "result" | "busy" | "onMapping" | "onSaveTemplate"
+  "result" | "busy" | "onMapping" | "onSaveTemplate" | "currency"
 >) {
   const [mapping, setMapping] = useState(() => initialMapping(result));
-  const [name, setName] = useState("");
+  const [name, setName] = useState("My statement layout");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
   const mappingKey = JSON.stringify(result.mapping);
@@ -104,73 +106,60 @@ export function GenericColumnMapping({
         if (!columns.length) return null;
         return (
           <div
-            className="generic-table-scroll"
+            className="generic-mapping-columns"
             key={page}
             role="region"
-            aria-label={`Column preview, page ${page}`}
             tabIndex={0}
+            aria-label={`Column preview, page ${page}`}
           >
-            <table>
-              <caption>
-                Page {page} · first {rows.length} reconstructed rows
-              </caption>
-              <thead>
-                <tr>
-                  {columns.map((column, index) => (
-                    <th scope="col" key={column.id}>
-                      <label>
-                        {column.headerText || `Column ${index + 1}`}
-                        <select
-                          aria-label={`Role for ${column.headerText || `column ${index + 1}`} on page ${page}`}
-                          disabled={busy}
-                          value={
-                            mapping.columnRoles.find(
-                              (role) => role.columnId === column.id,
-                            )?.role ?? "ignore"
-                          }
-                          onChange={(event) =>
-                            update({
-                              ...mapping,
-                              columnRoles: result.table.columns.map(
-                                (entry) => ({
-                                  columnId: entry.id,
-                                  role:
-                                    entry.id === column.id
-                                      ? (event.target.value as ColumnRole)
-                                      : (mapping.columnRoles.find(
-                                          (role) => role.columnId === entry.id,
-                                        )?.role ?? "ignore"),
-                                }),
-                              ),
-                            })
-                          }
-                        >
-                          {roles.map((role) => (
-                            <option value={role.value} key={role.value}>
-                              {role.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map((row) => (
-                  <tr key={row.id}>
-                    {columns.map((column) => (
-                      <td key={column.id}>
-                        {row.cells
-                          .filter((cell) => cell.columnId === column.id)
-                          .map((cell) => cell.text)
-                          .join(" ") || "—"}
-                      </td>
+            <h3>Page {page} columns</h3>
+            {columns.map((column, index) => (
+              <section className="generic-mapping-column" key={column.id}>
+                <label>
+                  {column.headerText || `Column ${index + 1}`}
+                  <select
+                    aria-label={`Role for ${column.headerText || `column ${index + 1}`} on page ${page}`}
+                    disabled={busy}
+                    value={
+                      mapping.columnRoles.find(
+                        (role) => role.columnId === column.id,
+                      )?.role ?? "ignore"
+                    }
+                    onChange={(event) =>
+                      update({
+                        ...mapping,
+                        columnRoles: result.table.columns.map((entry) => ({
+                          columnId: entry.id,
+                          role:
+                            entry.id === column.id
+                              ? (event.target.value as ColumnRole)
+                              : (mapping.columnRoles.find(
+                                  (role) => role.columnId === entry.id,
+                                )?.role ?? "ignore"),
+                        })),
+                      })
+                    }
+                  >
+                    {roles.map((role) => (
+                      <option value={role.value} key={role.value}>
+                        {role.label}
+                      </option>
                     ))}
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                  </select>
+                </label>
+                <p className="muted">Sample values</p>
+                <ul>
+                  {rows.slice(0, 3).map((row) => (
+                    <li key={row.id}>
+                      {row.cells
+                        .filter((cell) => cell.columnId === column.id)
+                        .map((cell) => cell.text)
+                        .join(" ") || "—"}
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ))}
           </div>
         );
       })}
@@ -178,6 +167,8 @@ export function GenericColumnMapping({
         {result.checks.reconciledExactly
           ? "These columns reconcile exactly to the statement."
           : `${result.checks.balanceRowsPassed} rows match their running balance. The statement is not verified yet.`}
+        {result.checks.reconciliation.difference !== undefined &&
+          ` Difference ${money(result.checks.reconciliation.difference, result.parsed?.currency ?? currency)}.`}
       </p>
       <form
         className="generic-save-layout"

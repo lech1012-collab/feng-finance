@@ -12,6 +12,7 @@ import type {
 } from "../domain/models";
 import { fingerprint } from "../domain/normalize";
 import { monthOffset } from "../domain/dates";
+import { localToday } from "../analytics/reminders";
 import { auditedMutation } from "./audit";
 import { updateClosedMonthSnapshots } from "./month-review";
 
@@ -21,7 +22,8 @@ export async function loadDemo() {
   if (await db.accounts.get("demo-barclays"))
     return { result: undefined, changeId: "" };
   const now = new Date().toISOString(),
-    end = now.slice(0, 7);
+    // Demo statements are completed history, never a fictional future balance.
+    end = monthOffset(localToday().slice(0, 7), -1);
   const specifications: [
     string,
     Account["institution"],
@@ -463,7 +465,7 @@ export async function loadDemo() {
     {
       id: "demo-house-valuation",
       accountId: "demo-house",
-      date: `${end.slice(0, 4)}-06-01`,
+      date: `${monthOffset(end, -6)}-01`,
       valueMinor: 45000000,
       note: "Fictitious example value",
       isDemo: true,
@@ -471,7 +473,7 @@ export async function loadDemo() {
     {
       id: "demo-mortgage-valuation",
       accountId: "demo-mortgage",
-      date: `${end.slice(0, 4)}-06-01`,
+      date: `${monthOffset(end, -6)}-01`,
       valueMinor: 28000000,
       note: "Fictitious outstanding loan",
       isDemo: true,
@@ -533,6 +535,19 @@ export async function loadDemo() {
         });
     }
   }
+  const currentRateDate = new Date(`${localToday()}T12:00:00Z`);
+  while ([0, 6].includes(currentRateDate.getUTCDay()))
+    currentRateDate.setUTCDate(currentRateDate.getUTCDate() - 1);
+  const currentRate = currentRateDate.toISOString().slice(0, 10);
+  if (!rates.some((rate) => rate.date === currentRate))
+    rates.push({
+      id: `demo-fx-${currentRate}`,
+      date: currentRate,
+      base: "EUR",
+      quote: "GBP",
+      rate: "0.86425",
+      source: "manual",
+    });
   return auditedMutation(
     "Load demo data",
     [

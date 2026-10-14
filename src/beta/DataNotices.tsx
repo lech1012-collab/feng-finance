@@ -30,8 +30,6 @@ export function DataNotices({
     setError("");
     try {
       await onBackup();
-      if (separate)
-        await onSave([{ key: "separateStorageWarningSeen", value: "true" }]);
     } catch {
       setError(
         "The backup could not be prepared. Your existing data is safe. Please try again.",
@@ -54,7 +52,11 @@ export function DataNotices({
         {error && <p role="alert">{error}</p>}
       </div>
       <div className="actions">
-        <button disabled={busy} onClick={() => void backup()}>
+        <button
+          className="primary"
+          disabled={busy}
+          onClick={() => void backup()}
+        >
           Save backup
         </button>
         {separate && (

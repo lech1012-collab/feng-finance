@@ -252,7 +252,7 @@ describe("import review corrections", () => {
     const date = screen.getAllByLabelText("Date", { exact: true })[0];
     expect(date).toHaveAttribute("readonly");
     expect(
-      screen.getByText(/To correct them, open Reading options/),
+      screen.getByText(/To correct them, open Reading details/),
     ).toBeInTheDocument();
     fireEvent.blur(input, {
       target: { value: decimalMoney(row.amount, row.currency) },

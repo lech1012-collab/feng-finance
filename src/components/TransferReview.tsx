@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -87,6 +88,18 @@ export function TransferReview({
     }
   };
   if (!data || (!data.proposals.length && !receipt)) return null;
+  const toast = receipt && (
+    <Toast
+      id={receipt.changeId}
+      message={`${receipt.label}.`}
+      undo={async () => {
+        await undoChange(receipt.changeId);
+        setReceipt(undefined);
+        await onChanged?.();
+      }}
+    />
+  );
+  if (!data.proposals.length) return toast;
   const transactions = data.proposals.flatMap((proposal) => [
     proposal.debitTxId,
     proposal.creditTxId,
@@ -187,32 +200,7 @@ export function TransferReview({
           {error}
         </p>
       )}
-      {receipt && (
-        <div role="status" className="notice">
-          {receipt.label}.{" "}
-          <button
-            disabled={busy}
-            onClick={async () => {
-              setBusy(true);
-              try {
-                await undoChange(receipt.changeId);
-                setReceipt(undefined);
-                await onChanged?.();
-              } catch (exception) {
-                setError(
-                  exception instanceof Error
-                    ? exception.message
-                    : "Undo failed.",
-                );
-              } finally {
-                setBusy(false);
-              }
-            }}
-          >
-            Undo
-          </button>
-        </div>
-      )}
+      {toast}
     </section>
   );
 }

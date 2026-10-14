@@ -27,7 +27,7 @@ balances and printed totals agree, review the summary and confirm once. The
 generic PDF parser handles unfamiliar banks, unsupported layouts and scanned
 statements. Native bank recognition does not require a generic profile or a
 second generic reading of every row. Genuine native warnings remain in the
-simple review. **Reading options → Review PDF layout** deliberately switches
+simple review. **Reading details → Review PDF layout** deliberately switches
 to generic source correction if an amount or date needs changing.
 Every layout still needs its own arithmetic checks; synthetic fixtures do not
 certify every real statement variant. Questionable rows remain visible for
@@ -49,6 +49,8 @@ specification to source code and verification. The
 beta safeguards. Read the
 [security notes](docs/security-v2.md), [privacy audit](docs/privacy.md) and
 [validation record](docs/validation.md) for limitations and current release checks.
+The [UX review implementation record](docs/ux-v225-review.md) maps the designer's
+44 blockers and 205 additional findings to the v2.2.6 changes and manual checks.
 
 ## Development
 
@@ -72,6 +74,7 @@ npm run build                    # Strict TypeScript and static production PWA
 npm run preview                  # Production preview on port 4173
 npx playwright install --with-deps chromium webkit
 npm run test:e2e                  # Browser workflows, including mobile viewport
+npm run test:a11y                 # 161 demo screen states; keep preview running
 npm audit                        # Dependency vulnerability review
 npm run check                    # Unit tests, build and browser tests
 npm run check:repo                # Reject statements, exports and secrets in Git
@@ -180,13 +183,15 @@ on the source statement.
 ## Screens and planning
 
 - **Home:** dated cash/card debt/net-worth position, monthly income/spending/net,
-  up to three To do items, category spending, pots, cash-flow history, upcoming
+  prioritised To do items, category spending, pots, cash-flow history, upcoming
   payments and data health. Figures distinguish complete, partial, unverified
   and missing data. Missing history is a gap, not zero; comparisons require
   verified evidence at both endpoints.
-- **Transactions:** account chips, To review/Uncategorized and the requested
+- **Transactions:** account chips, Needs review/Uncategorised and the requested
   category shortcuts, indexed date/account filters, advanced search, saved views,
-  bulk review, tags, manual entries, sorting and source detail. Notes are
+  bulk review, tags, manual entries, sorting and source detail. Other filters open
+  in a sheet; saved views are quick chips. Category, type and tag edits save
+  immediately with Undo. Display-name edits retain original bank text. Notes are
   searchable. Up to five local image/PDF attachments can be added; images are
   resized to at most 1600 pixels before storage.
 - **Analyse:** one month/range drives cash flow, income/spending/category trends,
@@ -324,6 +329,10 @@ Local PIN hashes, salts, platform credential IDs and other `security:` settings
 are excluded, including audit snapshots. Restore keeps the current device's lock
 configuration; moving devices requires configuring that device's lock.
 
+Settings → Backup and restore provides one **Save backup** wizard, protected by
+default with a confirmed password of at least 12 characters. Restore accepts old
+JSON and `.feng` files, including older eight-character passwords.
+
 Use an encrypted **`.feng`** backup for a portable protected copy. It uses
 AES-GCM-256, PBKDF2-SHA256 with 600,000 iterations and fresh random salt/IV.
 The authenticated header carries format/version/date/encryption metadata, not
@@ -336,7 +345,8 @@ Restore validates versions, identifiers, safe integer money, references,
 currencies, statement counts, exact split sums, refund allocations, transfer
 links and portable receipt bytes before replacing data. A newer schema is
 rejected with an Update instruction. Replace restore requires explicit UI
-confirmation, runs atomically and supports local Undo. Merge is not supported.
+confirmation and runs atomically. Preview and cancellation leave existing data
+untouched; save a current backup first to preserve it before replacement. Merge is not supported.
 
 IndexedDB schema 1 is preserved. Schema 2 added merchant/review metadata. Schema
 3 additively introduces v2 tables and optional fields, retaining legacy amounts,
@@ -352,7 +362,7 @@ keeping the current additive database schema. Exact recovery does not immediatel
 rewrite old records with new defaults or perform automatic financial maintenance.
 No parser failure or version check automatically clears the database.
 
-For repeat-import testing, export a backup, then Settings → **Delete imported
+For repeat-import testing, export a backup, then Settings → Danger zone → **Delete imported
 records**. Accounts, categories, learned rules and plans remain; manual entries
 are retained. Reimport and compare every row against the source. **Erase
 everything** also removes categorization memory, plans, attachments and the local
@@ -424,3 +434,11 @@ are ignored and blocked.
 - No Open Banking, cloud sync, household sharing, AI assistant or automatic
   movement/cancellation of money. Property reporting is cash flow, not accrual,
   depreciation or a guaranteed tax treatment. Plans depend on imported evidence.
+
+## v2.2.6 UX review
+
+[The review implementation record](docs/ux-v225-review.md) maps all 44 blockers
+and 205 screen findings to shared controls, financial safeguards and verification.
+Dark remains the owner-selected default. Native Barclays, Barclaycard, Amex and
+Revolut parsing remains ahead of generic source review. Database schema 4,
+parser version 2.2.3 and portable backup version 1 remain unchanged.

@@ -72,8 +72,8 @@ async function records(page: Page) {
 async function privateInstalledApp(page: Page, host: LocalHost) {
   await page.goto(`${host.origin}/#/`);
   await acknowledgeBeta(page);
-  await page.goto(`${host.origin}/#/settings`);
-  const rates = page.getByLabel("Download public ECB rates");
+  await page.goto(`${host.origin}/#/settings?section=currency`);
+  const rates = page.getByLabel("Download daily rates (ECB)");
   if (await rates.isChecked()) {
     await rates.uncheck();
     await expect(page.getByText("Rate preference saved.")).toBeVisible();
@@ -112,7 +112,7 @@ async function privateInstalledApp(page: Page, host: LocalHost) {
   // Playwright setOffline bypasses WebKit's service worker and breaks local blobs.
   await page.reload();
   await expect(
-    page.getByRole("heading", { name: "Settings", exact: true }),
+    page.getByRole("heading", { name: "Currency", level: 1, exact: true }),
   ).toBeVisible();
   await page.goto(`${host.origin}/#/import`);
   await expect(
@@ -326,7 +326,7 @@ test("a one-penny digital discrepancy stays unverified until the source amount i
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
   const options = card.locator(
-    'details.generic-parser-details:has(> summary:text-is("Reading options"))',
+    'details.generic-parser-details:has(> summary:text-is("Reading details"))',
   );
   await options.locator(":scope > summary").click();
   await options

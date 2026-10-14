@@ -80,7 +80,7 @@ export function TagAnalysis({
                   <tr key={id}>
                     <th scope="row">
                       {categories.find((c) => c.id === id)?.name ??
-                        "Uncategorized"}
+                        "Uncategorised"}
                     </th>
                     <td>
                       <Link to={sourcePath(id)}>{money(amount, currency)}</Link>

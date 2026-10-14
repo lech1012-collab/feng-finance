@@ -1024,7 +1024,7 @@ export default function ImportPage({
                   if (entry.draft?.bankSource) {
                     return (
                       <details className="generic-parser-details">
-                        <summary>Reading options</summary>
+                        <summary>Reading details</summary>
                         <p>
                           This statement uses its bank reader. If a date or
                           amount looks wrong, review the PDF layout to correct

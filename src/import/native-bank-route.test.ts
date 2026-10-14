@@ -75,6 +75,23 @@ afterAll(async () => {
 });
 
 describe("supported bank readers precede generic inference", () => {
+  it("flags future statement periods and requires explicit acknowledgement even when the figures reconcile", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(new Date("2025-01-13T12:00:00Z"));
+    try {
+      const draft = await prepareDraft(source("T1"));
+      expect(
+        draft.warnings.some((warning) =>
+          warning.includes("ends in the future"),
+        ),
+      ).toBe(true);
+      expect(() => validateDraft(draft, false)).toThrow(/Acknowledge/);
+      draft.reviewedWarnings = true;
+      expect(() => validateDraft(draft, false)).not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
   it.each([
     ["T1", "Barclays", "current", 3],
     ["T4", "American Express", "credit", 2],

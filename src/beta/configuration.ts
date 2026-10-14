@@ -13,7 +13,8 @@ export const RELEASE_CONFIGURATION: ReleaseConfiguration = Object.freeze({
       ? __FENG_BUILD_DATE__
       : "development",
   feedbackUrl: nonempty(import.meta.env.VITE_FEEDBACK_URL),
-  feedbackEmail: nonempty(import.meta.env.VITE_FEEDBACK_EMAIL),
+  feedbackEmail:
+    nonempty(import.meta.env.VITE_FEEDBACK_EMAIL) ?? "lech1012@googlemail.com",
   feedbackContextParameter: nonempty(
     import.meta.env.VITE_FEEDBACK_CONTEXT_PARAMETER,
   ),

@@ -1,3 +1,5 @@
+import { merchantExpenses } from "../analytics/merchant-expenses";
+import { useSearchParams } from "react-router-dom";
 import { ReportBuilder } from "../components/ReportBuilder";
 import { TagAnalysis } from "../components/TagAnalysis";
 import { projectedReportingTransactions } from "../analytics/fx";
@@ -36,7 +38,7 @@ import { localToday } from "../analytics/reminders";
 import { financialType } from "../domain/transaction-type";
 import { displayMerchant } from "../domain/presentation";
 import { money } from "../domain/money";
-import { MonthPicker, Metric } from "../components/common";
+import { MonthPicker, Metric, RangeControl } from "../components/common";
 import { CashChart } from "../components/Chart";
 export default function Analysis({
   month,
@@ -49,6 +51,8 @@ export default function Analysis({
   currency: string;
   property?: boolean;
 }) {
+  const [params] = useSearchParams();
+  const view = params.get("view");
   const [period, setPeriod] = useState(property ? "ytd" : "6");
   const [customFrom, setCustomFrom] = useState(monthBounds(month)[0]);
   const [customTo, setCustomTo] = useState(
@@ -267,10 +271,7 @@ export default function Analysis({
     ? verifiedSeries.reduce((sum, point) => sum + (point.expenses ?? 0), 0) /
       verifiedSeries.length
     : undefined;
-  const largest = [...relevant]
-    .filter((t) => financialType(t) !== "transfer" && t.amount < 0)
-    .sort((a, b) => a.amount - b.amount)
-    .slice(0, 5);
+  const largest = merchantExpenses(relevant);
   const subcategories = property
     ? data.categories
         .filter((c) => c.parentId === "property")
@@ -288,6 +289,49 @@ export default function Analysis({
         }))
         .filter((c) => c.amount)
     : [];
+  if (!property && (view === "reports" || view === "trips"))
+    return (
+      <>
+        <Link className="back-link" to="/analysis">
+          ‹ Analyse
+        </Link>
+        <h1>{view === "reports" ? "Reports" : "Trips and projects"}</h1>
+        {missingRates ? (
+          <section className="card">
+            <h2>Rates needed</h2>
+            <p>
+              Some amounts cannot be converted. Totals are withheld until their
+              exchange rates are available.
+            </p>
+            <Link className="button" to="/settings?section=currency">
+              Review exchange rates
+            </Link>
+          </section>
+        ) : view === "reports" ? (
+          <ReportBuilder
+            transactions={data.transactions}
+            accounts={data.accounts}
+            categories={data.categories}
+            tags={data.tags}
+            currency={currency}
+            rawTransactions={source!.transactions}
+            settings={data.settings}
+          />
+        ) : (
+          <>
+            <TagAnalysis
+              transactions={selectedItems}
+              categories={data.categories}
+              tags={data.tags}
+              currency={currency}
+            />
+            <Link className="button" to="/settings?section=tags">
+              Manage tags
+            </Link>
+          </>
+        )}
+      </>
+    );
   return (
     <>
       {property && (
@@ -302,11 +346,6 @@ export default function Analysis({
           </p>
           <h1>{property ? "Property" : "Analyse"}</h1>
         </div>
-        {!property && (
-          <Link to="/planning" className="button">
-            Planning
-          </Link>
-        )}
       </div>
       {!property && (
         <>
@@ -318,26 +357,30 @@ export default function Analysis({
       )}
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
-        <label className="period-label">
-          Period
-          <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-            {["1", "3", "6", "12", "ytd", "annual", "tax", "custom"].map(
-              (v) => (
-                <option key={v} value={v}>
-                  {v === "ytd"
-                    ? "Year to date"
-                    : v === "annual"
-                      ? "Calendar year"
-                      : v === "tax"
-                        ? "UK tax year"
-                        : v === "custom"
-                          ? "Custom period"
-                          : `${v} month${v === "1" ? "" : "s"}`}
-                </option>
-              ),
-            )}
-          </select>
-        </label>
+        <RangeControl value={period} onChange={(n) => setPeriod(String(n))} />
+        <details className="other-periods">
+          <summary>Other periods</summary>
+          <label className="period-label">
+            Period
+            <select value={period} onChange={(e) => setPeriod(e.target.value)}>
+              {["1", "3", "6", "12", "ytd", "annual", "tax", "custom"].map(
+                (v) => (
+                  <option key={v} value={v}>
+                    {v === "ytd"
+                      ? "Year to date"
+                      : v === "annual"
+                        ? "Calendar year"
+                        : v === "tax"
+                          ? "UK tax year"
+                          : v === "custom"
+                            ? "Custom period"
+                            : `${v} month${v === "1" ? "" : "s"}`}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+        </details>
       </div>
       {period === "custom" && (
         <div className="card form-grid">
@@ -544,13 +587,29 @@ export default function Analysis({
           <h2>Largest expenses</h2>
           {largest.map((t) => (
             <Link
-              key={t.id}
-              to={`/transactions/${t.id}`}
+              key={`${t.currency}:${t.name}`}
+              to={`/transactions?allDates=1&advanced=1&conditions=${encodeURIComponent(
+                JSON.stringify([
+                  {
+                    field: "displayMerchant",
+                    operator: "equals",
+                    value: t.name,
+                  },
+                  {
+                    field: "date",
+                    operator: "between",
+                    value: start,
+                    valueTo: shiftDate(end, -1),
+                  },
+                ]),
+              )}`}
               className="insight-row"
             >
               <span>
-                {displayMerchant(t)}
-                <small>{formatUkDate(t.date)}</small>
+                {t.name}
+                <small>
+                  {t.count} payment{t.count === 1 ? "" : "s"}
+                </small>
               </span>
               <strong>{money(t.amount, currency)}</strong>
             </Link>
@@ -604,8 +663,8 @@ export default function Analysis({
                 ` Monthly average uses ${verifiedSeries.length} verified month${verifiedSeries.length === 1 ? "" : "s"}.`}
             </p>
           </section>
-          <section className="card">
-            <h2>Category trends</h2>
+          <details className="card">
+            <summary>Category trends</summary>
             <p className="muted">
               Monthly expenses in the selected period. Tap a value to inspect
               it.
@@ -652,49 +711,16 @@ export default function Analysis({
                 </tbody>
               </table>
             </div>
-          </section>
-          <section className="card">
-            <h2>Potential recurring costs</h2>
-            <p className="muted">
-              At least three payments, approximately a month apart, with similar
-              amounts. These are suggestions for review.
-            </p>
-            {regular.map((r) => (
-              <div key={r.merchant} className="insight-row">
-                <span>
-                  {displayMerchant({
-                    merchant: r.merchant,
-                    description: r.merchant,
-                  })}
-                  <small>
-                    {r.occurrences} payments · last {formatUkDate(r.lastDate)}
-                  </small>
-                </span>
-                <strong>{money(r.amount, currency)} / month</strong>
-              </div>
-            ))}
-            {!regular.length && <p>No recurring pattern found yet.</p>}
-          </section>
+          </details>
         </>
       )}
       {!property && (
-        <TagAnalysis
-          transactions={selectedItems}
-          categories={data.categories}
-          tags={data.tags}
-          currency={currency}
-        />
-      )}
-      {!property && (
-        <ReportBuilder
-          transactions={data.transactions}
-          accounts={data.accounts}
-          categories={data.categories}
-          tags={data.tags}
-          currency={currency}
-          rawTransactions={source!.transactions}
-          settings={data.settings}
-        />
+        <section className="card more-analysis">
+          <h2>More analysis</h2>
+          <Link to="/analysis?view=reports">Reports ›</Link>
+          <Link to="/subscriptions">Subscriptions and bills ›</Link>
+          <Link to="/analysis?view=trips">Trips and projects ›</Link>
+        </section>
       )}
     </>
   );

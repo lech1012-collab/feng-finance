@@ -4,7 +4,7 @@ import { test, expect, type Page } from "./fixtures";
 const fixture = (name: string) =>
   resolve(`tests/fixtures/known-bank-${name}.pdf`);
 const readingOptionsSelector =
-  'details.generic-parser-details:has(> summary:text-is("Reading options"))';
+  'details.generic-parser-details:has(> summary:text-is("Reading details"))';
 
 interface StoredTransaction {
   statementId: string;
@@ -264,7 +264,7 @@ test("an unknown HSBC statement retains the generic source-reading workflow", as
   await expect(
     card.getByRole("heading", { name: "Other detected", exact: true }),
   ).toBeVisible();
-  await expect(card.locator(readingOptionsSelector)).toHaveCount(0);
+  await expect(card.locator(readingOptionsSelector)).toHaveCount(1);
   const proof = card.getByRole("region", {
     name: "Statement reading and checks",
   });

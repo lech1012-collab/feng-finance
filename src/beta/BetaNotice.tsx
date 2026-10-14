@@ -47,6 +47,14 @@ export function BetaNotice({
           can't see it.
         </p>
         <p>Not financial advice.</p>
+        <details className="beta-privacy">
+          <summary>How your data is handled ›</summary>
+          <p>
+            Statements are read on this device. Feng stores your financial
+            records in this browser. Clearing browser data removes those
+            records. Save an encrypted backup to keep a separate copy.
+          </p>
+        </details>
         <p>Start with demo data to explore safely.</p>
         {installHelp && (
           <div className="beta-introduction-install">{installHelp}</div>

@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
@@ -29,6 +30,7 @@ import {
   type SplitLine,
 } from "../storage/accuracy";
 import "./accuracy.css";
+import { Sheet, SheetFooter } from "./Sheet";
 
 export interface AccuracyChange {
   changeId: string;
@@ -243,31 +245,16 @@ export function TransactionAccuracy({
         </p>
       )}
       {notice && (
-        <div className="notice" role="status">
-          {notice.label}.{" "}
-          {notice.changeId && (
-            <button
-              onClick={async () => {
-                try {
-                  await undoChange(notice.changeId);
-                  setNotice(undefined);
-                } catch (exception) {
-                  setError(
-                    exception instanceof Error
-                      ? exception.message
-                      : "Undo failed.",
-                  );
-                }
-              }}
-            >
-              Undo
-            </button>
-          )}
-          {notice.splitRuleOffer && (
-            <SplitRuleOffer {...notice.splitRuleOffer} />
-          )}
-        </div>
+        <Toast
+          id={notice.changeId}
+          message={`${notice.label}.`}
+          undo={async () => {
+            await undoChange(notice.changeId);
+            setNotice(undefined);
+          }}
+        />
       )}
+      {notice?.splitRuleOffer && <SplitRuleOffer {...notice.splitRuleOffer} />}
       {mode && data && (
         <AccuracyDialog
           title={
@@ -322,33 +309,10 @@ function AccuracyDialog({
   children: React.ReactNode;
   onClose: () => void;
 }) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const previous = document.activeElement as HTMLElement | null;
-    dialog.current?.showModal();
-    return () => {
-      dialog.current?.close();
-      if (previous?.isConnected) previous.focus();
-    };
-  }, []);
   return (
-    <dialog
-      ref={dialog}
-      className="accuracy-dialog"
-      aria-label={title}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-    >
-      <header>
-        <h2 id="accuracy-dialog-title">{title}</h2>
-        <button aria-label="Close editor" onClick={onClose}>
-          ✕
-        </button>
-      </header>
+    <Sheet title={title} onClose={onClose}>
       {children}
-    </dialog>
+    </Sheet>
   );
 }
 
@@ -515,10 +479,13 @@ function SplitEditor({
               />
             </label>
             <div className="split-line-tags">
-              <TagPicker
-                value={line.tags}
-                onChange={(tags) => update(i, { tags })}
-              />
+              <details>
+                <summary>Add tag</summary>
+                <TagPicker
+                  value={line.tags}
+                  onChange={(tags) => update(i, { tags })}
+                />
+              </details>
             </div>
           </div>
           {lines.length > 2 && (
@@ -556,29 +523,31 @@ function SplitEditor({
           Distribute remainder
         </button>
       </div>
-      <p role="status">
-        <strong>
-          {remaining === undefined
-            ? "Check the amounts"
-            : `${money(remaining, transaction.currency)} unallocated`}
-        </strong>
-      </p>
+      <SheetFooter>
+        <p role="status">
+          <strong>
+            {remaining === undefined
+              ? "Check the amounts"
+              : `Remaining ${money(remaining, transaction.currency)}${remaining === 0 ? " ✓" : ""}`}
+          </strong>
+        </p>
+        <button
+          className="primary"
+          disabled={
+            busy ||
+            remaining !== 0 ||
+            lines.some((line, i) => !line.categoryId || !amounts[i])
+          }
+          onClick={() => void save()}
+        >
+          Save split
+        </button>
+      </SheetFooter>
       {error && (
         <p role="alert" className="notice warning">
           {error}
         </p>
       )}
-      <button
-        className="primary"
-        disabled={
-          busy ||
-          remaining !== 0 ||
-          lines.some((line, i) => !line.categoryId || !amounts[i])
-        }
-        onClick={() => void save()}
-      >
-        Save split
-      </button>
     </div>
   );
 }
@@ -607,7 +576,7 @@ function UnsplitEditor({
           value={category}
           onChange={(event) => setCategory(event.target.value)}
         >
-          <option value="">Uncategorized</option>
+          <option value="">Uncategorised</option>
           {categories
             .filter(
               (item) =>
@@ -676,6 +645,7 @@ function RefundEditor({
 }) {
   const suggestions = refundCandidates(transaction, [...purchases, ...refunds]);
   const [search, setSearch] = useState("");
+  const [searchAll, setSearchAll] = useState(false);
   const [allocations, setAllocations] = useState<Record<string, string>>(
     Object.fromEntries(
       (transaction.refundAllocations ?? []).map((line) => [
@@ -724,12 +694,19 @@ function RefundEditor({
         : "Check the refund amounts.";
   }
   const impactText = (impact: RefundImpact) =>
-    `${refundMonthName(impact.month)} updated: ${categories.find((category) => category.id === impact.categoryId)?.name ?? "Uncategorized"} ${money(impact.amount, transaction.currency, true)} (refund)`;
+    `${refundMonthName(impact.month)} updated: ${categories.find((category) => category.id === impact.categoryId)?.name ?? "Uncategorised"} ${money(impact.amount, transaction.currency, true)} (refund)`;
   const shown = [
     ...suggestions,
     ...purchases.filter(
       (purchase) =>
+        (searchAll || Object.hasOwn(allocations, purchase.id)) &&
         !purchase.parentId &&
+        purchase.amount < 0 &&
+        !purchase.isTransfer &&
+        !purchase.transferPairId &&
+        purchase.currency === transaction.currency &&
+        !!purchase.isDemo === !!transaction.isDemo &&
+        purchase.date <= transaction.date &&
         !suggestions.some((item) => item.id === purchase.id),
     ),
   ]
@@ -775,6 +752,7 @@ function RefundEditor({
         />
       </label>
       <div className="refund-purchases">
+        {!shown.length && <p className="muted">No matching purchase found.</p>}
         {shown.map((purchase) => (
           <div key={purchase.id} className="refund-purchase">
             <label className="refund-choice">
@@ -822,6 +800,15 @@ function RefundEditor({
           </div>
         ))}
       </div>
+      <button
+        type="button"
+        onClick={() => {
+          setSearchAll((value) => !value);
+          setSearch("");
+        }}
+      >
+        {searchAll ? "Show matching purchases" : "Search all purchases"}
+      </button>
       {!!selected.length && (
         <div className="notice" role="status">
           <strong>Refund allocation preview</strong>

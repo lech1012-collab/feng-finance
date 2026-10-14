@@ -3,6 +3,7 @@ import type { RuntimeMode } from "./policy";
 import { InstallHelp } from "./InstallGuidance";
 import { WhatsNew } from "./WhatsNew";
 import { CURRENT_RELEASE, type ReleaseNotes } from "./release";
+import { formatLocalDateTime } from "../domain/dates";
 
 export interface DesktopInstallControl {
   available: boolean;
@@ -41,7 +42,7 @@ export function AboutLifecycle({
         <dd>{release.version}</dd>
         <dt>Build date</dt>
         <dd>
-          <time dateTime={buildDate}>{buildDate}</time>
+          <time dateTime={buildDate}>{formatLocalDateTime(buildDate)}</time>
         </dd>
         <dt>Beta round</dt>
         <dd>{release.betaRound}</dd>
@@ -102,25 +103,9 @@ export function AboutLifecycle({
           ? "Storage: protected"
           : "Storage: may be cleared by the browser. Install Feng and save backups."}
       </p>
-      {!storagePersisted && (
-        <button
-          disabled={storageBusy}
-          onClick={() => {
-            setStorageBusy(true);
-            setStorageError("");
-            void onRequestStorage()
-              .catch(() =>
-                setStorageError(
-                  "Your browser may clear Feng's data. Install Feng and save backups.",
-                ),
-              )
-              .finally(() => setStorageBusy(false));
-          }}
-        >
-          Request protected storage
-        </button>
-      )}
-      {storageError && <p role="alert">{storageError}</p>}
+      <a className="button" href="#/settings?section=storage">
+        Device storage
+      </a>
       <p className="muted">
         <a
           href={`${repositoryUrl}#readme`}

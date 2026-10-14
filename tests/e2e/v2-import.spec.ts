@@ -1,3 +1,4 @@
+import { settingsSection } from "./flows";
 import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
 
@@ -262,7 +263,7 @@ for (const leaveUnlinked of [false, true]) {
   test(`Automatic import review ${leaveUnlinked ? "remembers an unchecked pair" : "shows planned pairs and reports actual links after saving"}`, async ({
     page,
   }) => {
-    await page.goto("/#/settings");
+    await settingsSection(page, "transfers");
     const matching = page.getByRole("combobox", {
       name: "Transfer matching",
       exact: true,

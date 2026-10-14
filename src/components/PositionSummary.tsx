@@ -1,4 +1,7 @@
+import { displayAccountName } from "../domain/presentation";
+import { localToday } from "../analytics/reminders";
 import { Link } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
 import type {
   Account,
   Statement,
@@ -47,7 +50,7 @@ export function PositionSummary({
   onPeriodChange: (n: number) => void;
   historyOnly?: boolean;
 }) {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const end = new Date(
     Date.parse(`${monthBounds(month)[1]}T12:00:00Z`) - 86400000,
   )
@@ -209,20 +212,40 @@ export function PositionSummary({
         : undefined;
   const comparable =
     complete && total !== undefined && priorSum !== undefined && priorSum !== 0;
-  const meaningfulHistory = chart.meaningful;
-  const palette = ["#6EA8FF", "#A99BD6", "#F08A7E", "#E7C46A", "#7FD1C7"];
+  const [breakdown, setBreakdown] = useState(false);
+  const meaningfulHistory =
+    chart.data.filter((point) => point.complete && point.total !== null)
+      .length > 1 ||
+    (breakdown && chart.meaningful);
+  const [plotWidth, setPlotWidth] = useState(690);
+  const plot = useRef<SVGSVGElement>(null);
+  const palette = ["#6EA8FF", "#A99BD6", "#F08A7E", "#E7C46A", "#A6B3C6"];
   const plotted = chart.data.flatMap((p) =>
-    [...Object.values(p.values), p.total].filter(
-      (value): value is number => value !== null,
-    ),
+    (breakdown
+      ? [...Object.values(p.values), p.total]
+      : [p.complete ? p.total : null]
+    ).filter((value): value is number => value !== null),
   );
+  useEffect(() => {
+    const element = plot.current;
+    if (!element) return;
+    const measure = () => {
+      const width = element.getBoundingClientRect().width;
+      if (width > 0) setPlotWidth(width);
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [historyOnly, plotted.length > 0]);
   const low = Math.min(0, ...plotted),
     high = Math.max(1, ...plotted);
   const x = (date: string) =>
     35 +
     ((Date.parse(date) - Date.parse(chart.start)) /
       Math.max(1, Date.parse(chart.end) - Date.parse(chart.start))) *
-      620;
+      Math.max(1, plotWidth - 70);
   const y = (value: number) =>
     150 - ((value - low) / Math.max(1, high - low)) * 125;
   const paths = (key: string) => {
@@ -231,7 +254,12 @@ export function PositionSummary({
       previousKnown = false,
       verified = true;
     for (const point of chart.data) {
-      const value = key === "total" ? point.total : point.values[key];
+      const value =
+        key === "total"
+          ? point.complete
+            ? point.total
+            : null
+          : point.values[key];
       const reliable = key === "total" ? point.complete : point.verified[key];
       if (value === null) {
         if (path) segments.push({ path, verified });
@@ -267,7 +295,7 @@ export function PositionSummary({
         <section className="card position-summary">
           <div className="section-heading">
             <h2>Where you stand</h2>
-            <Link to="/transactions">Accounts</Link>
+            <Link to="/accounts">Accounts</Link>
           </div>
           <span
             className={`coverage-chip ${complete ? "coverage-complete" : "coverage-partial"}`}
@@ -298,16 +326,10 @@ export function PositionSummary({
                   : `${converted ? "≈ " : ""}${money(cardDebt, currency)}${cards.every((i) => i.reliable) ? "" : "*"}`}
               </strong>
             </Link>
-            <Link
-              to={
-                hasManual
-                  ? "/settings#manual-accounts"
-                  : "/transactions?allDates=1"
-              }
-            >
-              <span>{hasManual ? "Net worth" : "Net position"}</span>
+            <Link to={"/accounts"}>
+              <span>Net worth</span>
               <strong>
-                {total === undefined
+                {total === undefined || !complete
                   ? "Unavailable"
                   : `${converted ? "≈ " : ""}${money(total, currency)}${complete ? "" : "*"}`}
               </strong>
@@ -315,10 +337,41 @@ export function PositionSummary({
           </div>
           {!complete && (
             <p className="coverage-note">
-              * Dated balances are partial. Missing statements, valuations or
-              exchange rates prevent a verified total.
+              * Missing or stale balances. Net worth is withheld.
             </p>
           )}
+
+          {comparable && (
+            <p className="balance-change">
+              {comparable
+                ? `${(((total! - priorSum!) / Math.abs(priorSum!)) * 100).toFixed(1)}% vs ${period === 1 ? "last month" : `${period} months ago`} · ${new Date(`${priorDate}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`
+                : "No comparable verified balances for this range"}
+            </p>
+          )}
+          {items.some((i) => i.observed) && (
+            <p className="coverage-note">
+              Dated balances ·{" "}
+              {formatUkDate(
+                items
+                  .flatMap((i) => (i.observed ? [i.observed] : []))
+                  .sort()
+                  .at(-1)!,
+              )}
+            </p>
+          )}
+          <Link className="accounts-overview-link" to="/accounts">
+            {items.length} accounts ›
+          </Link>
+        </section>
+      )}
+      {historyOnly && (
+        <section className="card">
+          <div className="section-heading">
+            <h2>Balance history</h2>
+            <span className="muted">
+              {period} month{period === 1 ? "" : "s"}
+            </span>
+          </div>
           {meaningfulHistory && (
             <div
               className="balance-periods"
@@ -331,86 +384,31 @@ export function PositionSummary({
                   aria-pressed={period === n}
                   onClick={() => onPeriodChange(n)}
                 >
-                  {n}m
+                  {n}M
                 </button>
               ))}
             </div>
           )}
-          <p className="balance-change">
-            {comparable
-              ? `${(((total! - priorSum!) / Math.abs(priorSum!)) * 100).toFixed(1)}% vs ${period === 1 ? "last month" : `${period} months ago`} · ${new Date(`${priorDate}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`
-              : "No comparable verified balances for this range"}
-          </p>
-          <div className="balance-accounts">
-            {items.map((item) => (
-              <Link
-                key={item.account.id}
-                className="balance-account balance-account-main"
-                to={`/transactions?account=${item.account.id}&allDates=1`}
-              >
-                <span>
-                  <strong>{item.account.displayName}</strong>
-                  <small>
-                    {item.account.institution} ·{" "}
-                    {item.account.maskedAccountIdentifier} ·{item.source}
-                    {item.observed
-                      ? ` · as of ${new Date(`${item.observed}T12:00:00Z`).toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric", timeZone: "UTC" })}`
-                      : " · Not imported"}
-                  </small>
-                </span>
-                <span className="balance-account-value">
-                  <strong>
-                    {item.native === undefined
-                      ? "Unknown"
-                      : money(
-                          liabilityTypes.has(item.account.accountType)
-                            ? Math.abs(item.native)
-                            : item.native,
-                          item.account.currency,
-                        )}
-                  </strong>
-                  {item.account.currency !== currency && item.conversion && (
-                    <small
-                      title={`Rate ${item.conversion.rate} · ${formatUkDate(item.conversion.date)}`}
-                    >
-                      ≈ {money(item.conversion.amount, currency)}
-                    </small>
-                  )}
-                  {liabilityTypes.has(item.account.accountType) && (
-                    <small>Debt owed</small>
-                  )}
-                  {!item.balanceVerified && item.native !== undefined && (
-                    <small>Unverified reported balance</small>
-                  )}
-                  {item.evidenceReason && <small>{item.evidenceReason}</small>}
-                  {!item.reliable && item.balanceVerified && (
-                    <small>Partial or unverified</small>
-                  )}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </section>
-      )}
-      {historyOnly && (
-        <section className="card">
-          <div className="section-heading">
-            <h2>{hasManual ? "Net worth history" : "Balance history"}</h2>
-            <span className="muted">
-              {period} month{period === 1 ? "" : "s"}
-            </span>
-          </div>
+          <button
+            className="balance-breakdown"
+            aria-pressed={breakdown}
+            onClick={() => setBreakdown(!breakdown)}
+          >
+            Account breakdown
+          </button>
           {plotted.length > 0 ? (
             <>
               <svg
+                ref={plot}
                 className="position-history"
-                viewBox="0 0 690 190"
+                style={{ width: "100%", height: 190 }}
+                viewBox={`0 0 ${plotWidth} 190`}
                 role="img"
                 aria-label="Verified daily account balances with gaps for missing bank coverage and stepped manual valuations"
               >
                 <line
                   x1="35"
-                  x2="655"
+                  x2={plotWidth - 35}
                   y1={y(0)}
                   y2={y(0)}
                   stroke="var(--border)"
@@ -433,7 +431,7 @@ export function PositionSummary({
                 {chart.data
                   .filter(
                     (point, index) =>
-                      point.total === null && index < chart.data.length - 1,
+                      !point.complete && index < chart.data.length - 1,
                   )
                   .map((point) => (
                     <rect
@@ -459,56 +457,58 @@ export function PositionSummary({
                       </title>
                     </rect>
                   ))}
-                {chart.accounts.map((account, index) => (
-                  <g key={account.id} data-account-id={account.id}>
-                    {paths(account.id).map((segment, i) => (
-                      <path
-                        key={i}
-                        d={segment.path}
-                        fill="none"
-                        stroke={palette[index % palette.length]}
-                        strokeWidth="2"
-                        strokeDasharray={segment.verified ? undefined : "4 4"}
-                      />
-                    ))}
-                    {markers(account.id).map((point) => (
-                      <circle
-                        key={point.date}
-                        data-verified={point.verified[account.id]}
-                        cx={x(point.date)}
-                        cy={y(point.values[account.id]!)}
-                        r="3"
-                        fill={palette[index % palette.length]}
-                      >
-                        <title>
-                          {account.displayName} ({account.institution}) ·{" "}
-                          {new Date(
-                            `${point.date}T12:00:00Z`,
-                          ).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            timeZone: "UTC",
-                          })}
-                          :{" "}
-                          {money(
-                            liabilityTypes.has(account.accountType)
-                              ? Math.abs(point.values[account.id]!)
-                              : point.values[account.id]!,
-                            currency,
-                          )}
-                          {liabilityTypes.has(account.accountType)
-                            ? " debt owed"
-                            : ""}
-                          {point.verified[account.id] ? "" : " · unverified"}
-                          {account.currency !== currency
-                            ? ` · original ${money(point.nativeValues[account.id]!, account.currency)}, rate as of ${formatUkDate(point.rateDates[account.id]!)}`
-                            : ""}
-                        </title>
-                      </circle>
-                    ))}
-                  </g>
-                ))}
+                {breakdown &&
+                  chart.accounts.map((account, index) => (
+                    <g key={account.id} data-account-id={account.id}>
+                      {paths(account.id).map((segment, i) => (
+                        <path
+                          key={i}
+                          d={segment.path}
+                          fill="none"
+                          stroke={palette[index % palette.length]}
+                          strokeWidth="2"
+                          strokeDasharray={segment.verified ? undefined : "4 4"}
+                        />
+                      ))}
+                      {markers(account.id).map((point) => (
+                        <circle
+                          key={point.date}
+                          data-verified={point.verified[account.id]}
+                          cx={x(point.date)}
+                          cy={y(point.values[account.id]!)}
+                          r="3"
+                          fill={palette[index % palette.length]}
+                        >
+                          <title>
+                            {displayAccountName(account)} ({account.institution}
+                            ) ·{" "}
+                            {new Date(
+                              `${point.date}T12:00:00Z`,
+                            ).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                              timeZone: "UTC",
+                            })}
+                            :{" "}
+                            {money(
+                              liabilityTypes.has(account.accountType)
+                                ? Math.abs(point.values[account.id]!)
+                                : point.values[account.id]!,
+                              currency,
+                            )}
+                            {liabilityTypes.has(account.accountType)
+                              ? " debt owed"
+                              : ""}
+                            {point.verified[account.id] ? "" : " · unverified"}
+                            {account.currency !== currency
+                              ? ` · original ${money(point.nativeValues[account.id]!, account.currency)}, rate as of ${formatUkDate(point.rateDates[account.id]!)}`
+                              : ""}
+                          </title>
+                        </circle>
+                      ))}
+                    </g>
+                  ))}
                 {paths("total").map((segment, index) => (
                   <path
                     key={`total:${index}`}
@@ -525,7 +525,7 @@ export function PositionSummary({
                   {formatUkDate(chart.start)}
                 </text>
                 <text
-                  x="655"
+                  x={plotWidth - 35}
                   y="178"
                   textAnchor="end"
                   fill="var(--muted)"
@@ -535,20 +535,19 @@ export function PositionSummary({
                 </text>
               </svg>
               <div className="chart-legend">
-                {chart.accounts.map((account, index) => (
-                  <span key={account.id}>
-                    <i
-                      style={{ background: palette[index % palette.length] }}
-                      aria-hidden="true"
-                    />
-                    {account.displayName}
-                    {liabilityTypes.has(account.accountType) ? " debt" : ""}
-                  </span>
-                ))}
-                {chart.data.some((p) => p.total !== null) && (
-                  <span>
-                    Dashed: {hasManual ? "net worth" : "total balance"}
-                  </span>
+                {breakdown &&
+                  chart.accounts.map((account, index) => (
+                    <span key={account.id}>
+                      <i
+                        style={{ background: palette[index % palette.length] }}
+                        aria-hidden="true"
+                      />
+                      {displayAccountName(account)}
+                      {liabilityTypes.has(account.accountType) ? " debt" : ""}
+                    </span>
+                  ))}
+                {chart.data.some((p) => p.complete && p.total !== null) && (
+                  <span>Dashed: net worth</span>
                 )}
               </div>
             </>
@@ -558,12 +557,15 @@ export function PositionSummary({
               never shown as zero.
             </p>
           )}
-          <p className="muted">
-            Bank balances use reconciled daily transactions, including the
-            opening balance. Gaps indicate missing or unverified coverage.
-            Issue-date-only cards show their dated balance; manual valuations
-            step between dates.
-          </p>
+          <details>
+            <summary>How balances work</summary>
+            <p className="muted">
+              Bank balances use reconciled daily transactions, including the
+              opening balance. Gaps indicate missing or unverified coverage.
+              Issue-date-only cards show their dated balance; manual valuations
+              step between dates.
+            </p>
+          </details>
         </section>
       )}
     </>

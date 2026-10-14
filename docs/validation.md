@@ -2,12 +2,43 @@
 
 This release implements the 8 October 2026 developer specification and its v2.2
 amendment. It remains a React/strict TypeScript/Vite/Dexie application with local
-PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.5**
+PDF.js/Tesseract processing and static PWA hosting. Application version **2.2.6**
 uses additive IndexedDB **schema 4**. Portable JSON backup format remains
 **version 1**; supported older databases and backups are migrated without resetting
 financial records.
 
 ## Release evidence
+
+### UX review update, v2.2.6
+
+The [designer review implementation record](ux-v225-review.md) covers 44 blockers
+and 205 additional findings. Shared sheets, Undo notifications, grouped Settings,
+read-only account balances, compact charts and transaction controls are included.
+New backup exports are protected by default; older JSON and encrypted backups
+remain compatible. Refund suggestions and loan payment requirements are stricter,
+and missing FX rates withhold totals while retaining original amounts. Database
+schema 4, portable backup format 1 and parser version 2.2.3 remain unchanged.
+
+The local candidate passed **981 unit/component tests in 122 files**, a WCAG audit
+of **161 screen states** with zero reported violations or document overflow, and
+Lighthouse accessibility **100** / best practices **96**. Dependency audit reported
+zero vulnerabilities. The complete production browser suite contains **178 cases**
+across Chromium and WebKit. The release workflow must pass every case before Pages
+deploys its exact verified commit. The release Actions linked below record final
+browser and deployment results; the GitHub release notes record preserved-data
+and cold offline verification after publication.
+
+To repeat the accessibility audit, build the app, keep `npm run preview` running,
+install Playwright Chromium, and run `npm run test:a11y`. It creates isolated
+fictitious demo contexts, never reads a personal browser profile, and writes
+technical findings under ignored `test-results-accessibility/`. It checks 23
+pages at 320px/390px in dark and light modes, 390px at 200% text in both modes,
+and 1280px desktop. This checks WCAG rules and document overflow, not every
+visual alignment or physical assistive-technology behavior.
+
+Physical iPhone/Safari/VoiceOver, three real devices, the owner checklist and
+volunteer beta feedback remain manual sign-off gates. Automated WebKit results
+do not certify real iPhone installation, file pickers, Face ID or storage eviction.
 
 The upgrade baseline for this release is **v1.9.2**. The v2.0.0 source/tag did not reach production: its CI browser checks
 found a narrow WebKit layout issue and an offline receipt Undo issue. Those fixes

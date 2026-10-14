@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Attachment } from "../domain/models";
@@ -106,6 +107,32 @@ export function AttachmentManager({
       setBusy(false);
     }
   };
+  const noteSaving = useRef(false);
+  const latestNote = useRef(note);
+  latestNote.current = note;
+  const saveNote = async () => {
+    if (
+      noteSaving.current ||
+      !data?.transaction ||
+      latestNote.current.trim() === (data.transaction.note ?? "")
+    )
+      return;
+    noteSaving.current = true;
+    const draft = latestNote.current;
+    await run(() => saveTransactionNote(transactionId, draft), "Note saved.");
+    noteSaving.current = false;
+  };
+  useEffect(() => {
+    if (
+      !data?.transaction ||
+      note.trim() === (data.transaction.note ?? "") ||
+      busy ||
+      error
+    )
+      return;
+    const timer = window.setTimeout(() => void saveNote(), 750);
+    return () => window.clearTimeout(timer);
+  }, [note, data?.transaction?.note, busy, error]);
   const attach = (file?: File) => {
     if (file)
       void run(
@@ -125,27 +152,24 @@ export function AttachmentManager({
             id={`note-${transactionId}`}
             value={note}
             maxLength={10_000}
-            onChange={(event) => setNote(event.target.value)}
+            onChange={(event) => {
+              setNote(event.target.value);
+              setError("");
+            }}
+            onBlur={() => void saveNote()}
             placeholder="What was this payment for?"
           />
         </label>
-        <button
-          disabled={busy || note.trim() === (data.transaction.note ?? "")}
-          onClick={() =>
-            void run(
-              () => saveTransactionNote(transactionId, note),
-              "Note saved.",
-            )
-          }
-        >
-          Save note
-        </button>
+        <small className="muted" role="status">
+          {busy ? "Saving…" : "Notes save automatically."}
+        </small>
       </div>
       <p className="muted">
         {count} of {MAX_ATTACHMENTS} attachments. Images are compressed to 1600
         pixels. Files stay on this device.
       </p>
       <input
+        tabIndex={-1}
         ref={input}
         className="visually-hidden"
         aria-label="Choose transaction attachment"
@@ -158,6 +182,7 @@ export function AttachmentManager({
         }}
       />
       <input
+        tabIndex={-1}
         ref={camera}
         className="visually-hidden"
         aria-label="Take receipt photo"
@@ -200,34 +225,21 @@ export function AttachmentManager({
         ))}
       </ul>
       {notice && (
-        <div role="status" className="security-actions">
-          <span>{notice}</span>
-          {changeId && (
-            <button
-              disabled={busy}
-              onClick={async () => {
-                setBusy(true);
-                try {
+        <Toast
+          id={changeId || notice}
+          message={notice}
+          undo={
+            changeId
+              ? async () => {
                   await undoChange(changeId);
                   setChangeId("");
-                  setNotice("Change undone.");
+                  setNotice("");
                   const restored = await db.transactions.get(transactionId);
                   setNote(restored?.note ?? "");
-                } catch (failure) {
-                  setError(
-                    failure instanceof Error
-                      ? failure.message
-                      : "This change could not be undone.",
-                  );
-                } finally {
-                  setBusy(false);
                 }
-              }}
-            >
-              Undo
-            </button>
-          )}
-        </div>
+              : undefined
+          }
+        />
       )}
       {error && <p role="alert">{error}</p>}
     </section>

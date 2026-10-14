@@ -1,3 +1,4 @@
+import { localToday } from "../analytics/reminders";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { Bell, ChevronRight } from "lucide-react";
@@ -5,7 +6,7 @@ import { db } from "../storage/database";
 import { detectSubscriptions, reviewPrefix } from "../analytics/subscriptions";
 export function useSubscriptions(currency: string) {
   return useLiveQuery(async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
     const from = `${Number(today.slice(0, 4)) - 3}${today.slice(4)}`;
     const transactions = await db.transactions
       .where("date")

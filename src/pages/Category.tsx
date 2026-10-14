@@ -30,8 +30,8 @@ import { monthCoverage, verifiedStatements } from "../analytics/coverage";
 import { localToday } from "../analytics/reminders";
 import { shiftDate } from "../analytics/analysis-period";
 import { displayMerchant } from "../domain/presentation";
-import { money, currencyPrecision } from "../domain/money";
-import { MonthPicker, Metric } from "../components/common";
+import { compactMoney, money, currencyPrecision } from "../domain/money";
+import { MonthPicker, Metric, RangeControl } from "../components/common";
 export default function CategoryPage({
   month,
   currency,
@@ -83,7 +83,7 @@ export default function CategoryPage({
         <Link to="/">Home</Link>
       </section>
     );
-  const name = category?.name ?? "Uncategorized";
+  const name = category?.name ?? "Uncategorised";
   const today = localToday();
   const documents = verifiedStatements(
     data.statements,
@@ -187,21 +187,11 @@ export default function CategoryPage({
       </p>
       <div className="toolbar">
         <MonthPicker month={selected} onChange={chooseMonth} />
-        <div
-          className="theme-options"
-          role="group"
-          aria-label="Trend and comparison history"
-        >
-          {[1, 3, 6, 12].map((n) => (
-            <button
-              key={n}
-              aria-pressed={window === n}
-              onClick={() => setWindow(n)}
-            >
-              {n} month{n === 1 ? "" : "s"}
-            </button>
-          ))}
-        </div>
+        <RangeControl
+          value={window}
+          onChange={setWindow}
+          label="Trend and comparison history"
+        />
       </div>
       <p className="coverage-note">
         {monthLabel(selected)} · {coverage.status}. Trend:{" "}
@@ -413,16 +403,12 @@ export default function CategoryPage({
               </defs>
               <XAxis
                 dataKey="month"
-                tickFormatter={(m) => monthLabel(String(m)).split(" ")[0]}
+                tickFormatter={(m) => monthLabel(String(m)).slice(0, 3)}
                 tick={{ fill: "var(--muted)", fontSize: 13 }}
                 interval={window > 6 ? 1 : 0}
               />
               <YAxis
-                tickFormatter={(v) =>
-                  String(
-                    Math.round(Number(v) / 10 ** currencyPrecision(currency)),
-                  )
-                }
+                tickFormatter={(v) => compactMoney(Number(v), currency)}
                 tick={{ fill: "var(--muted)", fontSize: 13 }}
               />
               <Tooltip
@@ -508,43 +494,65 @@ export default function CategoryPage({
             predict a spending limit.
           </p>
         </details>
-        <div className="category-months">
-          {series.map((point) => (
-            <Link to={transactionUrl(point.month)} key={point.month}>
-              <span>
-                {monthLabel(point.month)}
-                {point.coverage.status !== "Complete"
-                  ? ` · ${point.coverage.status.toLowerCase()}`
-                  : ""}
-              </span>
-              <strong>
-                {point.amount === null
-                  ? point.unavailableReason
-                  : money(point.amount, currency)}
-              </strong>
-              <small>
-                {!point.coverage.hasIncomeSource ||
-                point.incomePercent === undefined
-                  ? "Income share unavailable"
-                  : `${point.incomePercent.toFixed(1)}% of income`}
-              </small>
-            </Link>
-          ))}
-        </div>
+        <details>
+          <summary>View values</summary>
+          <div className="category-months">
+            {series.map((point) => (
+              <Link to={transactionUrl(point.month)} key={point.month}>
+                <span>
+                  {monthLabel(point.month)}
+                  {point.coverage.status !== "Complete"
+                    ? ` · ${point.coverage.status.toLowerCase()}`
+                    : ""}
+                </span>
+                <strong>
+                  {point.amount === null
+                    ? point.unavailableReason
+                    : money(point.amount, currency)}
+                </strong>
+                <small>
+                  {!point.coverage.hasIncomeSource ||
+                  point.incomePercent === undefined
+                    ? "Income share unavailable"
+                    : `${point.incomePercent.toFixed(1)}% of income`}
+                </small>
+              </Link>
+            ))}
+          </div>
+        </details>
       </section>
       {stats.children.length > 0 && (
         <section className="card">
           <h2>Subcategories</h2>
-          {stats.children.map((c) => (
-            <Link
-              key={c.id}
-              className="subscription-evidence"
-              to={`/categories/${c.id}?month=${selected}`}
-            >
-              <span>{c.name}</span>
-              <strong>{money(c.amount, currency)}</strong>
-            </Link>
-          ))}
+          {stats.children
+            .filter((c) => c.amount !== 0)
+            .map((c) => (
+              <Link
+                key={c.id}
+                className="subscription-evidence"
+                to={`/categories/${c.id}?month=${selected}`}
+              >
+                <span>{c.name}</span>
+                <strong>{money(c.amount, currency)}</strong>
+              </Link>
+            ))}
+          {stats.children.some((c) => c.amount === 0) && (
+            <details>
+              <summary>Show all subcategories</summary>
+              {stats.children
+                .filter((c) => c.amount === 0)
+                .map((c) => (
+                  <Link
+                    key={c.id}
+                    className="subscription-evidence"
+                    to={`/categories/${c.id}?month=${selected}`}
+                  >
+                    <span>{c.name}</span>
+                    <strong>{money(c.amount, currency)}</strong>
+                  </Link>
+                ))}
+            </details>
+          )}
         </section>
       )}
       <section className="card">

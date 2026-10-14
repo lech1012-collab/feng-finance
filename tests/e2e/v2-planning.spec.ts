@@ -47,7 +47,7 @@ test("manual assets, earmarked pots, debt plans and scenarios keep actual bank r
   await expect(cash).toContainText("£5,126.00");
 
   await page.goto("/#/settings#manual-accounts");
-  const assets = page.locator(".manual-account-editor");
+  const assets = page.locator("main");
   await assets
     .getByRole("button", { name: "Add account", exact: true })
     .click();
@@ -57,7 +57,7 @@ test("manual assets, earmarked pots, debt plans and scenarios keep actual bank r
   await assets
     .getByRole("button", { name: "Save valuation", exact: true })
     .click();
-  await expect(assets.getByRole("status")).toContainText(
+  await expect(page.getByRole("status")).toContainText(
     "Account valuation saved",
   );
   await page.goto("/#/");
@@ -105,24 +105,28 @@ test("manual assets, earmarked pots, debt plans and scenarios keep actual bank r
   await assets.getByLabel("Amount owed", { exact: true }).fill("2000");
   await assets.getByLabel("APR %", { exact: true }).fill("24");
   await assets
+    .getByLabel("Minimum monthly payment", { exact: true })
+    .fill("100");
+  await assets
     .getByRole("button", { name: "Save valuation", exact: true })
     .click();
-  await expect(assets.getByRole("status")).toContainText(
+  await expect(page.getByRole("status")).toContainText(
     "Account valuation saved",
   );
   await page.goto("/#/planning");
   await page.getByRole("tab", { name: "Debt", exact: true }).click();
   await page
+    .getByRole("button", { name: "Edit repayment plan", exact: true })
+    .click();
+  await page
     .getByLabel("Monthly amount available", { exact: true })
     .fill("300");
-  await page
-    .getByRole("button", { name: "Calculate payoff", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Done", exact: true }).click();
   await expect(
     page.getByText("Estimated debt-free", { exact: true }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Forecast", exact: true }).click();
-  await page.getByLabel("Signed amount (GBP)").fill("-200");
+  await page.getByLabel("Amount (GBP)").fill("200");
   await page.getByLabel("Label", { exact: true }).fill("Fictitious repair");
   await page
     .getByRole("button", { name: "Add adjustment", exact: true })

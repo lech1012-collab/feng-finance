@@ -1,3 +1,4 @@
+import { Toast } from "./Toast";
 import { useId, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -173,11 +174,29 @@ export function TagManager() {
         </label>
         <label>
           Colour
-          <input
-            type="color"
-            value={colour}
-            onChange={(e) => setColour(e.target.value)}
-          />
+          <span className="colour-presets">
+            {[
+              "#6EA8FF",
+              "#A99BD6",
+              "#F08A7E",
+              "#E7C46A",
+              "#A6B3C6",
+              "#D994B8",
+              "#8A9EC5",
+              "#CC9C79",
+            ].map((c) => (
+              <button
+                aria-label={`Tag colour ${c}`}
+                aria-pressed={colour === c}
+                type="button"
+                key={c}
+                style={{ background: c }}
+                onClick={() => setColour(c)}
+              >
+                {colour === c ? "✓" : ""}
+              </button>
+            ))}
+          </span>
         </label>
         <button className="primary" type="submit">
           {editing ? "Save tag" : "Create tag"}
@@ -260,21 +279,19 @@ export function TagManager() {
         </div>
       )}
       {message && (
-        <p className="notice" role="status">
-          {message}{" "}
-          {changeId && (
-            <button
-              onClick={() =>
-                void perform(async () => {
+        <Toast
+          id={changeId || message}
+          message={message}
+          undo={
+            changeId
+              ? async () => {
                   await undoChange(changeId);
-                  return { changeId: "" };
-                }, "Tag change undone.")
-              }
-            >
-              Undo
-            </button>
-          )}
-        </p>
+                  setChangeId("");
+                  setMessage("");
+                }
+              : undefined
+          }
+        />
       )}
       {error && (
         <p role="alert" className="notice warning">

@@ -1,3 +1,8 @@
+import { useLiveQuery } from "dexie-react-hooks";
+import { recurringReportingTotal } from "../analytics/subscription-summary";
+import { Toast } from "../components/Toast";
+import { displayMerchant } from "../domain/presentation";
+import { localToday } from "../analytics/reminders";
 import { sha256 } from "../domain/normalize";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -9,7 +14,7 @@ import {
   reviewPrefix,
 } from "../analytics/subscriptions";
 import { db } from "../storage/database";
-import { money, safeSum } from "../domain/money";
+import { money } from "../domain/money";
 import { convertMinor } from "../analytics/fx";
 import { formatUkDate } from "../domain/dates";
 import { auditedMutation } from "../storage/audit";
@@ -18,7 +23,7 @@ import "../components/planning-v2.css";
 const statuses: [SubscriptionStatus, string][] = [
   ["review", "Review"],
   ["keep", "Keep"],
-  ["cancel", "Cancel next"],
+  ["cancel", "Plan to cancel"],
   ["cancelled", "I cancelled"],
   ["ignore", "Not a subscription"],
 ];
@@ -49,7 +54,7 @@ function SubscriptionCard({
             value: JSON.stringify({
               status,
               groupKey: s.key,
-              date: new Date().toISOString().slice(0, 10),
+              date: localToday(),
               amount: s.amount,
             }),
           });
@@ -62,8 +67,7 @@ function SubscriptionCard({
                     ? "cancel-planned"
                     : "active";
               if (status === "keep") series.lastAcknowledgedAmount = s.amount;
-              if (status === "cancelled")
-                series.endDate = new Date().toISOString().slice(0, 10);
+              if (status === "cancelled") series.endDate = localToday();
             }
           });
         },
@@ -95,7 +99,13 @@ function SubscriptionCard({
               ? `Recurring ${s.cadence} charge`
               : "Possible subscription · unconfirmed"}
           </p>
-          <h2>{s.merchant}</h2>
+          <h2>
+            {displayMerchant({ merchant: s.merchant, description: s.merchant })}
+          </h2>
+          <span className="small-chip">
+            {statuses.find(([value]) => value === s.status)?.[1] ??
+              "Needs review"}
+          </span>
           <p className="muted">
             {account} · Last charged {formatUkDate(s.charges.at(-1)!.date)}
           </p>
@@ -147,16 +157,33 @@ function SubscriptionCard({
         className="subscription-states"
         aria-label={`Review status for ${s.merchant}`}
       >
-        {statuses.map(([status, label]) => (
-          <button
-            key={status}
-            disabled={busy}
-            aria-pressed={s.status === status}
-            onClick={() => void save(status)}
-          >
-            {label}
-          </button>
-        ))}
+        {statuses
+          .filter(([status]) => status === "keep" || status === "cancel")
+          .map(([status, label]) => (
+            <button
+              key={status}
+              disabled={busy}
+              aria-pressed={s.status === status}
+              onClick={() => void save(status)}
+            >
+              {label}
+            </button>
+          ))}
+        <details className="object-menu">
+          <summary>More status options</summary>
+          {statuses
+            .filter(([status]) => status !== "keep" && status !== "cancel")
+            .map(([status, label]) => (
+              <button
+                disabled={busy}
+                key={status}
+                aria-pressed={s.status === status}
+                onClick={() => void save(status)}
+              >
+                {label}
+              </button>
+            ))}
+        </details>
       </div>
       {s.status === "cancel" && (
         <div className="notice">
@@ -206,46 +233,60 @@ function SubscriptionCard({
 }
 export default function Subscriptions({ currency }: { currency: string }) {
   const data = useSubscriptions(currency);
+  const helpSeen = useLiveQuery(() =>
+    db.settings.get("subscriptions:helpSeen"),
+  );
   const [message, setMessage] = useState("");
   const [changeId, setChange] = useState(""),
     [error, setError] = useState("");
   const [view, setView] = useState("review");
+  const [group, setGroup] = useState("subscriptions");
   const [sort, setSort] = useState("review");
   if (!data) return <p role="status">Checking recurring charges…</p>;
-  const review = data.items.filter((s) => s.needsReview);
-  const plans = data.items.filter(
+  const isBill = (s: Subscription) =>
+    s.charges.some((t) =>
+      ["utilities", "insurance", "childcare", "property"].includes(
+        t.categoryId ?? "",
+      ),
+    );
+  const groupItems = data.items.filter((s) =>
+    group === "bills" ? isBill(s) : !isBill(s),
+  );
+  const review = groupItems.filter((s) => s.needsReview);
+  const plans = groupItems.filter(
     (s) => s.status === "cancel" && !s.stale && s.annual !== undefined,
   );
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localToday();
   const inReporting = (amount: number, native: string) =>
     convertMinor(amount, native, currency, today, data.rates)?.amount;
-  const potentialRows = plans.map((s) => inReporting(s.annual!, s.currency));
-  const potential = safeSum(
-    potentialRows.filter((n): n is number => n !== undefined),
+  const potentialTotal = recurringReportingTotal(
+    plans.map((s) => ({ annual: s.annual!, currency: s.currency })),
+    currency,
+    today,
+    data.rates,
   );
-  const annualRows = data.items
-    .filter(
-      (s) =>
-        s.annual !== undefined &&
-        !s.stale &&
-        !["ignore", "cancelled"].includes(s.status),
-    )
-    .map((s) => inReporting(s.annual!, s.currency));
-  const annualTotal = safeSum(
-    annualRows.filter((n): n is number => n !== undefined),
+  const annualSources = groupItems.filter(
+    (s) =>
+      s.annual !== undefined &&
+      !s.stale &&
+      !["ignore", "cancelled"].includes(s.status),
   );
-  const missing =
-    annualRows.some((n) => n === undefined) ||
-    potentialRows.some((n) => n === undefined);
+  const yearlyTotal = recurringReportingTotal(
+    annualSources.map((s) => ({ annual: s.annual!, currency: s.currency })),
+    currency,
+    today,
+    data.rates,
+  );
   const visible = (
     view === "all"
-      ? data.items
+      ? groupItems
       : view === "cancel"
         ? data.items.filter(
             (s) => s.status === "cancel" || s.status === "cancelled",
           )
         : review
   )
+    .filter((s) => (group === "bills" ? isBill(s) : !isBill(s)))
     .slice()
     .sort((a, b) =>
       sort === "yearly"
@@ -262,7 +303,7 @@ export default function Subscriptions({ currency }: { currency: string }) {
       <div className="page-heading">
         <div>
           <p className="eyebrow">NOTIFICATION CENTRE</p>
-          <h1>Subscription review</h1>
+          <h1>Subscriptions and bills</h1>
         </div>
       </div>
       <p className="muted">
@@ -278,36 +319,61 @@ export default function Subscriptions({ currency }: { currency: string }) {
           <div>
             <small>Yearly recurring cost</small>
             <strong>
-              {data.items.some((s) => s.currency !== currency) ? "≈ " : ""}
-              {annualRows.length > 0 && annualRows.every((n) => n === undefined)
+              {yearlyTotal.missingRates
                 ? "Rates needed"
-                : annualRows.length === 0
+                : yearlyTotal.value === undefined
                   ? "Not detected"
-                  : money(annualTotal, currency)}
-              {missing ? "*" : ""}
+                  : money(
+                      yearlyTotal.value,
+                      currency,
+                      false,
+                      yearlyTotal.approximate,
+                    )}
             </strong>
             <small>
               At the latest observed prices.{" "}
-              {missing
-                ? "Some currencies need cached rates; this total is partial."
+              {yearlyTotal.missingRates
+                ? yearlyTotal.originals
+                    .map((item) => money(item.amount, item.currency))
+                    .join(" + ") + " · Original yearly amounts"
                 : ""}
             </small>
           </div>
           <div>
             <small>Recurring charges</small>
-            <strong>{annualRows.length}</strong>
+            <strong>{annualSources.length}</strong>
           </div>
         </div>
         <h2>{review.length} to review</h2>
-        <p>
-          Swipe a charge left to plan cancellation, right to keep it. You can
-          change its status at any time.
-        </p>
-        {potential > 0 && (
+        {!helpSeen && (
           <p>
-            <strong>{money(potential, currency)} / year</strong> in cancellation
-            plans at the latest observed rates. Potential avoided charges, not
-            confirmed savings.
+            Swipe a charge left to plan cancellation, right to keep it. You can
+            change its status at any time.
+          </p>
+        )}
+        {plans.length > 0 && (
+          <p>
+            <strong>
+              {potentialTotal.missingRates
+                ? "Rates needed"
+                : money(
+                    potentialTotal.value!,
+                    currency,
+                    false,
+                    potentialTotal.approximate,
+                  )}{" "}
+              / year
+            </strong>{" "}
+            in cancellation plans at the latest observed prices. Potential
+            avoided charges, not confirmed savings.
+            {potentialTotal.missingRates && (
+              <small>
+                {potentialTotal.originals
+                  .map((item) => money(item.amount, item.currency))
+                  .join(" + ")}{" "}
+                · Original yearly amounts
+              </small>
+            )}
           </p>
         )}
         <p className="muted">
@@ -317,31 +383,35 @@ export default function Subscriptions({ currency }: { currency: string }) {
         </p>
       </section>
       {message && (
-        <p className="notice" role="status">
-          {message}
-          {changeId && (
-            <button
-              onClick={() =>
-                void undoChange(changeId)
-                  .then(() => {
-                    setChange("");
-                    setMessage("Review undone.");
-                  })
-                  .catch((e) =>
-                    setError(
-                      e instanceof Error
-                        ? e.message
-                        : "Could not undo this review.",
-                    ),
-                  )
-              }
-            >
-              Undo
-            </button>
-          )}
-        </p>
+        <Toast
+          id={changeId || message}
+          message={message}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  setChange("");
+                  setMessage("");
+                }
+              : undefined
+          }
+        />
       )}
       {error && <p role="alert">{error}</p>}
+      <div className="segmented-control" aria-label="Recurring payment type">
+        <button
+          aria-pressed={group === "subscriptions"}
+          onClick={() => setGroup("subscriptions")}
+        >
+          Subscriptions
+        </button>
+        <button
+          aria-pressed={group === "bills"}
+          onClick={() => setGroup("bills")}
+        >
+          Bills
+        </button>
+      </div>
       <div
         className="subscription-tabs"
         role="group"
@@ -396,6 +466,9 @@ export default function Subscriptions({ currency }: { currency: string }) {
             onReviewed={(message, id) => {
               setMessage(message);
               setChange(id);
+              void db.settings
+                .put({ key: "subscriptions:helpSeen", value: "true" })
+                .catch(() => {});
             }}
             account={
               data.accounts.find((a) => a.id === s.accountId)?.displayName ??

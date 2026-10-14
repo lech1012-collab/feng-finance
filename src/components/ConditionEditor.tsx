@@ -46,7 +46,7 @@ export function ConditionEditor({
             ? accounts.map((a) => [a.id, a.displayName])
             : c.field === "categoryId"
               ? [
-                  ["", "Uncategorized"],
+                  ["", "Uncategorised"],
                   ...categories
                     .filter((c) => !c.archived && !c.parentId)
                     .map((c) => [c.id, c.name]),
@@ -193,6 +193,7 @@ export function ConditionEditor({
             )}
             <button
               type="button"
+              hidden={conditions.length === 1}
               aria-label={`Remove condition ${i + 1}`}
               onClick={() =>
                 onChange(conditions.filter((_, index) => index !== i))

@@ -83,7 +83,7 @@ it("separates verified card debt from missing cash, withholds the net and offers
   expect(screen.getByText("Net position").parentElement).toHaveTextContent(
     "Unavailable",
   );
-  expect(screen.queryByText("-£1,357.90")).not.toBeInTheDocument();
+  expect(screen.queryByText("−£1,357.90")).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole("button", { name: /^Import$/ }));
   expect(open).toHaveBeenCalledOnce();
 });

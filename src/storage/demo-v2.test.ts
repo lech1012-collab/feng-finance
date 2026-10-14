@@ -1,10 +1,33 @@
-import { beforeEach, afterAll, expect, it } from "vitest";
+import { beforeEach, afterAll, expect, it, vi } from "vitest";
 import { db } from "./database";
 import { loadDemo, deleteDemo } from "./demo";
 import { clearLocalData, createBackup, validateBackup } from "./backup";
 import { undoChange } from "./audit";
 import { transaction, accounts } from "../tests/helpers";
 import { cashFlow } from "../analytics/calculations";
+import { monthOffset } from "../domain/dates";
+
+it("generates completed statements, valuations and cached rates without any future records", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-01-13T12:00:00Z"));
+  try {
+    await loadDemo();
+    const backup = await createBackup();
+    expect(
+      backup.statements.every((row) => row.statementPeriodEnd <= "2025-12-31"),
+    ).toBe(true);
+    expect(backup.transactions.every((row) => row.date <= "2025-12-31")).toBe(
+      true,
+    );
+    expect(backup.valuations?.every((row) => row.date <= "2026-01-13")).toBe(
+      true,
+    );
+    expect(backup.fxRates?.every((row) => row.date <= "2026-01-13")).toBe(true);
+    expect(backup.fxRates?.some((row) => row.date === "2026-01-13")).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});
 
 beforeEach(async () => {
   await clearLocalData();
@@ -118,7 +141,7 @@ it("deletes demo entities without erasing real data and supports one Undo", asyn
 
 it("refreshes a closed mixed month in the same demo deletion and Undo", async () => {
   await loadDemo();
-  const month = new Date().toISOString().slice(0, 7);
+  const month = monthOffset(new Date().toISOString().slice(0, 7), -1);
   await db.accounts.put(accounts[0]);
   await db.transactions.put(
     transaction({

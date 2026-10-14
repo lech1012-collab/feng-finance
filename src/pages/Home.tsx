@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { PositionSummary } from "../components/PositionSummary";
+import { Toast } from "../components/Toast";
 import { ImportButton } from "../components/ImportPicker";
 import { MonthPicker } from "../components/common";
 import { CashChart } from "../components/Chart";
@@ -20,7 +21,10 @@ import { monthBounds, monthLabel, monthOffset } from "../domain/dates";
 import { displayDate, displayMerchant } from "../domain/presentation";
 import { cashFlow, categorySpending } from "../analytics/calculations";
 import { verifiedStatements } from "../analytics/coverage";
-import { excludedFlows, homeDataHealth } from "../analytics/home-summary";
+import {
+  excludedReportingFlows,
+  homeDataHealth,
+} from "../analytics/home-summary";
 import { reportingPlanningForecast } from "../analytics/reporting-forecast";
 import { potsOverview } from "../analytics/planning-v2";
 import { deeperInsights } from "../analytics/deeper";
@@ -172,6 +176,9 @@ export default function Home({
         <div className="page-heading">
           <h1>Home</h1>
         </div>
+        {location.state?.backupRestored && (
+          <Toast message="Backup restored successfully." />
+        )}
         <section className="welcome card">
           <Wallet size={30} />
           <h2>Your finances, in one place.</h2>
@@ -238,12 +245,12 @@ export default function Home({
   );
   const difference = flow.net - previous.net;
   const categories = categorySpending(current, data.categories, currency);
-  const excluded = excludedFlows(
-    projectedReportingTransactions(data.transactions, currency, data.rates)
-      .transactions,
+  const excluded = excludedReportingFlows(
+    data.transactions,
     data.accounts,
     month,
     currency,
+    data.rates,
     [start, end],
   );
   const subscriptions = [...new Set(data.accounts.map((a) => a.currency))]
@@ -325,7 +332,7 @@ export default function Home({
     ...(subscriptions.length
       ? [{ kind: "subscriptions", account: undefined }]
       : []),
-  ].slice(0, 3);
+  ];
   const monthName = new Date(`${month}-01T12:00:00Z`).toLocaleDateString(
     "en-GB",
     { month: "long", timeZone: "UTC" },
@@ -335,18 +342,28 @@ export default function Home({
     <>
       <div className="page-heading">
         <h1>Home</h1>
-        <ImportButton className="button primary import-main">
-          <Upload size={18} />
-          Import statement
-        </ImportButton>
+        {missingAccounts.length > 0 && (
+          <ImportButton className="button primary import-main">
+            <Upload size={18} />
+            Import statement
+          </ImportButton>
+        )}
       </div>
+      {location.state?.backupRestored && (
+        <Toast message="Backup restored successfully." />
+      )}
+      {location.state?.importedCount !== undefined && data.toReview === 0 && (
+        <Toast
+          message={`Import complete: ${location.state.importedCount} transactions imported.`}
+        />
+      )}
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
         <span className="muted">
           {reportingPeriodLabel(month, data.settings, data.transactions)}
         </span>
       </div>
-      {location.state?.importedCount !== undefined && (
+      {location.state?.importedCount !== undefined && data.toReview > 0 && (
         <div className="notice import-result" role="status">
           <span>
             Import complete: {location.state.importedCount} imported
@@ -360,17 +377,23 @@ export default function Home({
               ` · ${location.state.skippedFileCount} PDF${location.state.skippedFileCount === 1 ? "" : "s"} skipped`}
             {location.state.automaticallyLinkedCount > 0 &&
               ` · ${location.state.automaticallyLinkedCount} pair${location.state.automaticallyLinkedCount === 1 ? "" : "s"} linked automatically`}
-            {data.toReview > 0 && ` · ${data.toReview} still to review`}
+            {data.toReview > 0 &&
+              ` · ${data.toReview} to review, ${data.uncategorized} need a category`}
           </span>
           {location.state.automaticallyLinkedCount > 0 && (
             <Link to="/transactions?type=transfer&allDates=1">
               Review linked transfers
             </Link>
           )}
-          {data.toReview > 0 && <Link to={sortHref}>Sort now</Link>}
+          {data.toReview > 0 && (
+            <Link className="button primary" to={sortHref}>
+              Sort now
+            </Link>
+          )}
         </div>
       )}
       {location.state?.importedCount > 0 &&
+        data.toReview === 0 &&
         !data.settings.some(
           (s) => s.key === "setup:dismissed" && s.value === "true",
         ) && (
@@ -391,7 +414,7 @@ export default function Home({
               </button>
             </div>
             <p>Protect access and keep a copy of your data.</p>
-            <div className="actions">
+            <div className="setup-list">
               <Link to="/settings#security">Set app lock</Link>
               <Link to="/settings#backup">Save backup</Link>
               <Link to="/settings#transfers">Transfer matching</Link>
@@ -451,7 +474,7 @@ export default function Home({
               {coverage.hasIncomeSource && coverage.hasData
                 ? coverage.missingRates
                   ? "n/a"
-                  : `${projection.converted ? "≈ " : ""}${money(flow.net, currency, true)}${coverage.complete ? "" : "*"}`
+                  : `${money(flow.net, currency, true, projection.converted)}${coverage.complete ? "" : "*"}`
                 : "n/a"}
             </strong>
           </Link>
@@ -479,27 +502,56 @@ export default function Home({
             `Not comparable yet: ${monthName} ${coverage.complete ? "needs a complete previous month" : coverage.hasUnverifiedStatements ? "unverified" : "incomplete"}.`
           )}
         </p>
-        <div className="not-counted">
-          <span>Not counted:</span>
-          {data.transactions.some(
-            (t) => t.kind === "refund" && t.date >= start && t.date < end,
-          ) && (
-            <Link to={`/transactions?month=${month}&allDates=0`}>
-              Refunds · counted in original purchase months
-            </Link>
-          )}
-          <Link
-            to={`/transactions?month=${month}&type=transfer&transferKind=internal`}
-          >
-            {money(excluded.internal, currency)} transfers
-          </Link>
-          <span aria-hidden="true">·</span>
-          <Link
-            to={`/transactions?month=${month}&type=transfer&transferKind=card`}
-          >
-            {money(excluded.card, currency)} card repayments
-          </Link>
-        </div>
+        {!!excluded.count && (
+          <div className="not-counted">
+            <span>Not counted:</span>
+            {data.transactions.some(
+              (t) => t.kind === "refund" && t.date >= start && t.date < end,
+            ) && (
+              <Link to={`/transactions?month=${month}&allDates=0`}>
+                Refunds · counted in original purchase months
+              </Link>
+            )}
+            {excluded.internal !== 0 && (
+              <Link
+                to={`/transactions?month=${month}&type=transfer&transferKind=internal`}
+              >
+                {excluded.internal === undefined
+                  ? "Rate needed"
+                  : money(excluded.internal, currency)}{" "}
+                transfers
+                {excluded.internal === undefined && (
+                  <small>
+                    Original:{" "}
+                    {excluded.originals
+                      .filter((row) => row.internal)
+                      .map((row) => money(row.internal, row.currency))
+                      .join(" · ")}
+                  </small>
+                )}
+              </Link>
+            )}
+            {excluded.card !== 0 && (
+              <Link
+                to={`/transactions?month=${month}&type=transfer&transferKind=card`}
+              >
+                {excluded.card === undefined
+                  ? "Rate needed"
+                  : money(excluded.card, currency)}{" "}
+                card repayments
+                {excluded.card === undefined && (
+                  <small>
+                    Original:{" "}
+                    {excluded.originals
+                      .filter((row) => row.card)
+                      .map((row) => money(row.card, row.currency))
+                      .join(" · ")}
+                  </small>
+                )}
+              </Link>
+            )}
+          </div>
+        )}
       </section>
 
       {todo.length > 0 && (
@@ -737,8 +789,20 @@ export default function Home({
                 </small>
               </span>
               <strong>
-                {forecast.converted ? "≈ " : ""}
-                {money(payment.amount, currency, true)}
+                {payment.amount === undefined ? (
+                  <>
+                    Rate needed
+                    <small>
+                      {money(
+                        payment.originalAmount,
+                        payment.originalCurrency,
+                        true,
+                      )}
+                    </small>
+                  </>
+                ) : (
+                  money(payment.amount, currency, true, forecast.converted)
+                )}
               </strong>
             </Link>
           ))}

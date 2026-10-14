@@ -1,3 +1,6 @@
+import { reviewDate } from "../analytics/month-review-details";
+import { Sheet, SheetFooter } from "./Sheet";
+import { displayMerchant } from "../domain/presentation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
@@ -44,6 +47,7 @@ import {
 import { effectiveTransactions } from "../analytics/effective-transactions";
 import { reportingPeriodLabel } from "../domain/period";
 import {
+  compactMoney,
   currencyPrecision,
   decimalMoney,
   money,
@@ -58,8 +62,9 @@ import { reportingPeriod } from "../domain/period";
 import { readBudget, budgetKey } from "../analytics/planning";
 import { detectSubscriptions } from "../analytics/subscriptions";
 import "./planning-v2.css";
+import { Toast } from "./Toast";
 
-function useFeedback() {
+function useFeedback(onUndo?: () => void | Promise<void>) {
   const [message, setMessage] = useState(""),
     [error, setError] = useState(""),
     [changeId, setChange] = useState(""),
@@ -88,27 +93,20 @@ function useFeedback() {
     <>
       {error && <p role="alert">{error}</p>}
       {message && (
-        <p role="status">
-          {message}{" "}
-          {changeId && (
-            <button
-              onClick={() =>
-                void undoChange(changeId)
-                  .then(() => {
-                    setChange("");
-                    setMessage("Change undone.");
-                  })
-                  .catch((e) =>
-                    setError(
-                      e instanceof Error ? e.message : "Could not undo.",
-                    ),
-                  )
-              }
-            >
-              Undo
-            </button>
-          )}
-        </p>
+        <Toast
+          message={message}
+          id={changeId}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  await onUndo?.();
+                  setChange("");
+                  setMessage("Change undone.");
+                }
+              : undefined
+          }
+        />
       )}
     </>
   );
@@ -179,7 +177,7 @@ export function PotsPanel({
     data.statements,
     data.transactions,
     currency,
-    localToday(),
+    reviewDate(monthBounds(month)[1], localToday()),
     data.rates,
     data.valuations,
   );
@@ -219,132 +217,148 @@ export function PotsPanel({
           </details>
         )}
         {editing !== undefined && (
-          <form
-            className="planning-v2-form"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void (async () => {
-                try {
-                  const potCurrency = editing?.currency ?? currency;
-                  const pot: Pot = {
-                    id: editing?.id ?? crypto.randomUUID(),
-                    name,
-                    type,
-                    cadence: type === "sinking" ? potCadence : undefined,
-                    targetMinor: parseMoney(target, potCurrency),
-                    currency: potCurrency,
-                    targetDate: date || undefined,
-                    linkedAccountId: account || undefined,
-                    linkedCategoryId: category || undefined,
-                    contributions: editing?.contributions ?? [],
-                    createdAt: editing?.createdAt ?? new Date().toISOString(),
-                  };
-                  if (await f.run(() => savePot(pot), "Pot saved."))
-                    setEditing(undefined);
-                } catch (e) {
-                  f.setError(
-                    e instanceof Error
-                      ? e.message
-                      : "Enter a valid pot amount.",
-                  );
-                }
-              })();
+          <Sheet
+            title={editing ? "Edit pot" : "New pot"}
+            onClose={() => {
+              if (!f.busy) setEditing(undefined);
             }}
           >
-            <label>
-              Name
-              <input
-                required
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <label>
-              Type
-              <select
-                value={type}
-                onChange={(e) => setType(e.target.value as Pot["type"])}
-              >
-                <option value="goal">Savings goal</option>
-                <option value="sinking">Irregular cost</option>
-              </select>
-            </label>
-            <label>
-              Target amount
-              <input
-                required
-                inputMode="decimal"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-              />
-            </label>
-            {type === "sinking" && (
-              <label>
-                Cost frequency
-                <select
-                  disabled={type !== "sinking"}
-                  value={potCadence}
-                  onChange={(e) =>
-                    setPotCadence(e.target.value as NonNullable<Pot["cadence"]>)
+            <form
+              id="pot-form"
+              className="planning-v2-form"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void (async () => {
+                  try {
+                    const potCurrency = editing?.currency ?? currency;
+                    const pot: Pot = {
+                      id: editing?.id ?? crypto.randomUUID(),
+                      name,
+                      type,
+                      cadence: type === "sinking" ? potCadence : undefined,
+                      targetMinor: parseMoney(target, potCurrency),
+                      currency: potCurrency,
+                      targetDate: date || undefined,
+                      linkedAccountId: account || undefined,
+                      linkedCategoryId: category || undefined,
+                      contributions: editing?.contributions ?? [],
+                      createdAt: editing?.createdAt ?? new Date().toISOString(),
+                    };
+                    if (await f.run(() => savePot(pot), "Pot saved."))
+                      setEditing(undefined);
+                  } catch (e) {
+                    f.setError(
+                      e instanceof Error
+                        ? e.message
+                        : "Enter a valid pot amount.",
+                    );
                   }
+                })();
+              }}
+            >
+              <label>
+                Name
+                <input
+                  required
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                />
+              </label>
+              <label>
+                Type
+                <select
+                  value={type}
+                  onChange={(e) => setType(e.target.value as Pot["type"])}
                 >
-                  <option value="monthly">Monthly</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="annual">Annual</option>
+                  <option value="goal">Savings goal</option>
+                  <option value="sinking">Irregular cost</option>
                 </select>
               </label>
-            )}
-            <label>
-              Due date
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-              />
-            </label>
-            <label>
-              Linked savings account
-              <select
-                value={account}
-                onChange={(e) => setAccount(e.target.value)}
-              >
-                <option value="">Monthly contributions</option>
-                {data.accounts
-                  .filter((a) => a.accountType === "savings")
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.displayName}
-                    </option>
-                  ))}
-              </select>
-            </label>
-            {type === "sinking" && (
               <label>
-                Spending category
+                Target amount
+                <input
+                  required
+                  inputMode="decimal"
+                  value={target}
+                  onChange={(e) => setTarget(e.target.value)}
+                />
+              </label>
+              {type === "sinking" && (
+                <label>
+                  Cost frequency
+                  <select
+                    disabled={type !== "sinking"}
+                    value={potCadence}
+                    onChange={(e) =>
+                      setPotCadence(
+                        e.target.value as NonNullable<Pot["cadence"]>,
+                      )
+                    }
+                  >
+                    <option value="monthly">Monthly</option>
+                    <option value="quarterly">Quarterly</option>
+                    <option value="annual">Annual</option>
+                  </select>
+                </label>
+              )}
+              <label>
+                Due date
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                />
+              </label>
+              <label>
+                How progress is tracked
                 <select
-                  value={category}
-                  onChange={(e) => setCategory(e.target.value)}
+                  value={account}
+                  onChange={(e) => setAccount(e.target.value)}
                 >
-                  <option value="">Choose category</option>
-                  {data.categories
-                    .filter(
-                      (c) => c.kind === "expense" && !c.parentId && !c.archived,
-                    )
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.name}
+                  <option value="">Monthly contributions</option>
+                  {data.accounts
+                    .filter((a) => a.accountType === "savings")
+                    .map((a) => (
+                      <option key={a.id} value={a.id}>
+                        {a.displayName}
                       </option>
                     ))}
                 </select>
               </label>
-            )}
-            <div className="actions">
-              <button disabled={f.busy}>Save pot</button>
-              <button type="button" onClick={() => setEditing(undefined)}>
-                Cancel
-              </button>
-            </div>
-          </form>
+              {type === "sinking" && (
+                <label>
+                  Spending category
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    <option value="">Choose category</option>
+                    {data.categories
+                      .filter(
+                        (c) =>
+                          c.kind === "expense" && !c.parentId && !c.archived,
+                      )
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+              )}
+              <SheetFooter>
+                <div className="actions">
+                  <button className="primary" form="pot-form" disabled={f.busy}>
+                    Save pot
+                  </button>
+                  <button type="button" onClick={() => setEditing(undefined)}>
+                    Cancel
+                  </button>
+                </div>
+              </SheetFooter>
+              {f.feedback}
+            </form>
+          </Sheet>
         )}
         {f.feedback}
       </section>
@@ -461,18 +475,21 @@ export function PotsPanel({
                   <button disabled={f.busy}>Confirm contribution</button>
                 </form>
               )}
-              <button
-                onClick={() => {
-                  if (
-                    window.confirm(
-                      `Delete ${p.name}? You can undo this change.`,
+              <details className="object-menu">
+                <summary>Pot options</summary>{" "}
+                <button
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        `Delete ${p.name}? You can undo this change.`,
+                      )
                     )
-                  )
-                    void f.run(() => removePot(p.id), "Pot deleted.");
-                }}
-              >
-                Delete pot
-              </button>
+                      void f.run(() => removePot(p.id), "Pot deleted.");
+                  }}
+                >
+                  Delete pot
+                </button>
+              </details>
             </article>
           );
         })}
@@ -512,6 +529,7 @@ export function MonthlyBudgetsPanel({
   const [category, setCategory] = useState("groceries"),
     [amount, setAmount] = useState(""),
     [rollover, setRollover] = useState<MonthlyBudget["rollover"]>("none");
+  const [editingBudget, setEditingBudget] = useState(false);
   const f = useFeedback();
   if (!data) return <p role="status">Loading monthly budgets…</p>;
   const selected = data.budgets
@@ -557,7 +575,10 @@ export function MonthlyBudgetsPanel({
   );
   return (
     <section className="card">
-      <h2>Monthly budgets</h2>
+      <div className="section-heading">
+        <h2>Monthly budgets</h2>
+        <button onClick={() => setEditingBudget(true)}>Set budget</button>
+      </div>
       <p className="muted">
         {reportingPeriodLabel(month, data.settings, data.transactions)}. Budget
         plus carried amount, minus spending, equals what is left.{" "}
@@ -569,75 +590,102 @@ export function MonthlyBudgetsPanel({
           : ""}
         {projection.converted ? " ≈ Includes currency conversions." : ""}
       </p>
-      <form
-        className="planning-v2-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          try {
-            void f.run(
-              () =>
-                saveMonthlyBudget({
-                  id: `${currency}:${category}:${month}`,
-                  categoryId: category,
-                  month,
-                  currency,
-                  amountMinor: parseMoney(amount, currency),
-                  rollover,
-                }),
-              "Monthly budget saved.",
-            );
-          } catch (e) {
-            f.setError(
-              e instanceof Error ? e.message : "Invalid budget amount.",
-            );
-          }
-        }}
-      >
-        <label>
-          Category
-          <select
-            value={category}
-            onChange={(e) => {
-              setCategory(e.target.value);
-              const b = budgets.find((b) => b.categoryId === e.target.value);
-              setAmount(b ? decimalMoney(b.amountMinor, currency) : "");
-              setRollover(b?.rollover ?? "none");
+      {editingBudget && (
+        <Sheet
+          title="Monthly budget"
+          onClose={() => {
+            if (!f.busy) setEditingBudget(false);
+          }}
+        >
+          <form
+            id="monthly-budget-form"
+            className="planning-v2-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              try {
+                void f
+                  .run(
+                    () =>
+                      saveMonthlyBudget({
+                        id: `${currency}:${category}:${month}`,
+                        categoryId: category,
+                        month,
+                        currency,
+                        amountMinor: parseMoney(amount, currency),
+                        rollover,
+                      }),
+                    "Monthly budget saved.",
+                  )
+                  .then((ok) => {
+                    if (ok) setEditingBudget(false);
+                  });
+              } catch (e) {
+                f.setError(
+                  e instanceof Error ? e.message : "Invalid budget amount.",
+                );
+              }
             }}
           >
-            {data.categories
-              .filter((c) => !c.parentId && !c.archived && c.kind === "expense")
-              .map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label>
-          {monthLabel(month)} budget
-          <input
-            required
-            inputMode="decimal"
-            aria-label="Monthly rollover budget amount"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-          />
-        </label>
-        <label>
-          Carry into next month
-          <select
-            value={rollover}
-            onChange={(e) =>
-              setRollover(e.target.value as MonthlyBudget["rollover"])
-            }
-          >
-            <option value="none">Nothing</option>
-            <option value="surplus">Surplus only</option>
-            <option value="both">Surplus and overspend</option>
-          </select>
-        </label>
-        <button disabled={f.busy}>Save monthly budget</button>
-      </form>
+            <label>
+              Category
+              <select
+                value={category}
+                onChange={(e) => {
+                  setCategory(e.target.value);
+                  const b = budgets.find(
+                    (b) => b.categoryId === e.target.value,
+                  );
+                  setAmount(b ? decimalMoney(b.amountMinor, currency) : "");
+                  setRollover(b?.rollover ?? "none");
+                }}
+              >
+                {data.categories
+                  .filter(
+                    (c) => !c.parentId && !c.archived && c.kind === "expense",
+                  )
+                  .map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.name}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <label>
+              {monthLabel(month)} budget
+              <input
+                required
+                inputMode="decimal"
+                aria-label="Monthly rollover budget amount"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+            </label>
+            <label>
+              Carry into next month
+              <select
+                value={rollover}
+                onChange={(e) =>
+                  setRollover(e.target.value as MonthlyBudget["rollover"])
+                }
+              >
+                <option value="none">Nothing</option>
+                <option value="surplus">Surplus only</option>
+                <option value="both">Surplus and overspend</option>
+              </select>
+            </label>
+            {f.feedback}
+            <SheetFooter>
+              <button
+                className="primary"
+                form="monthly-budget-form"
+                disabled={f.busy || !amount}
+              >
+                Save monthly budget
+              </button>
+            </SheetFooter>
+          </form>
+        </Sheet>
+      )}
       {f.feedback}
       <div className="budget-grid">
         {budgets.map((b) => {
@@ -664,6 +712,7 @@ export function MonthlyBudgetsPanel({
                     setCategory(b.categoryId);
                     setAmount(decimalMoney(b.amountMinor, currency));
                     setRollover(b.rollover);
+                    setEditingBudget(true);
                   }}
                 >
                   {data.categories.find((c) => c.id === b.categoryId)?.name ??
@@ -672,7 +721,7 @@ export function MonthlyBudgetsPanel({
                 <strong>
                   {missingCategoryRate
                     ? "Left: unavailable"
-                    : `${money(r.leftMinor, currency)} left`}
+                    : `${money(r.leftMinor, currency)} ${month < localToday().slice(0, 7) ? (r.leftMinor < 0 ? "overspent" : "unspent") : "left"}`}
                 </strong>
               </div>
               <p>
@@ -683,8 +732,9 @@ export function MonthlyBudgetsPanel({
                   : `${money(r.spentMinor, currency)} spent`}
               </p>
               <small className="muted">
-                {r.daysRemaining} day{r.daysRemaining === 1 ? "" : "s"}{" "}
-                remaining
+                {month < localToday().slice(0, 7)
+                  ? `Ended ${formatUkDate(new Date(Date.parse(`${monthBounds(month)[1]}T12:00:00Z`) - 86400000).toISOString().slice(0, 10))}`
+                  : `${r.daysRemaining} day${r.daysRemaining === 1 ? "" : "s"} remaining`}
                 {r.provisional
                   ? " · Carry is provisional until previous months are closed"
                   : ""}
@@ -730,6 +780,7 @@ export function CalendarPanel({
     [due, setDue] = useState(""),
     [end, setEnd] = useState(""),
     [account, setAccount] = useState("");
+  const [moneyDirection, setMoneyDirection] = useState("out");
   const f = useFeedback();
   if (!data) return <p role="status">Loading payment calendar…</p>;
   const detected = [
@@ -749,7 +800,17 @@ export function CalendarPanel({
         !data.series.some(
           (d) =>
             d.matchKey === s.matchKey ||
-            (d.accountId === s.accountId && d.name === s.name),
+            (d.accountId === s.accountId &&
+              d.currency === s.currency &&
+              d.cadence === s.cadence &&
+              displayMerchant({
+                merchant: d.name,
+                description: d.name,
+              }).toLocaleLowerCase() ===
+                displayMerchant({
+                  merchant: s.name,
+                  description: s.name,
+                }).toLocaleLowerCase()),
         ),
     ),
   ];
@@ -806,9 +867,14 @@ export function CalendarPanel({
         status: "active",
       } as RecurringSeries);
     setEditing(target);
-    setName(target.name);
+    setName(
+      displayMerchant({ merchant: target.name, description: target.name }),
+    );
     setCadence(target.cadence);
-    setAmount(decimalMoney(target.expectedAmountMinor, target.currency));
+    setAmount(
+      decimalMoney(Math.abs(target.expectedAmountMinor), target.currency),
+    );
+    setMoneyDirection(target.expectedAmountMinor > 0 ? "in" : "out");
     setDue(target.nextDue);
     setEnd(target.endDate ?? "");
     setAccount(target.accountId);
@@ -912,19 +978,19 @@ export function CalendarPanel({
                 className="calendar-day"
                 key={d}
                 aria-pressed={date === d}
-                aria-label={`${formatUkDate(d)}, ${rows.length} payment${rows.length === 1 ? "" : "s"}, ${dayMissing ? "Money out unavailable; exchange rates needed" : `actual money out ${money(actual, currency)}, expected ${money(expected, currency)}`}`}
+                aria-label={`${formatUkDate(d)}, ${rows.length} payment${rows.length === 1 ? "" : "s"}, ${dayMissing ? "Money out unavailable; exchange rates needed" : `actual money out ${compactMoney(actual, currency)}, expected ${compactMoney(expected, currency)}`}`}
                 onClick={() => setDay(d)}
               >
                 <strong>{i + 1}</strong>
                 {dayMissing && <span>n/a</span>}
                 {actual > 0 && (
                   <span className="actual-payment">
-                    {money(actual, currency)}
+                    {compactMoney(actual, currency)}
                   </span>
                 )}
                 {expected > 0 && (
                   <span className="expected-payment">
-                    {money(expected, currency)}
+                    {compactMoney(expected, currency)}
                   </span>
                 )}
                 {rows.some((t) => t.payday) && (
@@ -943,14 +1009,16 @@ export function CalendarPanel({
             <div className="planning-v2-object" key={i.id}>
               <span>
                 {i.transactionId ? (
-                  <Link to={`/transactions/${i.transactionId}`}>{i.name}</Link>
+                  <Link to={`/transactions/${i.transactionId}`}>
+                    {displayMerchant({ merchant: i.name, description: i.name })}
+                  </Link>
                 ) : (
                   <button
                     onClick={() =>
                       edit(series.find((s) => s.id === i.seriesId))
                     }
                   >
-                    {i.name}
+                    {displayMerchant({ merchant: i.name, description: i.name })}
                   </button>
                 )}
                 <small>
@@ -979,7 +1047,8 @@ export function CalendarPanel({
             <span>
               {s.name}
               <small>
-                {s.cadence} · {s.status} ·{" "}
+                {s.cadence[0].toUpperCase() + s.cadence.slice(1)} ·{" "}
+                {s.status[0].toUpperCase() + s.status.slice(1)} ·{" "}
                 {data.series.some((d) => d.id === s.id)
                   ? "Confirmed"
                   : "Detected, confirm or edit"}
@@ -990,104 +1059,18 @@ export function CalendarPanel({
         ))}
       </details>
       {editing && (
-        <form
-          className="planning-v2-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            try {
-              void f
-                .run(
-                  () =>
-                    saveRecurringSeries({
-                      ...editing,
-                      name,
-                      accountId: account,
-                      cadence,
-                      currency: formCurrency,
-                      expectedAmountMinor: parseMoney(amount, formCurrency),
-                      nextDue: due,
-                      endDate: end || undefined,
-                      status: "active",
-                    }),
-                  "Recurring series saved.",
-                )
-                .then((ok) => {
-                  if (ok) setEditing(undefined);
-                });
-            } catch (e) {
-              f.setError(
-                e instanceof Error ? e.message : "Invalid expected amount.",
-              );
-            }
+        <Sheet
+          title="Recurring payment"
+          onClose={() => {
+            if (!f.busy) setEditing(undefined);
           }}
         >
-          <label>
-            Name
-            <input
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </label>
-          <label>
-            Account
-            <select
-              disabled={!!editing?.amountHistory.length}
-              value={account}
-              onChange={(e) => setAccount(e.target.value)}
-            >
-              {data.accounts.map((a) => (
-                <option key={a.id} value={a.id}>
-                  {a.displayName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Cadence
-            <select
-              value={cadence}
-              onChange={(e) =>
-                setCadence(e.target.value as RecurringSeries["cadence"])
-              }
-            >
-              {["weekly", "monthly", "quarterly", "annual"].map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Expected signed amount ({formCurrency})
-            <input
-              required
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <small>Negative for bills, positive for income.</small>
-          </label>
-          <label>
-            Next due
-            <input
-              required
-              type="date"
-              value={due}
-              onChange={(e) => setDue(e.target.value)}
-            />
-          </label>
-          <label>
-            End date
-            <input
-              type="date"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-            />
-          </label>
-          <div className="actions">
-            <button disabled={f.busy}>Confirm series</button>
-            <button
-              type="button"
-              onClick={() =>
+          <form
+            id="recurring-payment-form"
+            className="planning-v2-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              try {
                 void f
                   .run(
                     () =>
@@ -1095,52 +1078,183 @@ export function CalendarPanel({
                         ...editing,
                         name,
                         accountId: account,
-                        currency: formCurrency,
                         cadence,
-                        expectedAmountMinor: parseMoney(amount, formCurrency),
+                        currency: formCurrency,
+                        expectedAmountMinor:
+                          Math.abs(parseMoney(amount, formCurrency)) *
+                          (moneyDirection === "in" ? 1 : -1),
                         nextDue: due,
                         endDate: end || undefined,
-                        status: "ignored",
+                        status: "active",
                       }),
-                    "Series ignored.",
+                    "Recurring series saved.",
                   )
                   .then((ok) => {
                     if (ok) setEditing(undefined);
-                  })
+                  });
+              } catch (e) {
+                f.setError(
+                  e instanceof Error ? e.message : "Invalid expected amount.",
+                );
               }
-            >
-              Ignore merchant
-            </button>
-            <button
-              type="button"
-              onClick={() =>
-                void f
-                  .run(
-                    () =>
-                      saveRecurringSeries({
-                        ...editing,
-                        name,
-                        accountId: account,
-                        currency: formCurrency,
-                        cadence,
-                        expectedAmountMinor: parseMoney(amount, formCurrency),
-                        nextDue: due,
-                        endDate: localToday(),
-                      }),
-                    "Series ended.",
-                  )
-                  .then((ok) => {
-                    if (ok) setEditing(undefined);
-                  })
-              }
-            >
-              End series today
-            </button>
-            <button type="button" onClick={() => setEditing(undefined)}>
-              Cancel
-            </button>
-          </div>
-        </form>
+            }}
+          >
+            <label>
+              Name
+              <input
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </label>
+            <label>
+              Account
+              <select
+                disabled={!!editing?.amountHistory.length}
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
+              >
+                {data.accounts.map((a) => (
+                  <option key={a.id} value={a.id}>
+                    {a.displayName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Cadence
+              <select
+                value={cadence}
+                onChange={(e) =>
+                  setCadence(e.target.value as RecurringSeries["cadence"])
+                }
+              >
+                {["weekly", "monthly", "quarterly", "annual"].map((c) => (
+                  <option key={c} value={c}>
+                    {c[0].toUpperCase() + c.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Money direction
+              <select
+                value={moneyDirection}
+                onChange={(e) => setMoneyDirection(e.target.value)}
+              >
+                <option value="out">Money out</option>
+                <option value="in">Money in</option>
+              </select>
+            </label>
+            <label>
+              Expected amount ({formCurrency})
+              <input
+                required
+                inputMode="decimal"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+              />
+              <small>
+                The money direction controls whether this is a payment or
+                income.
+              </small>
+            </label>
+            <label>
+              Next due
+              <input
+                required
+                type="date"
+                value={due}
+                onChange={(e) => setDue(e.target.value)}
+              />
+            </label>
+            <label>
+              End date
+              <input
+                type="date"
+                value={end}
+                onChange={(e) => setEnd(e.target.value)}
+              />
+            </label>
+            {f.feedback}
+            <details className="object-menu">
+              <summary>More series options</summary>
+              <div className="actions">
+                <button
+                  type="button"
+                  onClick={() =>
+                    void f
+                      .run(
+                        () =>
+                          saveRecurringSeries({
+                            ...editing,
+                            name,
+                            accountId: account,
+                            currency: formCurrency,
+                            cadence,
+                            expectedAmountMinor:
+                              Math.abs(parseMoney(amount, formCurrency)) *
+                              (moneyDirection === "in" ? 1 : -1),
+                            nextDue: due,
+                            endDate: end || undefined,
+                            status: "ignored",
+                          }),
+                        "Series ignored.",
+                      )
+                      .then((ok) => {
+                        if (ok) setEditing(undefined);
+                      })
+                  }
+                >
+                  Ignore merchant
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    void f
+                      .run(
+                        () =>
+                          saveRecurringSeries({
+                            ...editing,
+                            name,
+                            accountId: account,
+                            currency: formCurrency,
+                            cadence,
+                            expectedAmountMinor:
+                              Math.abs(parseMoney(amount, formCurrency)) *
+                              (moneyDirection === "in" ? 1 : -1),
+                            nextDue: due,
+                            endDate: localToday(),
+                          }),
+                        "Series ended.",
+                      )
+                      .then((ok) => {
+                        if (ok) setEditing(undefined);
+                      })
+                  }
+                >
+                  End series today
+                </button>
+              </div>
+            </details>
+            <SheetFooter>
+              <button
+                type="button"
+                disabled={f.busy}
+                onClick={() => setEditing(undefined)}
+              >
+                Cancel
+              </button>
+              <button
+                className="primary"
+                form="recurring-payment-form"
+                disabled={f.busy}
+              >
+                Confirm series
+              </button>
+            </SheetFooter>
+          </form>
+        </Sheet>
       )}
       {f.feedback}
     </section>
@@ -1181,8 +1295,26 @@ export function DebtPanel({
     [terms, setTerms] = useState<
       Record<string, { apr: string; minimum: string }>
     >({}),
-    [ready, setReady] = useState(false);
-  const f = useFeedback();
+    [ready, setReady] = useState(true);
+  const [editingDebt, setEditingDebt] = useState<string>();
+  const [editingPlan, setEditingPlan] = useState(false);
+  const f = useFeedback(async () => {
+    setTerms({});
+    planTouched.current = false;
+    const saved = await db.settings.get(`debt-plan:${currency}`);
+    try {
+      const value = JSON.parse(saved?.value ?? "null") as {
+        payment?: string;
+        strategy?: typeof strategy;
+        custom?: string[];
+      } | null;
+      setPayment(value?.payment ?? "");
+      setStrategy(value?.strategy ?? "avalanche");
+      setCustom(value?.custom ?? []);
+    } catch {
+      setPayment("");
+    }
+  });
   const initialized = useRef("");
   useEffect(() => {
     if (!data || initialized.current === currency) return;
@@ -1206,6 +1338,71 @@ export function DebtPanel({
       /* Older settings do not become a financial plan. */
     }
   }, [data, currency]);
+  const planTouched = useRef(false);
+  const planSaving = useRef(false);
+  useEffect(() => {
+    if (!data || !planTouched.current || planSaving.current || !payment.trim())
+      return;
+    let amount: number;
+    try {
+      amount = parseMoney(payment, currency);
+      if (amount <= 0) return;
+    } catch {
+      return;
+    }
+    const value = JSON.stringify({ payment, strategy, custom });
+    if (value === data.settings?.value) return;
+    const timer = window.setTimeout(() => {
+      planSaving.current = true;
+      void f
+        .run(
+          () =>
+            auditedMutation("Save debt plan", ["settings"], () =>
+              db.settings.put({ key: `debt-plan:${currency}`, value }),
+            ),
+          "Repayment settings saved.",
+        )
+        .finally(() => {
+          planSaving.current = false;
+        });
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [
+    payment,
+    strategy,
+    JSON.stringify(custom),
+    data?.settings?.value,
+    currency,
+  ]);
+  useEffect(() => {
+    if (!data) return;
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        for (const [accountId, draft] of Object.entries(terms)) {
+          const account = data.accounts.find((a) => a.id === accountId);
+          if (!account || !draft.apr.trim()) continue;
+          const apr = Number(draft.apr);
+          if (!Number.isFinite(apr) || apr < 0 || apr > 100) continue;
+          let minimum: number | undefined;
+          try {
+            minimum = draft.minimum.trim()
+              ? parseMoney(draft.minimum, account.currency)
+              : undefined;
+            if (minimum !== undefined && minimum < 0) continue;
+          } catch {
+            continue;
+          }
+          if (apr === account.apr && minimum === account.minPaymentMinor)
+            continue;
+          await f.run(
+            () => saveDebtTerms(accountId, apr, minimum),
+            "Debt terms saved.",
+          );
+        }
+      })();
+    }, 700);
+    return () => window.clearTimeout(timer);
+  }, [JSON.stringify(terms), data?.accounts, currency]);
   if (!data) return <p role="status">Loading debt planner…</p>;
   const debtRows = debtBalances(
     data.accounts,
@@ -1215,15 +1412,25 @@ export function DebtPanel({
     month,
     localToday(),
   );
+  // Card minimums are estimates. A loan/mortgage needs the owner's actual payment.
+  const includedRows = debtRows.filter(
+    (d) =>
+      ["credit", "credit_card"].includes(d.account.accountType) ||
+      (d.account.minPaymentMinor ?? 0) > 0,
+  );
   let result: ReturnType<typeof debtPayoff> | undefined,
     minimum: ReturnType<typeof debtPayoff> | undefined,
     planError = "";
-  if (ready)
+  if (ready && payment.trim())
     try {
-      const rows = debtRows.filter((d) => d.balance && !d.full);
+      const rows = includedRows.filter((d) => d.balance && !d.full);
+      if (!rows.length)
+        throw new Error(
+          "No debts are included. Add a credit card or enter the actual monthly payment for a loan.",
+        );
       if (rows.some((d) => d.account.apr === undefined))
         throw new Error("Enter the APR for each debt before calculating.");
-      if (debtRows.some((d) => d.balance === undefined))
+      if (includedRows.some((d) => d.balance === undefined))
         throw new Error(
           "A verified imported balance or dated manual valuation is needed for every debt before calculating.",
         );
@@ -1268,6 +1475,7 @@ export function DebtPanel({
           minimumMinor: min?.amount,
           floorMinor: floor.amount,
           currency,
+          accountType: d.account.accountType,
         };
       });
       result = debtPayoff(
@@ -1286,11 +1494,100 @@ export function DebtPanel({
     <section className="card">
       <h2>Debt payoff planner</h2>
       <p className="muted">
-        Monthly interest = balance × APR ÷ 12, rounded to the currency's
-        smallest unit. Estimates assume unchanged rates and no new borrowing.
+        Monthly interest = balance × APR ÷ 12, rounded to the nearest penny.
+        Estimates assume unchanged rates and no new borrowing. Loans and
+        mortgages are included only after you enter their actual monthly
+        payment.
       </p>
       {!debtRows.length && (
         <p>Add a credit card, loan or mortgage to plan repayments.</p>
+      )}
+      {planError && <p role="alert">{planError}</p>}
+      {result && (
+        <>
+          {result.reason && <p className="notice warning">{result.reason}</p>}
+          {!result.reason && (
+            <div className="planning-v2-kpis">
+              <div>
+                <small>Total interest</small>
+                <strong>{money(result.totalInterestMinor, currency)}</strong>
+              </div>
+              <div>
+                <small>Estimated debt-free</small>
+                <strong>
+                  {result.reason
+                    ? "Not determined"
+                    : result.points.length
+                      ? monthLabel(result.points.at(-1)!.month)
+                      : "Already clear"}
+                </strong>
+              </div>
+              {minimum && !minimum.reason && (
+                <div>
+                  <small>Interest saved vs minimum only</small>
+                  <strong>
+                    {money(
+                      Math.max(
+                        0,
+                        minimum.totalInterestMinor - result.totalInterestMinor,
+                      ),
+                      currency,
+                    )}
+                  </strong>
+                </div>
+              )}
+            </div>
+          )}
+          {!result.reason && (
+            <table className="planning-compact-table">
+              <thead>
+                <tr>
+                  <th>Debt</th>
+                  <th>Estimated payoff</th>
+                </tr>
+              </thead>
+              <tbody>
+                {includedRows
+                  .filter((d) => !d.full && d.balance)
+                  .map((d) => (
+                    <tr key={d.account.id}>
+                      <td>{d.account.displayName}</td>
+                      <td>
+                        {result.payoff[d.account.id]
+                          ? monthLabel(result.payoff[d.account.id]!)
+                          : "Not determined"}
+                      </td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+          {!result.reason && (
+            <details>
+              <summary>Monthly payment schedule</summary>
+              <table className="planning-compact-table">
+                <thead>
+                  <tr>
+                    <th>Month</th>
+                    <th>Paid</th>
+                    <th>Interest</th>
+                    <th>Remaining</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.points.map((p) => (
+                    <tr key={p.month}>
+                      <td>{monthLabel(p.month)}</td>
+                      <td>{money(p.paidMinor, currency)}</td>
+                      <td>{money(p.interestMinor, currency)}</td>
+                      <td>{money(p.balanceMinor, currency)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </details>
+          )}
+        </>
       )}
       <div className="planning-v2-list">
         {debtRows.map((d) => {
@@ -1326,233 +1623,247 @@ export function DebtPanel({
               {d.full ? (
                 <p className="muted">Paid in full monthly, no plan needed.</p>
               ) : (
-                <form
-                  className="planning-v2-form"
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    try {
-                      void f.run(
-                        () =>
-                          saveDebtTerms(
-                            d.account.id,
-                            Number(t.apr),
-                            t.minimum
-                              ? parseMoney(t.minimum, d.account.currency)
-                              : undefined,
-                          ),
-                        "Debt terms saved.",
-                      );
-                    } catch (e) {
-                      f.setError(
-                        e instanceof Error
-                          ? e.message
-                          : "Enter valid debt terms.",
-                      );
-                    }
-                  }}
-                >
-                  <label>
-                    APR %
-                    <input
-                      required
-                      inputMode="decimal"
-                      aria-label={`${d.account.displayName} APR`}
-                      value={t.apr}
-                      onChange={(e) =>
-                        setTerms({
-                          ...terms,
-                          [d.account.id]: { ...t, apr: e.target.value },
-                        })
-                      }
-                    />
-                  </label>
-                  <label>
-                    Minimum monthly payment
-                    <input
-                      inputMode="decimal"
-                      aria-label={`${d.account.displayName} minimum payment`}
-                      value={t.minimum}
-                      onChange={(e) =>
-                        setTerms({
-                          ...terms,
-                          [d.account.id]: { ...t, minimum: e.target.value },
-                        })
-                      }
-                    />
-                    <small>
-                      Empty: 1% plus interest, or{" "}
-                      {money(
-                        25 * 10 ** currencyPrecision(d.account.currency),
-                        d.account.currency,
-                      )}
-                      .
-                    </small>
-                  </label>
-                  <button disabled={f.busy}>Save terms</button>
-                </form>
+                <>
+                  <button onClick={() => setEditingDebt(d.account.id)}>
+                    Edit repayment terms
+                  </button>
+                  {editingDebt === d.account.id && (
+                    <Sheet
+                      title={`${d.account.displayName} terms`}
+                      onClose={() => {
+                        if (!f.busy) setEditingDebt(undefined);
+                      }}
+                    >
+                      <form
+                        id="debt-terms-form"
+                        className="planning-v2-form"
+                        onSubmit={(e) => {
+                          e.preventDefault();
+                          try {
+                            void f
+                              .run(
+                                () =>
+                                  saveDebtTerms(
+                                    d.account.id,
+                                    Number(t.apr),
+                                    t.minimum
+                                      ? parseMoney(
+                                          t.minimum,
+                                          d.account.currency,
+                                        )
+                                      : undefined,
+                                  ),
+                                "Debt terms saved.",
+                              )
+                              .then((ok) => {
+                                if (ok) setEditingDebt(undefined);
+                              });
+                          } catch (e) {
+                            f.setError(
+                              e instanceof Error
+                                ? e.message
+                                : "Enter valid debt terms.",
+                            );
+                          }
+                        }}
+                      >
+                        <label>
+                          APR %
+                          <input
+                            required
+                            inputMode="decimal"
+                            aria-label={`${d.account.displayName} APR`}
+                            value={t.apr}
+                            onChange={(e) =>
+                              setTerms({
+                                ...terms,
+                                [d.account.id]: { ...t, apr: e.target.value },
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          Minimum monthly payment
+                          <input
+                            inputMode="decimal"
+                            aria-label={`${d.account.displayName} minimum payment`}
+                            value={t.minimum}
+                            onChange={(e) =>
+                              setTerms({
+                                ...terms,
+                                [d.account.id]: {
+                                  ...t,
+                                  minimum: e.target.value,
+                                },
+                              })
+                            }
+                          />
+                          <small>
+                            {["credit", "credit_card"].includes(
+                              d.account.accountType,
+                            ) ? (
+                              <>
+                                Empty: 1% plus interest, or{" "}
+                                {money(
+                                  25 *
+                                    10 ** currencyPrecision(d.account.currency),
+                                  d.account.currency,
+                                )}
+                                .
+                              </>
+                            ) : (
+                              "Enter the actual payment to include this loan. No credit-card minimum is assumed."
+                            )}
+                          </small>
+                        </label>
+                        {f.feedback}
+                        <SheetFooter>
+                          <button
+                            className="primary"
+                            form="debt-terms-form"
+                            disabled={f.busy || !t.apr}
+                          >
+                            Done
+                          </button>
+                        </SheetFooter>
+                      </form>
+                    </Sheet>
+                  )}
+                </>
               )}
             </article>
           );
         })}
       </div>
-      <form
-        className="planning-v2-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setReady(true);
-          try {
-            parseMoney(payment, currency);
-            void f.run(
-              () =>
-                auditedMutation("Save debt plan", ["settings"], async () => {
-                  await db.settings.put({
-                    key: `debt-plan:${currency}`,
-                    value: JSON.stringify({ payment, strategy, custom }),
+      <button onClick={() => setEditingPlan(true)}>Edit repayment plan</button>
+      {editingPlan && (
+        <Sheet
+          title="Repayment plan"
+          onClose={() => {
+            if (!f.busy) setEditingPlan(false);
+          }}
+        >
+          <form
+            id="debt-plan-form"
+            className="planning-v2-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              setReady(true);
+              try {
+                parseMoney(payment, currency);
+                void f
+                  .run(
+                    () =>
+                      auditedMutation(
+                        "Save debt plan",
+                        ["settings"],
+                        async () => {
+                          await db.settings.put({
+                            key: `debt-plan:${currency}`,
+                            value: JSON.stringify({
+                              payment,
+                              strategy,
+                              custom,
+                            }),
+                          });
+                        },
+                      ),
+                    "Repayment settings saved.",
+                  )
+                  .then((ok) => {
+                    if (ok) setEditingPlan(false);
                   });
-                }),
-              "Debt plan calculated.",
-            );
-          } catch (e) {
-            f.setError(
-              e instanceof Error ? e.message : "Enter a valid monthly amount.",
-            );
-          }
-        }}
-      >
-        <label>
-          Monthly amount available
-          <input
-            required
-            inputMode="decimal"
-            value={payment}
-            onChange={(e) => setPayment(e.target.value)}
-          />
-        </label>
-        <label>
-          Strategy
-          <select
-            value={strategy}
-            onChange={(e) => setStrategy(e.target.value as typeof strategy)}
+              } catch (e) {
+                f.setError(
+                  e instanceof Error
+                    ? e.message
+                    : "Enter a valid monthly amount.",
+                );
+              }
+            }}
           >
-            <option value="avalanche">Avalanche: highest APR first</option>
-            <option value="snowball">Snowball: smallest balance first</option>
-            <option value="custom">Custom order</option>
-          </select>
-        </label>
-        {strategy === "custom" && (
-          <div className="full-width">
-            <p>Move the first priority to the top.</p>
-            {[
-              ...new Set([...custom, ...debtRows.map((d) => d.account.id)]),
-            ].map((id, i) => (
-              <div className="planning-v2-object" key={id}>
-                <span>
-                  {i + 1}. {data.accounts.find((a) => a.id === id)?.displayName}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setCustom([
-                      id,
-                      ...[
-                        ...new Set([
-                          ...custom,
-                          ...debtRows.map((d) => d.account.id),
-                        ]),
-                      ].filter((d) => d !== id),
-                    ])
-                  }
-                >
-                  Move first
-                </button>
+            <label>
+              Monthly amount available
+              <input
+                required
+                inputMode="decimal"
+                value={payment}
+                onChange={(e) => {
+                  planTouched.current = true;
+                  setPayment(e.target.value);
+                }}
+              />
+            </label>
+            <fieldset>
+              <legend>Strategy</legend>
+              <div className="segmented-control">
+                {(["avalanche", "snowball", "custom"] as const).map((v) => (
+                  <button
+                    key={v}
+                    type="button"
+                    aria-pressed={strategy === v}
+                    onClick={() => {
+                      planTouched.current = true;
+                      setStrategy(v);
+                    }}
+                  >
+                    {v[0].toUpperCase() + v.slice(1)}
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
-        <button>Calculate payoff</button>
-      </form>
-      {f.feedback}
-      {planError && <p role="alert">{planError}</p>}
-      {result && (
-        <>
-          {result.reason && <p className="notice warning">{result.reason}</p>}
-          <div className="planning-v2-kpis">
-            <div>
-              <small>Total interest</small>
-              <strong>{money(result.totalInterestMinor, currency)}</strong>
-            </div>
-            <div>
-              <small>Estimated debt-free</small>
-              <strong>
-                {result.reason
-                  ? "Not determined"
-                  : result.points.length
-                    ? monthLabel(result.points.at(-1)!.month)
-                    : "Already clear"}
-              </strong>
-            </div>
-            {minimum && !minimum.reason && (
-              <div>
-                <small>Interest saved vs minimum only</small>
-                <strong>
-                  {money(
-                    Math.max(
-                      0,
-                      minimum.totalInterestMinor - result.totalInterestMinor,
-                    ),
-                    currency,
-                  )}
-                </strong>
+              <p className="muted">
+                {strategy === "avalanche"
+                  ? "Pay the highest APR first."
+                  : strategy === "snowball"
+                    ? "Clear the smallest balance first."
+                    : "Choose which debt to prioritise."}
+              </p>
+            </fieldset>
+            {strategy === "custom" && (
+              <div className="full-width">
+                <p>Move the first priority to the top.</p>
+                {[
+                  ...new Set([...custom, ...debtRows.map((d) => d.account.id)]),
+                ].map((id, i) => (
+                  <div className="planning-v2-object" key={id}>
+                    <span>
+                      {i + 1}.{" "}
+                      {data.accounts.find((a) => a.id === id)?.displayName}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setCustom([
+                          id,
+                          ...[
+                            ...new Set([
+                              ...custom,
+                              ...debtRows.map((d) => d.account.id),
+                            ]),
+                          ].filter((d) => d !== id),
+                        ])
+                      }
+                    >
+                      Move first
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
-          </div>
-          <table className="planning-compact-table">
-            <thead>
-              <tr>
-                <th>Debt</th>
-                <th>Estimated payoff</th>
-              </tr>
-            </thead>
-            <tbody>
-              {debtRows
-                .filter((d) => !d.full && d.balance)
-                .map((d) => (
-                  <tr key={d.account.id}>
-                    <td>{d.account.displayName}</td>
-                    <td>
-                      {result.payoff[d.account.id]
-                        ? monthLabel(result.payoff[d.account.id]!)
-                        : "Not determined"}
-                    </td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-          <details>
-            <summary>Monthly payment schedule</summary>
-            <table className="planning-compact-table">
-              <thead>
-                <tr>
-                  <th>Month</th>
-                  <th>Paid</th>
-                  <th>Interest</th>
-                  <th>Remaining</th>
-                </tr>
-              </thead>
-              <tbody>
-                {result.points.map((p) => (
-                  <tr key={p.month}>
-                    <td>{monthLabel(p.month)}</td>
-                    <td>{money(p.paidMinor, currency)}</td>
-                    <td>{money(p.interestMinor, currency)}</td>
-                    <td>{money(p.balanceMinor, currency)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </details>
-        </>
+            {f.feedback}
+            <SheetFooter>
+              <button
+                className="primary"
+                form="debt-plan-form"
+                disabled={f.busy || !payment}
+              >
+                Done
+              </button>
+            </SheetFooter>
+          </form>
+        </Sheet>
       )}
+      {f.feedback}
     </section>
   );
 }
@@ -1581,6 +1892,7 @@ export function ScenarioPanel({
     [seriesId, setSeriesId] = useState(""),
     [end, setEnd] = useState(""),
     [changes, setChanges] = useState<Scenario["changes"]>([]);
+  const [direction, setDirection] = useState("out");
   const f = useFeedback();
   const capturedCurrency =
     data?.scenarios.find((s) => s.id === selected)?.currency ?? currency;
@@ -1624,7 +1936,7 @@ export function ScenarioPanel({
       missingRate
         ? []
         : scenarioForecast(
-            points,
+            points.filter((p) => p.date >= localToday()),
             {
               ...scenario,
               changes: convertedChanges.map((c) => ({
@@ -1688,7 +2000,10 @@ export function ScenarioPanel({
           e.preventDefault();
           try {
             const value =
-              type === "pause" ? 0 : parseMoney(amount, capturedCurrency);
+              type === "pause"
+                ? 0
+                : Math.abs(parseMoney(amount, capturedCurrency)) *
+                  (direction === "out" ? -1 : 1);
             if ((type === "pause" || type === "recurring-change") && !seriesId)
               throw new Error("Choose the recurring series to adjust.");
             setChanges([
@@ -1734,14 +2049,21 @@ export function ScenarioPanel({
         </label>
         {type !== "pause" && (
           <label>
-            Signed amount ({capturedCurrency})
+            Amount ({capturedCurrency})
             <input
               required
               inputMode="decimal"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
-            <small>Negative for spending, positive for income.</small>
+            <select
+              aria-label="Scenario money direction"
+              value={direction}
+              onChange={(e) => setDirection(e.target.value)}
+            >
+              <option value="out">Money out</option>
+              <option value="in">Money in</option>
+            </select>
           </label>
         )}
         {(type === "pause" || type === "recurring-change") && (
@@ -1770,6 +2092,7 @@ export function ScenarioPanel({
         <label>
           Label
           <input
+            placeholder="e.g. Car repair"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
           />
@@ -1833,22 +2156,37 @@ export function ScenarioPanel({
               Save scenario
             </button>
             {selected && (
-              <button
-                onClick={() =>
-                  void f
-                    .run(() => removeScenario(selected), "Scenario deleted.")
-                    .then((ok) => {
-                      if (ok) {
-                        setSelected("");
-                        setChanges([]);
-                      }
-                    })
-                }
-              >
-                Delete scenario
-              </button>
+              <details className="object-menu">
+                <summary>Scenario options</summary>
+                <button
+                  onClick={() =>
+                    void f
+                      .run(() => removeScenario(selected), "Scenario deleted.")
+                      .then((ok) => {
+                        if (ok) {
+                          setSelected("");
+                          setChanges([]);
+                        }
+                      })
+                  }
+                >
+                  Delete scenario
+                </button>
+              </details>
             )}
           </div>
+          {projected.length > 0 && !missingRate && (
+            <p className="scenario-end-summary">
+              By {formatUkDate(projected.at(-1)!.date)}:{" "}
+              {money(projected.at(-1)!.scenario, currency)} ·{" "}
+              {money(
+                projected.at(-1)!.scenario - projected.at(-1)!.balance,
+                currency,
+                true,
+              )}{" "}
+              vs baseline
+            </p>
+          )}
           {points.length && !missingRate ? (
             <div
               className="chart"

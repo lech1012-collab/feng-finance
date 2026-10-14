@@ -42,7 +42,7 @@ describe("safe, actionable backup errors", () => {
       format: "another-product",
     });
     expect(message).toContain("not a supported Feng Finance backup");
-    expect(message).toContain("Choose a JSON file exported");
+    expect(message).toContain("Choose a file created using Save backup");
     expect(message).not.toMatch(/PRIVATE|invalid_value|expected|\[|\{/);
     expect(message.length).toBeLessThan(250);
   });

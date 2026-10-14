@@ -1,3 +1,4 @@
+import { loadDemoUi, settingsSection } from "./flows";
 import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
 
@@ -123,9 +124,9 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
   ).toContainText("£1,357.90");
   await expect(
     position.locator("a").filter({ hasText: /^Card debt/ }),
-  ).not.toContainText("-£");
+  ).not.toContainText("−£");
   await expect(
-    position.locator("a").filter({ hasText: /^Net position/ }),
+    position.locator("a").filter({ hasText: /^Net worth/ }),
   ).toContainText("Unavailable");
   const monthly = page.locator(".month-summary");
   await expect(monthly.locator(".month-income")).toContainText(
@@ -142,8 +143,11 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
     "From imported accounts only",
   );
   await expect(
-    page.locator(".balance-account-main").filter({ hasText: "Everyday cash" }),
-  ).toContainText("Not imported");
+    page
+      .getByRole("link", { name: /accounts/i })
+      .filter({ hasText: /accounts/ })
+      .first(),
+  ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "Import statement", exact: true }),
   ).toBeVisible();
@@ -163,8 +167,9 @@ test("UX trust: missing months are accessible gaps instead of zero-valued cash f
   await expect(homeFlow.locator('svg pattern[id^="missing-"]')).toHaveCount(1);
   await page.goto("/#/analysis");
   await page
-    .getByRole("combobox", { name: "Period", exact: true })
-    .selectOption("6");
+    .getByRole("group", { name: "Time range", exact: true })
+    .getByRole("button", { name: "6 months", exact: true })
+    .click();
   const chart = page.locator("section.card").filter({
     has: page.getByRole("heading", {
       name: "Income, expenses & net cash flow",
@@ -180,7 +185,7 @@ test("UX trust: missing months are accessible gaps instead of zero-valued cash f
   await expect(
     partialRow.getByRole("cell", { name: "Not imported", exact: true }),
   ).toHaveCount(2);
-  await expect(partialRow).toContainText("-£357.90");
+  await expect(partialRow).toContainText("−£357.90");
 });
 
 test("UX scope: the analysis period drives the date range and every monthly chart row", async ({
@@ -203,8 +208,9 @@ test("UX scope: the analysis period drives the date range and every monthly char
   ] as const;
   for (const [value, label, range, count] of scopes) {
     await page
-      .getByRole("combobox", { name: "Period", exact: true })
-      .selectOption(value);
+      .getByRole("group", { name: "Time range", exact: true })
+      .getByRole("button", { name: label, exact: true })
+      .click();
     await expect(chart.locator(".section-heading")).toContainText(label);
     await expect(
       page.locator("main > p").filter({ hasText: range }),
@@ -302,14 +308,7 @@ test("UX mobile: Home and transaction controls stay usable at narrow widths and 
 test("UX mobile: short drill-down links retain a full touch target", async ({
   page,
 }) => {
-  await page.goto("/#/settings");
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
-  await page
-    .getByRole("button", { name: "Load demo data", exact: true })
-    .click();
-  await expect(
-    page.getByText("Fictitious demo data added.", { exact: true }),
-  ).toBeVisible();
+  await loadDemoUi(page);
   for (const width of [320, 390, 430]) {
     await page.setViewportSize({ width, height: 844 });
     for (const path of [
@@ -393,14 +392,7 @@ test("UX mobile: import close and post-import shortcuts remain easy to tap", asy
 test("UX mobile: monthly review steps fit 320px with enlarged text", async ({
   page,
 }) => {
-  await page.goto("/#/settings");
-  await page.getByLabel("Download public ECB rates", { exact: true }).uncheck();
-  await page
-    .getByRole("button", { name: "Load demo data", exact: true })
-    .click();
-  await expect(
-    page.getByText("Fictitious demo data added.", { exact: true }),
-  ).toBeVisible();
+  await loadDemoUi(page);
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto("/#/review?month=2026-09");
   await expect(

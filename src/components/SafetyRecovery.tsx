@@ -1,3 +1,5 @@
+import { Sheet, SheetFooter } from "./Sheet";
+import { Toast } from "./Toast";
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db, type FinanceDB } from "../storage/database";
@@ -85,47 +87,59 @@ export function SafetyRecovery({
           Restore previous data
         </button>
       ) : (
-        <fieldset className="safety-recovery-confirm">
-          <legend>Replace current data with the earlier copy</legend>
-          <p className="notice warning">
-            This replaces all current accounts, transactions, settings and
-            attachments with their state before the update. Changes made after
-            that update will be lost. The earlier PIN and device unlock
-            configuration also return. Export a backup first if you want to keep
-            your current data.
-          </p>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={confirmed}
-              disabled={busy}
-              onChange={(event) => setConfirmed(event.target.checked)}
-            />
-            I understand that my current data and lock settings will be
-            replaced.
-          </label>
-          <div className="import-settings-actions">
-            <button
-              disabled={!confirmed || busy}
-              onClick={() => void restore()}
-            >
-              {busy ? "Restoring previous data…" : "Restore previous data"}
-            </button>
-            <button
-              disabled={busy}
-              onClick={() => {
-                setConfirming(false);
-                setConfirmed(false);
-                setError("");
-              }}
-            >
-              Cancel
-            </button>
-          </div>
-        </fieldset>
+        <Sheet
+          title="Restore previous data"
+          onClose={() => {
+            if (!busy) {
+              setConfirming(false);
+              setConfirmed(false);
+              setError("");
+            }
+          }}
+        >
+          <fieldset className="safety-recovery-confirm">
+            <legend>Replace current data with the earlier copy</legend>
+            <p className="notice warning">
+              This replaces all current accounts, transactions, settings and
+              attachments with their state before the update. Changes made after
+              that update will be lost. The earlier PIN and device unlock
+              configuration also return. Export a backup first if you want to
+              keep your current data.
+            </p>
+            <label className="check">
+              <input
+                type="checkbox"
+                checked={confirmed}
+                disabled={busy}
+                onChange={(event) => setConfirmed(event.target.checked)}
+              />
+              I understand that my current data and lock settings will be
+              replaced.
+            </label>
+            <SheetFooter>
+              <button
+                disabled={!confirmed || busy}
+                onClick={() => void restore()}
+              >
+                {busy ? "Restoring previous data…" : "Restore previous data"}
+              </button>
+              <button
+                disabled={busy}
+                onClick={() => {
+                  setConfirming(false);
+                  setConfirmed(false);
+                  setError("");
+                }}
+              >
+                Cancel
+              </button>
+            </SheetFooter>
+            {error && <p role="alert">{error}</p>}
+          </fieldset>
+        </Sheet>
       )}
-      {notice && <p role="status">{notice}</p>}
-      {error && (
+      {notice && <Toast message={notice} />}
+      {error && !confirming && (
         <p role="alert" className="notice warning">
           {error}
         </p>

@@ -1,3 +1,5 @@
+import { Sheet } from "./Sheet";
+import { Toast } from "./Toast";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -31,7 +33,7 @@ import {
   type ReportRow,
 } from "../analytics/reports";
 import { id } from "../domain/normalize";
-import { money, currencyPrecision } from "../domain/money";
+import { compactMoney, money, currencyPrecision } from "../domain/money";
 import { saveReport } from "../storage/views";
 import { auditedMutation, undoChange } from "../storage/audit";
 import { ConditionEditor } from "./ConditionEditor";
@@ -40,7 +42,7 @@ import { displayDate } from "../domain/presentation";
 import "./v2-rules.css";
 
 const blank: Omit<SavedReport, "id"> = {
-  name: "",
+  name: "Spending by category",
   groupBy: "category",
   measure: "sum",
   chart: "table",
@@ -72,6 +74,7 @@ export function ReportBuilder({
     false,
   );
   const [report, setReport] = useState<SavedReport>({ id: id(), ...blank });
+  const [editing, setEditing] = useState(false);
   const [showConditions, setShowConditions] = useState(false);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
@@ -118,7 +121,7 @@ export function ReportBuilder({
   const format = (value: number, row?: ReportRow) =>
     report.measure === "count"
       ? String(value)
-      : `${row?.converted ? "≈" : ""}${money(value, currency)}`;
+      : money(value, currency, false, !!row?.converted);
   const sourcePath = (row: ReportRow) => {
     const group = reportGroupCondition(
       row,
@@ -159,178 +162,216 @@ export function ReportBuilder({
             ))}
         </div>
       )}
-      <div className="v2-inline-form">
-        <label>
-          Group by
-          <select
-            value={report.groupBy}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                groupBy: e.target.value as SavedReport["groupBy"],
-              })
-            }
-          >
-            {["category", "tag", "account", "merchant", "month"].map((v) => (
-              <option key={v} value={v}>
-                {v[0].toUpperCase() + v.slice(1)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Measure
-          <select
-            value={report.measure}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                measure: e.target.value as SavedReport["measure"],
-              })
-            }
-          >
-            <option value="sum">Net amount</option>
-            <option value="count">Transaction count</option>
-            <option value="average">Average amount</option>
-          </select>
-        </label>
-        <label>
-          Display
-          <select
-            value={report.chart}
-            onChange={(e) =>
-              setReport({
-                ...report,
-                chart: e.target.value as SavedReport["chart"],
-              })
-            }
-          >
-            <option value="table">Table</option>
-            <option value="bar">Bar chart</option>
-            <option value="line">Line chart</option>
-          </select>
-        </label>
+      <div className="section-heading">
+        <button onClick={() => setEditing(true)}>Edit report</button>
+        <div className="segmented-control" aria-label="Report display">
+          {(["table", "bar", "line"] as const).map((value) => (
+            <button
+              key={value}
+              aria-pressed={report.chart === value}
+              onClick={() => setReport({ ...report, chart: value })}
+            >
+              {value[0].toUpperCase() + value.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
-      <div className="v2-inline-form">
-        <label>
-          UK tax year
-          <select
-            defaultValue=""
-            onChange={(e) =>
-              e.target.value && selectPeriod(Number(e.target.value))
-            }
+      <Sheet
+        open={editing}
+        title="Edit report"
+        onClose={() => setEditing(false)}
+        footer={
+          <button className="primary" onClick={() => setEditing(false)}>
+            View report
+          </button>
+        }
+      >
+        {" "}
+        <div className="v2-inline-form">
+          <label>
+            Group by
+            <select
+              value={report.groupBy}
+              onChange={(e) =>
+                setReport({
+                  ...report,
+                  groupBy: e.target.value as SavedReport["groupBy"],
+                })
+              }
+            >
+              {["category", "tag", "account", "merchant", "month"].map((v) => (
+                <option key={v} value={v}>
+                  {v[0].toUpperCase() + v.slice(1)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            Measure
+            <select
+              value={report.measure}
+              onChange={(e) =>
+                setReport({
+                  ...report,
+                  measure: e.target.value as SavedReport["measure"],
+                })
+              }
+            >
+              <option value="sum">Net amount</option>
+              <option value="count">Transaction count</option>
+              <option value="average">Average amount</option>
+            </select>
+          </label>
+        </div>
+        <div className="v2-inline-form">
+          <label>
+            UK tax year
+            <select
+              defaultValue=""
+              onChange={(e) =>
+                e.target.value && selectPeriod(Number(e.target.value))
+              }
+            >
+              <option value="">Choose tax year</option>
+              {[taxYear - 2, taxYear - 1, taxYear, taxYear + 1].map((y) => (
+                <option key={y} value={y}>
+                  {ukTaxYear(y).label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button
+            aria-expanded={showConditions}
+            onClick={() => setShowConditions(!showConditions)}
           >
-            <option value="">Choose tax year</option>
-            {[taxYear - 2, taxYear - 1, taxYear, taxYear + 1].map((y) => (
-              <option key={y} value={y}>
-                {ukTaxYear(y).label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button
-          aria-expanded={showConditions}
-          onClick={() => setShowConditions(!showConditions)}
+            {showConditions ? "Hide filters" : "Filter report"}
+          </button>
+        </div>
+        {showConditions && (
+          <ConditionEditor
+            conditions={report.conditions}
+            onChange={(conditions) => setReport({ ...report, conditions })}
+            categories={categories}
+            accounts={accounts}
+            tags={tags}
+            currency={currency}
+            maxConditions={19}
+          />
+        )}
+      </Sheet>
+      {report.chart === "bar" && rows.length > 0 && (
+        <div
+          className="report-horizontal-bars"
+          role="img"
+          aria-label={`${report.groupBy} ${report.measure} horizontal bar chart; full values below`}
         >
-          {showConditions ? "Hide filters" : "Filter report"}
-        </button>
-      </div>
-      {showConditions && (
-        <ConditionEditor
-          conditions={report.conditions}
-          onChange={(conditions) => setReport({ ...report, conditions })}
-          categories={categories}
-          accounts={accounts}
-          tags={tags}
-          currency={currency}
-          maxConditions={19}
-        />
+          {rows
+            .filter((row) => report.measure === "count" || row.value !== 0)
+            .map((row) => (
+              <Link
+                className="report-bar-object"
+                to={sourcePath(row)}
+                key={row.key}
+              >
+                <span>
+                  {row.label === "Uncategorized" ? "Uncategorised" : row.label}
+                </span>
+                <strong>{format(row.value, row)}</strong>
+                <span className="report-bar-track">
+                  <span
+                    style={{
+                      width: `${(Math.abs(row.value) / Math.max(1, ...rows.map((value) => Math.abs(value.value)))) * 100}%`,
+                      background:
+                        row.value < 0
+                          ? "var(--chart-expense)"
+                          : "var(--chart-income)",
+                    }}
+                  />
+                </span>
+              </Link>
+            ))}
+        </div>
       )}
-      {report.chart !== "table" && rows.length > 0 && (
+      {report.chart === "line" && rows.length > 0 && (
         <div
           className="v2-report-chart"
           role="img"
-          aria-label={`${report.groupBy} ${report.measure} chart, with values listed in the table below`}
+          aria-label={`${report.groupBy} ${report.measure} chart, full values below`}
         >
           <ResponsiveContainer width="100%" height="100%">
-            {report.chart === "bar" ? (
-              <BarChart data={rows}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis
-                  tickFormatter={(v) =>
-                    report.measure === "count"
-                      ? String(v)
-                      : String(v / 10 ** currencyPrecision(currency))
-                  }
-                />
-                <Tooltip
-                  formatter={(v, _name, item) =>
-                    format(Number(v), item.payload as ReportRow)
-                  }
-                />
-                <Bar dataKey="value" name={report.measure} fill="#8FB0FF" />
-              </BarChart>
-            ) : (
-              <LineChart data={rows}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                <YAxis
-                  tickFormatter={(v) =>
-                    report.measure === "count"
-                      ? String(v)
-                      : String(v / 10 ** currencyPrecision(currency))
-                  }
-                />
-                <Tooltip
-                  formatter={(v, _name, item) =>
-                    format(Number(v), item.payload as ReportRow)
-                  }
-                />
-                <Line
-                  dataKey="value"
-                  name={report.measure}
-                  stroke="#E7C46A"
-                  strokeWidth={2}
-                />
-              </LineChart>
-            )}
+            <LineChart data={rows}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="label" tick={{ fontSize: 12 }} />
+              <YAxis
+                tickFormatter={(v) =>
+                  report.measure === "count"
+                    ? String(v)
+                    : compactMoney(Number(v), currency)
+                }
+              />
+              <Tooltip
+                formatter={(v, _name, item) =>
+                  format(Number(v), item.payload as ReportRow)
+                }
+              />
+              <Line
+                dataKey="value"
+                name={report.measure}
+                stroke="#E7C46A"
+                strokeWidth={2}
+              />
+            </LineChart>
           </ResponsiveContainer>
         </div>
       )}
-      <table className="v2-report-table">
-        <caption className="sr-only">{report.name || "Current report"}</caption>
-        <thead>
-          <tr>
-            <th scope="col">
-              {report.groupBy[0].toUpperCase() + report.groupBy.slice(1)}
-            </th>
-            <th scope="col">Count</th>
-            <th scope="col">
-              {report.measure === "count" ? "Count" : "Amount"}
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={row.key}>
-              <th scope="row">
-                <Link to={sourcePath(row)}>{row.label}</Link>
+      <div
+        className="chart-table-wrap table-scroll"
+        role="region"
+        aria-label="Report values"
+        tabIndex={0}
+      >
+        <table className="v2-report-table">
+          <caption className="sr-only">
+            {report.name || "Current report"}
+          </caption>
+          <thead>
+            <tr>
+              <th scope="col">
+                {report.groupBy[0].toUpperCase() + report.groupBy.slice(1)}
               </th>
-              <td>{row.count}</td>
-              <td
-                title={
-                  row.converted
-                    ? `Converted from ${row.originalCurrencies.join(", ")}. Rates dated ${row.conversionDates.map(displayDate).join(", ")}.`
-                    : undefined
-                }
-              >
-                <Link to={sourcePath(row)}>{format(row.value, row)}</Link>
-              </td>
+              <th scope="col">Count</th>
+              <th scope="col">
+                {report.measure === "count" ? "Count" : "Amount"}
+              </th>
             </tr>
-          ))}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {rows
+              .filter((row) => report.measure === "count" || row.value !== 0)
+              .map((row) => (
+                <tr key={row.key}>
+                  <th scope="row">
+                    <Link to={sourcePath(row)}>
+                      {row.label === "Uncategorized"
+                        ? "Uncategorised"
+                        : row.label}
+                    </Link>
+                  </th>
+                  <td>{row.count}</td>
+                  <td
+                    title={
+                      row.converted
+                        ? `Converted from ${row.originalCurrencies.join(", ")}. Rates dated ${row.conversionDates.map(displayDate).join(", ")}.`
+                        : undefined
+                    }
+                  >
+                    <Link to={sourcePath(row)}>{format(row.value, row)}</Link>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
       {!rows.length && (
         <p className="muted">No transactions match this report.</p>
       )}

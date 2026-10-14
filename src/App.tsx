@@ -1,3 +1,4 @@
+import Accounts from "./pages/Accounts";
 import { autoCloseEligibleMonths } from "./storage/month-review";
 import { ImportPickerContext } from "./components/ImportPicker";
 import {
@@ -52,6 +53,10 @@ import { APP_VERSION, type Setting } from "./domain/models";
 import { BetaNotice } from "./beta/BetaNotice";
 import { InstallBanner, InstallHelp } from "./beta/InstallGuidance";
 import { DataNotices } from "./beta/DataNotices";
+import {
+  needsFirstBackupReminder,
+  needsSeparateStorageWarning,
+} from "./beta/policy";
 import { WhatsNew } from "./beta/WhatsNew";
 import { useWhatsNewPrompt } from "./beta/useWhatsNewPrompt";
 import { useDesktopInstall } from "./beta/useDesktopInstall";
@@ -65,7 +70,8 @@ import {
   requestPersistentStorage,
   firstRealImportAt,
 } from "./beta/policy";
-import { exportBackupFile } from "./storage/backup";
+import { ToastProvider } from "./components/Toast";
+import { localToday } from "./analytics/reminders";
 import "./beta/beta.css";
 import { loadDemo, deleteDemo } from "./storage/demo";
 import { useSearchParams } from "react-router-dom";
@@ -91,10 +97,10 @@ function Shell() {
   const mobileNavigation = useRef<HTMLElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const openImportPicker = () => fileInput.current?.click();
-  const [month, setMonth] = useState(new Date().toISOString().slice(0, 7));
+  const [month, setMonth] = useState(localToday().slice(0, 7));
   const [monthChosen, setMonthChosen] = useState(false);
   const latestDate = useLiveQuery(async () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localToday();
     const [latestTransaction, statements] = await Promise.all([
       db.transactions.orderBy("date").last(),
       db.statements.toArray(),
@@ -434,6 +440,15 @@ function Shell() {
               Feng<span className="brand-finance">Finance</span>
             </span>
           </NavLink>
+          {initialized && !!demoCount && (
+            <Link
+              className="header-demo"
+              to="/settings?section=demo#demo"
+              aria-label="Demo data settings"
+            >
+              Demo
+            </Link>
+          )}
           <button
             className="primary sidebar-import"
             onClick={openImportPicker}
@@ -505,6 +520,7 @@ function Shell() {
               <Link
                 key={String(path)}
                 to={String(path)}
+                aria-label={String(label)}
                 className={active ? "active" : undefined}
                 aria-current={active ? "page" : undefined}
                 onClick={
@@ -524,7 +540,9 @@ function Shell() {
                 }
               >
                 <I size={21} />
-                <span>{String(label)}</span>
+                <span>
+                  {label === "Transactions" ? "Activity" : String(label)}
+                </span>
               </Link>
             );
           })}
@@ -535,8 +553,47 @@ function Shell() {
               <span className="brand-icon">
                 F<span>·</span>
               </span>
-              Feng Finance
+              <span>
+                Feng<span className="brand-finance"> Finance</span>
+              </span>
             </NavLink>
+            <div className="header-states">
+              {initialized && !!demoCount && (
+                <Link
+                  className="header-demo"
+                  to="/settings?section=demo#demo"
+                  aria-label="Demo data settings"
+                >
+                  Demo
+                </Link>
+              )}
+              {initialized && !initError && (
+                <CurrencyViewNotice
+                  currency={currency}
+                  allowAutomaticDownload={
+                    !exactRecovery &&
+                    !!betaData &&
+                    !needsBetaNotice(betaData.prefs) &&
+                    !betaBusy
+                  }
+                />
+              )}
+              {!online && (
+                <button
+                  className="header-status"
+                  type="button"
+                  aria-label="Offline. Feng works offline; exchange rates cannot update."
+                  title="Feng works offline. Exchange rates cannot update."
+                  onClick={() =>
+                    setStorageWarning(
+                      "Feng works offline. Exchange rates cannot update until you reconnect.",
+                    )
+                  }
+                >
+                  ↯
+                </button>
+              )}
+            </div>
             <Link
               to="/settings"
               className="mobile-settings"
@@ -547,7 +604,6 @@ function Shell() {
             >
               <SettingsIcon size={22} />
             </Link>
-            {!online && <span className="small-chip">Offline</span>}
           </header>
           {updateAvailable &&
             safeUpdate &&
@@ -563,27 +619,17 @@ function Shell() {
               {storageWarning}
             </div>
           )}
-          {initialized && !initError && (
-            <CurrencyViewNotice
-              currency={currency}
-              allowAutomaticDownload={
-                !exactRecovery &&
-                !!betaData &&
-                !needsBetaNotice(betaData.prefs) &&
-                !betaBusy
-              }
-            />
-          )}
-          {initialized && !!demoCount && (
-            <div className="notice demo-banner" role="status">
-              <span>Demo mode · fictitious financial data</span>
-              <button onClick={() => void deleteDemo()}>Clear demo</button>
-            </div>
-          )}
           {betaData &&
             !exactRecovery &&
             !betaBusy &&
-            !needsBetaNotice(betaData.prefs) && (
+            !needsBetaNotice(betaData.prefs) &&
+            location.pathname === "/" &&
+            location.state?.importedCount === undefined &&
+            !(
+              betaData.hasRealImports &&
+              (needsSeparateStorageWarning(betaData.prefs, runtimeMode, true) ||
+                needsFirstBackupReminder(betaData.prefs))
+            ) && (
               <InstallBanner
                 prefs={betaData.prefs}
                 mode={runtimeMode}
@@ -594,14 +640,15 @@ function Shell() {
             !exactRecovery &&
             !betaBusy &&
             !needsBetaNotice(betaData.prefs) &&
-            location.pathname === "/" && (
+            location.pathname === "/" &&
+            location.state?.importedCount === undefined && (
               <DataNotices
                 prefs={betaData.prefs}
                 mode={runtimeMode}
                 hasRealImports={betaData.hasRealImports}
                 onSave={saveBetaSettings}
                 onBackup={async () => {
-                  await exportBackupFile();
+                  navigate("/settings?section=backup&save=1#backup");
                 }}
               />
             )}
@@ -628,6 +675,7 @@ function Shell() {
             ) : (
               <Suspense fallback={<p role="status">Loading…</p>}>
                 <Routes>
+                  <Route path="/accounts" element={<Accounts />} />
                   <Route
                     path="/"
                     element={
@@ -766,7 +814,9 @@ export default function App() {
     <ErrorBoundary>
       <HashRouter>
         <AppLock>
-          <Shell />
+          <ToastProvider>
+            <Shell />
+          </ToastProvider>
         </AppLock>
       </HashRouter>
     </ErrorBoundary>

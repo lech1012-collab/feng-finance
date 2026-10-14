@@ -72,7 +72,7 @@ async function seedSortingQueue(page: Page, extraRows: Transaction[] = []) {
   await page.reload();
   await expect(
     page.getByRole("button", {
-      name: `Uncategorized ${rows.length}`,
+      name: `Uncategorised ${rows.length}`,
       exact: true,
     }),
   ).toBeVisible();
@@ -148,7 +148,7 @@ test("desktop dragging scrolls the category rail and Escape stops it without sav
     2,
   );
   await expect(
-    page.getByRole("button", { name: "Uncategorized 2", exact: true }),
+    page.getByRole("button", { name: "Uncategorised 2", exact: true }),
   ).toBeVisible();
   expect(await manualRuleCount(page)).toBe(0);
 });
@@ -203,22 +203,22 @@ test("desktop rail suggests categories and multi-selection learns and undoes bot
     0,
   );
   await expect(
-    page.getByRole("button", { name: "Uncategorized 0", exact: true }),
+    page.getByRole("button", { name: "Uncategorised 0", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".category-feedback")).toContainText("2 merchants");
-  await expect(page.locator(".category-feedback")).toContainText(
+  await expect(page.locator(".ux-toast")).toContainText("2 payments");
+  await expect(page.locator(".ux-toast")).toContainText(
     "Future matching payments will follow",
   );
   expect(await manualRuleCount(page)).toBe(2);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await page
-    .getByRole("button", { name: "Close categorization", exact: true })
+    .getByRole("button", { name: "Close categorisation", exact: true })
     .click();
   await expect(page.locator(".transaction-list .transaction-row")).toHaveCount(
     2,
   );
   await expect(
-    page.getByRole("button", { name: "Uncategorized 2", exact: true }),
+    page.getByRole("button", { name: "Uncategorised 2", exact: true }),
   ).toBeVisible();
   expect(await manualRuleCount(page)).toBe(0);
 });
@@ -235,7 +235,7 @@ test("mobile queue advances after a suggestion and Skip defers the remaining pay
     dialog.getByText("Known merchant match", { exact: false }),
   ).toBeVisible();
   await dialog
-    .getByRole("button", { name: "Categorize as Groceries", exact: true })
+    .getByRole("button", { name: "Categorise as Groceries", exact: true })
     .click();
   dialog = page.getByRole("dialog");
   await expect(dialog.getByText("Corner Shop", { exact: true })).toBeVisible();
@@ -248,7 +248,7 @@ test("mobile queue advances after a suggestion and Skip defers the remaining pay
     1,
   );
   await expect(
-    page.getByRole("button", { name: "Uncategorized 1", exact: true }),
+    page.getByRole("button", { name: "Uncategorised 1", exact: true }),
   ).toBeVisible();
   expect(await manualRuleCount(page)).toBe(1);
 });
@@ -277,7 +277,7 @@ test("mobile Undo restores all seven pending cards and the progress denominator"
     dialog.getByText("1 of 7 to sort", { exact: true }),
   ).toBeVisible();
   await dialog
-    .getByRole("button", { name: "Categorize as Groceries", exact: true })
+    .getByRole("button", { name: "Categorise as Groceries", exact: true })
     .click();
   dialog = page.getByRole("dialog");
   await expect(
@@ -291,11 +291,11 @@ test("mobile Undo restores all seven pending cards and the progress denominator"
     dialog.getByText("1 of 7 to sort", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Uncategorized 7", exact: true }),
+    page.getByRole("button", { name: "Uncategorised 7", exact: true }),
   ).toHaveCount(1);
   expect(await manualRuleCount(page)).toBe(0);
   await dialog
-    .getByRole("button", { name: "Categorize as Groceries", exact: true })
+    .getByRole("button", { name: "Categorise as Groceries", exact: true })
     .click();
   dialog = page.getByRole("dialog");
   await expect(
@@ -307,7 +307,7 @@ test("mobile Undo restores all seven pending cards and the progress denominator"
     dialog.getByText("1 of 5 to sort", { exact: true }),
   ).toBeVisible();
   await dialog
-    .getByRole("button", { name: "Close categorization", exact: true })
+    .getByRole("button", { name: "Close categorisation", exact: true })
     .click();
   await expect(page.locator(".transaction-list .transaction-row")).toHaveCount(
     6,
@@ -346,7 +346,7 @@ test("mobile left swipe reveals a suggestion without saving until chosen and Und
   const actions = row.locator("..").locator(".swipe-actions");
   await expect(
     actions.getByRole("button", {
-      name: "Categorize as Groceries",
+      name: "Categorise as Groceries",
       exact: true,
     }),
   ).toBeVisible();
@@ -359,27 +359,27 @@ test("mobile left swipe reveals a suggestion without saving until chosen and Und
   );
   expect(await manualRuleCount(page)).toBe(0);
   await actions
-    .getByRole("button", { name: "Categorize as Groceries", exact: true })
+    .getByRole("button", { name: "Categorise as Groceries", exact: true })
     .click();
   await expect(page.locator(".transaction-list .transaction-row")).toHaveCount(
     1,
   );
   await expect(
-    page.getByRole("button", { name: "Uncategorized 1", exact: true }),
+    page.getByRole("button", { name: "Uncategorised 1", exact: true }),
   ).toBeVisible();
-  await expect(page.locator(".category-feedback")).toContainText(
+  await expect(page.locator(".ux-toast")).toContainText(
     "Future matching payments will follow",
   );
   expect(await manualRuleCount(page)).toBe(1);
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await page
-    .getByRole("button", { name: "Close categorization", exact: true })
+    .getByRole("button", { name: "Close categorisation", exact: true })
     .click();
   await expect(page.locator(".transaction-list .transaction-row")).toHaveCount(
     2,
   );
   await expect(
-    page.getByRole("button", { name: "Uncategorized 2", exact: true }),
+    page.getByRole("button", { name: "Uncategorised 2", exact: true }),
   ).toBeVisible();
   expect(await manualRuleCount(page)).toBe(0);
 });

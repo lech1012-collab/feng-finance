@@ -11,7 +11,7 @@ import type {
   ManualValuation,
 } from "../domain/models";
 import { monthBounds, monthOffset, parseDate } from "../domain/dates";
-import { currencyPrecision, safeSum } from "../domain/money";
+import { currencyPrecision, money, safeSum } from "../domain/money";
 import { normalizeMerchant } from "../domain/normalize";
 import { detectSubscriptions, readReview } from "./subscriptions";
 import { shiftPlannedDate, paymentPatterns } from "./planning";
@@ -525,6 +525,7 @@ export interface DebtInput {
   minimumMinor?: number;
   floorMinor?: number;
   currency?: string;
+  accountType?: Account["accountType"];
 }
 export interface DebtPlan {
   points: {
@@ -537,6 +538,7 @@ export interface DebtPlan {
   totalPaidMinor: number;
   payoff: Record<string, string | undefined>;
   reason?: string;
+  requiredMinimumMinor?: number;
 }
 /** Interest and payments round to minor units every month, matching a monthly spreadsheet. */
 export function debtPayoff(
@@ -569,6 +571,20 @@ export function debtPayoff(
     points: DebtPlan["points"] = [];
   let totalInterestMinor = 0,
     totalPaidMinor = 0;
+  const missingPayment = debts.find(
+    (d) =>
+      d.accountType &&
+      !["credit", "credit_card"].includes(d.accountType) &&
+      !(d.minimumMinor && d.minimumMinor > 0),
+  );
+  if (missingPayment)
+    return {
+      points,
+      totalInterestMinor,
+      totalPaidMinor,
+      payoff,
+      reason: `Enter the actual monthly payment for ${missingPayment.name} before including it in a debt plan.`,
+    };
   for (let i = 0; i < 600; i++) {
     const active = debts.filter((d) => balance.get(d.id)! > 0);
     if (!active.length)
@@ -601,7 +617,8 @@ export function debtPayoff(
         totalInterestMinor,
         totalPaidMinor,
         payoff,
-        reason: `Monthly amount is below the required minimum of ${required} minor units.`,
+        requiredMinimumMinor: required,
+        reason: `Monthly amount is below the required minimum of ${money(required, debts[0]?.currency ?? "GBP")}. Increase the amount or remove a debt from the plan.`,
       };
     let allowance = availableMinor ?? required;
     for (const d of active) {

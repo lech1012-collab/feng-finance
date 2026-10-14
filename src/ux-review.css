@@ -1,0 +1,941 @@
+/* Shared review rules: usable targets, neutral data controls and room to read. */
+:root {
+  --body-size: 0.9375rem;
+}
+.visually-hidden {
+  position: absolute !important;
+  width: 1px !important;
+  height: 1px !important;
+  padding: 0 !important;
+  margin: -1px !important;
+  overflow: hidden !important;
+  clip: rect(0, 0, 0, 0) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+}
+.app input:not([type="checkbox"]):not([type="radio"]):not([type="color"]),
+.app select,
+.ux-sheet input:not([type="checkbox"]):not([type="radio"]),
+.ux-sheet select {
+  min-height: 48px;
+  font-size: 1rem;
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--line);
+}
+.app input:user-invalid,
+.ux-sheet input:user-invalid,
+input[aria-invalid="true"] {
+  border-color: var(--blocking);
+}
+.app button.primary,
+.app .button.primary,
+.ux-sheet .primary {
+  min-height: 48px;
+}
+.app .actions,
+.app .accuracy-actions {
+  gap: 8px;
+}
+.app .danger-section {
+  margin-top: 24px;
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+}
+.app .danger-section > h3,
+.app .danger-section > p {
+  margin: 0;
+}
+.app .danger:not(:disabled),
+.ux-sheet .danger:not(:disabled) {
+  background: transparent;
+  color: var(--blocking);
+  border-color: var(--blocking);
+}
+.app .danger:disabled,
+.ux-sheet .danger:disabled {
+  color: var(--muted);
+  border-color: var(--line);
+  background: transparent;
+}
+.app .check,
+.ux-sheet .check,
+.app .security-checkbox {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  text-align: left;
+}
+.app label:has(> input[type="checkbox"]:not([role="switch"])),
+.ux-sheet label:has(> input[type="checkbox"]:not([role="switch"])) {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px 12px;
+  min-height: 44px;
+  text-align: left;
+}
+.app label:has(> input[type="checkbox"]:not([role="switch"])) > :not(input),
+.ux-sheet
+  label:has(> input[type="checkbox"]:not([role="switch"]))
+  > :not(input) {
+  grid-column: 2;
+}
+.app .check input,
+.ux-sheet .check input,
+.app .security-checkbox input {
+  width: 20px;
+  min-height: 20px;
+  height: 20px;
+  flex: none;
+  margin: 0;
+}
+.app .muted,
+.app .coverage-note,
+.app small,
+.ux-sheet .muted,
+.ux-sheet small {
+  font-size: 0.8125rem;
+}
+.amount,
+.app strong,
+.ux-sheet strong {
+  font-variant-numeric: tabular-nums;
+}
+.app .page-heading h1 {
+  font-size: clamp(1.25rem, calc(6.2vw + 0.4rem), 2rem);
+  line-height: 1.2;
+  overflow: visible;
+  overflow-wrap: normal;
+  hyphens: none;
+}
+.app .page-heading {
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+.app .page-heading > div {
+  min-width: 0;
+  flex: 1 1 160px;
+}
+.mobile-header {
+  flex-wrap: nowrap;
+  gap: 4px;
+}
+.mobile-header .brand {
+  min-width: 0;
+  flex: 1;
+  font-size: 1rem;
+  white-space: nowrap;
+}
+.mobile-header .brand-icon,
+.mobile-header .brand-finance {
+  display: none;
+}
+.header-states {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+}
+.header-status,
+.header-demo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px;
+  font-size: 0.75rem;
+  color: var(--ink);
+  flex: none;
+  white-space: nowrap;
+}
+.header-demo {
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding-inline: 8px;
+}
+.mobile-settings {
+  width: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  flex: none;
+}
+.app .mobile-navigation > a {
+  container-name: navitem;
+  container-type: inline-size;
+  font-size: 0.75rem;
+  overflow: visible;
+}
+.app .mobile-navigation > a > span {
+  overflow: visible;
+  white-space: nowrap;
+  text-overflow: clip;
+}
+@container navitem (max-width: 4.8em) {
+  .mobile-navigation > a > span {
+    display: none;
+  }
+}
+.app .planning-v2-tabs {
+  display: flex;
+  overflow-x: auto;
+  gap: 4px;
+  scroll-padding-inline: 16px;
+}
+.app .planning-v2-tabs button {
+  flex: 1 0 auto;
+  font-size: 0.8125rem;
+  padding: 8px;
+  min-height: 44px;
+}
+.app .planning-v2-tabs [aria-selected="true"],
+.app button[aria-pressed="true"],
+.app .theme-options button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--surface);
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.app .planning-v2-tabs [aria-selected="false"] {
+  background: transparent;
+  color: var(--ink);
+  border-color: var(--line);
+}
+.app .planning-v2-form,
+.ux-sheet .form-grid {
+  gap: 16px;
+}
+.app .planning-v2-object strong,
+.app .upcoming-row > strong {
+  white-space: nowrap;
+}
+.recharts-cartesian-axis-tick-value {
+  font-size: max(12px, 0.75rem);
+}
+.app .refund-purchases .refund-choice {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 64px;
+  text-align: left;
+}
+.app .refund-purchases .refund-choice input {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  flex: none;
+}
+.app .refund-purchases .refund-choice > span {
+  flex: 1;
+  min-width: 0;
+}
+.sheet-footer > p {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+.app .theme-options {
+  display: flex;
+  gap: 8px;
+}
+.settings-menu ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.settings-menu li + li {
+  border-top: 1px solid var(--line);
+}
+.settings-menu a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 0;
+  font-size: 0.9375rem;
+}
+.settings-menu a span {
+  min-width: 0;
+}
+.settings-menu .settings-danger-link {
+  color: var(--blocking);
+}
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.settings-menu .card {
+  margin-bottom: 16px;
+}
+.app .beta-about > button {
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+.app .calendar-cell {
+  font-size: 0.75rem;
+}
+.app .calendar-cell .amount {
+  white-space: nowrap;
+}
+@media (max-width: 899px) {
+  .app main {
+    padding: 16px 16px calc(var(--mobile-nav-height, 72px) + 32px);
+  }
+  .app .mobile-header {
+    padding: max(8px, env(safe-area-inset-top)) 16px 8px;
+    min-height: 60px;
+  }
+  .app .planning-v2-form,
+  .ux-sheet .form-grid {
+    grid-template-columns: 1fr;
+  }
+  .app .account-filter-chips {
+    display: flex;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 0 0 8px;
+  }
+  .app .account-filter-chip {
+    flex: 0 0 auto;
+    min-height: 44px;
+    width: auto;
+    padding: 6px 12px;
+    white-space: nowrap;
+    overflow-wrap: normal;
+    hyphens: none;
+  }
+  .app .account-filter-chip > span {
+    display: none;
+  }
+  .app .account-filter-chip > strong {
+    white-space: nowrap;
+    font-size: 0.8125rem;
+  }
+  .app .planning-v2-tabs {
+    scroll-snap-type: x proximity;
+  }
+  .app .planning-v2-tabs button {
+    scroll-snap-align: start;
+  }
+  .app .category-drag-handle,
+  .app .category-keyhint {
+    display: none;
+  }
+  .category-board kbd {
+    display: none;
+  }
+  .category-board .suggested-categories .category-tile-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .category-board .suggested-categories .category-tile {
+    min-height: 56px;
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    padding: 8px 12px;
+  }
+  .app .calendar-grid {
+    gap: 2px;
+  }
+  .app .calendar-cell {
+    min-width: 0;
+    padding: 4px 2px;
+  }
+  .app .balance-chart table,
+  .app .chart table {
+    min-width: 440px;
+  }
+  .app .chart details,
+  .app .balance-chart details {
+    overflow-x: auto;
+  }
+  .app .chart details:has(table),
+  .app .balance-chart details:has(table) {
+    border-right: 3px solid var(--line);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .app *,
+  .ux-sheet * {
+    scroll-behavior: auto;
+  }
+}
+
+/* One row, one object; amounts keep their place at larger text sizes. */
+.app .category-row {
+  display: block;
+  width: 100%;
+  grid-column: 1 / -1;
+  padding: 12px 0;
+  min-height: 64px;
+}
+.app .category-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.app .category-meta > span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+  font-size: 0.9375rem;
+}
+.app .category-meta > strong {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  white-space: nowrap;
+  font-size: 0.9375rem;
+}
+.app .category-row .bar-track {
+  display: block;
+  height: 6px;
+  margin-top: 8px;
+}
+.app .category-row .bar-track > div {
+  height: 6px;
+}
+.app .insight-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 16px;
+  align-items: center;
+  min-height: 64px;
+}
+.app .insight-row > strong,
+.app .planning-v2-object > strong,
+.app .subscription-evidence > strong {
+  white-space: nowrap;
+  text-align: right;
+  margin: 0;
+}
+.app .insight-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app .insight-row small {
+  display: block;
+  margin-top: 4px;
+}
+.app .position-metrics strong {
+  font-size: clamp(1.25rem, 4.8vw, 1.75rem);
+  overflow-wrap: anywhere;
+}
+.app .position-metrics > a {
+  min-width: 0;
+}
+.app .position-summary .coverage-note {
+  margin-block: 12px;
+}
+.app .position-history {
+  min-height: 190px;
+}
+.app .balance-periods,
+.app .segmented-control {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.app .balance-periods button,
+.app .segmented-control button {
+  min-height: 44px;
+  flex: 1;
+  padding: 8px;
+  font-size: 0.8125rem;
+  border-radius: 10px;
+}
+.app .balance-periods button[aria-pressed="true"],
+.app .segmented-control button[aria-pressed="true"] {
+  background: var(--accent);
+  color: var(--on-accent, #111827);
+  border-color: var(--accent);
+}
+.app .accounts-overview-link,
+.app .back-link {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+}
+.account-overview-list,
+.settings-object-list {
+  display: grid;
+}
+.app .account-overview-row,
+.app .settings-object-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 64px;
+  text-align: left;
+  gap: 12px;
+  padding: 12px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+}
+.account-overview-row > span:first-child,
+.settings-object-row > span:first-child {
+  flex: 1;
+  min-width: 0;
+}
+.account-overview-row small,
+.settings-object-row small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+.account-overview-row .account-balance {
+  flex: none;
+  text-align: right;
+  max-width: 48%;
+  overflow-wrap: anywhere;
+}
+.app .transaction-tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 12px;
+}
+.app .transaction-menu {
+  margin-block: 12px;
+}
+.app .transaction-menu summary,
+.app .object-menu summary {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px;
+}
+.app .object-menu {
+  margin-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.app .object-menu button {
+  color: var(--blocking);
+}
+.app .search-input {
+  min-width: 0;
+  flex: 1;
+}
+.app .search-input input {
+  min-width: 0;
+  width: 100%;
+}
+.app .detail-source {
+  margin-block: 16px;
+}
+.app .detail-meta > div {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.38fr) minmax(0, 1fr);
+  align-items: baseline;
+  min-height: 40px;
+  gap: 8px;
+}
+.app .detail-meta dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.app .detail-description {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+.app .detail-action-row {
+  margin-top: 16px;
+}
+.app .tag-picker .tag-option,
+.ux-sheet .tag-picker .tag-option {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  font-size: 0.8125rem;
+}
+.app .tag-picker .tag-option input,
+.ux-sheet .tag-picker .tag-option input {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 0;
+}
+.app .tag-picker .tag-option .tag-dot,
+.ux-sheet .tag-picker .tag-option .tag-dot {
+  grid-column: auto;
+}
+.app .tag-option:has(input:checked),
+.ux-sheet .tag-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--surface-2);
+}
+.colour-presets {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.colour-presets button {
+  width: 44px;
+  min-height: 44px;
+  color: #111827;
+  border: 2px solid transparent;
+}
+.colour-presets button[aria-pressed="true"] {
+  border-color: var(--ink);
+}
+.app .planning-period-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px 12px;
+}
+.app .planning-period-row > p {
+  margin-block: 0;
+}
+.app .planning-v2-form {
+  gap: 16px;
+}
+.app .calendar-day span {
+  font-size: 0.75rem;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.app .calendar-day {
+  min-width: 0;
+  padding: 8px 2px;
+}
+.app .planning-v2-object {
+  min-height: 64px;
+  gap: 12px;
+}
+.app .planning-v2-object > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.app .more-analysis,
+.app .setup-list {
+  display: grid;
+  gap: 0;
+}
+.app .more-analysis > a,
+.app .setup-list > a {
+  display: flex;
+  align-items: center;
+  min-height: 52px;
+  border-bottom: 1px solid var(--line);
+}
+.app .v2-report-table a {
+  text-decoration: none;
+}
+.app .v2-report-table td:last-child,
+.app .v2-report-table th:last-child {
+  text-align: right;
+}
+.app .v2-report-table {
+  width: 100%;
+  table-layout: fixed;
+}
+.app .v2-report-table th:first-child {
+  width: 45%;
+  overflow-wrap: anywhere;
+}
+.app .v2-report-table td:last-child {
+  overflow-wrap: anywhere;
+}
+.app .rule-order-controls {
+  display: inline-flex;
+  margin-left: 8px;
+  gap: 4px;
+}
+.app .rule-order-controls button {
+  width: 44px;
+  min-height: 44px;
+  padding: 8px;
+}
+.generic-mapping-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 16px;
+}
+.generic-mapping-columns > h3 {
+  grid-column: 1/-1;
+}
+.generic-mapping-column {
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+  min-width: 0;
+}
+.generic-mapping-column li {
+  overflow-wrap: anywhere;
+}
+.generic-mapping-column ul {
+  padding-left: 20px;
+  margin: 0;
+}
+.generic-mapping-column select {
+  width: 100%;
+}
+.app .review-steps {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.app .review-steps button {
+  width: 44px;
+  min-width: 44px;
+  height: 44px;
+  padding: 8px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted);
+}
+.app .review-steps button[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--surface-2);
+}
+.app .review-footer {
+  position: sticky;
+  bottom: calc(72px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  padding: 12px;
+  border-top: 1px solid var(--line);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+}
+.app .review-footer > span {
+  flex: 1;
+  font-size: 0.8125rem;
+}
+.beta-introduction .small-chip {
+  display: inline-flex;
+  width: auto;
+  min-height: 24px;
+  align-items: center;
+}
+.beta-introduction .beta-notice-actions,
+.app .welcome .actions {
+  display: grid;
+  grid-template-columns: 1fr;
+}
+.pin-entry {
+  position: relative;
+}
+.pin-slots {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.pin-slots > span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  height: 48px;
+  background: var(--surface);
+}
+.pin-entry input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  opacity: 0;
+  caret-color: transparent;
+}
+.pin-entry:focus-within .pin-slots > span {
+  border-color: var(--accent);
+}
+@media (min-width: 900px) {
+  .app .review-footer {
+    bottom: 0;
+  }
+}
+@media (max-width: 640px) {
+  .app .search-line {
+    gap: 4px;
+  }
+  .ux-sheet .form-grid,
+  .ux-sheet .v2-inline-form,
+  .ux-sheet .condition-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+  .app .generic-mapping-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .v2-report-table td,
+  .app .v2-report-table th {
+    padding: 8px 4px;
+    font-size: 0.8125rem;
+  }
+  .app .position-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app .position-metrics > :last-child {
+    grid-column: 1 / -1;
+  }
+  .app .planning-v2-kpis,
+  .app .category-kpis {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app .planning-v2-kpis > :last-child:nth-child(odd),
+  .app .category-kpis > :last-child:nth-child(odd) {
+    grid-column: 1/-1;
+  }
+}
+@media (max-width: 359px) {
+  .app .page-heading h1 {
+    overflow-wrap: anywhere;
+  }
+  .app .calendar-day span {
+    font-size: 0.75rem;
+  }
+  .app .account-overview-row {
+    flex-wrap: wrap;
+  }
+  .app .account-overview-row .account-balance {
+    max-width: 100%;
+  }
+}
+.app .insight-row small {
+  color: var(--muted);
+}
+:root[data-theme="light"] .app .segmented-control button[aria-pressed="true"],
+:root[data-theme="light"] .app .balance-periods button[aria-pressed="true"] {
+  color: #fff;
+}
+.app .range-control button {
+  padding: 4px;
+}
+.app .range-control button span {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+}
+.app .not-counted a small {
+  display: block;
+}
+/* Page colours identify navigation and actions; data surfaces stay neutral. */
+:root[data-theme="dark"] .app {
+  --surface: #191f2b;
+  --raised: #252d3b;
+  --ok-color: #91b5ef;
+  --on-accent: #111827;
+}
+:root[data-theme="light"] .app {
+  --surface: #fff;
+  --raised: #f0f2f5;
+  --ok-color: #235caf;
+  --on-accent: #fff;
+}
+.app .transaction-status {
+  display: inline-flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+}
+.app .transaction-origin {
+  margin-left: 8px;
+}
+.app .chart-table {
+  overflow-x: auto;
+  max-width: 100%;
+}
+:root[data-theme="dark"] .app[data-page] {
+  --surface: #191f2b;
+  --raised: #252d3b;
+}
+:root[data-theme="light"] .app[data-page] {
+  --surface: #fff;
+  --raised: #f0f2f5;
+}
+.switch-row input {
+  order: -1;
+}
+.pin-entry {
+  display: block;
+}
+.pin-slots {
+  width: 100%;
+}
+.app .calendar-grid {
+  min-width: 332px;
+  grid-template-columns: repeat(7, minmax(44px, 1fr));
+}
+.app .report-horizontal-bars {
+  display: grid;
+  gap: 16px;
+  margin-block: 16px;
+}
+.app .report-bar-object {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 12px;
+  min-height: 64px;
+}
+.app .report-bar-object > span:first-child {
+  overflow-wrap: anywhere;
+}
+.app .report-bar-object > strong {
+  text-align: right;
+}
+.app .report-bar-track {
+  grid-column: 1/-1;
+  display: block;
+  height: 8px;
+  background: var(--raised);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.app .report-bar-track > span {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+}
+
+.category-colour-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-inline-end: 8px;
+}
+.saved-view-chips:empty {
+  display: none;
+}
+.saved-view-chips > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+:root[data-theme="light"] .app .calendar-day .actual-payment {
+  color: #fff;
+}

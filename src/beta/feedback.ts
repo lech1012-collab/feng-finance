@@ -1,4 +1,5 @@
 import type { FeedbackTechnicalContext, ReleaseConfiguration } from "./types";
+import { formatLocalDateTime } from "../domain/dates";
 
 export interface FeedbackRuntime {
   userAgent: string;
@@ -26,7 +27,7 @@ export function feedbackContext(
   const ios = ipad || iphone;
   const android = /Android/i.test(ua);
   const operatingSystem = ios
-    ? `iOS${version(ua, /(?:CPU (?:iPhone )?OS|iPhone OS) ([\d_]+)/i)}`
+    ? "iOS"
     : android
       ? `Android${version(ua, /Android ([\d.]+)/i)}`
       : /Windows/i.test(ua)
@@ -86,8 +87,8 @@ export function technicalContextText(
 ): string {
   return [
     `Feng ${context.appVersion}`,
-    `Build: ${context.buildDate}`,
-    `Device: ${context.deviceType}`,
+    `Build: ${formatLocalDateTime(context.buildDate)}`,
+    `Device: ${context.deviceType === "iphone" ? "iPhone" : context.deviceType === "ipad" ? "iPad" : context.deviceType === "mobile" ? "Mobile" : "Desktop"}`,
     `OS: ${context.operatingSystem}`,
     `Browser: ${context.browser}`,
     `Mode: ${context.displayMode}`,
