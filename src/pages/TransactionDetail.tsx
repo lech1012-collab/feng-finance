@@ -19,6 +19,7 @@ import type { Rule } from "../domain/models";
 import { TransactionAccuracy } from "../components/TransactionAccuracy";
 import { TransferReview } from "../components/TransferReview";
 import { TagPicker } from "../components/TagManager";
+import { createTagForTransaction } from "../storage/tags";
 import { AttachmentManager } from "../components/AttachmentManager";
 import { authorizeMonthEdit } from "../storage/month-review";
 import {
@@ -548,6 +549,12 @@ function Editor({
         >
           <TagPicker
             value={tags}
+            onCreate={async (name) => {
+              if (!(await authorizeMonthEdit([t]))) return;
+              const result = await createTagForTransaction(t.id, name);
+              setTags(result.result.tags);
+              setReceipt(result.changeId);
+            }}
             onChange={(value) => {
               setTags(value);
               void save(undefined, { tags: value });

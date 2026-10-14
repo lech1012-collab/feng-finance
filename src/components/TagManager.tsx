@@ -15,9 +15,11 @@ import "./transaction-polish.css";
 export function TagPicker({
   value,
   onChange,
+  onCreate,
 }: {
   value: string[];
   onChange: (value: string[]) => void;
+  onCreate?: (name: string) => Promise<void>;
 }) {
   const tags = useLiveQuery(
     () => db.tags.filter((t) => !t.archived).toArray(),
@@ -28,6 +30,10 @@ export function TagPicker({
   const [search, setSearch] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [createdReceipt, setCreatedReceipt] = useState<{
+    changeId: string;
+    tagId: string;
+  }>();
   const filtered = tags.filter((tag) =>
     tag.name.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase()),
   );
@@ -60,12 +66,21 @@ export function TagPicker({
               setBusy(true);
               setError("");
               try {
+                if (onCreate) {
+                  await onCreate(search.trim());
+                  setSearch("");
+                  return;
+                }
                 const created = await saveTag({
                   name: search.trim(),
                   colour: "#A99BD6",
                   archived: false,
                 });
                 onChange([...new Set([...value, created.result.id])]);
+                setCreatedReceipt({
+                  changeId: created.changeId,
+                  tagId: created.result.id,
+                });
                 setSearch("");
               } catch (e) {
                 setError(
@@ -82,6 +97,17 @@ export function TagPicker({
           </button>
         )}
       </div>
+      {createdReceipt && (
+        <Toast
+          id={createdReceipt.changeId}
+          message="Tag created."
+          undo={async () => {
+            await undoChange(createdReceipt.changeId);
+            onChange(value.filter((id) => id !== createdReceipt.tagId));
+            setCreatedReceipt(undefined);
+          }}
+        />
+      )}
       {filtered.length ? (
         filtered.map((tag) => (
           <label className="tag-option tag-chip-target" key={tag.id}>

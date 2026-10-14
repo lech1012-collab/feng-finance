@@ -26,6 +26,42 @@ export async function saveTag(tag: Omit<Tag, "id"> & { id?: string }) {
   });
 }
 
+/** Create and attach as one reversible operation, preserving every other transaction field. */
+export async function createTagForTransaction(
+  transactionId: string,
+  name: string,
+  colour = "#A99BD6",
+) {
+  const cleanName = name.trim();
+  if (!cleanName || cleanName.length > 100 || !/^#[\da-f]{6}$/i.test(colour))
+    throw new Error("Enter a name and a valid colour.");
+  return auditedMutation(
+    "Create and add transaction tag",
+    ["tags", "transactions", "monthCloses", "settings"],
+    async () => {
+      const transaction = await db.transactions.get(transactionId);
+      if (!transaction) throw new Error("This transaction no longer exists.");
+      await ensureMonthsOpen([transaction]);
+      if (
+        await db.tags
+          .filter(
+            (t) => t.name.toLocaleLowerCase() === cleanName.toLocaleLowerCase(),
+          )
+          .first()
+      )
+        throw new Error("A tag with this name already exists.");
+      const tag: Tag = { id: id(), name: cleanName, colour, archived: false };
+      const tags = [...new Set([...(transaction.tags ?? []), tag.id])];
+      await db.tags.put(tag);
+      await db.transactions.update(transactionId, {
+        tags,
+        updatedAt: new Date().toISOString(),
+      });
+      return { tag, tags };
+    },
+  );
+}
+
 export async function mergeTags(sourceId: string, targetId: string) {
   if (sourceId === targetId) throw new Error("Choose two different tags.");
   return auditedMutation(
