@@ -343,6 +343,8 @@ test.describe("public-rate HTTP privacy", () => {
 test("first run and the main pages fit narrow screens and large text without overlapping navigation", async ({
   page,
 }, testInfo) => {
+  // Twenty page/viewport combinations, including settled 200% text charts.
+  test.setTimeout(180000);
   await page.goto("/#/");
   await expect(page.locator("main section.card")).toHaveCount(1);
   await expect(

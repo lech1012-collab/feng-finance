@@ -19,6 +19,15 @@ remain compatible. Refund suggestions and loan payment requirements are stricter
 and missing FX rates withhold totals while retaining original amounts. Database
 schema 4, portable backup format 1 and parser version 2.2.3 remain unchanged.
 
+Home opens an independent read-only snapshot on every remount, preventing a
+Safari-engine navigation from joining an older ambient query and remaining on
+Loading. Navigation/back/forward and the 20-page/viewport large-text journey pass
+in both engines. Recovery tests remain in the unlocked document until the actual
+restore; a redundant full reload correctly relocked Safari and has been removed.
+All six old-schema recovery cases still compare original native records, keys,
+PIN settings and receipt bytes. Longer limits apply only to the two journeys
+that visit eleven or twenty pages; financial assertions are unchanged.
+
 The local candidate passed **981 unit/component tests in 122 files**, a WCAG audit
 of **161 screen states** with zero reported violations or document overflow, and
 Lighthouse accessibility **100** / best practices **96**. Dependency audit reported

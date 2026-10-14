@@ -322,7 +322,7 @@ for (const version of [1, 2, 3] as const) {
         exact: true,
       }),
     ).toBeVisible();
-    await settingsSection(page, "backup");
+    // Stay in the unlocked document: reloading correctly requires the PIN again.
     const recovery = page.locator("#previous-data");
     await expect(
       recovery.getByRole("heading", { name: "Previous data" }),

@@ -59,7 +59,7 @@ export default function Home({
   const data = useLiveQuery(
     () =>
       db.transaction(
-        "r",
+        "r!",
         [
           db.statements,
           db.accounts,
@@ -73,8 +73,8 @@ export default function Home({
           db.recurringSeries,
         ],
         async () => {
-          // One coherent snapshot avoids combining source balances and transactions
-          // from different commits, and keeps remounted reads out of the implicit cache.
+          // An independent readonly snapshot avoids joining an ambient query when
+          // Home remounts, and keeps balances and source rows in the same commit.
           const [statements, accounts] = await Promise.all([
             db.statements.toArray(),
             db.accounts.toArray(),

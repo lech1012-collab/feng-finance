@@ -269,6 +269,7 @@ Automated browser checks will be reported separately from those release gates.
 ## Implementation and deliberate choices
 
 - `Sheet` and `Toast` unify editing and reversible changes. Sheets use native modal focus handling, a scrollable body and sticky controls. Undo messages float for six seconds and pause during focus, hover or a write. Money, dates, source text and account identities remain separate from presentation.
+- Home uses an independent read-only database snapshot when it remounts. Browser back/forward and the full large-text navigation journey are checked in both engines, including the Safari-engine loading regression. This changes no stored records or calculation rules.
 - Settings is a grouped landing page. Accounts shows native bank/card balances and manual cash wallets; dated ledger movements use the same calculator as Home. Existing currencies, account types and category parent relationships are preserved. Categories can be renamed, archived, or added under a parent; pickers distinguish parent names.
 - Refund suggestions default to matching merchants within 90 days of the refund, with sufficient remaining purchase value. Search all remains an explicit choice. Loans/mortgages require their actual monthly payment; only cards receive a fallback minimum. Invalid plans do not show interest savings.
 - Missing rates withhold converted totals, including upcoming payments, excluded transfers and recurring yearly costs, while showing originals. Demo transactions/statements are in completed months; future import periods require acknowledgement.
