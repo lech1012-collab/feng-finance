@@ -1,3 +1,4 @@
+import { useRootFontSize } from "./useRootFontSize";
 import { Sheet } from "./Sheet";
 import { Toast } from "./Toast";
 import { useMemo, useState } from "react";
@@ -75,6 +76,7 @@ export function ReportBuilder({
   currency: string;
   settings?: Setting[];
 }) {
+  const chartRem = useRootFontSize();
   const reports = useLiveQuery(() => db.savedReports.toArray(), [], []);
   const taxEnabled = useLiveQuery(
     async () =>
@@ -378,6 +380,7 @@ export function ReportBuilder({
                   }
                 />
                 <YAxis
+                  width={Math.max(60, Math.round(chartRem * 3.75))}
                   tick={{ fontSize: 12 }}
                   tickFormatter={(v) =>
                     report.measure === "count"

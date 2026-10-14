@@ -1,0 +1,529 @@
+/* Shared release sizing. Text wraps at word boundaries; financial values do not. */
+.app {
+  --radius: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  font-size: 0.9375rem;
+}
+.app .header-states {
+  gap: 8px;
+}
+.app .mobile-header .brand {
+  min-width: 44px;
+  min-height: 44px;
+}
+.app .eyebrow,
+.app .brand-finance {
+  font-size: max(12px, 0.75rem);
+}
+.app .section-heading,
+.app .toolbar,
+.app .category-filter-buttons {
+  gap: 8px;
+}
+.app .categories-card > .review-link {
+  display: flex;
+  margin-top: 8px;
+  min-height: 44px;
+}
+.app .data-health .section-heading {
+  border-top: 0;
+}
+.app .planning-v2-object > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: nowrap;
+  flex: none;
+}
+.app .planning-v2-object {
+  flex-wrap: wrap;
+}
+.app .calendar-grid {
+  gap: 8px;
+  min-width: 356px;
+}
+.app .calendar-day {
+  gap: 4px;
+}
+.app .card {
+  padding: 16px;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  container-type: inline-size;
+}
+.app select,
+.ux-sheet select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23778699' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 44px;
+}
+.app .review-pot-contribution {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.app .card h2 {
+  font-size: 1.0625rem;
+}
+.app .swipe-transaction .transaction-row {
+  border-block: 0;
+}
+.app .swipe-transaction + .swipe-transaction {
+  border-top: 1px solid var(--line);
+}
+.app p {
+  margin-bottom: 16px;
+}
+.app h2 {
+  margin-bottom: 16px;
+}
+.app h3 {
+  margin-bottom: 12px;
+}
+.app .section-heading h2 {
+  margin: 0;
+}
+.app label {
+  gap: 8px;
+}
+.app .toolbar {
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.app .section-heading {
+  flex-wrap: wrap;
+}
+.app .section-heading > h2 {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+.app .section-heading > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.amount,
+.financial-value,
+.date-value,
+time {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  font-variant-numeric: tabular-nums;
+}
+.balance-axis-date {
+  font-size: max(12px, 0.75rem);
+}
+.app .storage-meter {
+  height: 8px;
+  width: 100%;
+  display: block;
+  border: 0;
+}
+.app .storage-meter::-webkit-meter-bar {
+  min-height: 8px;
+  height: 8px;
+  background: var(--raised);
+  border: 0;
+  border-radius: 4px;
+}
+.app .storage-meter::-webkit-meter-optimum-value,
+.app .storage-meter::-webkit-meter-suboptimum-value {
+  background: var(--income-color);
+}
+.app .storage-meter::-webkit-meter-even-less-good-value {
+  background: var(--warning-color);
+}
+.app .chart-data .table-scroll {
+  background: linear-gradient(to left, var(--surface), transparent 24px) right /
+    24px 100% no-repeat;
+}
+.app .chart-data th:first-child,
+.app .balance-chart table th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+  white-space: nowrap;
+}
+.app .month-figures strong:not(.metric-unavailable),
+.app .position-metrics strong,
+.app .account-balance strong {
+  white-space: nowrap;
+}
+.app .month-figures .metric-unavailable {
+  white-space: normal;
+}
+.app .account-overview-row,
+.app .settings-object-row {
+  border-bottom: 0;
+}
+.app .account-overview-row + .account-overview-row,
+.app .settings-object-row + .settings-object-row {
+  border-top: 1px solid var(--line);
+}
+.app .more-analysis > a,
+.app .setup-list > a {
+  border-bottom: 0;
+  justify-content: space-between;
+  gap: 16px;
+}
+.app .more-analysis > a + a,
+.app .setup-list > a + a {
+  border-top: 1px solid var(--line);
+}
+.app .setup-list .setup-state {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.app .setup-list .setup-state--complete {
+  color: var(--income-color);
+}
+.app .subscription-evidence:has(> .ui-list-row) {
+  display: block;
+  padding: 0;
+}
+.generic-column-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 16px;
+}
+.generic-column-navigation > span {
+  text-align: center;
+}
+.generic-mapping-controls,
+.generic-correction,
+.generic-save-layout {
+  gap: 16px;
+}
+.generic-mapping-column {
+  touch-action: pan-y;
+}
+.generic-mapping-column li {
+  margin-block: 8px;
+}
+.generic-live-check {
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.app .page-heading h1 {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.sorting-card {
+  grid-template-columns: 20px minmax(0, 1fr) max-content;
+  gap: 12px;
+}
+.sorting-card > div {
+  min-width: 0;
+}
+.sorting-card > div > strong,
+.sorting-card > div > small {
+  display: block;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+.sorting-card > strong {
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.app .account-overview-row > .account-balance {
+  white-space: nowrap;
+}
+@media (max-width: 899px) {
+  .app .mobile-navigation {
+    gap: 8px;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  }
+  .app .mobile-navigation > a {
+    gap: 4px;
+  }
+  .sorting-card {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+  .generic-column-navigation > button {
+    flex: 1 1 calc(50% - 8px);
+  }
+  .generic-column-navigation > span {
+    flex: 1 0 100%;
+    order: -1;
+  }
+  .generic-mapping-columns[data-active-page="false"],
+  .generic-mapping-column:not(.is-current) {
+    display: none;
+  }
+  .generic-mapping-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .generic-mapping-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (min-width: 900px) {
+  .app .sidebar {
+    width: 240px;
+  }
+  .app .main-wrap {
+    margin-left: 240px;
+    width: calc(100% - 240px);
+  }
+  .app .sidebar-import {
+    white-space: nowrap;
+    font-size: 0.9375rem;
+    padding-inline: 8px;
+  }
+  .app {
+    --radius: 12px;
+  }
+  .app .card {
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .app .card h2 {
+    font-size: 1rem;
+  }
+  .generic-column-navigation {
+    display: none;
+  }
+  .category-dialog {
+    inset: 0 0 0 auto;
+    transform: none;
+    width: min(100%, 420px);
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 12px 0 0 12px;
+  }
+}
+/* Rem thresholds respond to the requested text-size setting, not just viewport width. */
+@container (max-width: 18rem) {
+  .app .position-metrics,
+  .app .month-figures,
+  .app .category-kpis,
+  .app .planning-v2-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .position-metrics > :last-child,
+  .app .category-kpis > :last-child,
+  .app .planning-v2-kpis > :last-child {
+    grid-column: auto;
+  }
+  .app .insight-row,
+  .app .category-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .app .insight-row > strong,
+  .app .category-meta > strong {
+    justify-content: flex-end;
+    text-align: right;
+    align-self: flex-end;
+  }
+}
+@media (max-width: 359px) {
+  .sorting-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .month-figures,
+  .app .position-metrics,
+  .app .planning-v2-kpis,
+  .app .category-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .position-metrics > :last-child,
+  .app .planning-v2-kpis > :last-child,
+  .app .category-kpis > :last-child {
+    grid-column: auto;
+  }
+}
+.app .sidebar > .ui-demo-chip {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.app .category-rail {
+  gap: 8px;
+}
+.app .planning-v2-object > span > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.app .search-input {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 4px;
+}
+.app .search-input > input {
+  min-width: 0;
+  flex: 1;
+}
+.app .search-input > svg,
+.app .search-input > button {
+  flex: none;
+}
+.app .search-input input::-webkit-search-cancel-button {
+  display: none;
+}
+.app .account-filter-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.app .account-filter-chip {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  flex: none;
+  max-width: none;
+}
+.app .account-filter-chip > .account-chip-visual {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+.app .account-chip-visual strong {
+  font-size: inherit;
+}
+.app .account-chip-visual small {
+  color: var(--muted);
+  font-size: max(12px, 0.75rem);
+  font-weight: normal;
+}
+.app .account-filter-chip[aria-pressed="true"] .account-chip-visual {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.app .transaction-status.ui-status-chip,
+.app .review-status.ui-status-chip {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  margin: 4px 0 0;
+  max-width: 100%;
+  color: var(--ink);
+  width: fit-content;
+}
+.app .transaction-status .ui-chip-visual {
+  max-width: 100%;
+  white-space: normal;
+}
+.app .calendar-grid {
+  min-width: max(356px, calc(19.25rem + 48px));
+}
+.app .metric-strip {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+}
+@container (max-width: 18rem) {
+  .upcoming-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .upcoming-row > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .upcoming-row > strong {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+}
+.app .category-rail .rail-tile {
+  margin-block: 8px;
+}
+@media (max-width: 899px) {
+  .app main {
+    padding-bottom: calc(
+      var(--mobile-nav-height, 78px) + 48px + env(safe-area-inset-bottom)
+    );
+  }
+}
+.app .chart-coverage {
+  gap: 8px;
+}
+.app .subscription-evidence {
+  display: flex;
+  width: 100%;
+  min-height: 64px;
+  border-bottom: 0;
+}
+.app .subscription-evidence + .subscription-evidence {
+  border-top: 1px solid var(--line);
+}
+.app .manual-account-editor .planning-v2-object {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  width: 100%;
+  gap: 12px;
+}
+.app .manual-account-editor .planning-v2-object > strong {
+  justify-self: end;
+}
+.app .demo-actions {
+  gap: 16px;
+}
+.app .file-button {
+  overflow: visible;
+  min-height: 48px;
+  margin-block: 0;
+}
+.app table {
+  border-collapse: collapse;
+}
+.app table td,
+.app table th {
+  border-top: 0;
+  border-bottom: 0;
+}
+.app table thead tr {
+  border-bottom: 1px solid var(--line);
+}
+.app table tbody tr + tr {
+  border-top: 1px solid var(--line);
+}
+@container (max-width: 18rem) {
+  .manual-account-editor .planning-v2-object {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.app .chart-coverage .ui-chip-target {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.app .chart-month-gap .ui-chip-visual {
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 5px,
+    var(--line) 5px,
+    var(--line) 6px
+  );
+}

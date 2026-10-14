@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { ReleaseNotes } from "./release";
+import { formatUkDate } from "../domain/dates";
 
 export function WhatsNew({
   release,
@@ -44,7 +45,9 @@ export function WhatsNew({
         <h2 id="whats-new-heading">What's new in Feng</h2>
         <p>
           Version {release.version} ·{" "}
-          <time dateTime={release.date}>{release.date}</time>
+          <time dateTime={release.date} className="date-value">
+            {formatUkDate(release.date)}
+          </time>
         </p>
         <ul>
           {release.points.slice(0, 5).map((point) => (

@@ -7,7 +7,7 @@
 .import-settings-actions button {
   min-height: 44px;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .import-layout-setting {
   display: flex;
@@ -19,7 +19,7 @@
 }
 .import-layout-setting > div:first-child {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .import-layout-setting strong,
 .import-layout-setting small {

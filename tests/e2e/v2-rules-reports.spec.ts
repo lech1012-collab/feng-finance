@@ -228,7 +228,6 @@ test("text query saves a reusable view and Analyse saves a category report", asy
   await report
     .getByRole("combobox", { name: "Group by", exact: true })
     .selectOption("merchant");
-  await page.getByRole("button", { name: "View report", exact: true }).click();
   await report
     .getByLabel("Report name", { exact: true })
     .fill("Merchant totals");

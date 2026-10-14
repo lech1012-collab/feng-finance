@@ -320,9 +320,14 @@ export default function Subscriptions({ currency }: { currency: string }) {
       <p className="muted">
         Find charges you may have forgotten. Based on up to three years of
         imported statements
-        {data.lastDate
-          ? `, with transactions through ${formatUkDate(data.lastDate)}`
-          : ""}
+        {data.lastDate && (
+          <>
+            , with transactions through{" "}
+            <time dateTime={data.lastDate} className="date-value">
+              {formatUkDate(data.lastDate)}
+            </time>
+          </>
+        )}
         . Your data stays on this device.
       </p>
       <section className="card">

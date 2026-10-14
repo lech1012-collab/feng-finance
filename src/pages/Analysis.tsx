@@ -518,7 +518,7 @@ export default function Analysis({
         )}
       </section>
       <div className="content-grid">
-        <section className="card">
+        <section className="card" id="category-spending">
           <h2>{property ? "Property costs" : "Category spending"}</h2>
           {property ? (
             <dl className="totals">

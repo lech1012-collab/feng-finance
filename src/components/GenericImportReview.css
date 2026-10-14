@@ -71,7 +71,7 @@
   min-width: 0;
 }
 .generic-review-row > summary strong {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .generic-review-row > summary > strong {
   white-space: nowrap;
@@ -149,7 +149,7 @@
   margin: 0;
   text-align: right;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .generic-correction,
 .generic-mapping-controls {
@@ -228,7 +228,7 @@
   min-width: 9rem;
   max-width: 22rem;
   border-bottom: 1px solid var(--line);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   text-align: left;
 }
 .generic-table-scroll th label {

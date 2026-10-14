@@ -29,6 +29,7 @@ import { previewImportTransfers } from "../import/transfer-review";
 import { ImportTransferReview } from "../components/ImportTransferReview";
 import { importMonthGuardDates } from "../import/month-guards";
 import { GenericImportReview } from "../components/GenericImportReview";
+import { Stepper } from "../components/UIPrimitives";
 import type { LayoutMapping, RowReviewAction } from "../import/generic/types";
 import type { PdfImportSession } from "../import/pdf-session-types";
 import { FeedbackLink } from "../components/FeedbackPanel";
@@ -57,6 +58,7 @@ export default function ImportPage({
   );
   const initialTransferLinkIds = useRef(new Set<string>());
   const navigate = useNavigate();
+  const localPicker = useRef<HTMLInputElement>(null);
   const accounts = useLiveQuery(
     () => db.accounts.filter((a) => !a.isDemo).toArray(),
     [],
@@ -810,23 +812,24 @@ export default function ImportPage({
           </Link>
         )}
       </div>
-      <ol className="import-steps" aria-label="Import progress">
-        {(["pick", "check", "review", "done"] as const).map((step, index) => (
-          <li key={step} aria-current={phase === step ? "step" : undefined}>
-            <span>{index + 1}</span>
-            {step === "pick"
-              ? "Pick"
-              : step === "check"
-                ? "Check"
-                : step === "review"
-                  ? "Review"
-                  : "Done"}
-          </li>
-        ))}
-      </ol>
+      <Stepper
+        label="Import progress"
+        steps={["Pick", "Check", "Review", "Done"]}
+        current={["pick", "check", "review", "done"].indexOf(phase)}
+      />
       {entries.length === 0 && (
         <section
           className="card upload-card"
+          onClick={(event) => {
+            const target = event.target;
+            if (
+              !busy &&
+              target instanceof HTMLElement &&
+              !target.closest("input, label, button, a")
+            ) {
+              localPicker.current?.click();
+            }
+          }}
           onDragOver={(e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = busy ? "none" : "copy";
@@ -848,6 +851,7 @@ export default function ImportPage({
             <Upload size={18} />
             Select statements
             <input
+              ref={localPicker}
               aria-label="Select statements"
               type="file"
               accept={STATEMENT_FILE_ACCEPT}
@@ -861,8 +865,8 @@ export default function ImportPage({
             />
           </label>
           <p className="muted">
-            Digital PDFs work best. Scanned pages use local OCR. Up to 30 MB /
-            100 pages per PDF.
+            Digital PDFs work best. Scanned pages are read on this device. Up to
+            30 MB and 100 pages per PDF.
           </p>
         </section>
       )}

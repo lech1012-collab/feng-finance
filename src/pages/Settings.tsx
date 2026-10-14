@@ -395,7 +395,7 @@ export default function Settings({
             Explore with fictitious data; deleting it keeps your imported
             records.
           </p>
-          <div className="actions">
+          <div className="actions demo-actions">
             <button
               disabled={busy}
               onClick={() => void run(loadDemo, "Fictitious demo data added.")}

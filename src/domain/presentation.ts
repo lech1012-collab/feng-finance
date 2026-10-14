@@ -48,6 +48,24 @@ export function displayMerchant(
 export const displayDate = (iso: string) => formatUkDate(iso, true);
 export const displayDateRange = formatDateRange;
 
+export function displayAccountType(type: Account["accountType"]) {
+  const names: Partial<Record<Account["accountType"], string>> = {
+    current: "Current account",
+    savings: "Savings account",
+    credit: "Credit card",
+    credit_card: "Credit card",
+    mortgage: "Mortgage",
+    loan: "Loan",
+    property: "Property",
+    vehicle: "Vehicle",
+    pension: "Pension",
+    investment: "Investment",
+    other_asset: "Other asset",
+    other_liability: "Other liability",
+  };
+  return names[type] ?? "Account";
+}
+
 /** Friendly fallback only for the generic names supplied by bank statements. */
 export function displayAccountName(
   account: Pick<Account, "displayName" | "institution" | "accountType">,

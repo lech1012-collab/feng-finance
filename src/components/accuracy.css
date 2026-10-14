@@ -103,7 +103,7 @@
   display: grid;
   gap: 4px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .refund-choice small {
   font-size: 13px;
@@ -126,7 +126,7 @@
   display: grid;
   gap: 4px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .transfer-proposal-sides small {
   font-size: 13px;

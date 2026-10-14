@@ -19,7 +19,7 @@
 }
 .import-transfer-list > label span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .import-transfer-list > label .block {
   display: block;
@@ -35,7 +35,7 @@
 }
 .import-automatic-summary p {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .import-automatic-summary .block {
   display: block;

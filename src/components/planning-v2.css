@@ -58,7 +58,7 @@
 }
 .planning-v2-object span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .planning-v2-object small {
   display: block;
@@ -67,7 +67,7 @@
 }
 .planning-v2-object > strong {
   flex: 0 1 auto;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .planning-v2-panels [hidden] {
   display: none !important;
@@ -139,7 +139,7 @@
   padding: 12px 6px;
   text-align: left;
   border-bottom: 1px solid var(--line);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .planning-compact-table td:last-child,
 .planning-compact-table th:last-child {
@@ -165,7 +165,7 @@
 .planning-v2-kpis strong {
   display: block;
   font-size: 22px;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .planning-v2-kpis small {
   color: var(--muted);

@@ -26,12 +26,14 @@ export function StatusChip({
   icon,
   onClick,
   ariaLabel,
+  className = "",
 }: {
   children: ReactNode;
   tone?: "neutral" | "complete" | "warning" | "error";
   icon?: ReactNode;
   onClick?: () => void;
   ariaLabel?: string;
+  className?: string;
 }) {
   const content = (
     <span className={`ui-chip-visual ui-chip-visual--${tone}`}>
@@ -46,14 +48,17 @@ export function StatusChip({
   return onClick ? (
     <button
       type="button"
-      className="ui-chip-target"
+      className={`ui-chip-target ${className}`.trim()}
       onClick={onClick}
       aria-label={ariaLabel}
     >
       {content}
     </button>
   ) : (
-    <span className="ui-status-chip" aria-label={ariaLabel}>
+    <span
+      className={`ui-status-chip ${className}`.trim()}
+      aria-label={ariaLabel}
+    >
       {content}
     </span>
   );

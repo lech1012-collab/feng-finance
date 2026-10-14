@@ -134,7 +134,7 @@ test("manual category memory survives deleting imports and reimporting the same 
     .click();
   await expect(
     page.getByText(
-      "Imported records deleted. Accounts and saved categorization rules kept.",
+      "Imported records deleted. Accounts and saved categorisation rules kept.",
     ),
   ).toBeVisible();
   await page.reload();
@@ -159,7 +159,7 @@ test("manual category memory survives deleting imports and reimporting the same 
     .click();
   await expect(
     page.getByText(
-      "Imported records deleted. Accounts and saved categorization rules kept.",
+      "Imported records deleted. Accounts and saved categorisation rules kept.",
     ),
   ).toBeVisible();
   await openImport(page);
@@ -715,7 +715,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
     .click();
   await expect(
     page.getByText(
-      "Imported records deleted. Accounts and saved categorization rules kept.",
+      "Imported records deleted. Accounts and saved categorisation rules kept.",
     ),
   ).toBeVisible();
   await openImport(page);
@@ -1040,16 +1040,16 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
     .getByRole("combobox", { name: "Bank", exact: true })
     .selectOption("Barclays");
   await expect(statement).toHaveClass(/import-statement-blocking/);
-  await expect(statement.locator(":scope > summary .small-chip")).toHaveText(
-    "Parse again",
-  );
+  await expect(
+    statement.locator(":scope > summary .ui-chip-visual"),
+  ).toHaveText("Parse again");
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Parse again", exact: true }).click();
-  await expect(statement.locator(":scope > summary .small-chip")).toHaveText(
-    "✓ Reconciled",
-  );
+  await expect(
+    statement.locator(":scope > summary .ui-chip-visual"),
+  ).toHaveText("✓ Reconciled");
   await expect(statement).not.toHaveClass(/import-statement-blocking/);
   await selectStatement(page, "barclays-no-period");
   await expect(page.getByRole("alert")).toContainText(
@@ -1168,7 +1168,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
     .click();
   await expectTransactionCount(page, 0);
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toHaveCount(0);
   // Deleting the demo removes its planning, transfer and valuation records too.
   const emptyDownload = page.waitForEvent("download");
@@ -1219,7 +1219,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
       .filter({ hasText: "Backup restored successfully." }),
   ).toBeVisible();
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
 });
 
@@ -1333,7 +1333,7 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     page.getByRole("status").filter({ hasText: "Fictitious demo data added." }),
   ).toBeVisible();
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
   await page
     .getByRole("navigation", { name: "Main navigation" })
@@ -2024,13 +2024,13 @@ test("subscription notification centre supports review, cancellation plans and p
   await page.getByRole("button", { name: /Try fictitious demo data/ }).click();
   await expectTransactionCount(page, 176);
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
   // Home shows the three most urgent tasks. The seeded transfer and statement
   // gaps can outrank recurring review, which remains available at its route.
   await gotoRoute(page, "/subscriptions");
   await expect(
-    page.getByRole("heading", { name: "Subscriptions and bills", exact: true }),
+    page.getByRole("heading", { name: "Subscriptions", exact: true }),
   ).toBeVisible();
   const netflix = page.getByRole("article", { name: /Netflix/i });
   await expect(netflix).toBeVisible();

@@ -1,3 +1,4 @@
+import { useRootFontSize } from "../components/useRootFontSize";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useSearchParams } from "react-router-dom";
@@ -38,6 +39,7 @@ export default function Planning({
   setMonth: (month: string) => void;
   currency: string;
 }) {
+  const chartRem = useRootFontSize();
   const today = localToday();
   const earliest = [
     `${Number(today.slice(0, 4)) - 3}-01-01`,
@@ -300,6 +302,7 @@ export default function Planning({
                             tick={{ fill: "var(--muted)", fontSize: 13 }}
                           />
                           <YAxis
+                            width={Math.max(60, Math.round(chartRem * 3.75))}
                             tickFormatter={(v) =>
                               `${+(Number(v) / factor / 1000).toFixed(1)}k`
                             }

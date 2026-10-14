@@ -98,7 +98,7 @@
 .attachment-list li > span {
   flex: 1;
   min-width: 120px;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .attachment-list a {
   padding: 10px;

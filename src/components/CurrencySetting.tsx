@@ -100,7 +100,7 @@ export function CurrencySetting() {
       <select
         id="reporting-currency"
         value={currency}
-        disabled={busy}
+        disabled={busy || !data}
         onChange={(e) => {
           const nextCurrency = e.target.value;
           void run(

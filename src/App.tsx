@@ -71,6 +71,7 @@ import {
   firstRealImportAt,
 } from "./beta/policy";
 import { ToastProvider } from "./components/Toast";
+import { AppHeader, DemoChip } from "./components/UIPrimitives";
 import { localToday } from "./analytics/reminders";
 import "./beta/beta.css";
 import { loadDemo, deleteDemo } from "./storage/demo";
@@ -441,13 +442,7 @@ function Shell() {
             </span>
           </NavLink>
           {initialized && !!demoCount && (
-            <Link
-              className="header-demo"
-              to="/settings?section=demo#demo"
-              aria-label="Demo data settings"
-            >
-              Demo
-            </Link>
+            <DemoChip to="/settings?section=demo#demo" />
           )}
           <button
             className="primary sidebar-import"
@@ -548,7 +543,54 @@ function Shell() {
           })}
         </nav>
         <div className="main-wrap">
-          <header className="mobile-header">
+          <AppHeader
+            className="mobile-header"
+            actions={
+              <>
+                <div className="header-states">
+                  {initialized && !!demoCount && (
+                    <DemoChip to="/settings?section=demo#demo" />
+                  )}
+                  {initialized && !initError && (
+                    <CurrencyViewNotice
+                      currency={currency}
+                      allowAutomaticDownload={
+                        !exactRecovery &&
+                        !!betaData &&
+                        !needsBetaNotice(betaData.prefs) &&
+                        !betaBusy
+                      }
+                    />
+                  )}
+                  {!online && (
+                    <button
+                      className="header-status"
+                      type="button"
+                      aria-label="Offline. Feng works offline; exchange rates cannot update."
+                      title="Feng works offline. Exchange rates cannot update."
+                      onClick={() =>
+                        setStorageWarning(
+                          "Feng works offline. Exchange rates cannot update until you reconnect.",
+                        )
+                      }
+                    >
+                      ↯
+                    </button>
+                  )}
+                </div>
+                <Link
+                  to="/settings"
+                  className="mobile-settings"
+                  aria-label="Settings"
+                  aria-current={
+                    location.pathname === "/settings" ? "page" : undefined
+                  }
+                >
+                  <SettingsIcon size={22} />
+                </Link>
+              </>
+            }
+          >
             <NavLink className="brand" to="/">
               <span className="brand-icon">
                 F<span>·</span>
@@ -557,54 +599,7 @@ function Shell() {
                 Feng<span className="brand-finance"> Finance</span>
               </span>
             </NavLink>
-            <div className="header-states">
-              {initialized && !!demoCount && (
-                <Link
-                  className="header-demo"
-                  to="/settings?section=demo#demo"
-                  aria-label="Demo data settings"
-                >
-                  Demo
-                </Link>
-              )}
-              {initialized && !initError && (
-                <CurrencyViewNotice
-                  currency={currency}
-                  allowAutomaticDownload={
-                    !exactRecovery &&
-                    !!betaData &&
-                    !needsBetaNotice(betaData.prefs) &&
-                    !betaBusy
-                  }
-                />
-              )}
-              {!online && (
-                <button
-                  className="header-status"
-                  type="button"
-                  aria-label="Offline. Feng works offline; exchange rates cannot update."
-                  title="Feng works offline. Exchange rates cannot update."
-                  onClick={() =>
-                    setStorageWarning(
-                      "Feng works offline. Exchange rates cannot update until you reconnect.",
-                    )
-                  }
-                >
-                  ↯
-                </button>
-              )}
-            </div>
-            <Link
-              to="/settings"
-              className="mobile-settings"
-              aria-label="Settings"
-              aria-current={
-                location.pathname === "/settings" ? "page" : undefined
-              }
-            >
-              <SettingsIcon size={22} />
-            </Link>
-          </header>
+          </AppHeader>
           {updateAvailable &&
             safeUpdate &&
             betaData &&
