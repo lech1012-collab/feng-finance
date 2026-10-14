@@ -3,6 +3,7 @@ dist/
 test-results/
 test-results-*/
 playwright-report/
+/audit/
 *.pdf
 /private-fixtures/
 .env*
