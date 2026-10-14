@@ -1,4 +1,5 @@
-import type { RecurringSeries, Transaction } from "../domain/models";
+import type { RecurringSeries, Setting, Transaction } from "../domain/models";
+import { recurringDecisions } from "./recurring-identity";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { normalizeMerchant } from "../domain/normalize";
 import type { PlannedPayment } from "./planning";
@@ -30,13 +31,25 @@ export function recurringMerchant(series: RecurringSeries) {
   }
   return normalizeMerchant(series.name);
 }
-export function recurringMatches(series: RecurringSeries, row: Transaction) {
+export function recurringMatches(
+  series: RecurringSeries,
+  row: Pick<
+    Transaction,
+    "accountId" | "currency" | "amount" | "merchant" | "description"
+  >,
+  settings: Setting[] = [],
+) {
+  const merchants = [
+    recurringMerchant(series),
+    ...recurringDecisions(series, settings)
+      .filter((d) => d.choice === "same")
+      .map((d) => recurringMerchant({ ...series, matchKey: d.matchKey })),
+  ];
   return (
     row.accountId === series.accountId &&
     row.currency === series.currency &&
     Math.sign(row.amount) === Math.sign(series.expectedAmountMinor) &&
-    normalizeMerchant(row.merchant || row.description) ===
-      recurringMerchant(series)
+    merchants.includes(normalizeMerchant(row.merchant || row.description))
   );
 }
 /** All expected consumers use the same confirmed cadence and due-date anchor. */
@@ -45,6 +58,7 @@ export function confirmedPaymentEvents(
   start: string,
   end: string,
   observed: Transaction[],
+  settings: Setting[] = [],
 ): PlannedPayment[] {
   const events: PlannedPayment[] = [];
   for (const s of series.filter((s) => s.status !== "ignored")) {
@@ -55,7 +69,7 @@ export function confirmedPaymentEvents(
       if (
         observed.some(
           (row) =>
-            recurringMatches(s, row) &&
+            recurringMatches(s, row, settings) &&
             Math.abs(day(row.date) - day(date)) <= 5,
         )
       )

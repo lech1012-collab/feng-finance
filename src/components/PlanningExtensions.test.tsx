@@ -11,6 +11,48 @@ import { db, initializeDatabase } from "../storage/database";
 import { accounts, transaction } from "../tests/helpers";
 import Planning from "../pages/Planning";
 import { CalendarPanel, PotsPanel, ScenarioPanel } from "./PlanningExtensions";
+import { savedBill } from "../tests/recurring-fixtures";
+
+it("asks before combining similar recurring names and lets Undo restore the question", async () => {
+  await db.recurringSeries.put(savedBill);
+  await db.transactions.bulkPut(
+    ["2026-07-04", "2026-08-04", "2026-09-04"].map((date, i) =>
+      transaction({
+        id: `match-${i}`,
+        date,
+        merchant: "NETFLIX.COM",
+        description: "NETFLIX.COM",
+        amount: -1249,
+        categoryId: "subscriptions",
+      }),
+    ),
+  );
+  const before = await db.transactions.toArray();
+  render(
+    <MemoryRouter>
+      <CalendarPanel currency="GBP" month="2026-10" />
+    </MemoryRouter>,
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Review possible match" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Is this the same as Netflix?" }),
+  ).toBeVisible();
+  expect(screen.getByText("Saved payment")).toBeVisible();
+  expect(screen.getByText("Detected payment")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Same bill" }));
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: "Review possible match" }),
+    ).not.toBeInTheDocument(),
+  );
+  expect(await db.transactions.toArray()).toEqual(before);
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+  expect(
+    await screen.findByRole("button", { name: "Review possible match" }),
+  ).toBeVisible();
+});
 
 beforeEach(async () => {
   await db.delete();

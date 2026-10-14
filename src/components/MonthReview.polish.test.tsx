@@ -181,12 +181,18 @@ it("distinguishes the period cutoff and suggested amount from an already confirm
   });
   show();
   fireEvent.click(screen.getByRole("button", { name: "3. Pots and goals" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /Car insurance.*Contribute/ }),
+  );
   expect(screen.getByLabelText("Car insurance contribution (GBP)")).toHaveValue(
     "90.00",
   );
   expect(
     screen.getByText(/This month's confirmed £90.00 is shown above/),
   ).toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Contribute to Car insurance" }),
+  );
   fireEvent.click(
     screen.getByText("Why Planning may show a different suggestion"),
   );

@@ -28,7 +28,11 @@ import {
   ledgerTransactions,
 } from "./effective-transactions";
 import { manualCashBalance } from "./manual-cash";
-import { recurringDate, recurringMerchant } from "./recurring-events";
+import {
+  recurringDate,
+  recurringMerchant,
+  recurringMatches,
+} from "./recurring-events";
 import { accountSnapshot } from "./balances";
 import { latestValuation } from "./net-worth";
 
@@ -456,6 +460,7 @@ export function recurringCalendar(
   transactions: Transaction[],
   month: string,
   currency: string,
+  settings: Setting[] = [],
 ): CalendarItem[] {
   const [start, end] = monthBounds(month);
   const actual = transactions
@@ -491,11 +496,17 @@ export function recurringCalendar(
       if (
         actual.some(
           (t) =>
-            t.accountId === s.accountId &&
-            t.currency === s.currency &&
-            normalizeMerchant(t.name) === seriesMerchant(s) &&
-            Math.sign(t.amountMinor) === Math.sign(s.expectedAmountMinor) &&
-            Math.abs(stamp(t.date) - stamp(date)) <= 5 * 86400000,
+            recurringMatches(
+              s,
+              {
+                accountId: t.accountId,
+                currency: t.currency,
+                merchant: t.name,
+                description: t.name,
+                amount: t.amountMinor,
+              },
+              settings,
+            ) && Math.abs(stamp(t.date) - stamp(date)) <= 5 * 86400000,
         )
       )
         continue;

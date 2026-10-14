@@ -35,6 +35,7 @@ import {
   reviewPriceChanges,
 } from "../analytics/month-review-details";
 import { ListRow } from "./UIPrimitives";
+import { Sheet } from "./Sheet";
 export function MonthReview({
   month,
   currency,
@@ -62,6 +63,7 @@ export function MonthReview({
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
   const [changeId, setChangeId] = useState("");
+  const [contributing, setContributing] = useState("");
   const [contributions, setContributions] = useState<Record<string, string>>(
     {},
   );
@@ -415,58 +417,105 @@ export function MonthReview({
                 />
               );
             return (
-              <div className="review-pot-contribution" key={p.id}>
-                <label>
-                  {p.name} contribution ({p.currency})
-                  <input
-                    inputMode="decimal"
-                    value={
-                      contributions[p.id] ??
-                      decimalMoney(
-                        existing ?? progress.monthlyMinor,
-                        p.currency,
-                      )
-                    }
-                    onChange={(e) =>
-                      setContributions({
-                        ...contributions,
-                        [p.id]: e.target.value,
-                      })
-                    }
-                    aria-describedby={`contribution-help-${p.id}`}
-                  />
-                </label>
-                <small id={`contribution-help-${p.id}`}>
-                  Suggested {money(progress.monthlyMinor, p.currency)} as of{" "}
-                  {formatUkDate(asOf)}.
-                  {existing !== undefined &&
-                    ` This month's confirmed ${money(existing, p.currency)} is shown above.`}
-                </small>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    void run(async () => {
-                      const result = await confirmPotContribution(
-                        p.id,
-                        month,
-                        parseMoney(
-                          contributions[p.id] ??
-                            decimalMoney(
-                              existing ?? progress.monthlyMinor,
-                              p.currency,
-                            ),
-                          p.currency,
-                        ),
-                      );
-                      setChangeId(result.changeId);
-                    }, "Contribution confirmed. Pots earmark cash; they never reduce your balance.")
-                  }
-                >
-                  Confirm contribution
-                </button>
-              </div>
+              <ListRow
+                key={p.id}
+                title={p.name}
+                meta={
+                  <>
+                    Contribute · Suggested{" "}
+                    {money(progress.monthlyMinor, p.currency)} as of{" "}
+                    {formatUkDate(asOf)}
+                  </>
+                }
+                amount={
+                  <strong>
+                    {money(existing ?? progress.monthlyMinor, p.currency)}
+                  </strong>
+                }
+                onClick={() => setContributing(p.id)}
+              />
             );
           })}
+          {contributing &&
+            (() => {
+              const item = potSummary.items.find(
+                ({ pot }) => pot.id === contributing,
+              );
+              if (!item || item.pot.linkedAccountId) return null;
+              const { pot: p, progress } = item;
+              const existing = p.contributions.find(
+                (c) => c.month === month,
+              )?.amountMinor;
+              return (
+                <Sheet
+                  title={`Contribute to ${p.name}`}
+                  onClose={() => {
+                    if (!busy) setContributing("");
+                  }}
+                  footer={
+                    <button
+                      className="primary"
+                      disabled={busy}
+                      form="review-contribution-form"
+                    >
+                      Confirm contribution
+                    </button>
+                  }
+                >
+                  <form
+                    id="review-contribution-form"
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      void run(async () => {
+                        const result = await confirmPotContribution(
+                          p.id,
+                          month,
+                          parseMoney(
+                            contributions[p.id] ??
+                              decimalMoney(
+                                existing ?? progress.monthlyMinor,
+                                p.currency,
+                              ),
+                            p.currency,
+                          ),
+                        );
+                        setChangeId(result.changeId);
+                        setContributing("");
+                      }, "Contribution confirmed. Pots earmark cash; they never reduce your balance.");
+                    }}
+                  >
+                    <label>
+                      {p.name} contribution ({p.currency})
+                      <input
+                        inputMode="decimal"
+                        required
+                        value={
+                          contributions[p.id] ??
+                          decimalMoney(
+                            existing ?? progress.monthlyMinor,
+                            p.currency,
+                          )
+                        }
+                        onChange={(e) =>
+                          setContributions({
+                            ...contributions,
+                            [p.id]: e.target.value,
+                          })
+                        }
+                        aria-describedby="review-contribution-help"
+                      />
+                    </label>
+                    <p id="review-contribution-help">
+                      Suggested {money(progress.monthlyMinor, p.currency)} as of{" "}
+                      {formatUkDate(asOf)}.
+                      {existing !== undefined &&
+                        ` This month's confirmed ${money(existing, p.currency)} is shown above.`}
+                    </p>
+                    {error && <p role="alert">{error}</p>}
+                  </form>
+                </Sheet>
+              );
+            })()}
           {!data.pots.length && (
             <p>Create a goal or irregular-cost pot in Planning.</p>
           )}

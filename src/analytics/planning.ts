@@ -341,13 +341,16 @@ export function planningForecast(
     (s) => s.currency === currency && accountIds.has(s.accountId),
   );
   const patterns = paymentPatterns(observed, settings, currency, today).filter(
-    (p) => !series.some((s) => p.rows.some((row) => recurringMatches(s, row))),
+    (p) =>
+      !series.some((s) =>
+        p.rows.some((row) => recurringMatches(s, row, settings)),
+      ),
   );
   const end = dateAt(day(today) + horizon);
   const events = (start: string) =>
     [
       ...paymentEvents(patterns, start, end, observed),
-      ...confirmedPaymentEvents(series, start, end, observed),
+      ...confirmedPaymentEvents(series, start, end, observed, settings),
     ].sort(
       (a, b) =>
         a.date.localeCompare(b.date) || a.merchant.localeCompare(b.merchant),
@@ -374,7 +377,7 @@ export function planningForecast(
   // including rows older than the recent six used to establish its cadence.
   const recurring = (t: Transaction) =>
     recurringRows.has(t.id) ||
-    series.some((s) => recurringMatches(s, t)) ||
+    series.some((s) => recurringMatches(s, t, settings)) ||
     patterns.some(
       (p) =>
         p.rows[0].accountId === t.accountId &&

@@ -1,3 +1,4 @@
+import { useRootFontSize } from "./useRootFontSize";
 import { reviewDate } from "../analytics/month-review-details";
 import { Sheet, SheetFooter } from "./Sheet";
 import { displayMerchant } from "../domain/presentation";
@@ -61,9 +62,17 @@ import { monthCoverage } from "../analytics/coverage";
 import { reportingPeriod } from "../domain/period";
 import { readBudget, budgetKey } from "../analytics/planning";
 import { detectSubscriptions } from "../analytics/subscriptions";
+import { resolveRecurringSeries } from "../analytics/recurring-identity";
+import { saveRecurringMatchDecision } from "../storage/recurring-identity";
 import "./planning-v2.css";
 import { Toast } from "./Toast";
-import { ListRow, SegmentedControl, StatusChip } from "./UIPrimitives";
+import {
+  KeyValueRow,
+  ListRow,
+  SegmentedControl,
+  StatusChip,
+  WarningBox,
+} from "./UIPrimitives";
 
 function useFeedback(onUndo?: () => void | Promise<void>) {
   const [message, setMessage] = useState(""),
@@ -799,6 +808,10 @@ export function CalendarPanel({
     [end, setEnd] = useState(""),
     [account, setAccount] = useState("");
   const [moneyDirection, setMoneyDirection] = useState("out");
+  const [matching, setMatching] = useState<{
+    confirmed: RecurringSeries;
+    detected: RecurringSeries;
+  }>();
   const f = useFeedback();
   if (!data) return <p role="status">Loading payment calendar…</p>;
   const detected = [
@@ -811,27 +824,11 @@ export function CalendarPanel({
       data.settings,
     ),
   );
-  const series = [
-    ...data.series,
-    ...detected.filter(
-      (s) =>
-        !data.series.some(
-          (d) =>
-            d.matchKey === s.matchKey ||
-            (d.accountId === s.accountId &&
-              d.currency === s.currency &&
-              d.cadence === s.cadence &&
-              displayMerchant({
-                merchant: d.name,
-                description: d.name,
-              }).toLocaleLowerCase() ===
-                displayMerchant({
-                  merchant: s.name,
-                  description: s.name,
-                }).toLocaleLowerCase()),
-        ),
-    ),
-  ];
+  const { series, proposals: possibleMatches } = resolveRecurringSeries(
+    data.series,
+    detected,
+    data.settings,
+  );
   const priceRises = [...new Set(data.transactions.map((t) => t.currency))]
     .flatMap((native) =>
       detectSubscriptions(
@@ -857,7 +854,13 @@ export function CalendarPanel({
     data.accounts.find((a) => a.id === account)?.currency ??
     editing?.currency ??
     currency;
-  const items = recurringCalendar(series, data.transactions, month, "*");
+  const items = recurringCalendar(
+    series,
+    data.transactions,
+    month,
+    "*",
+    data.settings,
+  );
   const missingRates = items.some(
     (i) =>
       i.currency !== currency &&
@@ -915,6 +918,20 @@ export function CalendarPanel({
           ? " Some payments need exchange rates. Daily totals are partial until rates are available."
           : ""}
       </p>
+      {possibleMatches.length > 0 && (
+        <WarningBox
+          severity="warning"
+          title={`${possibleMatches.length} possible recurring bill match${possibleMatches.length === 1 ? "" : "es"}`}
+        >
+          <p>
+            Similar entries remain separate until you confirm they are the same
+            bill. Expected totals may include both.
+          </p>
+          <button onClick={() => setMatching(possibleMatches[0])}>
+            Review possible match
+          </button>
+        </WarningBox>
+      )}
       {priceRises.length > 0 && (
         <aside className="notice warning" aria-label="Recurring price changes">
           <h3>Recurring prices changed</h3>
@@ -1076,6 +1093,97 @@ export function CalendarPanel({
           </button>
         ))}
       </details>
+      {matching && (
+        <Sheet
+          title={`Is this the same as ${displayMerchant({ merchant: matching.confirmed.name, description: matching.confirmed.name })}?`}
+          onClose={() => {
+            if (!f.busy) setMatching(undefined);
+          }}
+        >
+          <p>
+            Confirming uses the saved amount and due date for one expected bill.
+            Imported transactions and balances stay unchanged.
+          </p>
+          {[
+            { label: "Saved payment", value: matching.confirmed },
+            { label: "Detected payment", value: matching.detected },
+          ].map(({ label, value }) => (
+            <section key={label} aria-label={label}>
+              <h3>{label}</h3>
+              <KeyValueRow
+                label="Bill"
+                value={displayMerchant({
+                  merchant: value.name,
+                  description: value.name,
+                })}
+              />
+              <KeyValueRow
+                label="Amount"
+                value={money(value.expectedAmountMinor, value.currency)}
+              />
+              <KeyValueRow
+                label="Account"
+                value={
+                  data.accounts.find((a) => a.id === value.accountId)
+                    ?.displayName ?? "Account unavailable"
+                }
+              />
+              <KeyValueRow
+                label="Next due"
+                value={formatUkDate(value.nextDue)}
+              />
+              <KeyValueRow
+                label="Frequency"
+                value={value.cadence[0].toUpperCase() + value.cadence.slice(1)}
+              />
+            </section>
+          ))}
+          {f.feedback}
+          <SheetFooter>
+            <button
+              disabled={f.busy}
+              onClick={() =>
+                void f
+                  .run(
+                    () =>
+                      saveRecurringMatchDecision(
+                        matching.confirmed.id,
+                        matching.detected,
+                        "separate",
+                      ),
+                    "Recurring bills kept separate.",
+                  )
+                  .then((ok) => {
+                    if (ok) setMatching(undefined);
+                  })
+              }
+            >
+              Keep separate
+            </button>
+            <button
+              className="primary"
+              disabled={f.busy}
+              onClick={() =>
+                void f
+                  .run(
+                    () =>
+                      saveRecurringMatchDecision(
+                        matching.confirmed.id,
+                        matching.detected,
+                        "same",
+                      ),
+                    "Recurring bill match confirmed.",
+                  )
+                  .then((ok) => {
+                    if (ok) setMatching(undefined);
+                  })
+              }
+            >
+              Same bill
+            </button>
+          </SheetFooter>
+        </Sheet>
+      )}
       {editing && (
         <Sheet
           title="Recurring payment"
@@ -1273,7 +1381,7 @@ export function CalendarPanel({
           </form>
         </Sheet>
       )}
-      {f.feedback}
+      {!matching && f.feedback}
     </section>
   );
 }
@@ -1892,6 +2000,7 @@ export function ScenarioPanel({
   currency: string;
   points: { date: string; balance: number }[];
 }) {
+  const chartRem = useRootFontSize();
   const data = useLiveQuery(
     async () => ({
       scenarios: await db.scenarios.toArray(),
@@ -2065,6 +2174,7 @@ export function ScenarioPanel({
                   tickFormatter={(v) => formatUkDate(String(v))}
                 />
                 <YAxis
+                  width={Math.max(60, Math.round(chartRem * 3.75))}
                   tick={{ fontSize: 13 }}
                   tickFormatter={(v) => compactMoney(Number(v), currency)}
                 />

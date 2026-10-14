@@ -82,6 +82,9 @@ it("shows foreign pots, parses a contribution in its native precision and keeps 
     </MemoryRouter>,
   );
   fireEvent.click(screen.getByRole("button", { name: "3. Pots and goals" }));
+  fireEvent.click(
+    screen.getByRole("button", { name: /Japan trip.*Contribute/ }),
+  );
   const input = screen.getByLabelText("Japan trip contribution (JPY)");
   expect(input).toHaveValue("10000");
   expect(screen.getByText(/Automatic from Euro savings/)).toBeInTheDocument();
