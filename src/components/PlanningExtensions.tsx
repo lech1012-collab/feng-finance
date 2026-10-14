@@ -63,6 +63,7 @@ import { readBudget, budgetKey } from "../analytics/planning";
 import { detectSubscriptions } from "../analytics/subscriptions";
 import "./planning-v2.css";
 import { Toast } from "./Toast";
+import { ListRow, SegmentedControl, StatusChip } from "./UIPrimitives";
 
 function useFeedback(onUndo?: () => void | Promise<void>) {
   const [message, setMessage] = useState(""),
@@ -171,13 +172,14 @@ export function PotsPanel({
       s.expectedAmountMinor < 0 &&
       !data.pots.some((p) => p.name === s.name),
   );
+  const suggestionDate = reviewDate(monthBounds(month)[1], localToday());
   const overview = potsOverview(
     data.pots,
     data.accounts,
     data.statements,
     data.transactions,
     currency,
-    reviewDate(monthBounds(month)[1], localToday()),
+    suggestionDate,
     data.rates,
     data.valuations,
   );
@@ -405,11 +407,27 @@ export function PotsPanel({
                 {money(progress.monthlyMinor, p.currency)} a month needed
                 {progress.covered ? " · Covered by pot" : ""}
               </p>
-              <p className="muted">
-                {progress.onTrack
-                  ? "On track"
-                  : `Behind by ${money(progress.behindMinor, p.currency)}`}
-              </p>
+              <StatusChip
+                tone={
+                  progress.linkedUnavailable || !progress.onTrack
+                    ? "warning"
+                    : "complete"
+                }
+              >
+                {progress.linkedUnavailable
+                  ? "Balance unavailable"
+                  : progress.onTrack
+                    ? "On track"
+                    : `Behind by ${money(progress.behindMinor, p.currency)}`}
+              </StatusChip>
+              <details>
+                <summary>How this suggestion works</summary>
+                <p className="muted">
+                  Calculated as of {formatUkDate(suggestionDate)} for the
+                  calendar month, including confirmed contributions. A
+                  payday-aligned review uses its own period end.
+                </p>
+              </details>
               {linked ? (
                 <p className="muted">
                   From {linked.displayName}
@@ -1045,7 +1063,7 @@ export function CalendarPanel({
             onClick={() => edit(s)}
           >
             <span>
-              {s.name}
+              {displayMerchant({ merchant: s.name, description: s.name })}
               <small>
                 {s.cadence[0].toUpperCase() + s.cadence.slice(1)} ·{" "}
                 {s.status[0].toUpperCase() + s.status.slice(1)} ·{" "}
@@ -1136,16 +1154,15 @@ export function CalendarPanel({
                 ))}
               </select>
             </label>
-            <label>
-              Money direction
-              <select
-                value={moneyDirection}
-                onChange={(e) => setMoneyDirection(e.target.value)}
-              >
-                <option value="out">Money out</option>
-                <option value="in">Money in</option>
-              </select>
-            </label>
+            <SegmentedControl
+              label="Money direction"
+              value={moneyDirection}
+              onChange={setMoneyDirection}
+              options={[
+                { value: "out", label: "Money out" },
+                { value: "in", label: "Money in" },
+              ]}
+            />
             <label>
               Expected amount ({formCurrency})
               <input
@@ -1893,6 +1910,7 @@ export function ScenarioPanel({
     [end, setEnd] = useState(""),
     [changes, setChanges] = useState<Scenario["changes"]>([]);
   const [direction, setDirection] = useState("out");
+  const [editingScenario, setEditingScenario] = useState(false);
   const f = useFeedback();
   const capturedCurrency =
     data?.scenarios.find((s) => s.id === selected)?.currency ?? currency;
@@ -1968,281 +1986,402 @@ export function ScenarioPanel({
     ],
   );
   if (!data) return <p role="status">Loading scenarios…</p>;
+  const finalPoint = projected.at(-1);
+  const endDifference = finalPoint
+    ? finalPoint.scenario - finalPoint.balance
+    : undefined;
+  const save = () => {
+    const nextId = selected || crypto.randomUUID();
+    void f
+      .run(() => saveScenario({ ...scenario, id: nextId }), "Scenario saved.")
+      .then((ok) => {
+        if (ok) {
+          setSelected(nextId);
+          setEditingScenario(false);
+        }
+      });
+  };
   return (
     <section className="card">
-      <h2>What if?</h2>
-      <p className="muted">
-        Explore changes without editing any actual balances or transactions.
-        Save up to five scenarios.
-      </p>
-      <label>
-        Saved scenario
-        <select
-          value={selected}
-          onChange={(e) => {
-            setSelected(e.target.value);
-            const s = data.scenarios.find((s) => s.id === e.target.value);
-            setName(s?.name ?? "My scenario");
-            setChanges(s?.changes ?? []);
-          }}
-        >
-          <option value="">New scenario</option>
-          {data.scenarios.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <form
-        className="planning-v2-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          try {
-            const value =
-              type === "pause"
-                ? 0
-                : Math.abs(parseMoney(amount, capturedCurrency)) *
-                  (direction === "out" ? -1 : 1);
-            if ((type === "pause" || type === "recurring-change") && !seriesId)
-              throw new Error("Choose the recurring series to adjust.");
-            setChanges([
-              ...changes,
-              {
-                id: crypto.randomUUID(),
-                date,
-                amountMinor: value,
-                description: description || type,
-                type,
-                recurringSeriesId: seriesId || undefined,
-                endDate: end || undefined,
-              },
-            ]);
-            setAmount("");
-          } catch (e) {
-            f.setError(
-              e instanceof Error ? e.message : "Enter a valid adjustment.",
-            );
-          }
-        }}
-      >
-        <label>
-          Adjustment
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as typeof type)}
-          >
-            <option value="one-off">One-off income or expense</option>
-            <option value="recurring-change">Change recurring amount</option>
-            <option value="pause">Pause a recurring series</option>
-            <option value="new-recurring">New monthly recurring item</option>
-          </select>
-        </label>
-        <label>
-          From date
-          <input
-            required
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
-        {type !== "pause" && (
-          <label>
-            Amount ({capturedCurrency})
-            <input
-              required
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <select
-              aria-label="Scenario money direction"
-              value={direction}
-              onChange={(e) => setDirection(e.target.value)}
-            >
-              <option value="out">Money out</option>
-              <option value="in">Money in</option>
-            </select>
-          </label>
-        )}
-        {(type === "pause" || type === "recurring-change") && (
-          <label>
-            Recurring series
-            <select
-              required
-              value={seriesId}
-              onChange={(e) => setSeriesId(e.target.value)}
-            >
-              <option value="">Choose series</option>
-              {data.series
-                .filter(
-                  (s) =>
-                    s.status !== "ignored" &&
-                    (!s.endDate || s.endDate >= localToday()),
-                )
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.currency})
-                  </option>
-                ))}
-            </select>
-          </label>
-        )}
-        <label>
-          Label
-          <input
-            placeholder="e.g. Car repair"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </label>
-        {type !== "one-off" && (
-          <label>
-            Until date (optional)
-            <input
-              type="date"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-            />
-          </label>
-        )}
-        <button>Add adjustment</button>
-      </form>
-      <div className="planning-v2-list">
-        {changes.map((c) => (
-          <div className="planning-v2-object" key={c.id}>
-            <span>
-              {c.description}
-              <small>
-                {formatUkDate(c.date)} · {c.type}
-              </small>
-            </span>
-            <strong>{money(c.amountMinor, capturedCurrency)}</strong>
-            <button
-              aria-label={`Remove ${c.description}`}
-              onClick={() => setChanges(changes.filter((x) => x.id !== c.id))}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
+      <div className="section-heading">
+        <h2>What if?</h2>
+        <button onClick={() => setEditingScenario(true)}>Edit scenario</button>
       </div>
-      {changes.length > 0 && (
+      <p className="muted">
+        Preview changes without editing your actual finances.
+      </p>
+      {changes.length === 0 ? (
+        <p>
+          No adjustments yet. Edit a scenario to compare it with the baseline.
+        </p>
+      ) : (
+        <p>
+          {name} · {changes.length} adjustment{changes.length === 1 ? "" : "s"}
+        </p>
+      )}
+      {finalPoint &&
+        endDifference !== undefined &&
+        !missingRate &&
+        changes.length > 0 && (
+          <p className="scenario-end-summary">
+            {endDifference === 0 ? (
+              "No change to the baseline on "
+            ) : (
+              <>
+                <span className="amount">
+                  {money(Math.abs(endDifference), currency)}
+                </span>
+                {endDifference < 0 ? " less on " : " more on "}
+              </>
+            )}
+            <time dateTime={finalPoint.date}>
+              {formatUkDate(finalPoint.date)}
+            </time>
+            .
+            <small>
+              {" "}
+              Projected balance{" "}
+              <span className="amount">
+                {money(finalPoint.scenario, currency)}
+              </span>
+              .
+            </small>
+          </p>
+        )}
+      {projected.length > 0 && !missingRate ? (
         <>
+          <div
+            className="chart"
+            role="img"
+            aria-label="Solid baseline and dashed what-if balance"
+          >
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={projected}>
+                <CartesianGrid vertical={false} stroke="var(--line)" />
+                <XAxis
+                  dataKey="date"
+                  minTickGap={50}
+                  tick={{ fontSize: 13 }}
+                  tickFormatter={(v) => formatUkDate(String(v))}
+                />
+                <YAxis
+                  tick={{ fontSize: 13 }}
+                  tickFormatter={(v) => compactMoney(Number(v), currency)}
+                />
+                <Tooltip
+                  labelFormatter={(v) => formatUkDate(String(v))}
+                  formatter={(v) => money(Number(v), currency)}
+                  contentStyle={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
+                    color: "var(--ink)",
+                  }}
+                />
+                <Line
+                  name="Baseline"
+                  dataKey="balance"
+                  dot={false}
+                  stroke="var(--chart-income)"
+                  isAnimationActive={false}
+                />
+                <Line
+                  name="What-if scenario"
+                  dataKey="scenario"
+                  dot={false}
+                  stroke="var(--chart-net)"
+                  strokeDasharray="6 4"
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <details>
+            <summary>View values</summary>
+            <div
+              className="table-scroll"
+              role="region"
+              aria-label="Scenario values"
+              tabIndex={0}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Baseline</th>
+                    <th>Scenario</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projected.map((point) => (
+                    <tr key={point.date}>
+                      <th>{formatUkDate(point.date)}</th>
+                      <td className="amount">
+                        {money(point.balance, currency)}
+                      </td>
+                      <td className="amount">
+                        {money(point.scenario, currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
+      ) : (
+        <p className="muted">
+          {missingRate
+            ? "Cached exchange rates are needed for this scenario."
+            : "Import complete recent history to show a baseline and scenario chart. Your scenario can still be saved."}
+        </p>
+      )}
+      {changes.length > 0 && (
+        <div className="planning-v2-list">
+          {changes.map((c) => (
+            <ListRow
+              key={c.id}
+              title={c.description}
+              meta={formatUkDate(c.date)}
+              amount={<strong>{money(c.amountMinor, capturedCurrency)}</strong>}
+            />
+          ))}
+        </div>
+      )}
+      {editingScenario && (
+        <Sheet
+          title="Edit scenario"
+          onClose={() => {
+            if (!f.busy) setEditingScenario(false);
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                disabled={f.busy}
+                onClick={() => setEditingScenario(false)}
+              >
+                Done
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={f.busy || changes.length === 0 || !name.trim()}
+                onClick={save}
+              >
+                Save scenario
+              </button>
+            </>
+          }
+        >
           <label>
-            Scenario name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <div className="actions">
-            <button
-              disabled={f.busy}
-              onClick={() => {
-                const nextId = selected || crypto.randomUUID();
-                void f
-                  .run(
-                    () =>
-                      saveScenario({
-                        ...scenario,
-                        id: nextId,
-                      }),
-                    "Scenario saved.",
-                  )
-                  .then((ok) => {
-                    if (ok) setSelected(nextId);
-                  });
+            Saved scenario
+            <select
+              value={selected}
+              onChange={(e) => {
+                setSelected(e.target.value);
+                const s = data.scenarios.find((s) => s.id === e.target.value);
+                setName(s?.name ?? "My scenario");
+                setChanges(s?.changes ?? []);
               }}
             >
-              Save scenario
-            </button>
-            {selected && (
-              <details className="object-menu">
-                <summary>Scenario options</summary>
+              <option value="">New scenario</option>
+              {data.scenarios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="muted">
+            Save up to five scenarios. Their values never become actual
+            balances.
+          </p>
+          <form
+            id="scenario-adjustment-form"
+            className="planning-v2-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              try {
+                const value =
+                  type === "pause"
+                    ? 0
+                    : Math.abs(parseMoney(amount, capturedCurrency)) *
+                      (direction === "out" ? -1 : 1);
+                if (
+                  (type === "pause" || type === "recurring-change") &&
+                  !seriesId
+                )
+                  throw new Error("Choose the recurring series to adjust.");
+                setChanges([
+                  ...changes,
+                  {
+                    id: crypto.randomUUID(),
+                    date,
+                    amountMinor: value,
+                    description: description || type,
+                    type,
+                    recurringSeriesId: seriesId || undefined,
+                    endDate: end || undefined,
+                  },
+                ]);
+                setAmount("");
+              } catch (e) {
+                f.setError(
+                  e instanceof Error ? e.message : "Enter a valid adjustment.",
+                );
+              }
+            }}
+          >
+            <label>
+              Adjustment
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as typeof type)}
+              >
+                <option value="one-off">One-off income or expense</option>
+                <option value="recurring-change">
+                  Change recurring amount
+                </option>
+                <option value="pause">Pause a recurring series</option>
+                <option value="new-recurring">
+                  New monthly recurring item
+                </option>
+              </select>
+            </label>
+            <label>
+              From date
+              <input
+                required
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+              />
+            </label>
+            {type !== "pause" && (
+              <>
+                <label>
+                  Amount ({capturedCurrency})
+                  <input
+                    required
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </label>
+                <SegmentedControl
+                  label="Scenario money direction"
+                  value={direction}
+                  onChange={setDirection}
+                  options={[
+                    { value: "out", label: "Money out" },
+                    { value: "in", label: "Money in" },
+                  ]}
+                />
+              </>
+            )}
+            {(type === "pause" || type === "recurring-change") && (
+              <label>
+                Recurring series
+                <select
+                  required
+                  value={seriesId}
+                  onChange={(e) => setSeriesId(e.target.value)}
+                >
+                  <option value="">Choose series</option>
+                  {data.series
+                    .filter(
+                      (s) =>
+                        s.status !== "ignored" &&
+                        (!s.endDate || s.endDate >= localToday()),
+                    )
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.currency})
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+            <label>
+              Label
+              <input
+                placeholder="e.g. Car repair"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
+            {type !== "one-off" && (
+              <label>
+                Until date (optional)
+                <input
+                  type="date"
+                  value={end}
+                  onChange={(e) => setEnd(e.target.value)}
+                />
+              </label>
+            )}
+            <button>Add adjustment</button>
+          </form>
+          <div className="planning-v2-list">
+            {changes.map((c) => (
+              <div key={c.id}>
+                <ListRow
+                  title={c.description}
+                  meta={formatUkDate(c.date)}
+                  amount={
+                    <strong>{money(c.amountMinor, capturedCurrency)}</strong>
+                  }
+                />
                 <button
+                  type="button"
+                  aria-label={`Remove ${c.description}`}
                   onClick={() =>
-                    void f
-                      .run(() => removeScenario(selected), "Scenario deleted.")
-                      .then((ok) => {
-                        if (ok) {
-                          setSelected("");
-                          setChanges([]);
-                        }
-                      })
+                    setChanges(changes.filter((x) => x.id !== c.id))
                   }
                 >
-                  Delete scenario
+                  Remove adjustment
                 </button>
-              </details>
-            )}
+              </div>
+            ))}
           </div>
-          {projected.length > 0 && !missingRate && (
-            <p className="scenario-end-summary">
-              By {formatUkDate(projected.at(-1)!.date)}:{" "}
-              {money(projected.at(-1)!.scenario, currency)} ·{" "}
-              {money(
-                projected.at(-1)!.scenario - projected.at(-1)!.balance,
-                currency,
-                true,
-              )}{" "}
-              vs baseline
-            </p>
+          <label>
+            Scenario name
+            <input
+              value={name}
+              maxLength={100}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          {selected && (
+            <details className="object-menu">
+              <summary>Scenario options</summary>
+              <button
+                className="danger"
+                type="button"
+                onClick={() => {
+                  if (
+                    !window.confirm(`Delete ${name}? You can undo this change.`)
+                  )
+                    return;
+                  void f
+                    .run(() => removeScenario(selected), "Scenario deleted.")
+                    .then((ok) => {
+                      if (ok) {
+                        setSelected("");
+                        setChanges([]);
+                        setEditingScenario(false);
+                      }
+                    });
+                }}
+              >
+                Delete scenario
+              </button>
+            </details>
           )}
-          {points.length && !missingRate ? (
-            <div
-              className="chart"
-              role="img"
-              aria-label="Solid baseline and dashed what-if balance"
-            >
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={projected}>
-                  <CartesianGrid vertical={false} stroke="var(--line)" />
-                  <XAxis
-                    dataKey="date"
-                    minTickGap={50}
-                    tickFormatter={(v) => formatUkDate(String(v))}
-                  />
-                  <YAxis
-                    tickFormatter={(v) =>
-                      `${Math.round(Number(v) / 10 ** currencyPrecision(currency) / 1000)}k`
-                    }
-                  />
-                  <Tooltip
-                    labelFormatter={(v) => formatUkDate(String(v))}
-                    formatter={(v) => money(Number(v), currency)}
-                    contentStyle={{
-                      background: "var(--surface)",
-                      border: "1px solid var(--line)",
-                      color: "var(--ink)",
-                    }}
-                  />
-                  <Line
-                    name="Baseline"
-                    dataKey="balance"
-                    dot={false}
-                    stroke="var(--chart-income)"
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    name="What-if scenario"
-                    dataKey="scenario"
-                    dot={false}
-                    stroke="var(--chart-net)"
-                    strokeDasharray="6 4"
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="muted">
-              {missingRate
-                ? "Cached exchange rates are needed for this scenario."
-                : "Import complete recent history to show a baseline and scenario chart. Your scenario can still be saved."}
-            </p>
-          )}
-        </>
+          {f.feedback}
+        </Sheet>
       )}
-      {f.feedback}
+      {!editingScenario && f.feedback}
     </section>
   );
 }

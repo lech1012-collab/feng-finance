@@ -18,6 +18,8 @@ import { projectedReportingTransactions } from "../analytics/fx";
 import { cashFlow, categorySpending } from "../analytics/calculations";
 import { reportingPeriod, reportingPeriodLabel } from "../domain/period";
 import { formatUkDate, monthLabel, monthOffset } from "../domain/dates";
+import { monthBounds } from "../domain/dates";
+import { displayMerchant } from "../domain/presentation";
 import { money, parseMoney, decimalMoney, safeSum } from "../domain/money";
 import { download } from "../storage/backup";
 import {
@@ -32,6 +34,7 @@ import {
   reviewDate,
   reviewPriceChanges,
 } from "../analytics/month-review-details";
+import { ListRow } from "./UIPrimitives";
 export function MonthReview({
   month,
   currency,
@@ -82,6 +85,17 @@ export function MonthReview({
     to,
     localToday(),
   );
+  const nextMonth = monthOffset(month, 1);
+  const nextPriceChanges = priceChanges.length
+    ? []
+    : reviewPriceChanges(
+        data.rows,
+        data.settings,
+        to,
+        reportingPeriod(nextMonth, data.settings, data.rows)[1],
+        localToday(),
+      );
+  const planningAsOf = reviewDate(monthBounds(month)[1], localToday());
   const projected = projectedReportingTransactions(
     effectiveTransactions(data.rows),
     currency,
@@ -155,6 +169,10 @@ export function MonthReview({
       return {
         ...category,
         difference: mean === undefined ? undefined : category.amount - mean,
+        percentage:
+          mean === undefined || mean === 0
+            ? undefined
+            : ((category.amount - mean) / mean) * 100,
       };
     })
     .filter((c) => c.difference !== undefined)
@@ -250,24 +268,49 @@ export function MonthReview({
       {step === 1 && (
         <section className="card">
           <h2>What changed</h2>
-          {changes.map((c) => (
-            <Link
-              key={c.id}
-              className="insight-row"
-              to={`/categories/${c.id}?month=${month}`}
-            >
-              <span>
-                {c.name}
-                <small>vs usual spending</small>
-              </span>
-              <strong>{money(c.difference!, currency, true)}</strong>
-            </Link>
-          ))}
-          {!changes.length && (
+          {coverage.complete &&
+            changes.map((c) => (
+              <Link
+                key={c.id}
+                className="insight-row"
+                to={`/categories/${c.id}?month=${month}`}
+              >
+                <span>
+                  {c.name}
+                  <small>vs your 3-month average</small>
+                </span>
+                <strong
+                  className={c.difference! > 0 ? "spending-amount" : "positive"}
+                >
+                  <span className="amount">
+                    {money(c.difference!, currency, true)}
+                  </span>
+                  <small>
+                    {c.percentage === undefined
+                      ? "No previous spending"
+                      : `${c.percentage < 0 ? "−" : "+"}${Math.abs(c.percentage).toFixed(0)}%`}
+                  </small>
+                </strong>
+              </Link>
+            ))}
+          {!coverage.complete && (
+            <p className="muted">
+              Not comparable yet · {monthLabel(month)}{" "}
+              {coverage.hasUnverifiedStatements ? "unverified" : "incomplete"}.
+            </p>
+          )}
+          {coverage.complete && !changes.length && (
             <p>Comparisons begin when verified history is available.</p>
           )}
+          <p className="muted">{past.length} of 3 complete months used.</p>
           <h3>New merchants</h3>
-          <p>{newMerchants.join(" · ") || "No new merchants this month."}</p>
+          <p>
+            {newMerchants
+              .map((name) =>
+                displayMerchant({ merchant: name, description: name }),
+              )
+              .join(" · ") || "No new merchants this month."}
+          </p>
           <h3>Subscription changes</h3>
           {priceChanges.map((subscription) => (
             <Link
@@ -276,7 +319,12 @@ export function MonthReview({
               to="/subscriptions"
             >
               <span>
-                <strong>{subscription.merchant}</strong>
+                <strong>
+                  {displayMerchant({
+                    merchant: subscription.merchant,
+                    description: subscription.merchant,
+                  })}
+                </strong>
                 <small>
                   {money(subscription.previousMedian!, subscription.currency)} →{" "}
                   {money(subscription.amount, subscription.currency)} ·{" "}
@@ -305,11 +353,21 @@ export function MonthReview({
               </span>
             </Link>
           ))}
-          {!priceChanges.length && (
+          {!priceChanges.length && !nextPriceChanges.length && (
             <p className="muted">
               No subscription price increases to review in this period.
             </p>
           )}
+          {nextPriceChanges.slice(0, 3).map((subscription) => (
+            <p className="muted" key={subscription.key}>
+              {displayMerchant({
+                merchant: subscription.merchant,
+                description: subscription.merchant,
+              })}{" "}
+              rose on {formatUkDate(subscription.priceChangeDate!)}; you'll see
+              it in {monthLabel(nextMonth).split(" ")[0]}'s review.
+            </p>
+          ))}
           <Link to="/subscriptions" className="button">
             Review subscription changes
           </Link>
@@ -318,31 +376,46 @@ export function MonthReview({
       {step === 2 && (
         <section className="card">
           <h2>Pots and goals</h2>
+          <p className="muted">Suggestions as of {formatUkDate(asOf)}.</p>
+          {asOf !== planningAsOf && (
+            <details>
+              <summary>Why Planning may show a different suggestion</summary>
+              <p>
+                This review follows your month-start setting. Planning uses the
+                calendar month, with suggestions as of{" "}
+                {formatUkDate(planningAsOf)}. Confirmed contributions are
+                already included in each suggestion.
+              </p>
+            </details>
+          )}
           {potSummary.items.map(({ pot: p, progress, sourceDate }) => {
             const existing = p.contributions.find(
               (c) => c.month === month,
             )?.amountMinor;
             if (p.linkedAccountId)
               return (
-                <div className="settings-row" key={p.id}>
-                  <span>
-                    <strong>{p.name}</strong>
-                    <small>
+                <ListRow
+                  key={p.id}
+                  title={p.name}
+                  meta={
+                    <>
                       Automatic from{" "}
                       {data.accounts.find((a) => a.id === p.linkedAccountId)
                         ?.displayName ?? "linked savings account"}
                       {sourceDate ? ` · as of ${formatUkDate(sourceDate)}` : ""}
-                    </small>
-                  </span>
-                  <strong>
-                    {progress.linkedUnavailable
-                      ? "Balance unavailable"
-                      : money(progress.savedMinor, p.currency)}
-                  </strong>
-                </div>
+                    </>
+                  }
+                  amount={
+                    <strong>
+                      {progress.linkedUnavailable
+                        ? "Balance unavailable"
+                        : money(progress.savedMinor, p.currency)}
+                    </strong>
+                  }
+                />
               );
             return (
-              <div className="settings-row" key={p.id}>
+              <div className="review-pot-contribution" key={p.id}>
                 <label>
                   {p.name} contribution ({p.currency})
                   <input
@@ -360,8 +433,15 @@ export function MonthReview({
                         [p.id]: e.target.value,
                       })
                     }
+                    aria-describedby={`contribution-help-${p.id}`}
                   />
                 </label>
+                <small id={`contribution-help-${p.id}`}>
+                  Suggested {money(progress.monthlyMinor, p.currency)} as of{" "}
+                  {formatUkDate(asOf)}.
+                  {existing !== undefined &&
+                    ` This month's confirmed ${money(existing, p.currency)} is shown above.`}
+                </small>
                 <button
                   disabled={busy}
                   onClick={() =>

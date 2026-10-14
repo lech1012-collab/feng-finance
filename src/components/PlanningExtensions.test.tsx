@@ -159,6 +159,7 @@ it("saving a new scenario selects it so a second save updates instead of duplica
     </MemoryRouter>,
   );
   await screen.findByRole("heading", { name: "What if?" });
+  fireEvent.click(screen.getByRole("button", { name: "Edit scenario" }));
   fireEvent.change(screen.getByRole("textbox", { name: /Amount \(GBP\)/ }), {
     target: { value: "-100" },
   });
@@ -169,6 +170,12 @@ it("saving a new scenario selects it so a second save updates instead of duplica
   fireEvent.click(screen.getByRole("button", { name: "Save scenario" }));
   await waitFor(async () => expect(await db.scenarios.count()).toBe(1));
   const first = (await db.scenarios.toArray())[0];
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Edit scenario" }),
+    ).not.toBeInTheDocument(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Edit scenario" }));
   await waitFor(() =>
     expect(
       screen.getByRole("combobox", { name: "Saved scenario" }),
