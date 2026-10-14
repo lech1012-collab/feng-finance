@@ -19,6 +19,9 @@ const currency = z.string().refine((s) => {
     return false;
   }
 });
+// ECB tables include more quotes than the currencies supported by our ledgers.
+// Preserve their exact cache codes without broadening account or amount support.
+const fxCurrency = z.string().regex(/^[A-Z]{3}$/);
 const colour = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 const institution = z.enum([
   "Barclays",
@@ -360,8 +363,8 @@ export const attachmentSchema = z.object({
 export const fxSchema = z.object({
   id: identifier,
   date,
-  base: currency,
-  quote: currency,
+  base: fxCurrency,
+  quote: fxCurrency,
   rate: z
     .string()
     .regex(/^(?:0|[1-9]\d*)(?:\.\d{1,12})?$/)
