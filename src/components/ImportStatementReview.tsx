@@ -32,6 +32,7 @@ import {
   type FileReview,
 } from "../import/review-model";
 import type { RowReviewAction } from "../import/generic/types";
+import { StatusChip } from "./UIPrimitives";
 
 export function ImportStatementReview({
   entry,
@@ -69,6 +70,9 @@ export function ImportStatementReview({
   const exactSkipped =
     d?.exactDuplicate && !d.duplicateOverride && !entry.requiresBatchRecheck;
   const checks = d?.transactions.filter((t) => needsRowCheck(t, d)) ?? [];
+  const duplicateCount =
+    d?.transactions.filter((transaction) => transaction.duplicate !== "none")
+      .length ?? 0;
   const updateDraft = (update: Partial<ImportDraft>) =>
     d && patch({ draft: { ...d, ...update } });
   const updateRow = (
@@ -162,9 +166,21 @@ export function ImportStatementReview({
               : entry.progress || "Ready to check"}
           </span>
         </span>
-        <span className={`small-chip ${blocking ? "blocking-chip" : ""}`}>
+        <StatusChip
+          tone={
+            blocking
+              ? "error"
+              : entry.skip || exactSkipped
+                ? "neutral"
+                : validation?.status === "warning"
+                  ? "warning"
+                  : validation?.status === "reconciled"
+                    ? "complete"
+                    : "neutral"
+          }
+        >
           {status}
-        </span>
+        </StatusChip>
         <ChevronDown size={18} aria-hidden="true" />
       </summary>
       <div className="import-statement-content">
@@ -389,14 +405,12 @@ export function ImportStatementReview({
                 </label>
               </div>
             )}
-            <p>
-              {d.transactions.filter((t) => t.duplicate !== "none").length}{" "}
-              possible or confirmed duplicate transaction
-              {d.transactions.filter((t) => t.duplicate !== "none").length === 1
-                ? ""
-                : "s"}
-              ; excluded by default.
-            </p>
+            {duplicateCount > 0 && (
+              <p>
+                {duplicateCount} possible or confirmed duplicate transaction
+                {duplicateCount === 1 ? "" : "s"}; excluded by default.
+              </p>
+            )}
             {!exactSkipped && (d.warnings.length > 0 || outsideDates) && (
               <div
                 className={`notice ${d.reviewedWarnings ? "warning" : "import-blocking-warning"}`}
@@ -469,7 +483,7 @@ export function ImportStatementReview({
                   aria-pressed={!entry.showAll}
                   onClick={() => patch({ showAll: false })}
                 >
-                  To check ({checks.length})
+                  To check{checks.length > 0 && ` (${checks.length})`}
                 </button>
                 <button
                   disabled={busy}
@@ -509,7 +523,7 @@ export function ImportStatementReview({
                   >
                     <summary className="review-compact">
                       <span>
-                        <strong>{t.merchant || t.description}</strong>
+                        <strong>{displayMerchant(t)}</strong>
                         <small>
                           {formatUkDate(t.date, true)} ·{" "}
                           {t.isTransfer
@@ -542,6 +556,10 @@ export function ImportStatementReview({
                         {t.sourcePage}
                       </span>
                     </div>
+                    <details>
+                      <summary>Original description</summary>
+                      <p>{t.description}</p>
+                    </details>
                     {t.duplicate !== "none" && (
                       <p className="warning-text">
                         {t.duplicate === "certain"

@@ -20,6 +20,7 @@ import { formatUkDate } from "../domain/dates";
 import { auditedMutation } from "../storage/audit";
 import { undoChange } from "../storage/audit";
 import "../components/planning-v2.css";
+import { ListRow, StatusChip } from "../components/UIPrimitives";
 const statuses: [SubscriptionStatus, string][] = [
   ["review", "Review"],
   ["keep", "Keep"],
@@ -102,10 +103,12 @@ function SubscriptionCard({
           <h2>
             {displayMerchant({ merchant: s.merchant, description: s.merchant })}
           </h2>
-          <span className="small-chip">
-            {statuses.find(([value]) => value === s.status)?.[1] ??
-              "Needs review"}
-          </span>
+          <StatusChip tone={s.needsReview ? "warning" : "neutral"}>
+            {s.status === "review"
+              ? "Needs review"
+              : (statuses.find(([value]) => value === s.status)?.[1] ??
+                "Needs review")}
+          </StatusChip>
           <p className="muted">
             {account} · Last charged {formatUkDate(s.charges.at(-1)!.date)}
           </p>
@@ -221,10 +224,21 @@ function SubscriptionCard({
               to={`/transactions/${t.id}`}
               key={t.id}
             >
-              <span>
-                {formatUkDate(t.date)} · {t.description}
-              </span>
-              <strong>{money(t.amount, t.currency)}</strong>
+              <ListRow
+                title={displayMerchant(t)}
+                meta={
+                  <>
+                    <time dateTime={t.date}>{formatUkDate(t.date)}</time>
+                    {s.increase > 0 && t.id === s.charges.at(-1)?.id && (
+                      <>
+                        {" · "}
+                        <StatusChip tone="warning">Price changed</StatusChip>
+                      </>
+                    )}
+                  </>
+                }
+                amount={<strong>{money(t.amount, t.currency)}</strong>}
+              />
             </Link>
           ))}
       </details>
@@ -301,10 +315,7 @@ export default function Subscriptions({ currency }: { currency: string }) {
   return (
     <>
       <div className="page-heading">
-        <div>
-          <p className="eyebrow">NOTIFICATION CENTRE</p>
-          <h1>Subscriptions and bills</h1>
-        </div>
+        <h1>Subscriptions</h1>
       </div>
       <p className="muted">
         Find charges you may have forgotten. Based on up to three years of
