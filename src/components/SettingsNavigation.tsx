@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
+import { SectionCard } from "./UIPrimitives";
 
 export const settingsTitles: Record<string, string> = {
   appearance: "Appearance",
@@ -25,17 +26,19 @@ export const settingsTitles: Record<string, string> = {
   danger: "Danger zone",
 };
 const groups = [
-  ["Preferences", ["appearance", "currency", "period"]],
+  ["Appearance", ["appearance"]],
+  ["Money", ["currency", "period", "reports"]],
+  ["Transfers", ["transfers"]],
   [
-    "Your finances",
-    ["accounts", "categories", "rules", "transfers", "reminders", "reports"],
+    "Categorisation",
+    ["categories", "rules", "imports", "statements", "diagnostics"],
   ],
-  [
-    "Privacy and data",
-    ["security", "backup", "storage", "export", "changes", "demo"],
-  ],
-  ["Import tools", ["statements", "imports", "diagnostics"]],
-  ["About", ["about", "danger"]],
+  ["Reminders", ["reminders"]],
+  ["Security", ["security", "storage"]],
+  ["Backup and restore", ["backup", "export", "changes"]],
+  ["About and feedback", ["about"]],
+  ["Demo data", ["demo"]],
+  ["Danger zone", ["danger"]],
 ] as const;
 export const settingsSectionsForHash: Record<string, string> = {
   backup: "backup",
@@ -65,8 +68,7 @@ export function SettingsNavigation() {
   return (
     <nav className="settings-menu" aria-label="Settings sections">
       {groups.map(([name, sections]) => (
-        <section className="card" key={name}>
-          <h2>{name}</h2>
+        <SectionCard title={name} key={name}>
           <ul>
             {sections.map((section) => (
               <li key={section}>
@@ -74,19 +76,15 @@ export function SettingsNavigation() {
                   className={
                     section === "danger" ? "settings-danger-link" : undefined
                   }
-                  to={
-                    section === "accounts"
-                      ? "/accounts"
-                      : `/settings?section=${section}`
-                  }
+                  to={`/settings?section=${section}`}
                 >
                   <span>{settingsTitles[section]}</span>
-                  <ChevronRight size={18} aria-hidden="true" />
+                  <ChevronRight size={16} aria-hidden="true" />
                 </Link>
               </li>
             ))}
           </ul>
-        </section>
+        </SectionCard>
       ))}
     </nav>
   );

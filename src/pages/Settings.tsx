@@ -25,6 +25,7 @@ import { Reminders } from "../components/Reminders";
 import { useGlobalCurrency } from "../components/CurrencySetting";
 import { ThemeSetting } from "../components/Theme";
 import { PersonalRules } from "../components/PersonalRules";
+import { SwitchRow } from "../components/UIPrimitives";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import {
@@ -60,7 +61,7 @@ import {
 import { parseMoney, decimalMoney, money } from "../domain/money";
 import { matches } from "../categorization/engine";
 import { saveRule, deleteRule } from "../storage/rules";
-import { formatUkDate } from "../domain/dates";
+import { formatDateRange } from "../domain/dates";
 import { backupErrorMessage } from "../storage/backup-error";
 import {
   BackupFileTooLargeError,
@@ -214,25 +215,26 @@ export default function Settings({
       {activeSection === "reports" && (
         <section className="card">
           <h2>Reports</h2>
-          <label className="check">
-            <input
-              type="checkbox"
-              checked={data?.taxEnabled ?? false}
-              onChange={(e) => {
-                const enabled = e.target.checked;
-                void auditedMutation(
-                  "Change property tax reports",
-                  ["settings"],
-                  () =>
-                    db.settings.put({
-                      key: "property-tax-report",
-                      value: String(enabled),
-                    }),
-                );
-              }}
-            />
-            Enable property tax summary
-          </label>
+          <SwitchRow
+            label="Enable property tax summary"
+            checked={data?.taxEnabled ?? false}
+            disabled={busy}
+            onChange={(enabled) => {
+              void run(
+                () =>
+                  auditedMutation(
+                    "Change property tax reports",
+                    ["settings"],
+                    () =>
+                      db.settings.put({
+                        key: "property-tax-report",
+                        value: String(enabled),
+                      }),
+                  ),
+                "Report preference saved.",
+              );
+            }}
+          />
           <p className="muted">
             Adds rental income and selected allowable expenses to Analyse
             reports.
@@ -341,8 +343,10 @@ export default function Settings({
                         <div>
                           <dt>Statement dates</dt>
                           <dd>
-                            {formatUkDate(s.statementPeriodStart)} –{" "}
-                            {formatUkDate(s.statementPeriodEnd)}
+                            {formatDateRange(
+                              s.statementPeriodStart,
+                              s.statementPeriodEnd,
+                            )}
                           </dd>
                         </div>
                         <div>
@@ -425,7 +429,7 @@ export default function Settings({
         <section className="card danger-zone">
           <h2>Danger zone</h2>
           <button disabled={busy} onClick={exportBackup}>
-            <Download size={17} />
+            <Download size={20} aria-hidden="true" />
             Back up before deleting
           </button>
           <div className="danger-section">
@@ -449,7 +453,7 @@ export default function Settings({
                 void run(async () => {
                   await deleteImportedRecords();
                   setDeleteImportsConfirmed(false);
-                }, "Imported records deleted. Accounts and saved categorization rules kept.")
+                }, "Imported records deleted. Accounts and saved categorisation rules kept.")
               }
             >
               Delete imported records
