@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { GenericParseResult } from "../import/generic/types";
 import {
   displayMoney,
@@ -9,6 +9,8 @@ import {
 } from "./generic-review-view";
 import { GenericReviewRow } from "./GenericReviewRow";
 import { GenericColumnMapping } from "./GenericColumnMapping";
+import { Sheet } from "./Sheet";
+import { CheckboxRow, WarningBox } from "./UIPrimitives";
 import "./GenericImportReview.css";
 export type { GenericImportReviewProps } from "./generic-review-view";
 function UnverifiedImport({
@@ -16,73 +18,58 @@ function UnverifiedImport({
   busy,
   onConfirm,
   onCancel,
-  returnFocus,
 }: {
   result: GenericParseResult;
   busy: boolean;
   onConfirm: () => void;
   onCancel: () => void;
-  returnFocus?: HTMLElement | null;
 }) {
-  const ref = useRef<HTMLDialogElement>(null);
-  const heading = useId();
   const [accepted, setAccepted] = useState(false);
-  useEffect(() => {
-    const prior =
-      returnFocus ??
-      (document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : undefined);
-    ref.current?.showModal();
-    return () => {
-      ref.current?.close();
-      if (prior?.isConnected) prior.focus();
-    };
-  }, [returnFocus]);
   return (
-    <dialog
-      ref={ref}
-      className="generic-unverified-dialog"
-      aria-labelledby={heading}
-      onCancel={(event) => {
-        event.preventDefault();
-        onCancel();
-      }}
+    <Sheet
+      title="Import an unverified statement?"
+      onClose={onCancel}
+      footer={
+        <>
+          <button type="button" disabled={busy} onClick={onCancel} autoFocus>
+            Continue reviewing
+          </button>
+          <button
+            type="button"
+            disabled={busy || !accepted}
+            onClick={onConfirm}
+          >
+            Import unverified statement
+          </button>
+        </>
+      }
     >
-      <h3 id={heading}>Import an unverified statement?</h3>
-      <p>
-        Some rows or pages have not been verified against the statement. This
-        account and statement will be marked <strong>Unverified</strong>.
-      </p>
-      {!!result.checks.unreadPages.length && (
+      <WarningBox
+        title="Some statement figures are unverified"
+        severity="error"
+      >
         <p>
-          Pages {result.checks.unreadPages.join(", ")} have not been read. Their
-          transactions will not be imported.
+          Some rows or pages have not been verified against the statement. This
+          account and statement will be marked <strong>Unverified</strong>.
         </p>
-      )}
-      <p>
-        Only the selected, valid transactions will be added. Check the original
-        PDF before relying on these figures.
-      </p>
-      <label className="check">
-        <input
-          type="checkbox"
-          disabled={busy}
-          checked={accepted}
-          onChange={(event) => setAccepted(event.target.checked)}
-        />
-        I checked the original statement and accept importing these unverified
-        figures.
-      </label>
-      <div className="generic-action-row">
-        <button type="button" disabled={busy || !accepted} onClick={onConfirm}>
-          Import unverified statement
-        </button>
-        <button type="button" disabled={busy} onClick={onCancel} autoFocus>
-          Continue reviewing
-        </button>
-      </div>
-    </dialog>
+        {!!result.checks.unreadPages.length && (
+          <p>
+            Pages {result.checks.unreadPages.join(", ")} have not been read.
+            Their transactions will not be imported.
+          </p>
+        )}
+        <p>
+          Only the selected, valid transactions will be added. Check the
+          original PDF before relying on these figures.
+        </p>
+      </WarningBox>
+      <CheckboxRow
+        checked={accepted}
+        onChange={setAccepted}
+        disabled={busy}
+        label="I checked the original statement and accept importing these unverified figures."
+      />
+    </Sheet>
   );
 }
 
@@ -282,13 +269,15 @@ export function GenericImportReview({
               : "Map columns"}
         </button>
         {showMapping && (
-          <GenericColumnMapping
-            currency={currency}
-            result={result}
-            busy={busy}
-            onMapping={onMapping}
-            onSaveTemplate={onSaveTemplate}
-          />
+          <Sheet title="Map columns" onClose={() => setShowMapping(false)}>
+            <GenericColumnMapping
+              currency={currency}
+              result={result}
+              busy={busy}
+              onMapping={onMapping}
+              onSaveTemplate={onSaveTemplate}
+            />
+          </Sheet>
         )}
       </details>
       {needsOverride && (
@@ -307,7 +296,10 @@ export function GenericImportReview({
             type="button"
             disabled={busy || !canImportAnyway || hasInvalidRows}
             ref={overrideRef}
-            onClick={() => setShowOverride(true)}
+            onClick={() => {
+              overrideRef.current?.focus();
+              setShowOverride(true);
+            }}
           >
             Import anyway…
           </button>
@@ -317,7 +309,6 @@ export function GenericImportReview({
         <UnverifiedImport
           result={result}
           busy={busy}
-          returnFocus={overrideRef.current}
           onCancel={() => setShowOverride(false)}
           onConfirm={() => {
             setShowOverride(false);

@@ -210,6 +210,7 @@ describe("generic PDF evidence review", () => {
       screen.queryByText("Statement figures match exactly"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close Map columns" }));
     fireEvent.click(screen.getByRole("button", { name: "Import anyway…" }));
     const dialog = screen.getByRole("dialog");
     expect(
@@ -441,6 +442,7 @@ describe("generic PDF evidence review", () => {
     expect(
       screen.getByText(/Not imported: unread pages 2, 3/),
     ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Close Map columns" }));
     fireEvent.click(screen.getByRole("button", { name: "Import anyway…" }));
     const dialog = screen.getByRole("dialog");
     expect(

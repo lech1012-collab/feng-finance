@@ -39,10 +39,20 @@ export function Sheet({
   const titleId = useId();
   const close = useRef(onClose);
   close.current = onClose;
+  // React can focus an autoFocus child during commit, before this effect runs.
+  // Capture the opener during render so closing still returns to the actual trigger.
+  const opener = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
+  if (open && !wasOpen.current)
+    opener.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+  wasOpen.current = open;
   useEffect(() => {
     if (!open) return;
     const dialog = ref.current!;
-    const previous = document.activeElement as HTMLElement | null;
+    const previous = opener.current;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     if (dialog.showModal) dialog.showModal();
