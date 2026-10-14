@@ -256,6 +256,7 @@ export function CategoriesManager() {
               </button>
               {editing !== "new" && (
                 <button
+                  className={editing.archived ? undefined : "danger"}
                   disabled={busy}
                   type="button"
                   onClick={() => void archive(editing)}

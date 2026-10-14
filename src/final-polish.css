@@ -527,3 +527,42 @@ time {
     var(--line) 6px
   );
 }
+.app .month-figures,
+.app .position-metrics,
+.app .home-todo,
+.app .upcoming-row {
+  gap: 12px;
+}
+.app .month-figures > a,
+.app .position-metrics > a,
+.app .upcoming-row > span,
+.app .metric {
+  gap: 4px;
+}
+.app .metric-strip,
+.app .chart-legend {
+  gap: 16px;
+}
+.app .other-periods {
+  border-top: 0;
+}
+.ux-sheet .sheet-footer {
+  gap: 16px;
+}
+.app .object-menu > button:first-of-type {
+  margin-top: 16px;
+}
+.app main {
+  padding-bottom: max(32px, calc(var(--feng-toast-clearance, 0px) + 24px));
+}
+.ux-sheet .sheet-content {
+  padding-bottom: max(16px, calc(var(--feng-toast-clearance, 0px) + 16px));
+}
+@media (max-width: 899px) {
+  .app main {
+    padding-bottom: max(
+      calc(var(--mobile-nav-height, 78px) + 48px + env(safe-area-inset-bottom)),
+      calc(var(--feng-toast-clearance, 0px) + 24px)
+    );
+  }
+}

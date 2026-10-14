@@ -59,6 +59,29 @@ function ToastView({
     ".sheet-footer, .category-board-footer",
   );
   const [bottom, setBottom] = useState<number>();
+  const toastRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const node = toastRef.current;
+    if (!node) return;
+    const root = document.documentElement;
+    const previous = root.style.getPropertyValue("--feng-toast-clearance");
+    const measure = () =>
+      root.style.setProperty(
+        "--feng-toast-clearance",
+        `${node.getBoundingClientRect().height + (bottom ?? 12)}px`,
+      );
+    measure();
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : undefined;
+    observer?.observe(node);
+    return () => {
+      observer?.disconnect();
+      if (previous) root.style.setProperty("--feng-toast-clearance", previous);
+      else root.style.removeProperty("--feng-toast-clearance");
+    };
+  }, [bottom, currentDialog]);
   useEffect(() => {
     const obstacles = currentDialog
       ? Array.from(
@@ -104,6 +127,7 @@ function ToastView({
   }, [currentDialog, footer]);
   const body = (
     <div
+      ref={toastRef}
       className={`ux-toast${currentDialog ? " ux-toast--sheet" : ""}`}
       role="status"
       aria-atomic="true"

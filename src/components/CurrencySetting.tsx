@@ -123,7 +123,7 @@ export function CurrencySetting() {
       <SwitchRow
         label="Download daily rates (ECB)"
         checked={requestedEnabled ?? data?.enabled ?? true}
-        disabled={busy}
+        disabled={busy || !data}
         onChange={(enabled) => {
           setRequestedEnabled(enabled);
           void run(async () => {
