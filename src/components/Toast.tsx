@@ -58,18 +58,56 @@ function ToastView({
   const footer = currentDialog?.querySelector<HTMLElement>(
     ".sheet-footer, .category-board-footer",
   );
+  const [bottom, setBottom] = useState<number>();
+  useEffect(() => {
+    const obstacles = currentDialog
+      ? Array.from(
+          currentDialog.querySelectorAll<HTMLElement>(
+            ".sheet-footer, .category-board-footer",
+          ),
+        )
+      : Array.from(
+          document.querySelectorAll<HTMLElement>(
+            ".mobile-navigation, .import-outcome-footer, .sticky-actions",
+          ),
+        );
+    const measure = () => {
+      const viewportHeight = window.innerHeight;
+      const next = currentDialog
+        ? (footer?.getBoundingClientRect().height ?? 0) + 12
+        : obstacles.reduce((inset, element) => {
+            const rect = element.getBoundingClientRect();
+            const style = window.getComputedStyle(element);
+            return style.display !== "none" &&
+              style.visibility !== "hidden" &&
+              style.position === "fixed" &&
+              rect.width > 0 &&
+              rect.height > 0
+              ? Math.max(inset, viewportHeight - rect.top + 12)
+              : inset;
+          }, 12);
+      setBottom((previous) => (previous === next ? previous : next));
+    };
+    measure();
+    const observer =
+      typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(measure)
+        : undefined;
+    obstacles.forEach((element) => observer?.observe(element));
+    window.addEventListener("resize", measure);
+    window.visualViewport?.addEventListener("resize", measure);
+    return () => {
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+      window.visualViewport?.removeEventListener("resize", measure);
+    };
+  }, [currentDialog, footer]);
   const body = (
     <div
       className={`ux-toast${currentDialog ? " ux-toast--sheet" : ""}`}
       role="status"
       aria-atomic="true"
-      style={
-        currentDialog
-          ? {
-              bottom: `${(footer?.getBoundingClientRect().height ?? 0) + 12}px`,
-            }
-          : undefined
-      }
+      style={bottom == null ? undefined : { bottom: `${bottom}px` }}
       onMouseEnter={() => setPaused(true)}
       onMouseLeave={() => setPaused(false)}
       onFocus={() => setPaused(true)}

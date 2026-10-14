@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { StickyFooter } from "./UIPrimitives";
 import "./ux-controls.css";
 const FooterContext = createContext<HTMLElement | null>(null);
 export function SheetFooter({ children }: { children: ReactNode }) {
@@ -15,7 +16,7 @@ export function SheetFooter({ children }: { children: ReactNode }) {
   return host ? (
     createPortal(children, host)
   ) : (
-    <div className="sticky-actions">{children}</div>
+    <StickyFooter className="sticky-actions">{children}</StickyFooter>
   );
 }
 

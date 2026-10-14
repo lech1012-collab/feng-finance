@@ -2,6 +2,7 @@ import { useSwipe } from "./useSwipe";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { monthLabel, monthOffset } from "../domain/dates";
 import { money } from "../domain/money";
+import { EmptyState, SegmentedControl } from "./UIPrimitives";
 export function RangeControl({
   value,
   onChange,
@@ -12,22 +13,17 @@ export function RangeControl({
   label?: string;
 }) {
   return (
-    <div
-      className="segmented-control range-control"
-      role="group"
-      aria-label={label}
-    >
-      {[1, 3, 6, 12].map((n) => (
-        <button
-          key={n}
-          aria-pressed={String(value) === String(n)}
-          aria-label={`${n} month${n === 1 ? "" : "s"}`}
-          onClick={() => onChange(n)}
-        >
-          <span>{n}M</span>
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      className="range-control"
+      label={label}
+      value={Number(value)}
+      onChange={onChange}
+      options={[1, 3, 6, 12].map((n) => ({
+        value: n,
+        label: `${n}M`,
+        ariaLabel: `${n} month${n === 1 ? "" : "s"}`,
+      }))}
+    />
   );
 }
 export function MonthPicker({
@@ -94,12 +90,7 @@ export function Empty({
   title: string;
   children?: React.ReactNode;
 }) {
-  return (
-    <div className="empty">
-      <h2>{title}</h2>
-      {children}
-    </div>
-  );
+  return <EmptyState title={title}>{children}</EmptyState>;
 }
 export function Metric({
   label,
