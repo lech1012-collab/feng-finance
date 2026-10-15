@@ -623,11 +623,8 @@ export function MonthlyBudgetsPanel({
     <section className="card">
       <div className="section-heading">
         <h2>Monthly budgets</h2>
-        <button onClick={() => setEditingBudget(true)}>Set budget</button>
       </div>
       <p className="muted">
-        {reportingPeriodLabel(month, data.settings, data.transactions)}. Budget
-        plus carried amount, minus spending, equals what is left.{" "}
         {coverage.status !== "Complete"
           ? "Recorded spending is partial until all accounts are imported and verified."
           : ""}
@@ -754,6 +751,9 @@ export function MonthlyBudgetsPanel({
             <article className="budget-card" key={b.id}>
               <div className="section-heading">
                 <button
+                  className="budget-category-name"
+                  title="Edit budget"
+                  aria-haspopup="dialog"
                   onClick={() => {
                     setCategory(b.categoryId);
                     setAmount(decimalMoney(b.amountMinor, currency));
@@ -761,6 +761,15 @@ export function MonthlyBudgetsPanel({
                     setEditingBudget(true);
                   }}
                 >
+                  <span
+                    className="category-colour-dot"
+                    aria-hidden="true"
+                    style={{
+                      background:
+                        data.categories.find((c) => c.id === b.categoryId)
+                          ?.color ?? "var(--muted)",
+                    }}
+                  />
                   {data.categories.find((c) => c.id === b.categoryId)?.name ??
                     "Category"}
                 </button>
@@ -789,6 +798,17 @@ export function MonthlyBudgetsPanel({
           );
         })}
       </div>
+      {!budgets.length && <p>No budgets yet.</p>}
+      <div className="budget-footer-actions">
+        <button onClick={() => setEditingBudget(true)}>Set budget</button>
+      </div>
+      <details>
+        <summary>How budgets work</summary>
+        <p>
+          {reportingPeriodLabel(month, data.settings, data.transactions)}.
+          Budget plus carried amount, minus spending, equals what is left.
+        </p>
+      </details>
     </section>
   );
 }

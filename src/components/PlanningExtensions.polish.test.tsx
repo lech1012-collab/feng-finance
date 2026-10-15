@@ -9,7 +9,12 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { db, initializeDatabase } from "../storage/database";
 import { accounts, transaction } from "../tests/helpers";
-import { CalendarPanel, PotsPanel, ScenarioPanel } from "./PlanningExtensions";
+import {
+  CalendarPanel,
+  MonthlyBudgetsPanel,
+  PotsPanel,
+  ScenarioPanel,
+} from "./PlanningExtensions";
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -99,6 +104,41 @@ it("uses a status chip for a pot and retains its confirmed contribution and date
   );
   expect(container.querySelector(".ui-status-chip")).not.toBeNull();
   expect((await db.pots.get(pot.id))?.contributions).toEqual(pot.contributions);
+});
+it("shows the past budget result before setup actions and edits the category object in a sheet", async () => {
+  const budget = {
+    id: "past-budget",
+    categoryId: "groceries",
+    month: "2026-09",
+    currency: "GBP",
+    amountMinor: 16000,
+    rollover: "none" as const,
+  };
+  await db.budgets.put(budget);
+  await db.transactions.put(
+    transaction({
+      amount: -10000,
+      categoryId: "groceries",
+      date: "2026-09-04",
+    }),
+  );
+  render(
+    <MemoryRouter>
+      <MonthlyBudgetsPanel currency="GBP" month="2026-09" />
+    </MemoryRouter>,
+  );
+  const result = await screen.findByText("£60.00 unspent");
+  const setup = screen.getByRole("button", { name: "Set budget" });
+  expect(
+    result.compareDocumentPosition(setup) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(screen.getByText("Ended 30 Sep")).toBeVisible();
+  expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  const category = screen.getByRole("button", { name: "Groceries" });
+  expect(category.querySelector(".category-colour-dot")).not.toBeNull();
+  fireEvent.click(category);
+  expect(screen.getByRole("dialog", { name: "Monthly budget" })).toBeVisible();
+  expect(await db.budgets.get(budget.id)).toEqual(budget);
 });
 
 it("keeps recurring direction values intact when choosing them through the segmented control", async () => {

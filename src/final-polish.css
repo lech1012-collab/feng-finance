@@ -640,6 +640,38 @@ time {
   flex: 1 1 auto;
   min-width: max-content;
 }
+.app .segmented-control.ui-segmented-control.range-control {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(max-content, 1fr);
+  width: min(100%, 20rem);
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  flex: 1 1 100%;
+}
+.app .range-control > button {
+  min-width: 44px;
+}
+.app .budget-category-name {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+.app .budget-category-name .category-colour-dot {
+  flex: none;
+  margin-inline-end: 0;
+}
+.app .budget-footer-actions {
+  margin-top: 16px;
+}
+.app .budget-footer-actions + details {
+  margin-top: 8px;
+  border-block: 0;
+}
 .app .transaction-row {
   gap: 12px;
   padding-block: 16px;
