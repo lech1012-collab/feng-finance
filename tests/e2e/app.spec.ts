@@ -2084,7 +2084,12 @@ test("subscription notification centre supports review, cancellation plans and p
     netflix.getByRole("button", { name: "I cancelled", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await netflix.getByText(/View .*charges? and source evidence/).click();
-  await expect(netflix.locator(".subscription-evidence").first()).toBeVisible();
+  const evidence = netflix.getByRole("group", {
+    name: "Charge evidence",
+    exact: true,
+  });
+  await expect(evidence).toBeVisible();
+  await expect(evidence.getByRole("link").first()).toBeVisible();
   await netflix.getByRole("button", { name: "Review", exact: true }).click();
   await expect(
     netflix.getByRole("button", { name: "Review", exact: true }),

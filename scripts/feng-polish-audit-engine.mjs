@@ -100,6 +100,10 @@ export const AUDIT_RULES = {
     "medium",
     "Native file controls are visually hidden behind named controls.",
   ],
+  "hidden-content-leaked": [
+    "medium",
+    "Author styles must not reveal content marked hidden.",
+  ],
   "custom-select-native-arrow": [
     "low",
     "Custom select must not display a duplicate native arrow.",
@@ -285,6 +289,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     "control-overlap": ["medium"],
     "skip-link-leaked": ["medium"],
     "file-input-leaked": ["medium"],
+    "hidden-content-leaked": ["medium"],
     "custom-select-native-arrow": ["low"],
     "checkbox-unlabelled": ["high"],
     "switch-geometry": ["medium"],
@@ -750,6 +755,24 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       });
   }
 
+  for (const element of all.filter(
+    (node) =>
+      node.hasAttribute("hidden") &&
+      node.getAttribute("hidden") !== "until-found",
+  )) {
+    const r = element.getBoundingClientRect();
+    if (r.width > 0 && r.height > 0 && cs(element).display !== "none")
+      add(
+        "hidden-content-leaked",
+        element,
+        {
+          display: cs(element).display,
+          width: round(r.width),
+          height: round(r.height),
+        },
+        "hidden content has no rendered box",
+      );
+  }
   for (const toast of all.filter(
     (element) => element.matches(".ux-toast") && visible(element),
   )) {
@@ -964,7 +987,9 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       }
       if (
         a.e.parentElement !== b.e.parentElement &&
-        a.hit.parentElement !== b.hit.parentElement
+        a.hit.parentElement !== b.hit.parentElement &&
+        a.e.parentElement?.parentElement !== b.e.parentElement &&
+        b.e.parentElement?.parentElement !== a.e.parentElement
       )
         continue;
       const ar = a.rect,

@@ -994,19 +994,24 @@ time {
 }
 @container (max-width: 18rem) {
   .app .account-overview-row {
-    grid-template-columns: minmax(0, 1fr);
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16px;
     gap: 12px;
   }
   .app .account-overview-row > span:first-child {
-    flex: 1 0 100%;
+    grid-column: 1 / -1;
     width: 100%;
   }
   .app .account-overview-row > .account-balance {
+    grid-column: 1;
     width: 100%;
     max-width: 100%;
     justify-self: end;
     margin-left: auto;
+  }
+  .app .account-overview-row > svg {
+    grid-column: 2;
+    justify-self: end;
   }
   .app .totals > div,
   .app .subscription-evidence {
@@ -1022,6 +1027,20 @@ time {
   .app .totals > div > dd,
   .app .subscription-evidence > strong {
     margin-left: auto;
+  }
+}
+.analysis-shortcuts {
+  display: grid;
+  gap: 8px;
+  margin-block: 16px;
+}
+.analysis-shortcuts > .button {
+  justify-self: start;
+}
+@media (max-width: 359px) {
+  .ui-list-row:has(> .ui-list-row-amount > svg) > .ui-list-row-text {
+    flex: 1 1 0;
+    min-width: 0;
   }
 }
 

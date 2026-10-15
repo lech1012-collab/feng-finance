@@ -182,11 +182,9 @@ export default function CategoryPage({
       </Link>
       <div className="page-heading">
         <div>
-          <p className="eyebrow">CATEGORY OVERVIEW</p>
           <h1>{name}</h1>
         </div>
       </div>
-      <CategoryAnalysisPicker month={selected} category={id} />
       <p className="muted">
         {reportingPeriodLabel(selected, data.settings, source!.transactions)}
       </p>
@@ -198,17 +196,6 @@ export default function CategoryPage({
           label="Trend and comparison history"
         />
       </div>
-      <p className="coverage-note">
-        <span className="date-value">{monthLabel(selected)}</span> ·{" "}
-        {coverage.status}. Trend:{" "}
-        <span className="date-value">
-          {formatDateRange(
-            `${monthOffset(selected, 1 - window)}-01`,
-            shiftDate(monthBounds(selected)[1], -1),
-          )}
-        </span>
-        .
-      </p>
       <section className="card category-kpis">
         {coverage.hasData &&
         (!stats.incomeCategory || coverage.hasIncomeSource) ? (
@@ -282,6 +269,17 @@ export default function CategoryPage({
           </small>
         </div>
       </section>
+      <p className="coverage-note">
+        <span className="date-value">{monthLabel(selected)}</span> ·{" "}
+        {coverage.status}. Trend:{" "}
+        <span className="date-value">
+          {formatDateRange(
+            `${monthOffset(selected, 1 - window)}-01`,
+            shiftDate(monthBounds(selected)[1], -1),
+          )}
+        </span>
+        .
+      </p>
       {coverage.missingRates > 0 && (
         <p className="notice warning" role="status">
           Some account currencies cannot be converted. Category totals are
@@ -309,6 +307,7 @@ export default function CategoryPage({
           average.
         </p>
       )}
+      <CategoryAnalysisPicker month={selected} category={id} />
       {isProperty && (
         <section className="card">
           <h2>Property cash flow</h2>

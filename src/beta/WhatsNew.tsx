@@ -15,6 +15,8 @@ export function WhatsNew({
   useEffect(() => {
     const current = dialog.current;
     current?.showModal();
+    current?.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+    if (current) current.scrollTop = 0;
     return () => current?.close();
   }, []);
   const close = async () => {
@@ -42,7 +44,9 @@ export function WhatsNew({
       }}
     >
       <div className="beta-notice-content">
-        <h2 id="whats-new-heading">What's new in Feng</h2>
+        <h2 id="whats-new-heading" tabIndex={-1}>
+          What's new in Feng
+        </h2>
         <p>
           Version {release.version} ·{" "}
           <time dateTime={release.date} className="date-value">

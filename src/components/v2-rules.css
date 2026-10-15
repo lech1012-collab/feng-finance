@@ -132,6 +132,7 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  margin-bottom: 8px;
 }
 .v2-report-table {
   width: 100%;

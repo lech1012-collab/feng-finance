@@ -436,7 +436,7 @@ export function PositionSummary({
             </p>
           )}
           <Link className="accounts-overview-link" to="/accounts">
-            {items.length} accounts ›
+            {items.length} {items.length === 1 ? "account" : "accounts"} ›
           </Link>
         </section>
       )}

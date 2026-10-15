@@ -357,14 +357,6 @@ export default function Analysis({
           <h1>{property ? "Property" : "Analyse"}</h1>
         </div>
       </div>
-      {!property && (
-        <>
-          <CategoryAnalysisPicker month={month} />
-          <Link to={`/review?month=${month}`} className="button">
-            Review month
-          </Link>
-        </>
-      )}
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
         <PeriodControl value={period} onChange={setPeriod} />
@@ -472,6 +464,14 @@ export default function Analysis({
           in these recorded totals. Balances or extracted rows could not be
           confirmed; verified comparisons are withheld.
         </p>
+      )}
+      {!property && (
+        <div className="analysis-shortcuts">
+          <CategoryAnalysisPicker month={month} />
+          <Link to={`/review?month=${month}`} className="button">
+            Review month
+          </Link>
+        </div>
       )}
       {!property && (
         <DeeperInsights

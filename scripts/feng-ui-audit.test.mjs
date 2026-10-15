@@ -214,6 +214,16 @@ test("Controls expose unsafe destructive spacing and below-scale gaps", async ()
   assert.ok(has(r, "destructive-gap"));
   assert.ok(has(r, "spacing-token"));
 });
+test("A nested header action must leave space before the following input", async () => {
+  const body =
+    '<section><div class="header"><h2>Search</h2><button>Hide conditions</button></div><input aria-label="Query"></section>';
+  const css =
+    ".header{display:flex;flex-wrap:wrap;width:252px}.header h2{width:100%;margin:0}input{display:block;width:252px;height:48px}";
+  const crowded = await inspect(body, css);
+  assert.ok(has(crowded, "target-gap"));
+  const separated = await inspect(body, css + ".header{margin-bottom:8px}");
+  assert.ok(!has(separated, "target-gap"));
+});
 test("Native file input, visible skip link and unlabelled checkbox are detected", async () => {
   const r = await inspect(
     '<a class="skip-link" href="#main">Skip to content</a><input type="file"><input type="checkbox">',
@@ -296,6 +306,18 @@ test("Border-only vertical separators run the full neighbouring row height", asy
   );
   assert.ok(has(r, "vertical-line-short"));
   assert.ok(!has(r, "divider-short"));
+});
+test("Author button styles cannot silently reveal a hidden condition-removal control", async () => {
+  const broken = await inspect(
+    "<button hidden>Remove condition</button>",
+    "button{display:inline-flex}",
+  );
+  assert.ok(has(broken, "hidden-content-leaked"));
+  const fixed = await inspect(
+    "<button hidden>Remove condition</button>",
+    "button{display:inline-flex}[hidden]{display:none!important}",
+  );
+  assert.ok(!has(fixed, "hidden-content-leaked"));
 });
 test("A toast inside the same modal must clear its actual sorting footer", async () => {
   for (const bottom of [12, 64, 86]) {
