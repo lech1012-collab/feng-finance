@@ -1,7 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
-import { collectGeometry, auditState } from "./feng-polish-audit-engine.mjs";
+import {
+  collectGeometry,
+  auditState,
+  renderAuditReport,
+} from "./feng-polish-audit-engine.mjs";
+import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 const require = createRequire(import.meta.url);
 const { chromium } = require("@playwright/test");
 let browser;
@@ -29,6 +36,45 @@ async function inspect(body, css = "", width = 390) {
   return result;
 }
 const has = (r, rule) => r.issues.some((i) => i.rule === rule);
+test("Report opens one setup, links the retained raw measurements and fails missing after evidence", async () => {
+  const directory = await mkdtemp(join(tmpdir(), "feng-report-"));
+  const page = await browser.newPage();
+  try {
+    const output = join(directory, "report.html");
+    await renderAuditReport({
+      before: [
+        {
+          id: "home",
+          setup: "iphone390-dark",
+          title: "Home <source>",
+          audit: { measurements: { retainedInJson: true } },
+        },
+        { id: "home", setup: "desktop1440-dark" },
+      ],
+      output,
+      metadata: { expectedStatesPerSetup: 1 },
+    });
+    const html = await readFile(output, "utf8");
+    await page.setContent(html);
+    assert.equal(await page.locator("#setup").inputValue(), "iphone390-dark");
+    assert.equal(await page.locator(".state").count(), 1);
+    assert.equal(
+      await page.locator(".state h2").textContent(),
+      "Home <source>",
+    );
+    assert.equal(
+      await page
+        .getByRole("link", { name: /All raw text, target/ })
+        .getAttribute("href"),
+      "before/iphone390-dark/home.json",
+    );
+    assert.equal(await page.locator("#summary .status-fail").count(), 2);
+    assert.ok(!html.includes('"retainedInJson":true'));
+  } finally {
+    await page.close();
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 test("Range detects an actual amount breaking mid-number", async () => {
   const r = await inspect(
     '<strong class="amount">−£1,234.56</strong><span class="broken">Nationwide</span>',
