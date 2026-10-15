@@ -13,6 +13,13 @@ export async function inspectCaptureEvidence(rows, directory, phase) {
   const missingAccessibilityStates = rows
     .filter((row) => !(row.audit?.axe?.passes > 0))
     .map(identify);
+  const unreadyCaptureStates = rows
+    .filter(
+      (row) =>
+        row.metrics?.sceneReady === false ||
+        (phase === "after" && row.metrics?.sceneReady !== true),
+    )
+    .map(identify);
   const mismatchedPhaseStates = rows
     .filter((row) => row.phase !== phase)
     .map(identify);
@@ -40,12 +47,14 @@ export async function inspectCaptureEvidence(rows, directory, phase) {
     unidentifiedBuildStates,
     singleImmutableBuild,
     missingAccessibilityStates,
+    unreadyCaptureStates,
     mismatchedPhaseStates,
     missingScreenshots,
     completeEvidence:
       rows.length > 0 &&
       singleImmutableBuild &&
       !missingAccessibilityStates.length &&
+      !unreadyCaptureStates.length &&
       !mismatchedPhaseStates.length &&
       !missingScreenshots.length,
   };

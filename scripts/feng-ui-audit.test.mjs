@@ -9,6 +9,7 @@ import {
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { waitForReadyScene } from "./feng-polish-scene.mjs";
 const require = createRequire(import.meta.url);
 const { chromium } = require("@playwright/test");
 let browser;
@@ -36,6 +37,41 @@ async function inspect(body, css = "", width = 390) {
   return result;
 }
 const has = (r, rule) => r.issues.some((i) => i.rule === rule);
+test("Scene readiness waits through a transient IndexedDB-style loading frame", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.setContent(
+      '<main><h1>Home</h1><p>Old figures</p></main><script>setTimeout(()=>document.querySelector("main").innerHTML="<p role=status>Loading your finances…</p>",40);setTimeout(()=>document.querySelector("main").innerHTML="<h1>Home</h1><p>£123.45</p>",140)</script>',
+    );
+    const scene = await waitForReadyScene(page);
+    assert.ok(scene.includes("£123.45"));
+    assert.ok(!scene.includes("Loading your finances"));
+  } finally {
+    await page.close();
+  }
+});
+test("A loading-only screen cannot become screenshot evidence", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.setContent(
+      '<main><p role="status">Loading your finances…</p></main>',
+    );
+    await assert.rejects(waitForReadyScene(page, 300), /did not become ready/);
+  } finally {
+    await page.close();
+  }
+});
+test("A visible first-launch modal is ready while the private page is inert", async () => {
+  const page = await browser.newPage();
+  try {
+    await page.setContent(
+      '<main inert><p role="status">Loading your finances…</p></main><dialog open><h2>Welcome to Feng</h2><p>On your device</p></dialog>',
+    );
+    assert.ok((await waitForReadyScene(page)).includes("Welcome to Feng"));
+  } finally {
+    await page.close();
+  }
+});
 test("Report opens one setup, links the retained raw measurements and fails missing after evidence", async () => {
   const directory = await mkdtemp(join(tmpdir(), "feng-report-"));
   const page = await browser.newPage();

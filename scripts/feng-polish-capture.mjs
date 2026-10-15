@@ -3,6 +3,7 @@ import { createRequire } from "node:module";
 import { mkdirSync, writeFileSync, readFileSync, renameSync } from "node:fs";
 import { pathToFileURL, fileURLToPath } from "node:url";
 import { resolve } from "node:path";
+import { sceneFingerprint, waitForReadyScene } from "./feng-polish-scene.mjs";
 const require = createRequire(new URL("../package.json", import.meta.url));
 const {
   chromium,
@@ -309,17 +310,25 @@ async function snap(page, id, title, { focus, full = true, scroll = 0 } = {}) {
       document.activeElement.blur(),
   );
   await page.evaluate(() => document.fonts.ready);
-  await page.waitForTimeout(130);
   const dir = OUTPUT + "/" + page.setup.id;
   mkdirSync(dir, { recursive: true });
   const filename = id + ".png";
-  await page.screenshot({ path: dir + "/" + filename, animations: "disabled" });
-  if (full)
+  let ready = false;
+  for (let attempt = 0; attempt < 3 && !ready; attempt++) {
+    const before = await waitForReadyScene(page);
     await page.screenshot({
-      path: dir + "/" + id + "-full.png",
-      fullPage: true,
+      path: dir + "/" + filename,
       animations: "disabled",
     });
+    if (full)
+      await page.screenshot({
+        path: dir + "/" + id + "-full.png",
+        fullPage: true,
+        animations: "disabled",
+      });
+    ready = before === (await sceneFingerprint(page));
+  }
+  if (!ready) throw new Error("UI changed during screenshot capture: " + id);
   const attempted = await page.evaluate(
     () => window.__fengAuditExternalFetches ?? [],
   );
@@ -335,6 +344,7 @@ async function snap(page, id, title, { focus, full = true, scroll = 0 } = {}) {
     await page.evaluate(() => (window.__fengAuditExternalFetches = []));
   }
   const metrics = await page.evaluate(() => ({
+    sceneReady: true,
     entryScript: document
       .querySelector('script[type="module"][src]')
       ?.getAttribute("src"),
@@ -1015,8 +1025,32 @@ async function importStates(setup) {
   try {
     await go(page, "/import");
     const file = page.getByLabel("Select statements", { exact: true });
+    // Delay only local file reads in this isolated synthetic profile. This keeps
+    // the real processing screen observable without changing the PDF bytes or
+    // racing into Review while the accessibility audit is still measuring it.
+    await page.evaluate(() => {
+      const original = Blob.prototype.arrayBuffer;
+      let release;
+      const gate = new Promise((resolve) => {
+        release = resolve;
+      });
+      Blob.prototype.arrayBuffer = async function () {
+        await gate;
+        return original.call(this);
+      };
+      window.__fengAuditReleaseFileRead = () => {
+        Blob.prototype.arrayBuffer = original;
+        release();
+      };
+    });
     const choosing = file.setInputFiles(fixture("known-bank-barclays-current"));
+    await expect(
+      page
+        .getByRole("list", { name: "Import progress" })
+        .locator('[aria-current="step"]'),
+    ).toHaveText(/Check/);
     await snap(page, "import-check", "Processing one selected PDF");
+    await page.evaluate(() => window.__fengAuditReleaseFileRead());
     await choosing;
     await expect(page.locator(".import-statement-card")).toHaveCount(1, {
       timeout: 120000,

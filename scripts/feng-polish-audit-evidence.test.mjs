@@ -13,7 +13,7 @@ async function fixture(run) {
       setup: "iphone390-dark",
       id: "home-empty",
       phase: "after",
-      metrics: { entryScript: "/assets/index-same-build.js" },
+      metrics: { entryScript: "/assets/index-same-build.js", sceneReady: true },
       audit: { axe: { passes: 25 } },
       image: "screen.png",
       fullImage: "screen.png",
@@ -44,6 +44,16 @@ test("rejects mixed application builds even when all numeric issue counts are ze
       "after",
     );
     assert.equal(result.singleImmutableBuild, false);
+    assert.equal(result.completeEvidence, false);
+  }));
+test("rejects an after screenshot without a verified ready scene", async () =>
+  fixture(async (directory, row) => {
+    const result = await inspectCaptureEvidence(
+      [{ ...row, metrics: { entryScript: row.metrics.entryScript } }],
+      directory,
+      "after",
+    );
+    assert.equal(result.unreadyCaptureStates.length, 1);
     assert.equal(result.completeEvidence, false);
   }));
 test("rejects a legacy capture without an identified entry script", async () =>

@@ -29,6 +29,7 @@ jobs:
       - run: npm test
       - run: npm run build
       - run: npx playwright install --with-deps chromium webkit
+      - run: node --test scripts/feng-ui-audit.test.mjs scripts/feng-polish-audit-evidence.test.mjs
       - run: npm run test:e2e
       - run: npm audit --audit-level=moderate
       - uses: actions/upload-artifact@v6
