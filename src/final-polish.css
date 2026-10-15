@@ -162,8 +162,8 @@ time {
 }
 .app .month-figures .metric-unavailable,
 .app .position-metrics .metric-unavailable {
-  white-space: nowrap;
-  font-size: 1.25rem;
+  white-space: normal;
+  font-size: 1rem;
 }
 .app .account-overview-row,
 .app .settings-object-row {

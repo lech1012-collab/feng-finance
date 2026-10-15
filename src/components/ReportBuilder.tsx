@@ -396,7 +396,7 @@ export function ReportBuilder({
                 <Line
                   dataKey="value"
                   name={report.measure}
-                  stroke="#E7C46A"
+                  stroke="var(--chart-net)"
                   strokeWidth={2}
                 />
               </LineChart>
