@@ -85,7 +85,7 @@ it("does not ask again for an already identical key and ignores malformed or sta
   ).toHaveLength(2);
   expect(
     resolveRecurringSeries(
-      [{ ...savedBill, cadence: "annual" }],
+      [{ ...savedBill, accountId: "a2" }],
       [detectedBill],
       [decision("same")],
     ).series,
@@ -120,4 +120,63 @@ it("uses the confirmed alias consistently in calendar and forecast while preserv
       decision("same"),
     ]),
   ).toBe(false);
+});
+
+it("keeps an explicit identity when its saved due date, price or frequency changes", () => {
+  const revised = {
+    ...savedBill,
+    cadence: "annual" as const,
+    nextDue: "2027-01-04",
+    expectedAmountMinor: -1299,
+  };
+  expect(
+    resolveRecurringSeries([revised], [detectedBill], [decision("same")])
+      .series,
+  ).toEqual([revised]);
+});
+it("one imported payment fulfils only one explicitly separate bill, preferring its exact amount", async () => {
+  const other = {
+    ...detectedBill,
+    id: "confirmed-second",
+    matchKey: JSON.stringify(["a1", "GBP", "NETFLIX", false]),
+  };
+  const separation = {
+    ...decision("separate"),
+    key: await recurringDecisionKey(savedBill.id, other.matchKey),
+    value: JSON.stringify({
+      ...JSON.parse(decision("separate").value),
+      matchKey: other.matchKey,
+    }),
+  };
+  const row = transaction({
+    id: "one-paid",
+    date: "2026-10-04",
+    merchant: "NETFLIX",
+    amount: -1249,
+  });
+  const before = structuredClone(row);
+  const events = confirmedPaymentEvents(
+    [savedBill, other],
+    "2026-10-01",
+    "2026-10-31",
+    [row],
+    [separation],
+  );
+  expect(events).toHaveLength(1);
+  expect(events[0].amount).toBe(-1099);
+  expect(
+    recurringCalendar([savedBill, other], [row], "2026-10", "GBP", [
+      separation,
+    ]).filter((e) => e.expected),
+  ).toHaveLength(1);
+  expect(
+    confirmedPaymentEvents(
+      [savedBill, other],
+      "2026-10-01",
+      "2026-10-31",
+      [row, { ...row, id: "second-paid", amount: -1099 }],
+      [separation],
+    ),
+  ).toEqual([]);
+  expect(row).toEqual(before);
 });

@@ -31,7 +31,7 @@ import { manualCashBalance } from "./manual-cash";
 import {
   recurringDate,
   recurringMerchant,
-  recurringMatches,
+  confirmedPaymentEvents,
 } from "./recurring-events";
 import { accountSnapshot } from "./balances";
 import { latestValuation } from "./net-worth";
@@ -484,45 +484,35 @@ export function recurringCalendar(
       transactionId: t.id,
       payday: t.categoryId === "salary",
     }));
-  const expected: CalendarItem[] = [];
-  for (const s of series.filter(
-    (s) =>
-      (currency === "*" || s.currency === currency) && s.status !== "ignored",
-  )) {
-    for (let i = 0; i < 400; i++) {
-      const date = nextSeriesDate(s.nextDue, s.cadence, i);
-      if (date >= end || (s.endDate && date > s.endDate)) break;
-      if (date < start) continue;
-      if (
-        actual.some(
-          (t) =>
-            recurringMatches(
-              s,
-              {
-                accountId: t.accountId,
-                currency: t.currency,
-                merchant: t.name,
-                description: t.name,
-                amount: t.amountMinor,
-              },
-              settings,
-            ) && Math.abs(stamp(t.date) - stamp(date)) <= 5 * 86400000,
-        )
-      )
-        continue;
-      expected.push({
-        id: `${s.id}:${date}`,
-        date,
-        amountMinor: s.expectedAmountMinor,
-        currency: s.currency,
-        name: s.name,
-        expected: true,
-        accountId: s.accountId,
-        seriesId: s.id,
-        payday: s.expectedAmountMinor > 0,
-      });
-    }
-  }
+  const byId = new Map(series.map((s) => [s.id, s]));
+  const expected: CalendarItem[] = confirmedPaymentEvents(
+    series.filter((s) => currency === "*" || s.currency === currency),
+    addDays(start, -1),
+    addDays(end, -1),
+    transactions.filter(
+      (t) =>
+        !t.parentId &&
+        !t.isTransfer &&
+        t.type !== "transfer" &&
+        t.date >= start &&
+        t.date < end &&
+        (currency === "*" || t.currency === currency),
+    ),
+    settings,
+  ).map((event) => {
+    const s = byId.get(event.id.slice(0, -11))!;
+    return {
+      id: event.id,
+      date: event.date,
+      amountMinor: event.amount,
+      currency: s.currency,
+      name: s.name,
+      expected: true,
+      accountId: s.accountId,
+      seriesId: s.id,
+      payday: s.expectedAmountMinor > 0,
+    };
+  });
   return [...actual, ...expected].sort(
     (a, b) =>
       a.date.localeCompare(b.date) || Number(a.expected) - Number(b.expected),

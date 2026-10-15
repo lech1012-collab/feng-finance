@@ -66,14 +66,6 @@ export function confirmedPaymentEvents(
       const date = recurringDate(s.nextDue, s.cadence, i);
       if (date > end || (s.endDate && date > s.endDate)) break;
       if (date <= start) continue;
-      if (
-        observed.some(
-          (row) =>
-            recurringMatches(s, row, settings) &&
-            Math.abs(day(row.date) - day(date)) <= 5,
-        )
-      )
-        continue;
       events.push({
         id: `${s.id}:${date}`,
         group: s.matchKey,
@@ -86,5 +78,58 @@ export function confirmedPaymentEvents(
       });
     }
   }
-  return events;
+  const separateIds = new Set<string>();
+  for (const canonical of series) {
+    for (const decision of recurringDecisions(canonical, settings).filter(
+      (d) => d.choice === "separate",
+    )) {
+      const other = series.find(
+        (s) =>
+          s.matchKey === decision.matchKey &&
+          s.accountId === canonical.accountId &&
+          s.currency === canonical.currency,
+      );
+      if (other) {
+        separateIds.add(canonical.id);
+        separateIds.add(other.id);
+      }
+    }
+  }
+  const byId = new Map(series.map((s) => [s.id, s]));
+  const source = (event: PlannedPayment) => byId.get(event.id.slice(0, -11))!;
+  const eligible = (event: PlannedPayment, row: Transaction) =>
+    recurringMatches(source(event), row, settings) &&
+    Math.abs(day(row.date) - day(event.date)) <= 5;
+  const matched = new Set<string>();
+  // An imported payment can fulfil only one bill that the owner kept separate.
+  // Exact amounts win, then the nearest date. Other series retain their existing
+  // matching behaviour; ledger amounts and classifications are never changed.
+  const pairs = events
+    .filter((e) => separateIds.has(source(e).id))
+    .flatMap((event) =>
+      observed
+        .filter((row) => eligible(event, row))
+        .map((row) => ({
+          event,
+          row,
+          amountDifference: Math.abs(event.amount - row.amount),
+          dateDifference: Math.abs(day(event.date) - day(row.date)),
+        })),
+    );
+  pairs.sort(
+    (a, b) =>
+      a.amountDifference - b.amountDifference ||
+      a.dateDifference - b.dateDifference ||
+      a.event.id.localeCompare(b.event.id) ||
+      a.row.id.localeCompare(b.row.id),
+  );
+  const usedRows = new Set<string>();
+  for (const pair of pairs) {
+    if (matched.has(pair.event.id) || usedRows.has(pair.row.id)) continue;
+    matched.add(pair.event.id);
+    usedRows.add(pair.row.id);
+  }
+  for (const event of events.filter((e) => !separateIds.has(source(e).id)))
+    if (observed.some((row) => eligible(event, row))) matched.add(event.id);
+  return events.filter((event) => !matched.has(event.id));
 }

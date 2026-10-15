@@ -54,7 +54,6 @@ export function recurringDecisions(
         typeof r.matchKey === "string" &&
         r.accountId === series.accountId &&
         r.currency === series.currency &&
-        r.cadence === series.cadence &&
         r.direction === Math.sign(series.expectedAmountMinor) &&
         (r.choice === "same" || r.choice === "separate")
       )
