@@ -1118,6 +1118,23 @@ time {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
   gap: 12px;
 }
+.category-board-footer {
+  display: grid;
+  flex: none;
+  gap: 8px;
+  padding-top: 8px;
+}
+.category-board-footer > .queue-progress {
+  margin: 0;
+}
+.category-board-footer > .sort-details {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding-block: 8px;
+  border: 0;
+}
 .app .brand,
 .app .month-picker {
   gap: 8px;

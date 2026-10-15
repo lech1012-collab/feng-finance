@@ -138,6 +138,18 @@ it("puts a sheet's toast into the top-layer dialog and leaves its footer clear",
     </ToastProvider>,
   );
   const dialog = screen.getByRole("dialog", { name: "Sort transaction" });
+  dialog.style.border = "0";
+  vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+    x: 0,
+    y: 0,
+    top: 0,
+    left: 0,
+    width: 390,
+    height: 768,
+    right: 390,
+    bottom: 768,
+    toJSON: () => ({}),
+  });
   const footer = dialog.querySelector<HTMLElement>(".sheet-footer")!;
   vi.spyOn(footer, "getBoundingClientRect").mockReturnValue({
     x: 0,
@@ -153,4 +165,47 @@ it("puts a sheet's toast into the top-layer dialog and leaves its footer clear",
   fireEvent(window, new Event("resize"));
   expect(screen.getByRole("status").parentElement).toBe(dialog);
   expect(screen.getByRole("status").style.bottom).toBe("80px");
+});
+
+it("measures a padded sorting dialog from the footer top, rather than only its height", () => {
+  render(
+    <ToastProvider>
+      <dialog
+        open
+        aria-label="Sorting"
+        style={{ border: "1px solid", padding: 14 }}
+      >
+        <footer className="category-board-footer">
+          <button>Skip</button>
+        </footer>
+        <Toast message="Category saved." undo={vi.fn()} />
+      </dialog>
+    </ToastProvider>,
+  );
+  const dialog = screen.getByRole("dialog", { name: "Sorting" });
+  const footer = dialog.querySelector<HTMLElement>(".category-board-footer")!;
+  vi.spyOn(dialog, "getBoundingClientRect").mockReturnValue({
+    x: 0,
+    y: 84,
+    top: 84,
+    left: 0,
+    width: 390,
+    height: 760,
+    right: 390,
+    bottom: 844,
+    toJSON: () => ({}),
+  });
+  vi.spyOn(footer, "getBoundingClientRect").mockReturnValue({
+    x: 14,
+    y: 724,
+    top: 724,
+    left: 14,
+    width: 362,
+    height: 106,
+    right: 376,
+    bottom: 830,
+    toJSON: () => ({}),
+  });
+  fireEvent(window, new Event("resize"));
+  expect(screen.getByRole("status").style.bottom).toBe("131px");
 });

@@ -55,9 +55,6 @@ function ToastView({
     return () => window.clearTimeout(timer);
   }, [value.key, busy, paused, onDismiss]);
   const currentDialog = dialog?.isConnected && dialog.open ? dialog : undefined;
-  const footer = currentDialog?.querySelector<HTMLElement>(
-    ".sheet-footer, .category-board-footer",
-  );
   const [bottom, setBottom] = useState<number>();
   const toastRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -98,7 +95,16 @@ function ToastView({
     const measure = () => {
       const viewportHeight = window.innerHeight;
       const next = currentDialog
-        ? (footer?.getBoundingClientRect().height ?? 0) + 12
+        ? getObstacles().reduce((inset, element) => {
+            const rect = element.getBoundingClientRect();
+            const dialogRect = currentDialog.getBoundingClientRect();
+            const border =
+              parseFloat(getComputedStyle(currentDialog).borderBottomWidth) ||
+              0;
+            return rect.width > 0 && rect.height > 0
+              ? Math.max(inset, dialogRect.bottom - border - rect.top + 12)
+              : inset;
+          }, 12)
         : getObstacles().reduce((inset, element) => {
             const rect = element.getBoundingClientRect();
             const style = window.getComputedStyle(element);
@@ -138,7 +144,7 @@ function ToastView({
       window.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("resize", measure);
     };
-  }, [currentDialog, footer]);
+  }, [currentDialog]);
   const body = (
     <div
       ref={toastRef}

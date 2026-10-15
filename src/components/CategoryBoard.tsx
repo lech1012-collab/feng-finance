@@ -595,28 +595,30 @@ export function CategoryBoard({
           </p>
         )}
       </div>
-      {queue && (
-        <div className="queue-progress">
-          <span>
-            {queue.position} of {queue.total} to sort
-          </span>
-          <button onClick={onSkip} disabled={busy}>
-            Skip
-          </button>
-        </div>
-      )}
-      <Link
-        className="sort-details"
-        to={`/transactions/${t.id}`}
-        state={{ returnTo: returnTo ?? location.pathname + location.search }}
-        aria-disabled={busy || undefined}
-        onClick={(event) => {
-          if (busy) event.preventDefault();
-          else onClose();
-        }}
-      >
-        View transaction details
-      </Link>
+      <footer className="category-board-footer">
+        {queue && (
+          <div className="queue-progress">
+            <span>
+              {queue.position} of {queue.total} to sort
+            </span>
+            <button onClick={onSkip} disabled={busy}>
+              Skip
+            </button>
+          </div>
+        )}
+        <Link
+          className="sort-details"
+          to={`/transactions/${t.id}`}
+          state={{ returnTo: returnTo ?? location.pathname + location.search }}
+          aria-disabled={busy || undefined}
+          onClick={(event) => {
+            if (busy) event.preventDefault();
+            else onClose();
+          }}
+        >
+          View transaction details
+        </Link>
+      </footer>
       {accuracyMode && (
         <TransactionAccuracy
           transaction={t}
