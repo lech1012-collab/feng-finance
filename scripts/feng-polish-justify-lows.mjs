@@ -112,11 +112,24 @@ try {
 } catch {
   visual = {};
 }
+let summary;
+try {
+  summary = JSON.parse(
+    await readFile(join(root, "after/summary.json"), "utf8"),
+  );
+} catch {
+  summary = {};
+}
 const result = {
   generatedAt: new Date().toISOString(),
   method:
     "Per-occurrence reasons for known structural lines, supported by the full-page image and source. Unknown patterns remain unresolved. Numerical audit issues are retained unchanged.",
-  complete: visual.complete === true && unjustified.length === 0,
+  complete:
+    visual.complete === true &&
+    summary.completeEvidence === true &&
+    summary.complete === true &&
+    unjustified.length === 0 &&
+    reviewed.length === (summary.issuesBySeverity?.low ?? 0),
   count: reviewed.length,
   visualReviewComplete: visual.complete === true,
   reviewed,
