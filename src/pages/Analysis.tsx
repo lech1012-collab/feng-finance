@@ -40,6 +40,7 @@ import { displayMerchant } from "../domain/presentation";
 import { money } from "../domain/money";
 import { MonthPicker, Metric, PeriodControl } from "../components/common";
 import { CashChart } from "../components/Chart";
+import { ListRow } from "../components/UIPrimitives";
 export default function Analysis({
   month,
   setMonth,
@@ -667,29 +668,31 @@ export default function Analysis({
                 Change against the previous period. Open a category for its
                 monthly plot.
               </p>
-              {spending.map((category) => (
-                <Link
-                  className="insight-row"
-                  key={category.id}
-                  to={
-                    category.id === "uncategorized"
-                      ? "/transactions?uncategorized=1&allDates=1"
-                      : `/categories/${category.id}?month=${month}`
-                  }
-                >
-                  <span>{category.name}</span>
-                  <strong>
-                    {comparable
-                      ? money(
-                          category.amount -
-                            (previousCategoryAmounts.get(category.id) ?? 0),
-                          currency,
-                          true,
-                        )
-                      : "Not comparable"}
-                  </strong>
-                </Link>
-              ))}
+              <ul className="category-trend-list">
+                {spending.map((category) => (
+                  <li key={category.id}>
+                    <ListRow
+                      title={category.name}
+                      key={category.id}
+                      to={
+                        category.id === "uncategorized"
+                          ? "/transactions?uncategorized=1&allDates=1"
+                          : `/categories/${category.id}?month=${month}`
+                      }
+                      amount={
+                        comparable
+                          ? money(
+                              category.amount -
+                                (previousCategoryAmounts.get(category.id) ?? 0),
+                              currency,
+                              true,
+                            )
+                          : "Not comparable"
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
             </div>
             <details className="category-monthly-values">
               <summary>Monthly values</summary>

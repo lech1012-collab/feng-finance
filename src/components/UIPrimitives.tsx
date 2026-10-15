@@ -99,6 +99,7 @@ export function ListRow({
   meta,
   amount,
   icon,
+  to,
   onClick,
   className = "",
 }: {
@@ -106,6 +107,7 @@ export function ListRow({
   meta?: ReactNode;
   amount?: ReactNode;
   icon?: ReactNode;
+  to?: string;
   onClick?: () => void;
   className?: string;
 }) {
@@ -120,17 +122,33 @@ export function ListRow({
       )}
       <span className="ui-list-row-text">
         <span className="ui-list-row-title">{title}</span>
-        {meta && <span className="ui-list-row-meta">{meta}</span>}
+        {meta && (
+          <>
+            {" "}
+            <span className="ui-list-row-meta">{meta}</span>
+          </>
+        )}
       </span>
-      {amount != null && <span className="ui-list-row-amount">{amount}</span>}
+      {amount != null && (
+        <>
+          {" "}
+          <span className="ui-list-row-amount">{amount}</span>
+        </>
+      )}
     </>
   );
-  return onClick ? (
-    <button type="button" className={rowClass} onClick={onClick}>
+  return to ? (
+    <Link to={to} className={rowClass} data-list-row>
+      {content}
+    </Link>
+  ) : onClick ? (
+    <button type="button" className={rowClass} onClick={onClick} data-list-row>
       {content}
     </button>
   ) : (
-    <div className={rowClass}>{content}</div>
+    <div className={rowClass} data-list-row>
+      {content}
+    </div>
   );
 }
 

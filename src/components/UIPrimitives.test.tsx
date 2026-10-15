@@ -121,6 +121,23 @@ it("uses plain text for rows and keeps an unknown amount distinct from zero", ()
   expect(screen.queryByText("£0.00")).not.toBeInTheDocument();
 });
 
+it("keeps a category row as a named native navigation link with an unavailable value", () => {
+  render(
+    <MemoryRouter>
+      <ListRow
+        to="/categories/groceries"
+        title="Groceries"
+        amount="Not comparable"
+      />
+    </MemoryRouter>,
+  );
+  expect(
+    screen.getByRole("link", { name: "Groceries Not comparable" }),
+  ).toHaveAttribute("href", "/categories/groceries");
+  expect(screen.queryByRole("button")).not.toBeInTheDocument();
+  expect(screen.queryByText("£0.00")).not.toBeInTheDocument();
+});
+
 it("exposes the current step without making completed steps interactive", () => {
   render(
     <Stepper
