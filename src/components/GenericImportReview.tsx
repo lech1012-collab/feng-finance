@@ -251,15 +251,35 @@ export function GenericImportReview({
             >
               {result.candidates.map((candidate, index) => (
                 <option value={candidate.id} key={candidate.id}>
-                  Reading {index + 1}: {candidate.checks.balanceRowsPassed}{" "}
-                  balance matches, {candidate.checks.needsReviewRows} need
-                  review
-                  {candidate.checks.reconciledExactly ? ", totals match" : ""}
+                  Reading {index + 1}
                 </option>
               ))}
             </select>
           </label>
         )}
+        {result.candidates.length > 1 &&
+          (() => {
+            const selected = result.candidates.find(
+              (candidate) => candidate.id === result.selectedCandidateId,
+            );
+            return (
+              selected && (
+                <p>
+                  {selected.checks.balanceRowsPassed} running balance
+                  {selected.checks.balanceRowsPassed === 1
+                    ? " matches"
+                    : "s match"}
+                  .
+                  {selected.checks.needsReviewRows > 0
+                    ? ` ${selected.checks.needsReviewRows} row${selected.checks.needsReviewRows === 1 ? " needs" : "s need"} review.`
+                    : ""}{" "}
+                  {selected.checks.reconciledExactly
+                    ? "Statement figures match exactly."
+                    : "Statement figures still need checking."}
+                </p>
+              )
+            );
+          })()}
         <button
           type="button"
           disabled={busy}

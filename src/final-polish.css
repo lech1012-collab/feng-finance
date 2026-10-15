@@ -472,6 +472,38 @@ time {
 }
 .app .chart-coverage {
   gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.app .chart-coverage > * {
+  flex: none;
+}
+.app .backup-status {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+.app .backup-status > svg {
+  flex: none;
+  margin-top: 4px;
+}
+.app .import-change-files {
+  margin: 0;
+  gap: 8px;
+}
+.app .import-change-files .file-button {
+  padding-inline: 0;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-decoration: underline;
+  font-size: 0.8125rem;
+}
+.app .import-review-list {
+  gap: 12px;
+  padding-bottom: 24px;
 }
 .app .subscription-evidence {
   display: flex;
@@ -637,6 +669,38 @@ time {
 .app .v2-report-table td:nth-child(n + 2),
 .app .v2-report-table th:nth-child(n + 2) {
   text-align: right;
+}
+.app .v2-report-table {
+  table-layout: auto;
+  min-width: max-content;
+}
+.app .planning-kpis,
+.app .planning-kpis > div {
+  gap: 12px;
+}
+.feedback-dialog .feedback-context {
+  gap: 8px;
+}
+.app .statement-history > details:first-child,
+.app #about-feedback > details:first-of-type {
+  border-top: 0;
+}
+.app .manual-account-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.app .period-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+}
+.app .property-cost-rows > div {
+  min-height: 52px;
+  align-items: center;
+  padding-block: 0;
 }
 .app .payment-timeline li {
   border-bottom: 0;
@@ -815,6 +879,48 @@ time {
   }
   .app .totals > div > dd,
   .app .subscription-evidence > strong {
+    margin-left: auto;
+  }
+}
+
+.app .generic-review-row,
+.app .generic-parser-details,
+.app .generic-statement-proof {
+  padding: 16px;
+}
+.app .generic-reading {
+  padding: 12px;
+}
+.app .generic-reading-values .generic-original-description {
+  overflow-x: auto;
+  white-space: nowrap;
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+}
+.app .review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.app .review-tabs > button {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+.app .pagination {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@container (max-width: 18rem) {
+  .app .review-compact {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app .review-compact > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .app .review-compact > strong {
     margin-left: auto;
   }
 }

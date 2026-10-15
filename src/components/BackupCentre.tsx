@@ -22,7 +22,7 @@ import { formatDateRange, formatUkDate } from "../domain/dates";
 import { localToday } from "../analytics/reminders";
 import { Sheet } from "./Sheet";
 import { Toast } from "./Toast";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Archive } from "lucide-react";
 
 function Password({
   label,
@@ -215,6 +215,7 @@ export function BackupCentre({
         protection happens on this device.
       </p>
       <p className="backup-status">
+        <Archive size={16} aria-hidden="true" />
         {data?.last
           ? `Last backup: ${formatUkDate(data.last.slice(0, 10))} · ${data.exported ?? 0} transactions`
           : "No backup saved yet. Save your first backup."}
@@ -424,7 +425,7 @@ export function BackupCentre({
               </time>
               {dates.length > 0 && (
                 <>
-                  <br />
+                  <br />{" "}
                   <span className="date-value">
                     {formatDateRange(dates[0], dates.at(-1)!)}
                   </span>

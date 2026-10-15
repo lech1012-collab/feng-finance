@@ -805,6 +805,26 @@ export default function ImportPage({
               ? `Review ${entries.length} statement${entries.length === 1 ? "" : "s"}`
               : "Import statements"}
           </h1>
+          {entries.length > 0 && (
+            <div className="import-change-files">
+              <label className={`button file-button ${busy ? "disabled" : ""}`}>
+                Choose different statements
+                <input
+                  aria-label="Select statements"
+                  type="file"
+                  accept={STATEMENT_FILE_ACCEPT}
+                  multiple
+                  disabled={busy}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = "";
+                    void selectFiles(files);
+                  }}
+                />
+              </label>
+              <span className="muted">Nothing is saved until you confirm.</span>
+            </div>
+          )}
         </div>
         {entries.length > 0 && (
           <Link className="icon-button" to="/" aria-label="Close import review">
@@ -824,7 +844,7 @@ export default function ImportPage({
             const target = event.target;
             if (
               !busy &&
-              target instanceof HTMLElement &&
+              target instanceof Element &&
               !target.closest("input, label, button, a")
             ) {
               localPicker.current?.click();
@@ -870,26 +890,7 @@ export default function ImportPage({
           </p>
         </section>
       )}
-      {entries.length > 0 && (
-        <div className="import-change-files">
-          <label className={`button file-button ${busy ? "disabled" : ""}`}>
-            Choose different statements
-            <input
-              aria-label="Select statements"
-              type="file"
-              accept={STATEMENT_FILE_ACCEPT}
-              multiple
-              disabled={busy}
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
-                e.target.value = "";
-                void selectFiles(files);
-              }}
-            />
-          </label>
-          <span className="muted">Nothing is saved until you confirm.</span>
-        </div>
-      )}
+
       {phase === "check" && (
         <section
           className="card import-processing-list"

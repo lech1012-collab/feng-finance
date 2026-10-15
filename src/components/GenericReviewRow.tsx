@@ -90,7 +90,15 @@ function ReadingValues({
       </div>
       <div>
         <dt>Description</dt>
-        <dd>{reading.description || "Not read"}</dd>
+        <dd
+          className="generic-original-description"
+          data-source-text
+          tabIndex={0}
+          role="region"
+          aria-label="Original transaction description"
+        >
+          <span>{reading.description || "Not read"}</span>
+        </dd>
       </div>
       <div>
         <dt>Amount</dt>
@@ -246,9 +254,7 @@ export function GenericReviewRow({
                     })
                   }
                 >
-                  {index === 0
-                    ? "Accept extracted values"
-                    : `Accept alternative ${index}`}
+                  Use reading {index + 1}
                 </button>
                 {!validReading(option) && (
                   <p className="muted">
@@ -344,7 +350,7 @@ export function GenericReviewRow({
               {error && <p role="alert">{error}</p>}
               <div className="generic-action-row">
                 <button type="submit" disabled={busy || !currency}>
-                  Save correction
+                  Save row
                 </button>
                 <button
                   type="button"
@@ -358,14 +364,14 @@ export function GenericReviewRow({
           ) : (
             <div className="generic-action-row">
               <button type="button" disabled={busy} onClick={startCorrection}>
-                Correct this row
+                Correct row
               </button>
               <button
                 type="button"
                 disabled={busy || excluded}
                 onClick={() => onAction(row.rowId, { kind: "exclude" })}
               >
-                Exclude this row
+                Exclude row
               </button>
             </div>
           )}

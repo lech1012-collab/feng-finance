@@ -303,6 +303,7 @@ export function CashChart({
         <>
           <div
             className="chart-coverage"
+            role="group"
             aria-label="Monthly statement coverage"
           >
             {data.map((point, index) =>

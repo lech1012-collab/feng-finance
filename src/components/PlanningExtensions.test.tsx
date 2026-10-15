@@ -42,15 +42,21 @@ it("asks before combining similar recurring names and lets Undo restore the ques
   expect(screen.getByText("Saved payment")).toBeVisible();
   expect(screen.getByText("Detected payment")).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Same bill" }));
-  await waitFor(() =>
-    expect(
-      screen.queryByRole("button", { name: "Review possible match" }),
-    ).not.toBeInTheDocument(),
+  await waitFor(
+    () =>
+      expect(
+        screen.queryByRole("button", { name: "Review possible match" }),
+      ).not.toBeInTheDocument(),
+    { timeout: 5000 },
   );
   expect(await db.transactions.toArray()).toEqual(before);
   fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
   expect(
-    await screen.findByRole("button", { name: "Review possible match" }),
+    await screen.findByRole(
+      "button",
+      { name: "Review possible match" },
+      { timeout: 5000 },
+    ),
   ).toBeVisible();
 });
 

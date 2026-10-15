@@ -1,4 +1,5 @@
 import { CategoriesManager } from "../components/CategoriesManager";
+import { StatusChip } from "../components/UIPrimitives";
 import { AccountsContent } from "./Accounts";
 import {
   AboutLifecycle,
@@ -335,9 +336,17 @@ export default function Settings({
                           ?.displayName ?? s.institution}{" "}
                         · {s.transactionCount} transaction
                         {s.transactionCount === 1 ? "" : "s"} ·{" "}
-                        {s.validationStatus === "reconciled"
-                          ? "Reconciled"
-                          : "Unverified"}
+                        <StatusChip
+                          tone={
+                            s.validationStatus === "reconciled"
+                              ? "complete"
+                              : "warning"
+                          }
+                        >
+                          {s.validationStatus === "reconciled"
+                            ? "Reconciled"
+                            : "Unverified"}
+                        </StatusChip>
                       </summary>
                       <dl className="totals">
                         <div>

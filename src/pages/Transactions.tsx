@@ -700,7 +700,7 @@ export default function Transactions({
   };
   const totalPages = Math.max(1, Math.ceil(filtered.length / 60));
   const currentPage = Math.min(page, totalPages - 1);
-  const items = filtered.slice(currentPage * 60, (currentPage + 1) * 60);
+  const items = filtered.slice(0, (currentPage + 1) * 60);
   const railSelection = (railDrag?.ids ?? selectedIds)
     .map((id) => data?.items.find((t) => t.id === id))
     .filter((t): t is Transaction => !!t);
@@ -1557,23 +1557,26 @@ export default function Transactions({
               )}
         </div>
       )}
-      {totalPages > 1 && (
+      {items.length > 0 && items.length < filtered.length && (
         <div className="pagination">
           <button
-            disabled={currentPage === 0}
-            onClick={() => setPage(currentPage - 1)}
+            onClick={() => {
+              const firstNew = items.length;
+              setPage(currentPage + 1);
+              requestAnimationFrame(() =>
+                document
+                  .querySelectorAll<HTMLElement>(
+                    ".transaction-list .transaction-row",
+                  )
+                  [firstNew]?.focus(),
+              );
+            }}
           >
-            Previous
+            Show more
           </button>
           <span>
-            Page {currentPage + 1} of {totalPages}
+            Showing {items.length} of {filtered.length}
           </span>
-          <button
-            disabled={currentPage + 1 >= totalPages}
-            onClick={() => setPage(currentPage + 1)}
-          >
-            Next
-          </button>
         </div>
       )}
       {railConflict && (

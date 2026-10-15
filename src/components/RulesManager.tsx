@@ -1,5 +1,10 @@
-import { displayMerchant, displayDate } from "../domain/presentation";
-import { ListRow } from "./UIPrimitives";
+import {
+  displayMerchant,
+  displayDate,
+  displayCategory,
+} from "../domain/presentation";
+import { displayRuleMatch } from "../domain/rule-presentation";
+import { ListRow, StatusChip } from "./UIPrimitives";
 import { Sheet, SheetFooter } from "./Sheet";
 import { Toast } from "./Toast";
 import { formatUkDate } from "../domain/dates";
@@ -221,7 +226,7 @@ function RuleEditor({
                     <option value="">Choose</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {displayCategory(c, categories)}
                       </option>
                     ))}
                   </select>
@@ -663,7 +668,7 @@ export function RulesManager({
               </button>
             </span>
             {(rule.auto || rule.createdFrom === "auto") && (
-              <span className="count-chip">Auto</span>
+              <StatusChip>Auto</StatusChip>
             )}
             <div className="muted">
               {rule.stats?.lastHit || rule.lastUsedAt
@@ -676,6 +681,9 @@ export function RulesManager({
                 : " · 0 matches"}
             </div>
           </div>
+          <p className="muted">
+            {displayRuleMatch(rule, accounts, categories)}
+          </p>
           <p className="muted">
             {rule.actions
               ?.map((a) =>

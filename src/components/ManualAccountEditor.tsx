@@ -1,4 +1,5 @@
 import { Sheet, SheetFooter } from "./Sheet";
+import { ChevronRight } from "lucide-react";
 import { Toast } from "./Toast";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -139,15 +140,18 @@ export function ManualAccountEditor({ currency }: { currency: string }) {
                       : ""}
                   </small>
                 </span>
-                <strong>
-                  {v
-                    ? money(
-                        liabilityTypes.has(a.accountType)
-                          ? -Math.abs(v.valueMinor)
-                          : v.valueMinor,
-                        a.currency,
-                      )
-                    : "Not entered"}
+                <strong className="manual-account-value">
+                  <span className="amount">
+                    {v
+                      ? money(
+                          liabilityTypes.has(a.accountType)
+                            ? -Math.abs(v.valueMinor)
+                            : v.valueMinor,
+                          a.currency,
+                        )
+                      : "Not entered"}
+                  </span>
+                  <ChevronRight size={16} aria-hidden="true" />
                 </strong>
               </button>
             );
