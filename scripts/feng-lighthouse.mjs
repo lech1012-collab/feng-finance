@@ -67,6 +67,14 @@ try {
         exact: true,
       })
       .click();
+    await page
+      .getByRole("status")
+      .filter({ hasText: "Appearance saved." })
+      .waitFor();
+    await page.waitForFunction(
+      (expected) => document.documentElement.dataset.theme === expected,
+      theme,
+    );
     for (const [name, route] of [
       ["home", "/"],
       ["transactions", "/transactions"],
@@ -103,6 +111,10 @@ try {
           result.lhr.categories["best-practices"].score * 100,
         ),
         url: result.lhr.finalDisplayedUrl,
+        entryScript: await page
+          .locator('script[type="module"][src]')
+          .first()
+          .getAttribute("src"),
       };
       scores.push(row);
       console.log(JSON.stringify(row));
