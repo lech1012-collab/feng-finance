@@ -26,6 +26,8 @@ test("blocks accidentally staged local secrets and portable financial backups", 
     "tls/private.key",
     "backup.feng",
     "feng-finance-backup-2026-10-11.json",
+    "Feng 15-Oct-2026.json",
+    "Feng 15-Oct-2026.feng",
     "private-fixtures/cells.txt",
   ];
   assert.deepEqual(blockedRepositoryPaths(paths), paths);
