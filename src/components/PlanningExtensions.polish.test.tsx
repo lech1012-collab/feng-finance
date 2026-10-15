@@ -94,9 +94,9 @@ it("uses a status chip for a pot and retains its confirmed contribution and date
   const status = await screen.findByText("On track");
   expect(status.closest(".ui-chip-visual")).not.toBeNull();
   fireEvent.click(screen.getByText("How this suggestion works"));
-  expect(
-    screen.getByText(/Calculated as of 14 Oct for the calendar month/),
-  ).toBeInTheDocument();
+  expect(screen.getByText(/Calculated as of/)).toHaveTextContent(
+    /Calculated as of 14 Oct for the calendar month/,
+  );
   expect(container.querySelector(".ui-status-chip")).not.toBeNull();
   expect((await db.pots.get(pot.id))?.contributions).toEqual(pot.contributions);
 });

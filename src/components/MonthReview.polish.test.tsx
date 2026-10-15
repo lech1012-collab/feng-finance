@@ -153,10 +153,10 @@ it("explains an actual price rise in the next period instead of moving it into t
   show();
   fireEvent.click(screen.getByRole("button", { name: "2. What changed" }));
   expect(
-    screen.getByText(
-      /Netflix rose on 4 Oct; you'll see it in October's review/,
-    ),
-  ).toBeInTheDocument();
+    screen.getByText(/you'll see it in October's review/),
+  ).toHaveTextContent(
+    /Netflix rose on 4 Oct; you'll see it in October's review/,
+  );
   expect(
     screen.queryByText(/No subscription price increases/),
   ).not.toBeInTheDocument();
@@ -197,8 +197,8 @@ it("distinguishes the period cutoff and suggested amount from an already confirm
     screen.getByText("Why Planning may show a different suggestion"),
   );
   expect(
-    screen.getByText(/calendar month, with suggestions as of 30 Sep/),
-  ).toBeInTheDocument();
+    screen.getByText(/calendar month, with suggestions as of/),
+  ).toHaveTextContent(/calendar month, with suggestions as of 30 Sep/);
   expect(data.pots[0].contributions).toEqual([
     { month: "2026-09", amountMinor: 9000 },
   ]);
