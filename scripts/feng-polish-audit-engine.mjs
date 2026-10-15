@@ -87,6 +87,10 @@ export const AUDIT_RULES = {
     "Content remains reachable above fixed/sticky bottom bars.",
   ],
   "fixed-overlap": ["high", "Fixed objects do not obscure actionable content."],
+  "toast-footer-clearance": [
+    "high",
+    "Floating receipts leave at least 12 px above the actual footer.",
+  ],
   "control-overlap": [
     "medium",
     "Independent interactive hit regions do not overlap.",
@@ -277,6 +281,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     "destructive-gap": ["high"],
     "bottom-content-covered": ["high"],
     "fixed-overlap": ["high"],
+    "toast-footer-clearance": ["high"],
     "control-overlap": ["medium"],
     "skip-link-leaked": ["medium"],
     "file-input-leaked": ["medium"],
@@ -745,6 +750,44 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       });
   }
 
+  for (const toast of all.filter(
+    (element) => element.matches(".ux-toast") && visible(element),
+  )) {
+    const dialog = toast.closest("dialog[open]");
+    let obstacles = dialog
+      ? [...dialog.querySelectorAll(".sheet-footer,.category-board-footer")]
+      : [
+          ...document.querySelectorAll(
+            ".mobile-navigation,.import-outcome-footer,.sticky-actions,.review-footer",
+          ),
+        ];
+    if (dialog && !obstacles.length)
+      obstacles = [...dialog.querySelectorAll(".queue-progress,.sort-details")];
+    const tr = toast.getBoundingClientRect();
+    for (const obstacle of obstacles.filter((element) => visible(element))) {
+      const or = obstacle.getBoundingClientRect();
+      if (
+        Math.min(tr.right, or.right) - Math.max(tr.left, or.left) <=
+        tolerance
+      )
+        continue;
+      if (!dialog && !["fixed", "sticky"].includes(cs(obstacle).position))
+        continue;
+      const clearance = or.top - tr.bottom;
+      if (clearance < 12 - tolerance)
+        add(
+          "toast-footer-clearance",
+          toast,
+          {
+            footer: selector(obstacle),
+            footerTop: round(or.top),
+            toastBottom: round(tr.bottom),
+            clearance: round(clearance),
+          },
+          ">= 12 px above the actual footer",
+        );
+    }
+  }
   const controls = all.filter(
     (e) =>
       visible(e) &&

@@ -880,6 +880,14 @@ async function transactionStates(setup) {
     // Use the documented keyboard alternative after the pointer/drag state
     // has been captured. It also lets the baseline's clipped small-screen
     // board complete the same data change without forcing a hidden click.
+    await expect(
+      page
+        .locator(
+          'dialog[open] .suggested-categories [data-category-target="groceries"]',
+        )
+        .first(),
+    ).toBeVisible();
+    await waitForReadyScene(page);
     await page.getByRole("dialog").focus();
     await page.keyboard.press("1");
     await expect

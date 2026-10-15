@@ -297,6 +297,14 @@ test("Border-only vertical separators run the full neighbouring row height", asy
   assert.ok(has(r, "vertical-line-short"));
   assert.ok(!has(r, "divider-short"));
 });
+test("A toast inside the same modal must clear its actual sorting footer", async () => {
+  for (const bottom of [12, 64, 86]) {
+    const r = await inspect(
+      `<dialog open style="position:fixed;inset:12px auto auto 16px;width:358px;height:500px;padding:14px;border:1px solid #777"><footer class="category-board-footer" style="position:absolute;bottom:14px;left:14px;right:14px;height:60px"><button>Skip</button></footer><div class="ux-toast" style="position:absolute;left:14px;right:14px;bottom:${bottom}px;height:56px">Saved <button>Undo</button></div></dialog>`,
+    );
+    assert.equal(has(r, "toast-footer-clearance"), bottom < 86);
+  }
+});
 test("Independent hit areas that overlap are reported", async () => {
   const r = await inspect(
     '<button>First</button><button style="margin-left:-20px">Second</button>',
