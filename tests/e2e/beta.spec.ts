@@ -165,7 +165,7 @@ test("first launch explains privacy before requesting storage and demo survives 
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
   await expect.poll(() => setting(page, "storagePersisted")).toBe("true");
   expect(
@@ -181,7 +181,7 @@ test("first launch explains privacy before requesting storage and demo survives 
   ).toBeVisible();
   await expect(notice).toHaveCount(0);
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
   await expect(
     page.getByRole("dialog", { name: "What's new in Feng" }),
@@ -231,7 +231,7 @@ test("import acknowledgement opens Files before asynchronous storage permission 
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toHaveCount(0);
   await expect.poll(() => setting(page, "betaNoticeAcceptedVersion")).toBe("1");
 });
@@ -368,7 +368,7 @@ test("existing Safari imports warn about separate storage and retain their overd
     .getByRole("button", { name: "Save backup", exact: true })
     .click();
   expect((await download).suggestedFilename()).toMatch(
-    /^feng-finance-backup-.*\.json$/,
+    /^Feng \d{1,2}-[A-Za-z]{3}-\d{4}\.json$/,
   );
   await expect(backupNotice).toHaveCount(0);
   await page.goto("/#/");

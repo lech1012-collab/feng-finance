@@ -139,7 +139,7 @@ test("Settings backup metadata and restore preview explain replacement before co
     `${parsed.transactions.length} transactions`,
   );
   await expect(
-    page.getByRole("status").filter({ hasText: "Backup ready:" }),
+    page.getByRole("status").filter({ hasText: "Backup ready." }),
   ).toBeVisible();
   const recordsBeforePreview = await localRecords(page);
   await page.getByLabel("Choose Feng backup", { exact: true }).setInputFiles({
@@ -384,6 +384,7 @@ test("Personal rules preview scope and can be edited or deleted without touching
   await edit.getByRole("button", { name: "Save rule", exact: true }).click();
   await expect(item).toContainText("Shopping");
   await expect(edit).not.toBeVisible();
+  page.once("dialog", (dialog) => dialog.accept());
   await item.getByRole("button", { name: "Delete", exact: true }).click();
   await expect(item).toHaveCount(0);
   expect(await transactionRecords(page)).toEqual(before);

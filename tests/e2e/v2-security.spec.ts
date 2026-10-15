@@ -193,7 +193,7 @@ test("encrypted backups expose no financial text and wrong-password/cancel resto
     encryption: "AES-256-GCM",
     iterations: 600000,
   });
-  await expect(page.getByRole("status")).toContainText("Backup ready:");
+  await expect(page.getByRole("status")).toContainText("Backup ready.");
   const tables = [
     "accounts",
     "statements",

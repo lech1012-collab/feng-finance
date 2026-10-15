@@ -223,7 +223,7 @@ test("split editor blocks an unallocated penny and refund updates the closed pur
   await page.goto("/#/transactions/accuracy-refund");
   await page.getByRole("button", { name: "Refund of…", exact: true }).click();
   const refund = page.getByRole("dialog", { name: "Refund of…", exact: true });
-  await refund.getByRole("checkbox", { name: /Clothing shop/i }).check();
+  await refund.getByRole("radio", { name: /Clothing shop/i }).check();
   await refund
     .getByRole("button", { name: "Link refund", exact: true })
     .click();

@@ -1030,7 +1030,9 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("1 to 30 Sep 2026", { exact: true }),
+    page
+      .locator(".import-statement-card > summary")
+      .getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   const statement = page.locator(".import-statement-card");
   await statement
@@ -1072,7 +1074,9 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await openImport(page);
   await selectStatement(page, "barclays-october");
   await expect(
-    page.getByText("1 to 31 Oct 2026", { exact: true }),
+    page
+      .locator(".import-statement-card > summary")
+      .getByText("1 to 31 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByLabel("Enter statement dates from the source file"),
@@ -1258,7 +1262,7 @@ test("offline launch, local PDF import, backup and no financial upload", async (
   const event = page.waitForEvent("download");
   await saveReadableBackup(page);
   expect((await event).suggestedFilename()).toMatch(
-    /feng-finance-backup-.*\.json/,
+    /^Feng \d{1,2}-[A-Za-z]{3}-\d{4}\.json$/,
   );
   expect(unexpected).toEqual([]);
 });
@@ -1479,7 +1483,9 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     }),
   ).toBeVisible();
   await expect(
-    amex.getByText("6 Sep to 5 Oct 2026", { exact: true }),
+    amex
+      .locator(":scope > summary")
+      .getByText("6 Sep to 5 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     amex.getByText(
@@ -1508,7 +1514,9 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     revolut.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    revolut.getByText("1 to 30 Sep 2026", { exact: true }),
+    revolut
+      .locator(":scope > summary")
+      .getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     revolut.locator(
@@ -1651,7 +1659,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   ).toBeVisible();
 });
 
-test("dark default, persistent appearance and mobile layouts without overlapping controls", async ({
+test("System default, persistent appearance and mobile layouts without overlapping controls", async ({
   page,
 }) => {
   test.setTimeout(120000);
@@ -1663,13 +1671,16 @@ test("dark default, persistent appearance and mobile layouts without overlapping
   await expect(
     page.getByRole("status").filter({ hasText: "Rate preference saved." }),
   ).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await settingsSection(page, "demo");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
   await expectTransactionCount(page, 176);
   await settingsSection(page, "appearance");
+  await expect(
+    page.getByRole("button", { name: "System", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Light", exact: true }).click();
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
@@ -1818,7 +1829,7 @@ test("personal rule corrections update existing transactions and future imports 
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "To check (0)", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await confirmImport(page);
   await gotoRoute(page, "/settings");
   await page.getByRole("link", { name: "Rules", exact: true }).click();

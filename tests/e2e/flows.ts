@@ -39,7 +39,12 @@ export async function selectPeriod(page: Page, period: string) {
     "6": "6 months",
     "12": "12 months",
   };
-  if (labels[period]) {
+  if (period === "ytd") {
+    await page
+      .getByRole("group", { name: "Time range", exact: true })
+      .getByRole("button", { name: "Year to date", exact: true })
+      .click();
+  } else if (labels[period]) {
     await page
       .getByRole("group", { name: "Time range", exact: true })
       .getByRole("button", { name: labels[period], exact: true })

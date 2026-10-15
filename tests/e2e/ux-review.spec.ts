@@ -151,6 +151,36 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
   await expect(
     page.getByRole("button", { name: "Import statement", exact: true }),
   ).toBeVisible();
+  await page.goto("/#/analysis");
+  await page
+    .getByRole("group", { name: "Time range", exact: true })
+    .getByRole("button", { name: "1 month", exact: true })
+    .click();
+  await page.getByText("Category trends", { exact: true }).click();
+  const category = page
+    .locator(".category-trend-summary")
+    .getByRole("link", { name: /Entertainment/ });
+  await expect(category).toContainText("Not comparable");
+  await expect(category).not.toContainText("£0");
+});
+
+test("Show more retains previous transactions without duplicate rows", async ({
+  page,
+}) => {
+  await loadDemoUi(page);
+  await page.goto("/#/transactions?allDates=1");
+  const rows = page.locator(".transaction-list .transaction-row");
+  await expect(rows).toHaveCount(60);
+  const first = await rows.evaluateAll((list) =>
+    list.map((e) => e.getAttribute("href")),
+  );
+  await page.getByRole("button", { name: "Show more", exact: true }).click();
+  await expect.poll(() => rows.count()).toBeGreaterThan(60);
+  const expanded = await rows.evaluateAll((list) =>
+    list.map((e) => e.getAttribute("href")),
+  );
+  expect(expanded.slice(0, 60)).toEqual(first);
+  expect(new Set(expanded).size).toBe(expanded.length);
 });
 
 test("UX trust: missing months are accessible gaps instead of zero-valued cash flow", async ({
@@ -242,12 +272,31 @@ test("UX mobile: Home and transaction controls stay usable at narrow widths and 
         page.getByRole("heading", { name: "Home", exact: true }),
       ).toBeVisible();
       await expect
-        .poll(() =>
-          page.evaluate(
-            () => document.documentElement.scrollWidth <= innerWidth + 1,
-          ),
+        .poll(
+          () =>
+            page.evaluate(() => ({
+              overflow: Math.max(
+                0,
+                document.documentElement.scrollWidth - innerWidth,
+              ),
+              outside: [...document.querySelectorAll("main *")]
+                .filter((e) => {
+                  if (!e.textContent?.trim() || e.children.length) return false;
+                  const r = document.createRange();
+                  r.selectNodeContents(e);
+                  return r.getBoundingClientRect().right > innerWidth + 1;
+                })
+                .slice(0, 8)
+                .map((e) => ({
+                  class: e.getAttribute("class"),
+                  text: e.textContent,
+                })),
+            })),
+          {
+            message: `Home at ${width}px / ${scale} text / ${font || "default font"}`,
+          },
         )
-        .toBe(true);
+        .toMatchObject({ overflow: 0 });
       for (const control of [
         page.getByRole("button", { name: "Previous month", exact: true }),
         page.getByRole("button", { name: "Next month", exact: true }),
