@@ -1,4 +1,7 @@
-import { useRootFontSize } from "../components/useRootFontSize";
+import {
+  chartTickFontSize,
+  useRootFontSize,
+} from "../components/useRootFontSize";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useSearchParams } from "react-router-dom";
@@ -110,6 +113,42 @@ export default function Planning({
   const shortage = forecast.points.find(
     (p) => p.date >= today && p.balance < 0,
   );
+  const forecastSummary = forecast.reason ? (
+    <div className="notice">
+      <p>{forecast.reason}</p>
+      <ImportButton>Import recent statements</ImportButton>
+    </div>
+  ) : (
+    end && (
+      <div className="planning-kpis">
+        <div>
+          <span>
+            Estimated on{" "}
+            <time className="date-value" dateTime={end.date}>
+              {formatUkDate(end.date)}
+            </time>
+          </span>
+          <strong>{money(end.balance, currency)}</strong>
+        </div>
+        <div>
+          <span>Expected income · next {horizon} days</span>
+          <strong>
+            {forecast.income === undefined
+              ? "Rate needed"
+              : money(forecast.income, currency)}
+          </strong>
+        </div>
+        <div>
+          <span>Expected bills · next {horizon} days</span>
+          <strong>
+            {forecast.bills === undefined
+              ? "Rate needed"
+              : money(forecast.bills, currency)}
+          </strong>
+        </div>
+      </div>
+    )
+  );
   return (
     <>
       <div className="page-heading">
@@ -217,6 +256,7 @@ export default function Planning({
                   ))}
                 </select>
               </div>
+              {forecastSummary}
               <p className="coverage-note">
                 From{" "}
                 <time className="date-value" dateTime={today}>
@@ -228,9 +268,20 @@ export default function Planning({
                   : ""}
                 Cash and savings minus card debt; this is an estimate of your
                 financial position.{" "}
-                {forecast.rateDates.length > 0
-                  ? `Rates as of ${forecast.rateDates.map((date) => formatUkDate(date)).join(", ")}. Future rates are assumed unchanged.`
-                  : ""}
+                {forecast.rateDates.length > 0 && (
+                  <>
+                    Rates as of{" "}
+                    {forecast.rateDates.map((date, index) => (
+                      <span key={date}>
+                        {index > 0 ? ", " : ""}
+                        <time className="date-value" dateTime={date}>
+                          {formatUkDate(date)}
+                        </time>
+                      </span>
+                    ))}
+                    . Future rates are assumed unchanged.
+                  </>
+                )}
               </p>
               <p className="forecast-inputs">
                 Based on {forecast.baselineMonths} complete previous month
@@ -255,183 +306,160 @@ export default function Planning({
                   verified balance.
                 </p>
               )}
-              {forecast.reason ? (
-                <div className="notice">
-                  <p>{forecast.reason}</p>
-                  <ImportButton>Import recent statements</ImportButton>
-                </div>
-              ) : (
-                end && (
-                  <>
-                    <div className="planning-kpis">
-                      <div>
-                        <span>
-                          Estimated on{" "}
-                          <time className="date-value" dateTime={end.date}>
-                            {formatUkDate(end.date)}
+              {forecast.reason
+                ? null
+                : end && (
+                    <>
+                      <div
+                        className="chart"
+                        role="img"
+                        aria-label="Projected total balance with higher and lower variable-spending scenarios"
+                      >
+                        <ResponsiveContainer width="100%" height={260}>
+                          <LineChart
+                            data={forecast.points}
+                            margin={{ top: 13, right: 8, left: -15, bottom: 0 }}
+                          >
+                            <CartesianGrid
+                              vertical={false}
+                              stroke="var(--line)"
+                            />
+                            <XAxis
+                              dataKey="date"
+                              minTickGap={40}
+                              tickFormatter={(v) => formatUkDate(String(v))}
+                              tick={{
+                                fill: "var(--muted)",
+                                fontSize: chartTickFontSize(chartRem),
+                              }}
+                            />
+                            <YAxis
+                              width={Math.max(60, Math.round(chartRem * 3.75))}
+                              tickFormatter={(v) =>
+                                `${+(Number(v) / factor / 1000).toFixed(1)}k`
+                              }
+                              tick={{
+                                fill: "var(--muted)",
+                                fontSize: chartTickFontSize(chartRem),
+                              }}
+                            />
+                            <Tooltip
+                              labelFormatter={(value) =>
+                                formatUkDate(String(value))
+                              }
+                              formatter={(v) => money(Number(v), currency)}
+                              contentStyle={{
+                                background: "var(--surface)",
+                                border: "1px solid var(--line)",
+                                color: "var(--ink)",
+                              }}
+                            />
+                            <ReferenceLine
+                              y={0}
+                              stroke="var(--chart-expense)"
+                            />
+                            <Line
+                              name="Usual spending"
+                              dataKey="balance"
+                              stroke="var(--chart-balance)"
+                              strokeWidth={3}
+                              dot={false}
+                              isAnimationActive={false}
+                            />
+                            <Line
+                              name="25% more variable spending"
+                              dataKey="lower"
+                              stroke="var(--chart-expense)"
+                              strokeDasharray="4 4"
+                              dot={false}
+                              isAnimationActive={false}
+                            />
+                            <Line
+                              name="25% less variable spending"
+                              dataKey="upper"
+                              stroke="var(--chart-net)"
+                              strokeDasharray="4 4"
+                              dot={false}
+                              isAnimationActive={false}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="chart-legend">
+                        <span>Solid: usual spending</span>
+                        <span>Dashed: variable spending ±25%</span>
+                      </div>
+                      {shortage && (
+                        <p className="notice warning">
+                          The model drops below zero around{" "}
+                          <time className="date-value" dateTime={shortage.date}>
+                            {formatUkDate(shortage.date)}
                           </time>
-                        </span>
-                        <strong>{money(end.balance, currency)}</strong>
-                      </div>
-                      <div>
-                        <span>Expected income · next {horizon} days</span>
-                        <strong>
-                          {forecast.income === undefined
-                            ? "Rate needed"
-                            : money(forecast.income, currency)}
-                        </strong>
-                      </div>
-                      <div>
-                        <span>Expected bills · next {horizon} days</span>
-                        <strong>
-                          {forecast.bills === undefined
-                            ? "Rate needed"
-                            : money(forecast.bills, currency)}
-                        </strong>
-                      </div>
-                    </div>
-                    <div
-                      className="chart"
-                      role="img"
-                      aria-label="Projected total balance with higher and lower variable-spending scenarios"
-                    >
-                      <ResponsiveContainer width="100%" height={260}>
-                        <LineChart
-                          data={forecast.points}
-                          margin={{ top: 13, right: 8, left: -15, bottom: 0 }}
-                        >
-                          <CartesianGrid
-                            vertical={false}
-                            stroke="var(--line)"
-                          />
-                          <XAxis
-                            dataKey="date"
-                            minTickGap={40}
-                            tickFormatter={(v) => formatUkDate(String(v))}
-                            tick={{ fill: "var(--muted)", fontSize: 13 }}
-                          />
-                          <YAxis
-                            width={Math.max(60, Math.round(chartRem * 3.75))}
-                            tickFormatter={(v) =>
-                              `${+(Number(v) / factor / 1000).toFixed(1)}k`
-                            }
-                            tick={{ fill: "var(--muted)", fontSize: 13 }}
-                          />
-                          <Tooltip
-                            labelFormatter={(value) =>
-                              formatUkDate(String(value))
-                            }
-                            formatter={(v) => money(Number(v), currency)}
-                            contentStyle={{
-                              background: "var(--surface)",
-                              border: "1px solid var(--line)",
-                              color: "var(--ink)",
-                            }}
-                          />
-                          <ReferenceLine y={0} stroke="var(--chart-expense)" />
-                          <Line
-                            name="Usual spending"
-                            dataKey="balance"
-                            stroke="var(--chart-balance)"
-                            strokeWidth={3}
-                            dot={false}
-                            isAnimationActive={false}
-                          />
-                          <Line
-                            name="25% more variable spending"
-                            dataKey="lower"
-                            stroke="var(--chart-expense)"
-                            strokeDasharray="4 4"
-                            dot={false}
-                            isAnimationActive={false}
-                          />
-                          <Line
-                            name="25% less variable spending"
-                            dataKey="upper"
-                            stroke="var(--chart-net)"
-                            strokeDasharray="4 4"
-                            dot={false}
-                            isAnimationActive={false}
-                          />
-                        </LineChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="chart-legend">
-                      <span>Solid: usual spending</span>
-                      <span>Dashed: variable spending ±25%</span>
-                    </div>
-                    {shortage && (
-                      <p className="notice warning">
-                        The model drops below zero around{" "}
-                        <time className="date-value" dateTime={shortage.date}>
-                          {formatUkDate(shortage.date)}
-                        </time>
-                        . Check payment timing and recent balances before making
-                        spending decisions.
-                      </p>
-                    )}
-                    <details>
-                      <summary>Forecast inputs and assumptions</summary>
-                      <p>
-                        Starting point:{" "}
-                        {money(forecast.anchor!.total!, currency)} verified on{" "}
-                        <time
-                          className="date-value"
-                          dateTime={forecast.anchor!.date}
-                        >
-                          {formatUkDate(forecast.anchor!.date)}
-                        </time>{" "}
-                        across {data.accounts.length} account
-                        {data.accounts.length === 1 ? "" : "s"}. Movements since
-                        that date use imported transactions and estimated
-                        missing recurring payments. Unobserved day-to-day
-                        spending is estimated from {forecast.baselineMonths}{" "}
-                        complete month{forecast.baselineMonths === 1 ? "" : "s"}
-                        .
-                      </p>
-                      <ul>
-                        {!forecast.converted &&
-                          data.accounts
-                            .filter((a) => a.tracking !== "manual")
-                            .map((account, index) => (
-                              <li key={account.id}>
-                                {account.displayName}:{" "}
-                                {money(
-                                  forecast.anchor!.balances[
-                                    `account${index}`
-                                  ] ?? 0,
-                                  currency,
-                                )}{" "}
-                                on{" "}
-                                <time
-                                  className="date-value"
-                                  dateTime={forecast.anchor!.date}
-                                >
-                                  {formatUkDate(forecast.anchor!.date)}
-                                </time>
-                              </li>
-                            ))}
-                      </ul>
-                      <p>
-                        Usual variable spending: approximately{" "}
-                        {money(Math.round(forecast.dailyVariable!), currency)}{" "}
-                        per day. Bills use the last charge; repeating income
-                        uses the lowest of the last three payments. Cancelled
-                        subscriptions and transfers are excluded from future
-                        payments. No repeating income detected means no income
-                        is assumed.
-                      </p>
-                      <p>
-                        The dashed lines change variable spending by 25%; they
-                        are scenarios, not statistical confidence limits. New
-                        purchases, irregular income, rate changes, taxes and
-                        payment delays may change the result. Budgets do not
-                        replace observed spending in this forecast.
-                      </p>
-                    </details>
-                  </>
-                )
-              )}
+                          . Check payment timing and recent balances before
+                          making spending decisions.
+                        </p>
+                      )}
+                      <details>
+                        <summary>Forecast inputs and assumptions</summary>
+                        <p>
+                          Starting point:{" "}
+                          {money(forecast.anchor!.total!, currency)} verified on{" "}
+                          <time
+                            className="date-value"
+                            dateTime={forecast.anchor!.date}
+                          >
+                            {formatUkDate(forecast.anchor!.date)}
+                          </time>{" "}
+                          across {data.accounts.length} account
+                          {data.accounts.length === 1 ? "" : "s"}. Movements
+                          since that date use imported transactions and
+                          estimated missing recurring payments. Unobserved
+                          day-to-day spending is estimated from{" "}
+                          {forecast.baselineMonths} complete month
+                          {forecast.baselineMonths === 1 ? "" : "s"}.
+                        </p>
+                        <ul>
+                          {!forecast.converted &&
+                            data.accounts
+                              .filter((a) => a.tracking !== "manual")
+                              .map((account, index) => (
+                                <li key={account.id}>
+                                  {account.displayName}:{" "}
+                                  {money(
+                                    forecast.anchor!.balances[
+                                      `account${index}`
+                                    ] ?? 0,
+                                    currency,
+                                  )}{" "}
+                                  on{" "}
+                                  <time
+                                    className="date-value"
+                                    dateTime={forecast.anchor!.date}
+                                  >
+                                    {formatUkDate(forecast.anchor!.date)}
+                                  </time>
+                                </li>
+                              ))}
+                        </ul>
+                        <p>
+                          Usual variable spending: approximately{" "}
+                          {money(Math.round(forecast.dailyVariable!), currency)}{" "}
+                          per day. Bills use the last charge; repeating income
+                          uses the lowest of the last three payments. Cancelled
+                          subscriptions and transfers are excluded from future
+                          payments. No repeating income detected means no income
+                          is assumed.
+                        </p>
+                        <p>
+                          The dashed lines change variable spending by 25%; they
+                          are scenarios, not statistical confidence limits. New
+                          purchases, irregular income, rate changes, taxes and
+                          payment delays may change the result. Budgets do not
+                          replace observed spending in this forecast.
+                        </p>
+                      </details>
+                    </>
+                  )}
             </section>
             <section className="card">
               <div className="section-heading">

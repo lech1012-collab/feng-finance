@@ -1,4 +1,4 @@
-import { useRootFontSize } from "./useRootFontSize";
+import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
 import { reviewDate } from "../analytics/month-review-details";
 import { Sheet, SheetFooter } from "./Sheet";
 import { displayMerchant } from "../domain/presentation";
@@ -780,11 +780,22 @@ export function MonthlyBudgetsPanel({
                 </strong>
               </div>
               <p>
-                {money(b.amountMinor, currency)} budget +{" "}
-                {money(r.carryMinor, currency)} carried −{" "}
-                {missingCategoryRate
-                  ? "Spending needs exchange rates"
-                  : `${money(r.spentMinor, currency)} spent`}
+                <span className="amount">{money(b.amountMinor, currency)}</span>{" "}
+                budget{" "}
+                <span className="amount">
+                  + {money(r.carryMinor, currency)}
+                </span>{" "}
+                carried{" "}
+                {missingCategoryRate ? (
+                  "− Spending needs exchange rates"
+                ) : (
+                  <>
+                    <span className="amount">
+                      − {money(r.spentMinor, currency)}
+                    </span>{" "}
+                    spent
+                  </>
+                )}
               </p>
               <small className="muted">
                 {month < localToday().slice(0, 7)
@@ -2223,12 +2234,12 @@ export function ScenarioPanel({
                 <XAxis
                   dataKey="date"
                   minTickGap={50}
-                  tick={{ fontSize: 13 }}
+                  tick={{ fontSize: chartTickFontSize(chartRem) }}
                   tickFormatter={(v) => formatUkDate(String(v))}
                 />
                 <YAxis
                   width={Math.max(60, Math.round(chartRem * 3.75))}
-                  tick={{ fontSize: 13 }}
+                  tick={{ fontSize: chartTickFontSize(chartRem) }}
                   tickFormatter={(v) => compactMoney(Number(v), currency)}
                 />
                 <Tooltip

@@ -1,4 +1,4 @@
-import { useRootFontSize } from "./useRootFontSize";
+import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
 import { StatusChip } from "./UIPrimitives";
 import {
   ResponsiveContainer,
@@ -167,7 +167,10 @@ export function CashChart({
               minTickGap={12}
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 13, fill: "var(--muted)" }}
+              tick={{
+                fontSize: chartTickFontSize(chartRem),
+                fill: "var(--muted)",
+              }}
               tickFormatter={(label) => {
                 const point = data.find((item) => item.label === label);
                 const short = String(label)
@@ -180,7 +183,10 @@ export function CashChart({
               width={Math.max(60, Math.round(chartRem * 3.75))}
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 13, fill: "var(--muted)" }}
+              tick={{
+                fontSize: chartTickFontSize(chartRem),
+                fill: "var(--muted)",
+              }}
               tickFormatter={(v) => {
                 return compactMoney(Number(v), currency);
               }}

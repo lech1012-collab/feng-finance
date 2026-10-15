@@ -880,6 +880,12 @@
       "title": "Report result: line",
       "kind": "state",
       "method": "Actual expanded disclosure or chart control, fictitious records only"
+    },
+    {
+      "id": "budget-status",
+      "title": "Populated past-period budget status before editing",
+      "kind": "state",
+      "method": "Fictitious monthly budget in the real Planning view, then edit via its category object."
     }
   ],
   "limitations": [
@@ -889,7 +895,7 @@
     "An inventory state is not certified captured until present in capture-manifest results. Failed scenario groups are recorded explicitly."
   ],
   "captureScript": "scripts/feng-polish-capture.mjs",
-  "count": 127,
+  "count": 136,
   "sourceDocuments": [
     "Complete UX Review v2.2.5",
     "Developer Specification v2.0",

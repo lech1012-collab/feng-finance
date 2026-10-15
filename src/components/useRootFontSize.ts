@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
 
+/** Match the rem-sized SVG label used by CSS and by Recharts' collision layout. */
+export function chartTickFontSize(rootFontSize: number) {
+  return Math.max(12, Math.round(rootFontSize * 0.75));
+}
+
 /** Chart gutters scale with text size so axis labels keep their full value. */
 export function useRootFontSize() {
   const [size, setSize] = useState(16);

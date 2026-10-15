@@ -10,7 +10,7 @@ export async function sceneFingerprint(page) {
     const loading = [...scope.querySelectorAll('[role="status"]')].some(
       (e) =>
         visible(e) &&
-        /^Loading(?: your finances)?(?:…|\.\.\.)$/u.test(e.textContent.trim()),
+        /^Loading(?:\s+.*)?(?:…|\.\.\.)$/u.test(e.textContent.trim()),
     );
     const heading = [...scope.querySelectorAll("h1,h2")]
       .find(visible)

@@ -5,6 +5,8 @@ import {
   collectGeometry,
   auditState,
   renderAuditReport,
+  collectElementInventory,
+  chartLabelOverlap,
 } from "./feng-polish-audit-engine.mjs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -37,6 +39,28 @@ async function inspect(body, css = "", width = 390) {
   return result;
 }
 const has = (r, rule) => r.issues.some((i) => i.rule === rule);
+test("SVG label collisions use the rendered font, including both horizontal and vertical axes", async () => {
+  const page = await browser.newPage();
+  try {
+    for (const axis of ["x", "y"])
+      for (const crowded of [true, false]) {
+        const x = axis === "x" ? (crowded ? 40 : 100) : 10;
+        const y = axis === "y" ? (crowded ? 35 : 80) : 30;
+        await page.setContent(
+          `<svg width="300" height="150"><g class="recharts-${axis}Axis-tick-labels"><text x="10" y="30" font-size="24"><tspan>May</tspan></text><text x="${x}" y="${y}" font-size="24"><tspan>Jun</tspan></text></g></svg>`,
+        );
+        const elements = await page.evaluate(collectElementInventory);
+        const issues = chartLabelOverlap(elements);
+        assert.equal(
+          issues.length > 0,
+          crowded,
+          `${axis} axis crowded=${crowded}`,
+        );
+      }
+  } finally {
+    await page.close();
+  }
+});
 test("Scene readiness waits through a transient IndexedDB-style loading frame", async () => {
   const page = await browser.newPage();
   try {

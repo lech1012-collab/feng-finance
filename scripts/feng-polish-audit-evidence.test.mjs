@@ -4,6 +4,21 @@ import { mkdtemp, writeFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { inspectCaptureEvidence } from "./feng-polish-audit-evidence.mjs";
+import { readFile } from "node:fs/promises";
+
+test("inventory counts and unique state IDs agree with the screenshots required by the gate", async () => {
+  const inventory = JSON.parse(
+    await readFile(
+      new URL("./feng-polish-screen-inventory.json", import.meta.url),
+      "utf8",
+    ),
+  );
+  assert.equal(inventory.count, inventory.states.length);
+  assert.equal(
+    new Set(inventory.states.map((state) => state.id)).size,
+    inventory.count,
+  );
+});
 
 async function fixture(run) {
   const directory = await mkdtemp(join(tmpdir(), "feng-audit-evidence-"));

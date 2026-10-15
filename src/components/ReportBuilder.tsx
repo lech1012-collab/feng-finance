@@ -1,4 +1,4 @@
-import { useRootFontSize } from "./useRootFontSize";
+import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
 import { Sheet } from "./Sheet";
 import { Toast } from "./Toast";
 import { useMemo, useState } from "react";
@@ -374,14 +374,14 @@ export function ReportBuilder({
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: chartTickFontSize(chartRem) }}
                   tickFormatter={(label: string) =>
                     report.groupBy === "month" ? label.slice(0, 3) : label
                   }
                 />
                 <YAxis
                   width={Math.max(60, Math.round(chartRem * 3.75))}
-                  tick={{ fontSize: 12 }}
+                  tick={{ fontSize: chartTickFontSize(chartRem) }}
                   tickFormatter={(v) =>
                     report.measure === "count"
                       ? String(v)

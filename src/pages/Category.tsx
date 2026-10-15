@@ -32,7 +32,10 @@ import { shiftDate } from "../analytics/analysis-period";
 import { displayMerchant } from "../domain/presentation";
 import { compactMoney, money, currencyPrecision } from "../domain/money";
 import { MonthPicker, Metric, RangeControl } from "../components/common";
-import { useRootFontSize } from "../components/useRootFontSize";
+import {
+  chartTickFontSize,
+  useRootFontSize,
+} from "../components/useRootFontSize";
 export default function CategoryPage({
   month,
   currency,
@@ -409,13 +412,20 @@ export default function CategoryPage({
               <XAxis
                 dataKey="month"
                 tickFormatter={(m) => monthLabel(String(m)).slice(0, 3)}
-                tick={{ fill: "var(--muted)", fontSize: 13 }}
-                interval={window > 6 ? 1 : 0}
+                tick={{
+                  fill: "var(--muted)",
+                  fontSize: chartTickFontSize(chartRem),
+                }}
+                interval="preserveStartEnd"
+                minTickGap={12}
               />
               <YAxis
                 width={Math.max(60, Math.round(chartRem * 3.75))}
                 tickFormatter={(v) => compactMoney(Number(v), currency)}
-                tick={{ fill: "var(--muted)", fontSize: 13 }}
+                tick={{
+                  fill: "var(--muted)",
+                  fontSize: chartTickFontSize(chartRem),
+                }}
               />
               <Tooltip
                 labelFormatter={(label) => monthLabel(String(label))}

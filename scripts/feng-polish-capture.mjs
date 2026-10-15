@@ -930,6 +930,26 @@ async function planningStates(setup) {
   const { context, page } = await open(setup);
   try {
     await go(page, "/planning?tab=budgets");
+    await put(page, {
+      budgets: [
+        {
+          id: "audit-groceries-budget",
+          categoryId: "groceries",
+          month: MONTH,
+          currency: "GBP",
+          amountMinor: 60000,
+          rollover: "none",
+        },
+      ],
+    });
+    // Native IndexedDB fixture writes do not emit Dexie's live-query notice.
+    await page.reload();
+    await expect(page.locator(".budget-card")).toHaveCount(1);
+    await snap(
+      page,
+      "budget-status",
+      "Populated past-period budget status before editing",
+    );
     await page.getByRole("button", { name: "Set budget", exact: true }).click();
     await snap(page, "budget-editor", "Budget edit sheet");
     await closeSheet(page);

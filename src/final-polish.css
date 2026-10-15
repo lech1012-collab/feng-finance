@@ -660,6 +660,17 @@ time {
   padding: 0;
   justify-content: flex-start;
   text-align: left;
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .budget-card .section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app .budget-card .section-heading > strong {
+  margin-left: auto;
+  white-space: nowrap;
 }
 .app .budget-category-name .category-colour-dot {
   flex: none;
@@ -671,6 +682,14 @@ time {
 .app .budget-footer-actions + details {
   margin-top: 8px;
   border-block: 0;
+}
+.app details > summary::marker {
+  content: "▸ ";
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+}
+.app details[open] > summary::marker {
+  content: "▾ ";
 }
 .app .transaction-row {
   gap: 12px;
@@ -739,6 +758,10 @@ time {
   flex-wrap: wrap;
   align-items: flex-start;
   gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 100%;
 }
 .app .property-cost-rows > div {
   min-height: 52px;

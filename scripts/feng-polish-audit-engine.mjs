@@ -26,6 +26,10 @@ const AxeBuilder = require("@axe-core/playwright").default;
 
 export const AUDIT_RULES = {
   "page-overflow": ["high", "Document must not scroll horizontally."],
+  "chart-label-overlap": [
+    "medium",
+    "SVG axis labels must not overlap at the rendered text size.",
+  ],
   "text-squeezed": [
     "medium",
     "Wrapped lines average at least 8 characters; no 3-line label in a box below 120 px.",
@@ -1768,6 +1772,58 @@ async function auditReachability(page, setup, context) {
   );
 }
 
+/** Also runs on saved SVG element rectangles, so baseline evidence stays comparable. */
+export function chartLabelOverlap(elements, context = {}) {
+  const labels = elements.filter(
+    (e) =>
+      e.tag === "tspan" &&
+      /recharts-[xy]Axis-tick-labels/u.test(e.selector) &&
+      e.w > 0 &&
+      e.h > 0,
+  );
+  const issues = new Map();
+  for (let i = 0; i < labels.length; i++)
+    for (let j = i + 1; j < labels.length; j++) {
+      const a = labels[i],
+        b = labels[j];
+      if (
+        /recharts-xAxis/u.test(a.selector) !==
+        /recharts-xAxis/u.test(b.selector)
+      )
+        continue;
+      const overlapWidth = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x);
+      const overlapHeight = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+      if (overlapWidth > 1 && overlapHeight > 1)
+        issues.set(`${b.selector}|${b.x}|${b.y}`, {
+          rule: "chart-label-overlap",
+          severity: "medium",
+          selector: b.selector,
+          text: b.name,
+          measured: {
+            other: a.selector,
+            otherLabel: a.name,
+            overlapWidth,
+            overlapHeight,
+            fontSize: b.fontSize,
+          },
+          expected:
+            "Non-overlapping axis labels at the actual scaled font size",
+          rect: {
+            x: b.x,
+            y: b.y,
+            width: b.w,
+            height: b.h,
+            left: b.x,
+            right: b.x + b.w,
+            top: b.y,
+            bottom: b.y + b.h,
+          },
+          ...context,
+        });
+    }
+  return [...issues.values()];
+}
+
 export async function auditState(page, setup, context = {}) {
   const mobile = (setup.width || page.viewportSize()?.width || 390) < 768;
   const geometry = await page.evaluate(collectGeometry, {
@@ -1776,6 +1832,12 @@ export async function auditState(page, setup, context = {}) {
     stateId: context.id,
   });
   const elements = await page.evaluate(collectElementInventory);
+  geometry.issues.push(
+    ...chartLabelOverlap(elements, {
+      setup: setup.id || setup.name,
+      state: context.id,
+    }),
+  );
   const reachability = await auditReachability(page, setup, context);
   let axe = { violations: [], passes: 0, incomplete: [] };
   if (process.env.FENG_AUDIT_AXE !== "0") {
