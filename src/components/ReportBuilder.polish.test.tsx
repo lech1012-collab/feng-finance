@@ -50,7 +50,7 @@ it("opens with report values and saves a named report from a sheet with local Un
   fireEvent.click(screen.getByRole("button", { name: "Edit report" }));
   const editor = screen.getByRole("dialog", { name: "Edit report" });
   expect(within(editor).getByLabelText("Report name")).toHaveValue(
-    "Spending by category",
+    "Cash flow by category",
   );
   expect(
     within(editor).getByRole("button", { name: "Save report" }),
@@ -97,8 +97,14 @@ it("shows an empty result for zero aggregate amounts and retains their transacti
 
 it("keeps bar results as named transaction links inside a group without changing their amounts", async () => {
   const original = transaction({ amount: -349, categoryId: "entertainment" });
-  await db.transactions.put(original);
-  await show([original]);
+  const income = transaction({
+    id: "report-income",
+    amount: 50000,
+    categoryId: "salary",
+    type: "income",
+  });
+  await db.transactions.bulkPut([original, income]);
+  await show([original, income]);
   fireEvent.click(screen.getByRole("button", { name: "Bar" }));
   const chart = screen.getByRole("group", {
     name: "category sum horizontal bar chart; full values below",
@@ -106,7 +112,11 @@ it("keeps bar results as named transaction links inside a group without changing
   expect(
     within(chart).getByRole("link", { name: "Entertainment −£3.49" }),
   ).toHaveAttribute("href", expect.stringContaining("/transactions?"));
+  expect(
+    within(chart).getByRole("link", { name: "Salary £500.00" }),
+  ).toBeVisible();
   expect(await db.transactions.get(original.id)).toEqual(original);
+  expect(await db.transactions.get(income.id)).toEqual(income);
 });
 
 it("shows Self Assessment results first and keeps allowable-category choices in a sheet", async () => {

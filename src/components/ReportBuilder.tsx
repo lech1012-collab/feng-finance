@@ -52,7 +52,7 @@ import "./v2-rules.css";
 import "./report-builder.css";
 
 const blank: Omit<SavedReport, "id"> = {
-  name: "Spending by category",
+  name: "Cash flow by category",
   groupBy: "category",
   measure: "sum",
   chart: "table",
@@ -398,6 +398,7 @@ export function ReportBuilder({
                   name={report.measure}
                   stroke="var(--chart-net)"
                   strokeWidth={2}
+                  isAnimationActive={false}
                 />
               </LineChart>
             </ResponsiveContainer>
