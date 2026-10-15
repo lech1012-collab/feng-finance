@@ -1700,10 +1700,9 @@ async function valueStates(setup) {
       { focus: (await monthly.count()) ? monthly : trends },
     );
     await go(page, "/analysis?view=reports");
-    const display = page.getByRole("group", {
-      name: "Report display",
-      exact: true,
-    });
+    // The baseline labelled this container without the group role. Capture its
+    // real controls too, so the before evidence does not omit that defect.
+    const display = page.locator('[aria-label="Report display"]');
     for (const mode of ["Bar", "Line"]) {
       await display.getByRole("button", { name: mode, exact: true }).click();
       await snap(

@@ -4,6 +4,7 @@ test-results/
 test-results-*/
 playwright-report/
 /audit/
+/audit
 *.pdf
 /private-fixtures/
 .env*

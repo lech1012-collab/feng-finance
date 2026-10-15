@@ -134,6 +134,9 @@ test("desktop keyboard import, Home and categorisation have accessible names, lo
         ).length,
     )
     .toBe(2);
+  await expect(
+    page.getByRole("button", { name: "Undo", exact: true }),
+  ).toBeVisible();
   const after = await ledger(page);
   const sourceFields = (rows: typeof before.transactions) =>
     rows.map(
@@ -159,8 +162,9 @@ test("desktop keyboard import, Home and categorisation have accessible names, lo
     sourceFields(before.transactions),
   );
   expect(after.statements).toEqual(before.statements);
-  await tabTo(page, page.getByRole("button", { name: "Undo", exact: true }));
-  await page.keyboard.press("Enter");
+  // The advertised shortcut remains available while reviewing source evidence,
+  // including after the six-second notification has expired.
+  await page.keyboard.press("Control+z");
   await expect
     .poll(
       async () =>
@@ -169,5 +173,10 @@ test("desktop keyboard import, Home and categorisation have accessible names, lo
         ).length,
     )
     .toBe(0);
+  const undone = await ledger(page);
+  expect(sourceFields(undone.transactions)).toEqual(
+    sourceFields(before.transactions),
+  );
+  expect(undone.statements).toEqual(before.statements);
   expect(unexpected).toEqual([]);
 });

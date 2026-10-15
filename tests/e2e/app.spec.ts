@@ -1682,6 +1682,12 @@ test("System default, persistent appearance and mobile layouts without overlappi
     page.getByRole("button", { name: "System", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Light", exact: true }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Appearance saved." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Light", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
   await expect(

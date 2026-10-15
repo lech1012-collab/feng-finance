@@ -82,6 +82,24 @@ test("Lists expose amount alignment without flagging KPI columns", async () => {
   );
   assert.ok(has(r, "amount-alignment"));
 });
+test("Tables compare money within its own column and still detect a misaligned cell", async () => {
+  const body =
+    '<table><tbody><tr><th>April</th><td><span class="amount">£1,234.00</span></td><td><span class="amount">−£234.00</span></td></tr><tr><th>May</th><td><span class="amount">£12.00</span></td><td><span class="amount">−£2.00</span></td></tr></tbody></table>';
+  const css =
+    "table{width:100%;table-layout:fixed}td{text-align:right}.amount{display:inline-block;white-space:nowrap}";
+  const aligned = await inspect(body, css);
+  assert.ok(!has(aligned, "amount-alignment"));
+  const misaligned = await inspect(
+    body,
+    css + "tr:last-child td:first-of-type{padding-right:12px}",
+  );
+  assert.ok(has(misaligned, "amount-alignment"));
+  assert.ok(
+    misaligned.issues
+      .filter((issue) => issue.rule === "amount-alignment")
+      .every((issue) => issue.text === "£12.00"),
+  );
+});
 test("Controls expose unsafe destructive spacing and below-scale gaps", async () => {
   const r = await inspect(
     '<div class="actions"><button>Save</button><button>Delete pot</button></div>',

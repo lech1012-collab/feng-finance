@@ -1275,10 +1275,14 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     );
     if (!row || !row.parentElement || !visible(row)) continue;
     const container = row.parentElement;
+    const cell = row.matches("tr") ? e.closest("td,th") : null;
     if (!amountGroups.has(container)) amountGroups.set(container, []);
-    amountGroups
-      .get(container)
-      .push({ e, row, right: e.getBoundingClientRect().right });
+    amountGroups.get(container).push({
+      e,
+      row,
+      cellIndex: cell?.cellIndex ?? null,
+      right: e.getBoundingClientRect().right,
+    });
   }
   for (const [container, rows] of amountGroups) {
     if (new Set(rows.map((r) => r.row)).size < 2) continue;
@@ -1288,11 +1292,17 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       const rr = row.row.getBoundingClientRect();
       let col = columns.find(
         (c) =>
+          c.cellIndex === row.cellIndex &&
           Math.abs(c.left - rr.left) <= tolerance &&
           Math.abs(c.width - rr.width) <= tolerance,
       );
       if (!col) {
-        col = { left: rr.left, width: rr.width, rows: [] };
+        col = {
+          left: rr.left,
+          width: rr.width,
+          cellIndex: row.cellIndex,
+          rows: [],
+        };
         columns.push(col);
       }
       col.rows.push(row);
