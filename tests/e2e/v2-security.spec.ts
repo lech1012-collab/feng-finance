@@ -194,6 +194,19 @@ test("encrypted backups expose no financial text and wrong-password/cancel resto
     iterations: 600000,
   });
   await expect(page.getByRole("status")).toContainText("Backup ready.");
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+    )
+    .toBeLessThanOrEqual(1);
+  await expect(page.locator(".backup-status")).toContainText("Last backup:");
+  await expect(page.locator(".backup-status time")).toBeVisible();
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "";
+  });
   const tables = [
     "accounts",
     "statements",

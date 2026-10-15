@@ -92,6 +92,29 @@ test("rejects mixed or unidentified stylesheets even when JavaScript entry point
     );
     assert.equal(mixed.singleImmutableBuild, false);
     assert.equal(mixed.completeEvidence, false);
+    const lazy = await inspectCaptureEvidence(
+      [
+        row,
+        {
+          ...row,
+          id: "settings",
+          metrics: {
+            ...row.metrics,
+            stylesheets: [
+              ...row.metrics.stylesheets,
+              "/assets/Settings-lazy.css",
+            ],
+          },
+        },
+      ],
+      directory,
+      "after",
+    );
+    assert.equal(
+      lazy.completeEvidence,
+      true,
+      "route-specific lazy CSS is not a different build",
+    );
     const missing = await inspectCaptureEvidence(
       [
         {

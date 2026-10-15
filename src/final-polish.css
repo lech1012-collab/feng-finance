@@ -525,6 +525,13 @@ time {
   flex: none;
   margin-top: 4px;
 }
+.app .backup-status > span {
+  flex: 1;
+  min-width: 0;
+}
+.backup-centre {
+  grid-template-columns: minmax(0, 1fr);
+}
 .app .import-change-files {
   margin: 0;
   gap: 8px;

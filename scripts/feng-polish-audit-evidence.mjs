@@ -10,13 +10,25 @@ export async function inspectCaptureEvidence(rows, directory, phase) {
   const stylesheetBuilds = [
     ...new Set(
       rows
-        .filter((row) => row.metrics?.stylesheets?.length)
-        .map((row) => JSON.stringify(row.metrics.stylesheets)),
+        .map((row) =>
+          row.metrics?.stylesheets?.filter((href) =>
+            /(?:^|\/)index-[^/]+\.css$/u.test(href),
+          ),
+        )
+        .filter((links) => links?.length)
+        .map((links) => JSON.stringify(links)),
     ),
   ];
   const unidentifiedStylesheetStates =
     phase === "after"
-      ? rows.filter((row) => !row.metrics?.stylesheets?.length).map(identify)
+      ? rows
+          .filter(
+            (row) =>
+              !row.metrics?.stylesheets?.some((href) =>
+                /(?:^|\/)index-[^/]+\.css$/u.test(href),
+              ),
+          )
+          .map(identify)
       : [];
   const unidentifiedBuildStates = rows
     .filter((row) => !row.metrics?.entryScript)
