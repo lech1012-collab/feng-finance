@@ -218,16 +218,19 @@ function SubscriptionCard({
           Regular payments are candidates, not proof of a subscription or
           non-use. Bills and essential services can also recur.
         </p>
-        {s.charges
-          .slice()
-          .reverse()
-          .map((t) => (
-            <Link
-              className="subscription-evidence"
-              to={`/transactions/${t.id}`}
-              key={t.id}
-            >
+        <div
+          className="subscription-evidence-list"
+          role="group"
+          aria-label="Charge evidence"
+        >
+          {s.charges
+            .slice()
+            .reverse()
+            .map((t) => (
               <ListRow
+                className="subscription-evidence"
+                to={`/transactions/${t.id}`}
+                key={t.id}
                 title={displayMerchant(t)}
                 meta={
                   <>
@@ -242,8 +245,8 @@ function SubscriptionCard({
                 }
                 amount={<strong>{money(t.amount, t.currency)}</strong>}
               />
-            </Link>
-          ))}
+            ))}
+        </div>
       </details>
     </article>
   );

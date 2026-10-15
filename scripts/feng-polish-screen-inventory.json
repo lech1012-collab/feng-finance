@@ -886,6 +886,30 @@
       "title": "Populated past-period budget status before editing",
       "kind": "state",
       "method": "Fictitious monthly budget in the real Planning view, then edit via its category object."
+    },
+    {
+      "id": "subscription-evidence",
+      "title": "Recurring charges and price-change evidence",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "tag-editor",
+      "title": "Tag name and preset colours",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "self-assessment-expenses",
+      "title": "Allowable expense choices",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transaction-tags",
+      "title": "Transaction tag choices and search",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
     }
   ],
   "limitations": [
@@ -895,7 +919,7 @@
     "An inventory state is not certified captured until present in capture-manifest results. Failed scenario groups are recorded explicitly."
   ],
   "captureScript": "scripts/feng-polish-capture.mjs",
-  "count": 136,
+  "count": 140,
   "sourceDocuments": [
     "Complete UX Review v2.2.5",
     "Developer Specification v2.0",

@@ -359,7 +359,7 @@ export function CategoryBoard({
   return (
     <dialog
       ref={dialog}
-      className="category-dialog"
+      className="category-dialog category-board"
       aria-label="Where does this belong?"
       onCancel={(e) => {
         e.preventDefault();

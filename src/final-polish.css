@@ -520,6 +520,10 @@ time {
   display: flex;
   gap: 8px;
   align-items: flex-start;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
 }
 .app .backup-status > svg {
   flex: none;
@@ -557,6 +561,19 @@ time {
 }
 .app .subscription-evidence + .subscription-evidence {
   border-top: 1px solid var(--line);
+}
+.app .ux-sheet .report-allowable-list {
+  display: grid;
+  gap: 8px;
+}
+.app .ux-sheet .report-allowable-list > .ui-checkbox-row {
+  display: flex;
+  flex-direction: row-reverse;
+  min-height: 52px;
+  padding: 8px 0;
+}
+.app .ux-sheet:has(.report-allowable-list) > .sheet-footer {
+  border-top: 0;
 }
 .app .manual-account-editor .planning-v2-object {
   display: grid;
@@ -830,6 +847,24 @@ time {
 }
 .beta-introduction .beta-notice-content {
   justify-content: flex-start;
+}
+.beta-introduction .small-chip {
+  align-self: flex-start;
+}
+.app .month-review-page > .page-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+.app .month-review-page > .page-heading > h1 {
+  min-width: 0;
+}
+.app-lock-screen button:disabled {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--muted);
+  opacity: 1;
 }
 .beta-introduction .beta-notice-actions {
   margin-top: 24px;

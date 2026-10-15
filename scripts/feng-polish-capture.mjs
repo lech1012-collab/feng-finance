@@ -494,6 +494,21 @@ async function baseStates(setup) {
     for (const [id, route, title] of routes) {
       await go(page, route);
       await snap(page, id, title);
+      if (id === "subscriptions") {
+        const evidence = page
+          .locator("details")
+          .filter({
+            has: page.locator("summary", { hasText: "source evidence" }),
+          })
+          .first();
+        await evidence.locator(":scope > summary").click();
+        await snap(
+          page,
+          "subscription-evidence",
+          "Recurring charges and price-change evidence",
+          { focus: evidence },
+        );
+      }
     }
     for (const section of [
       "appearance",
@@ -520,6 +535,13 @@ async function baseStates(setup) {
       await go(page, "/settings?section=" + section);
       await snap(page, "settings-" + section, "Settings: " + section);
     }
+    await go(page, "/settings?section=tags");
+    const addTag = page.getByRole("button", { name: "Add tag", exact: true });
+    if (await addTag.count()) await addTag.click();
+    await snap(page, "tag-editor", "Tag name and preset colours", {
+      focus: page.getByLabel("Tag name", { exact: true }),
+    });
+    if (await page.locator("dialog[open]").count()) await closeSheet(page);
     await go(page, "/settings?section=about");
     await page.getByRole("button", { name: "What's new", exact: true }).click();
     await snap(page, "whats-new", "Version-specific changes");
@@ -562,8 +584,39 @@ async function baseStates(setup) {
     await expect(
       page.getByLabel("Enable property tax summary", { exact: true }),
     ).toBeChecked();
+    await expect
+      .poll(async () => {
+        const rows = await database(page, ["settings"]);
+        return rows.settings.find(
+          (setting) => setting.key === "property-tax-report",
+        )?.value;
+      })
+      .toBe("true");
     await go(page, "/analysis?view=reports");
-    await snap(page, "self-assessment", "Self Assessment property summary");
+    const taxCard = page
+      .locator("section.card")
+      .filter({
+        has: page.getByRole("heading", {
+          name: "Property income for Self Assessment",
+          exact: true,
+        }),
+      })
+      .last();
+    await expect(taxCard).toBeVisible();
+    await snap(page, "self-assessment", "Self Assessment property summary", {
+      focus: taxCard,
+    });
+    const allowable = page.getByRole("button", {
+      name: "Choose allowable expenses",
+      exact: true,
+    });
+    if (await allowable.count()) await allowable.click();
+    await snap(page, "self-assessment-expenses", "Allowable expense choices", {
+      focus: (await page.locator("dialog[open]").count())
+        ? page.locator("dialog[open]")
+        : taxCard,
+    });
+    if (await page.locator("dialog[open]").count()) await closeSheet(page);
     await go(page, "/review?month=" + MONTH);
     for (let step = 1; step <= 4; step++) {
       if (step > 1)
@@ -826,12 +879,23 @@ async function transactionStates(setup) {
     // board complete the same data change without forcing a hidden click.
     await page.getByRole("dialog").focus();
     await page.keyboard.press("1");
-    await expect(
-      page
-        .getByRole("status")
-        .filter({ hasText: /category|Groceries|saved|learned/i })
-        .first(),
-    ).toBeVisible();
+    await expect
+      .poll(async () => {
+        const rows = await database(page, ["transactions"]);
+        return rows.transactions.find(
+          (transaction) => transaction.id === "ux-sort-waitrose",
+        )?.categoryId;
+      })
+      .toBe("groceries");
+    // The historical build has an in-flow receipt without a status role.
+    // Require the actual toast for the new UI; preserve the old layout as evidence.
+    if ((process.env.FENG_AUDIT_PHASE ?? "before") === "after")
+      await expect(
+        page
+          .getByRole("status")
+          .filter({ hasText: /category|Groceries|saved|learned/i })
+          .first(),
+      ).toBeVisible();
     await snap(
       page,
       "sorting-undo-toast",
@@ -849,6 +913,16 @@ async function transactionStates(setup) {
       "transaction-detail",
       "Transaction detail and source trace",
     );
+    const addTransactionTag = page.getByRole("button", {
+      name: "Add tag",
+      exact: true,
+    });
+    if (await addTransactionTag.count()) await addTransactionTag.click();
+    else await page.locator("summary", { hasText: /^Add tag$/u }).click();
+    await snap(page, "transaction-tags", "Transaction tag choices and search", {
+      focus: page.locator(".tag-picker").first(),
+    });
+    await go(page, "/transactions/" + expense.id);
     await page.getByRole("button", { name: "Split", exact: true }).click();
     const split = page.getByRole("dialog", {
       name: "Split transaction",
