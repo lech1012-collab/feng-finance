@@ -566,7 +566,7 @@ export function RulesManager({
   return (
     <section className="card" id="categorization-rules">
       <div className="v2-filter-header">
-        <h2>Categorisation rules</h2>
+        <h2>Rules</h2>
         <button
           className="primary"
           onClick={() =>
@@ -743,7 +743,14 @@ export function RulesManager({
               {rule.enabled === false ? "Enable" : "Pause"}
             </button>
             <button
+              className="danger"
               onClick={async () => {
+                if (
+                  !window.confirm(
+                    `Delete ${rule.name}? Existing transactions keep their categories. You can undo this change.`,
+                  )
+                )
+                  return;
                 try {
                   const result = await auditedMutation(
                     "Delete rule",
