@@ -143,6 +143,7 @@ time {
   background: var(--warning-color);
 }
 .app .chart-data .table-scroll {
+  margin-top: 8px;
   background: linear-gradient(to left, var(--surface), transparent 24px) right /
     24px 100% no-repeat;
 }
@@ -161,7 +162,8 @@ time {
 }
 .app .month-figures .metric-unavailable,
 .app .position-metrics .metric-unavailable {
-  white-space: normal;
+  white-space: nowrap;
+  font-size: 1.25rem;
 }
 .app .account-overview-row,
 .app .settings-object-row {
@@ -453,7 +455,8 @@ time {
   min-width: max(356px, calc(19.25rem + 48px));
 }
 .app .metric-strip {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
 }
 @container (max-width: 18rem) {
   .upcoming-row {
@@ -855,7 +858,7 @@ time {
   border-color: #ac473d;
 }
 .app .category-kpis {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: 12px;
 }
 @container (max-width: 18rem) {
@@ -905,6 +908,7 @@ time {
   max-width: 100%;
   min-width: 0;
   text-align: left;
+  min-height: 44px;
 }
 .app .review-tabs {
   display: flex;
@@ -966,6 +970,74 @@ time {
 .app .import-outcome-footer > div,
 .app .review-metrics > div {
   gap: 4px;
+}
+.app .import-outcome-footer > div {
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .import-outcome-footer > .primary,
+.app .import-result > .button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.app .generic-correction textarea {
+  font-size: 1rem;
+}
+.category-dialog .category-tile-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 12px;
+}
+.app .brand,
+.app .month-picker {
+  gap: 8px;
+}
+.app .content-grid,
+.app .transactions-workspace {
+  gap: 24px;
+}
+.app .category-months {
+  gap: 12px;
+}
+.app .notice:has(> strong),
+.ux-sheet .notice:has(> strong) {
+  display: block;
+}
+.app .category-monthly-values > .table-scroll {
+  margin-top: 8px;
+}
+.app .category-monthly-values td > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 44px;
+  min-height: 44px;
+}
+.app .report-bar-object {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.app .report-bar-object > span:first-child {
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .report-bar-object > strong {
+  margin-left: auto;
+}
+.app .report-bar-track {
+  flex: 1 0 100%;
+  width: 100%;
+}
+.app .recharts-default-tooltip {
+  background-color: var(--surface) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+.app .recharts-tooltip-label,
+.app .recharts-tooltip-item-name,
+.app .recharts-tooltip-item-value,
+.app .recharts-tooltip-item-separator {
+  color: var(--ink) !important;
 }
 .app .form-grid {
   gap: 16px;

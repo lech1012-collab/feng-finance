@@ -95,6 +95,20 @@ it("shows an empty result for zero aggregate amounts and retains their transacti
   );
 });
 
+it("keeps bar results as named transaction links inside a group without changing their amounts", async () => {
+  const original = transaction({ amount: -349, categoryId: "entertainment" });
+  await db.transactions.put(original);
+  await show([original]);
+  fireEvent.click(screen.getByRole("button", { name: "Bar" }));
+  const chart = screen.getByRole("group", {
+    name: "category sum horizontal bar chart; full values below",
+  });
+  expect(
+    within(chart).getByRole("link", { name: "Entertainment −£3.49" }),
+  ).toHaveAttribute("href", expect.stringContaining("/transactions?"));
+  expect(await db.transactions.get(original.id)).toEqual(original);
+});
+
 it("shows Self Assessment results first and keeps allowable-category choices in a sheet", async () => {
   await db.settings.put({ key: "property-tax-report", value: "true" });
   const year = new Date().getFullYear() - 1;

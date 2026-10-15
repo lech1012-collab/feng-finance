@@ -70,12 +70,18 @@ export function SafetyRecovery({
       <p>
         Feng saved your local data before the update to v
         {preview.targetAppVersion} on{" "}
-        {formatUkDate(preview.capturedAt.slice(0, 10))}.
+        <time className="date-value" dateTime={preview.capturedAt}>
+          {formatUkDate(preview.capturedAt.slice(0, 10))}
+        </time>
+        .
       </p>
       <p className="muted">
-        Available until {formatUkDate(preview.expiresAt.slice(0, 10))}. This
-        safety copy stays on this device and is separate from your downloadable
-        backup.
+        Available until{" "}
+        <time className="date-value" dateTime={preview.expiresAt}>
+          {formatUkDate(preview.expiresAt.slice(0, 10))}
+        </time>
+        . This safety copy stays on this device and is separate from your
+        downloadable backup.
       </p>
       {!confirming ? (
         <button

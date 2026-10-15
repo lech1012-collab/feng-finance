@@ -441,8 +441,11 @@ export function PotsPanel({
               <details>
                 <summary>How this suggestion works</summary>
                 <p className="muted">
-                  Calculated as of {formatUkDate(suggestionDate)} for the
-                  calendar month, including confirmed contributions. A
+                  Calculated as of{" "}
+                  <time className="date-value" dateTime={suggestionDate}>
+                    {formatUkDate(suggestionDate)}
+                  </time>{" "}
+                  for the calendar month, including confirmed contributions. A
                   payday-aligned review uses its own period end.
                 </p>
               </details>
@@ -450,9 +453,16 @@ export function PotsPanel({
                 <p className="muted">
                   From {linked.displayName}
                   {balance === undefined ? " · Import a verified balance" : ""}.
-                  {info.sourceDate
-                    ? ` As of ${formatUkDate(info.sourceDate)}.`
-                    : ""}
+                  {info.sourceDate && (
+                    <>
+                      {" "}
+                      As of{" "}
+                      <time className="date-value" dateTime={info.sourceDate}>
+                        {formatUkDate(info.sourceDate)}
+                      </time>
+                      .
+                    </>
+                  )}
                   {info.sharedAccount
                     ? " This savings balance funds more than one goal; totals count it once."
                     : ""}

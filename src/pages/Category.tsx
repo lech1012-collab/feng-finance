@@ -196,11 +196,14 @@ export default function CategoryPage({
         />
       </div>
       <p className="coverage-note">
-        {monthLabel(selected)} · {coverage.status}. Trend:{" "}
-        {formatDateRange(
-          `${monthOffset(selected, 1 - window)}-01`,
-          shiftDate(monthBounds(selected)[1], -1),
-        )}
+        <span className="date-value">{monthLabel(selected)}</span> ·{" "}
+        {coverage.status}. Trend:{" "}
+        <span className="date-value">
+          {formatDateRange(
+            `${monthOffset(selected, 1 - window)}-01`,
+            shiftDate(monthBounds(selected)[1], -1),
+          )}
+        </span>
         .
       </p>
       <section className="card category-kpis">

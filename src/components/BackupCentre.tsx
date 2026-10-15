@@ -224,9 +224,17 @@ export function BackupCentre({
       </p>
       <p className="backup-status">
         <Archive size={16} aria-hidden="true" />
-        {data?.last
-          ? `Last backup: ${formatUkDate(data.last.slice(0, 10))} · ${data.exported ?? 0} transactions`
-          : "No backup saved yet. Save your first backup."}
+        {data?.last ? (
+          <>
+            Last backup:{" "}
+            <time className="date-value" dateTime={data.last}>
+              {formatUkDate(data.last.slice(0, 10))}
+            </time>{" "}
+            · {data.exported ?? 0} transactions
+          </>
+        ) : (
+          "No backup saved yet. Save your first backup."
+        )}
       </p>
       <div className="actions">
         <button className="primary" onClick={openSave} disabled={busy}>
@@ -368,8 +376,13 @@ export function BackupCentre({
         >
           <p>
             Encrypted backup from{" "}
-            {formatUkDate(passwordFile.header.createdAt.slice(0, 10))}. Your
-            data stays unchanged until you confirm replacement.
+            <time
+              className="date-value"
+              dateTime={passwordFile.header.createdAt}
+            >
+              {formatUkDate(passwordFile.header.createdAt.slice(0, 10))}
+            </time>
+            . Your data stays unchanged until you confirm replacement.
           </p>
           <form
             id={passwordForm}

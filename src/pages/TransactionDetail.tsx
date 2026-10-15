@@ -506,8 +506,10 @@ function Editor({
               <option value="">Select a transaction</option>
               {possible.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {displayDate(p.date)} · {displayMerchant(p)} ·{" "}
-                  {money(p.amount, p.currency, true)}
+                  <time className="date-value" dateTime={p.date}>
+                    {displayDate(p.date)}
+                  </time>{" "}
+                  · {displayMerchant(p)} · {money(p.amount, p.currency, true)}
                 </option>
               ))}
             </select>

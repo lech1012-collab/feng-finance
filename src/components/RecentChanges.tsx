@@ -21,8 +21,10 @@ export function RecentChanges() {
           <span>
             {entry.label}
             <small>
-              {formatUkDate(entry.createdAt.slice(0, 10))} ·{" "}
-              {entry.changes.length} record
+              <time className="date-value" dateTime={entry.createdAt}>
+                {formatUkDate(entry.createdAt.slice(0, 10))}
+              </time>{" "}
+              · {entry.changes.length} record
               {entry.changes.length === 1 ? "" : "s"}
               {entry.undoneAt ? " · Undone" : ""}
             </small>

@@ -390,9 +390,13 @@ export default function Analysis({
         </div>
       )}
       <p className="muted">
-        {scope.valid
-          ? formatDateRange(start, shiftDate(end, -1))
-          : "Choose a valid date range"}
+        {scope.valid ? (
+          <span className="date-value">
+            {formatDateRange(start, shiftDate(end, -1))}
+          </span>
+        ) : (
+          "Choose a valid date range"
+        )}
         {scope.valid &&
           ` · ${complete ? "Complete" : coverage.some((c) => c.hasData) ? "Partial or unverified" : "No data"}`}
         {" · transfers excluded"}
@@ -650,9 +654,20 @@ export default function Analysis({
               </div>
             </dl>
             <p className="coverage-note">
-              {comparable
-                ? `Compared with ${formatDateRange(scope.previousStart, shiftDate(scope.previousEnd, -1))}; both periods have complete verified coverage.`
-                : "Not comparable yet: both periods need complete verified statement coverage."}
+              {comparable ? (
+                <>
+                  Compared with{" "}
+                  <span className="date-value">
+                    {formatDateRange(
+                      scope.previousStart,
+                      shiftDate(scope.previousEnd, -1),
+                    )}
+                  </span>
+                  ; both periods have complete verified coverage.
+                </>
+              ) : (
+                "Not comparable yet: both periods need complete verified statement coverage."
+              )}
               {average !== undefined &&
                 ` Monthly average uses ${verifiedSeries.length} verified month${verifiedSeries.length === 1 ? "" : "s"}.`}
             </p>
@@ -696,7 +711,12 @@ export default function Analysis({
             </div>
             <details className="category-monthly-values">
               <summary>Monthly values</summary>
-              <div className="table-scroll">
+              <div
+                className="table-scroll"
+                role="region"
+                aria-label="Category monthly values"
+                tabIndex={0}
+              >
                 <table>
                   <thead>
                     <tr>

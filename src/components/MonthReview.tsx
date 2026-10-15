@@ -366,8 +366,14 @@ export function MonthReview({
                 merchant: subscription.merchant,
                 description: subscription.merchant,
               })}{" "}
-              rose on {formatUkDate(subscription.priceChangeDate!)}; you'll see
-              it in {monthLabel(nextMonth).split(" ")[0]}'s review.
+              rose on{" "}
+              <time
+                className="date-value"
+                dateTime={subscription.priceChangeDate!}
+              >
+                {formatUkDate(subscription.priceChangeDate!)}
+              </time>
+              ; you'll see it in {monthLabel(nextMonth).split(" ")[0]}'s review.
             </p>
           ))}
           <Link to="/subscriptions" className="button">
@@ -378,15 +384,24 @@ export function MonthReview({
       {step === 2 && (
         <section className="card">
           <h2>Pots and goals</h2>
-          <p className="muted">Suggestions as of {formatUkDate(asOf)}.</p>
+          <p className="muted">
+            Suggestions as of{" "}
+            <time className="date-value" dateTime={asOf}>
+              {formatUkDate(asOf)}
+            </time>
+            .
+          </p>
           {asOf !== planningAsOf && (
             <details>
               <summary>Why Planning may show a different suggestion</summary>
               <p>
                 This review follows your month-start setting. Planning uses the
                 calendar month, with suggestions as of{" "}
-                {formatUkDate(planningAsOf)}. Confirmed contributions are
-                already included in each suggestion.
+                <time className="date-value" dateTime={planningAsOf}>
+                  {formatUkDate(planningAsOf)}
+                </time>
+                . Confirmed contributions are already included in each
+                suggestion.
               </p>
             </details>
           )}
@@ -404,7 +419,15 @@ export function MonthReview({
                       Automatic from{" "}
                       {data.accounts.find((a) => a.id === p.linkedAccountId)
                         ?.displayName ?? "linked savings account"}
-                      {sourceDate ? ` · as of ${formatUkDate(sourceDate)}` : ""}
+                      {sourceDate && (
+                        <>
+                          {" "}
+                          · as of{" "}
+                          <time className="date-value" dateTime={sourceDate}>
+                            {formatUkDate(sourceDate)}
+                          </time>
+                        </>
+                      )}
                     </>
                   }
                   amount={
@@ -424,7 +447,9 @@ export function MonthReview({
                   <>
                     Contribute · Suggested{" "}
                     {money(progress.monthlyMinor, p.currency)} as of{" "}
-                    {formatUkDate(asOf)}
+                    <time className="date-value" dateTime={asOf}>
+                      {formatUkDate(asOf)}
+                    </time>
                   </>
                 }
                 amount={

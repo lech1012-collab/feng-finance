@@ -671,9 +671,21 @@ export function RulesManager({
               <StatusChip>Auto</StatusChip>
             )}
             <div className="muted">
-              {rule.stats?.lastHit || rule.lastUsedAt
-                ? `Last used ${formatUkDate((rule.stats?.lastHit ?? rule.lastUsedAt!).slice(0, 10))}`
-                : "Not used yet"}
+              {rule.stats?.lastHit || rule.lastUsedAt ? (
+                <>
+                  Last used{" "}
+                  <time
+                    className="date-value"
+                    dateTime={rule.stats?.lastHit ?? rule.lastUsedAt!}
+                  >
+                    {formatUkDate(
+                      (rule.stats?.lastHit ?? rule.lastUsedAt!).slice(0, 10),
+                    )}
+                  </time>
+                </>
+              ) : (
+                "Not used yet"
+              )}
               {rule.singleUse ? " · Once" : ""}
               {rule.enabled === false ? " · Paused" : ""}
               {rule.stats
@@ -706,7 +718,7 @@ export function RulesManager({
               .join(" · ") ??
               (rule.type === "transfer"
                 ? "Transfer"
-                : categories.find((c) => c.id === rule.categoryId)?.name)}
+                : categories.find((c) => c.id === rule.categoryId)?.name)}{" "}
             <br />
             {rule.conditions?.find((c) => c.field === "accountId")
               ? (accounts.find(

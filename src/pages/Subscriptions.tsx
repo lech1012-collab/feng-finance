@@ -110,7 +110,10 @@ function SubscriptionCard({
                 "Needs review")}
           </StatusChip>
           <p className="muted">
-            {account} · Last charged {formatUkDate(s.charges.at(-1)!.date)}
+            {account} · Last charged{" "}
+            <time className="date-value" dateTime={s.charges.at(-1)!.date}>
+              {formatUkDate(s.charges.at(-1)!.date)}
+            </time>
           </p>
         </div>
         <strong className="subscription-amount">

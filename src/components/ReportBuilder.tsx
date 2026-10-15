@@ -335,7 +335,7 @@ export function ReportBuilder({
         {report.chart === "bar" && visibleRows.length > 0 && (
           <div
             className="report-horizontal-bars"
-            role="img"
+            role="group"
             aria-label={`${report.groupBy} ${report.measure} horizontal bar chart; full values below`}
           >
             {visibleRows.map((row) => (
@@ -346,9 +346,9 @@ export function ReportBuilder({
               >
                 <span>
                   {row.label === "Uncategorized" ? "Uncategorised" : row.label}
-                </span>
+                </span>{" "}
                 <strong>{format(row.value, row)}</strong>
-                <span className="report-bar-track">
+                <span className="report-bar-track" aria-hidden="true">
                   <span
                     style={{
                       width: `${(Math.abs(row.value) / Math.max(1, ...rows.map((value) => Math.abs(value.value)))) * 100}%`,

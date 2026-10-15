@@ -931,17 +931,33 @@ export default function Home({
             health.warning && data.count > 0 ? "backup-warning" : "muted"
           }
         >
-          {health.lastExportAt
-            ? `Last backup: ${displayDate(health.lastExportAt.slice(0, 10))}${health.exportedCount === undefined ? "" : ` · ${health.exportedCount} transaction${health.exportedCount === 1 ? "" : "s"}`}`
-            : "No backup exported yet."}
+          {health.lastExportAt ? (
+            <>
+              Last backup:{" "}
+              <time className="date-value" dateTime={health.lastExportAt}>
+                {displayDate(health.lastExportAt.slice(0, 10))}
+              </time>
+              {health.exportedCount === undefined
+                ? ""
+                : ` · ${health.exportedCount} transaction${health.exportedCount === 1 ? "" : "s"}`}
+            </>
+          ) : (
+            "No backup exported yet."
+          )}
           {health.lastExportAt &&
             health.warning &&
             " Save a new backup to include recent imports and changes."}
         </p>
         <p className="muted">
           {data.count} transaction{data.count === 1 ? "" : "s"} on this device
-          {health.reviewDate &&
-            ` · next statement review ${displayDate(health.reviewDate)}`}
+          {health.reviewDate && (
+            <>
+              {" · next statement review "}
+              <time className="date-value" dateTime={health.reviewDate}>
+                {displayDate(health.reviewDate)}
+              </time>
+            </>
+          )}
         </p>
       </section>
     </>

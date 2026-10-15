@@ -137,7 +137,10 @@ export function TransferReview({
                       )?.displayName ?? "Account"}
                     </span>
                     <small>
-                      {displayDate(row.date)} · {displayMerchant(row)}
+                      <time className="date-value" dateTime={row.date}>
+                        {displayDate(row.date)}
+                      </time>{" "}
+                      · {displayMerchant(row)}
                     </small>
                   </div>
                 ))}

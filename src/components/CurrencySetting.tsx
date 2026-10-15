@@ -148,9 +148,18 @@ export function CurrencySetting() {
       />
       <p className="muted">
         No personal data is sent.
-        {last
-          ? ` Cached rates: ${formatUkDate(last)}.`
-          : " No rates downloaded yet."}
+        {last ? (
+          <>
+            {" "}
+            Cached rates:{" "}
+            <time className="date-value" dateTime={last}>
+              {formatUkDate(last)}
+            </time>
+            .
+          </>
+        ) : (
+          " No rates downloaded yet."
+        )}
       </p>
       {(requestedEnabled ?? data?.enabled ?? true) && (
         <button

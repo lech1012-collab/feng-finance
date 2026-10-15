@@ -218,7 +218,11 @@ export default function Planning({
                 </select>
               </div>
               <p className="coverage-note">
-                From {formatUkDate(today)} · next {horizon} days.{" "}
+                From{" "}
+                <time className="date-value" dateTime={today}>
+                  {formatUkDate(today)}
+                </time>{" "}
+                · next {horizon} days.{" "}
                 {forecast.converted
                   ? "≈ Converted using cached exchange rates. "
                   : ""}
@@ -261,7 +265,12 @@ export default function Planning({
                   <>
                     <div className="planning-kpis">
                       <div>
-                        <span>Estimated on {formatUkDate(end.date)}</span>
+                        <span>
+                          Estimated on{" "}
+                          <time className="date-value" dateTime={end.date}>
+                            {formatUkDate(end.date)}
+                          </time>
+                        </span>
                         <strong>{money(end.balance, currency)}</strong>
                       </div>
                       <div>
@@ -354,8 +363,11 @@ export default function Planning({
                     {shortage && (
                       <p className="notice warning">
                         The model drops below zero around{" "}
-                        {formatUkDate(shortage.date)}. Check payment timing and
-                        recent balances before making spending decisions.
+                        <time className="date-value" dateTime={shortage.date}>
+                          {formatUkDate(shortage.date)}
+                        </time>
+                        . Check payment timing and recent balances before making
+                        spending decisions.
                       </p>
                     )}
                     <details>
@@ -363,8 +375,13 @@ export default function Planning({
                       <p>
                         Starting point:{" "}
                         {money(forecast.anchor!.total!, currency)} verified on{" "}
-                        {formatUkDate(forecast.anchor!.date)} across{" "}
-                        {data.accounts.length} account
+                        <time
+                          className="date-value"
+                          dateTime={forecast.anchor!.date}
+                        >
+                          {formatUkDate(forecast.anchor!.date)}
+                        </time>{" "}
+                        across {data.accounts.length} account
                         {data.accounts.length === 1 ? "" : "s"}. Movements since
                         that date use imported transactions and estimated
                         missing recurring payments. Unobserved day-to-day
@@ -385,7 +402,13 @@ export default function Planning({
                                   ] ?? 0,
                                   currency,
                                 )}{" "}
-                                on {formatUkDate(forecast.anchor!.date)}
+                                on{" "}
+                                <time
+                                  className="date-value"
+                                  dateTime={forecast.anchor!.date}
+                                >
+                                  {formatUkDate(forecast.anchor!.date)}
+                                </time>
                               </li>
                             ))}
                       </ul>
