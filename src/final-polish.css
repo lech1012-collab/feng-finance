@@ -224,11 +224,14 @@ time {
   hyphens: none;
 }
 .sorting-card {
+  display: flex;
+  flex-wrap: wrap;
   grid-template-columns: 20px minmax(0, 1fr) max-content;
   gap: 12px;
 }
 .sorting-card > div {
-  min-width: 0;
+  flex: 1 1 min(100%, 14rem);
+  min-width: min(100%, 14rem);
 }
 .sorting-card > div > strong,
 .sorting-card > div > small {
@@ -237,9 +240,15 @@ time {
   overflow-wrap: normal;
 }
 .sorting-card > strong {
+  margin-left: auto;
   white-space: nowrap;
   text-align: right;
   font-variant-numeric: tabular-nums;
+}
+.category-fixed-content .sorting-card > div > strong {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
 }
 .app .account-overview-row > .account-balance {
   white-space: nowrap;
@@ -609,18 +618,17 @@ time {
 .app .transaction-description {
   gap: 4px;
 }
-@container (max-width: 18rem) {
-  .app .swipe-transaction .transaction-row {
-    flex-wrap: wrap;
-    gap: 12px;
-  }
-  .app .transaction-row .transaction-description {
-    flex: 1 0 100%;
-    width: 100%;
-  }
-  .app .transaction-row > strong {
-    margin-left: auto;
-  }
+.app .swipe-transaction .transaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app .transaction-row .transaction-description {
+  flex: 1 1 min(100%, 14rem);
+  min-width: min(100%, 14rem);
+}
+.app .transaction-row > strong {
+  margin-left: auto;
 }
 .app .segmented-control {
   flex-wrap: wrap;
@@ -913,6 +921,7 @@ time {
 }
 @container (max-width: 18rem) {
   .app .review-compact {
+    display: flex;
     flex-wrap: wrap;
     gap: 8px;
   }
@@ -923,4 +932,89 @@ time {
   .app .review-compact > strong {
     margin-left: auto;
   }
+  .app .generic-review-row > summary {
+    flex-wrap: wrap;
+  }
+  .app .generic-review-row > summary > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .app .generic-review-row > summary > strong {
+    margin-left: auto;
+  }
+}
+.app .source-filename {
+  display: block;
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  overflow-x: auto;
+  padding-block: 8px;
+  white-space: nowrap;
+}
+.app .source-filename > strong {
+  display: inline-block;
+  min-width: max-content;
+}
+.app .import-outcome-footer,
+.app .import-statement-heading {
+  gap: 12px;
+}
+.app .import-outcome-footer {
+  padding: 16px;
+}
+.app .import-outcome-footer > div,
+.app .review-metrics > div {
+  gap: 4px;
+}
+.app .form-grid {
+  gap: 16px;
+}
+.app .settings-preview {
+  gap: 12px 24px;
+}
+.app .restore-count {
+  gap: 4px;
+}
+.app .restore-warning > details,
+.split-line-tags > details {
+  border-block: 0;
+}
+.app .rule-order-controls {
+  gap: 8px;
+}
+.app .rule-list-row,
+.app .transfer-tile,
+.app .queue-progress,
+.app .sorting-queue {
+  gap: 12px;
+}
+.app .rule-list-row:last-of-type {
+  border-bottom: 0;
+}
+.app .rule-list-row .v2-row-actions {
+  gap: 16px;
+}
+.category-trend-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.category-trend-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.app .review-compact,
+.app .generic-review-row > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app .review-compact > span,
+.app .generic-review-row > summary > span {
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .review-compact > strong,
+.app .generic-review-row > summary > strong {
+  margin-left: auto;
 }

@@ -919,7 +919,14 @@ export default function ImportPage({
                 ) : entry.state === "error" ? (
                   <AlertTriangle size={18} />
                 ) : null}
-                <strong>{entry.file.name}</strong>
+                <span
+                  className="source-filename"
+                  role="region"
+                  aria-label="Source filename"
+                  tabIndex={0}
+                >
+                  <strong>{entry.file.name}</strong>
+                </span>
               </span>
               <p role={entry.state === "checking" ? "status" : undefined}>
                 {entry.draft

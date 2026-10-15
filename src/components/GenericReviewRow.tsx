@@ -1,7 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { decimalMoney, parseMoney } from "../domain/money";
 import { parseDate } from "../domain/dates";
-import { displayDate } from "../domain/presentation";
+import { displayDate, displayMerchant } from "../domain/presentation";
 import type { RowCheck, RowReading, SourceRect } from "../import/generic/types";
 import {
   displayMoney,
@@ -90,14 +90,16 @@ function ReadingValues({
       </div>
       <div>
         <dt>Description</dt>
-        <dd
-          className="generic-original-description"
-          data-source-text
-          tabIndex={0}
-          role="region"
-          aria-label="Original transaction description"
-        >
-          <span>{reading.description || "Not read"}</span>
+        <dd>
+          <div
+            className="generic-original-description"
+            data-source-text
+            tabIndex={0}
+            role="region"
+            aria-label="Original transaction description"
+          >
+            <span>{reading.description || "Not read"}</span>
+          </div>
         </dd>
       </div>
       <div>
@@ -191,7 +193,12 @@ export function GenericReviewRow({
     >
       <summary>
         <span>
-          <strong>{reading?.description || "Unread transaction"}</strong>
+          <strong>
+            {displayMerchant({
+              merchant: "",
+              description: reading?.description || "Unread transaction",
+            })}
+          </strong>
           <small>
             Page {row.rect.page} · {state}
           </small>

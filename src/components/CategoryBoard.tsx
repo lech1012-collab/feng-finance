@@ -345,7 +345,9 @@ export function CategoryBoard({
       <div>
         <strong>{displayMerchant(t)}</strong>
         <small>
-          {displayDate(t.date)}
+          <time className="date-value" dateTime={t.date}>
+            {displayDate(t.date)}
+          </time>
           {evidence?.account
             ? ` · ${displayAccountName(evidence.account)}`
             : ""}

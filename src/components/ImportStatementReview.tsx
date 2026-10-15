@@ -542,7 +542,10 @@ export function ImportStatementReview({
                       <span>
                         <strong>{displayMerchant(t)}</strong>
                         <small>
-                          {formatUkDate(t.date, true)} ·{" "}
+                          <time className="date-value" dateTime={t.date}>
+                            {formatUkDate(t.date, true)}
+                          </time>{" "}
+                          ·{" "}
                           {t.isTransfer
                             ? "Transfer"
                             : (categories.find((c) => c.id === t.categoryId)
