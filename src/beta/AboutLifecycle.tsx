@@ -106,7 +106,7 @@ export function AboutLifecycle({
       <a className="button" href="#/settings?section=storage">
         Device storage
       </a>
-      <p className="muted">
+      <p className="muted beta-project-links">
         <a
           href={`${repositoryUrl}#readme`}
           target="_blank"

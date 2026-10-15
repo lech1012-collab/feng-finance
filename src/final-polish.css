@@ -774,6 +774,9 @@ time {
   align-items: center;
   min-height: 44px;
 }
+.app .beta-about .beta-project-links {
+  margin-top: 8px;
+}
 :where(.app .card > a):not([class]) {
   width: 100%;
 }

@@ -16,6 +16,7 @@
 .condition-editor {
   display: grid;
   gap: 12px;
+  margin-block: 8px;
 }
 .condition-row {
   display: flex;
