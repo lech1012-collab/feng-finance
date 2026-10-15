@@ -228,7 +228,7 @@ function SubscriptionCard({
             .reverse()
             .map((t) => (
               <ListRow
-                className="subscription-evidence"
+                className="recurring-charge-row"
                 to={`/transactions/${t.id}`}
                 key={t.id}
                 title={displayMerchant(t)}

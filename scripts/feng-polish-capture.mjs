@@ -840,6 +840,9 @@ async function transactionStates(setup) {
     const queueRow = page
       .getByRole("link", { name: /^Waitrose,.*Needs category/ })
       .first();
+    const queueTransactionId = decodeURIComponent(
+      (await queueRow.getAttribute("href")).split("?")[0].split("/").at(-1),
+    );
     if (!setup.mobile) {
       await queueRow.scrollIntoViewIfNeeded();
       await queueRow.hover();
@@ -883,7 +886,7 @@ async function transactionStates(setup) {
       .poll(async () => {
         const rows = await database(page, ["transactions"]);
         return rows.transactions.find(
-          (transaction) => transaction.id === "ux-sort-waitrose",
+          (transaction) => transaction.id === queueTransactionId,
         )?.categoryId;
       })
       .toBe("groceries");
