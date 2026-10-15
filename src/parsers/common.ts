@@ -421,7 +421,7 @@ export abstract class BaseParser implements StatementParser {
         ...extraction.warnings,
         ...(outside.length
           ? [
-              `${outside.length} transaction dates fall outside the statement period. Review them before import.`,
+              `${outside.length} transaction date${outside.length === 1 ? " is" : "s fall"} outside the statement period. Review them before import.`,
             ]
           : []),
       ],

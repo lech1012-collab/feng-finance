@@ -143,7 +143,15 @@ export function BackupCentre({
         ...metadata,
       ];
       const payload = protect ? await encryptBackup(backup, password) : backup;
-      const name = `feng-finance-backup-${backup.exportedAt.slice(0, 10)}.${protect ? "feng" : "json"}`;
+      // Keep the actual download name recognisable in its receipt without
+      // exposing an ISO timestamp in routine UI copy.
+      const date = new Date(backup.exportedAt).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      const name = `Feng ${date.replace(/\bSept\b/g, "Sep").replace(/\s+/g, "-")}.${protect ? "feng" : "json"}`;
       download(
         JSON.stringify(payload),
         protect ? "application/vnd.feng.backup+json" : "application/json",
@@ -153,7 +161,7 @@ export function BackupCentre({
       setSaving(false);
       setPassword("");
       setConfirmation("");
-      setNotice("Backup ready. Save it in Files.");
+      setNotice(`Backup ready. ${name}. Save it in Files.`);
     } catch (failure) {
       setError(
         failure instanceof Error

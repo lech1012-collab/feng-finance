@@ -470,7 +470,8 @@ export function ImportStatementReview({
             {checks.some((t) => t.include) && (
               <p>
                 <strong>
-                  {checks.filter((t) => t.include).length} transactions to
+                  {checks.filter((t) => t.include).length} transaction
+                  {checks.filter((t) => t.include).length === 1 ? "" : "s"} to
                   check.
                 </strong>
               </p>
