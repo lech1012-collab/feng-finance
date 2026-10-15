@@ -439,8 +439,10 @@ export default function Planning({
                             })}
                           </strong>
                           <span>
-                            {formatUkDate(p.date)} · {accounts.get(p.accountId)}{" "}
-                            · {p.cadence}
+                            <time className="date-value" dateTime={p.date}>
+                              {formatUkDate(p.date)}
+                            </time>{" "}
+                            · {accounts.get(p.accountId)} · {p.cadence}
                           </span>
                           <small>
                             {p.evidence} payment{p.evidence === 1 ? "" : "s"}{" "}

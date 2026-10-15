@@ -577,8 +577,6 @@ export default function CategoryPage({
                 <span>
                   {displayMerchant(t)}
                   <small className="muted">
-                    {" "}
-                    ·{" "}
                     <time className="date-value" dateTime={t.date}>
                       {formatUkDate(t.date)}
                     </time>

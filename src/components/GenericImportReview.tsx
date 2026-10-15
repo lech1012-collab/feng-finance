@@ -137,11 +137,13 @@ export function GenericImportReview({
         {result.checks.reconciliation.difference !== undefined && (
           <p>
             Balance difference:{" "}
-            {displayMoney(
-              result.checks.reconciliation.difference,
-              currency,
-              true,
-            )}
+            <span className="amount">
+              {displayMoney(
+                result.checks.reconciliation.difference,
+                currency,
+                true,
+              )}
+            </span>
             . Every penny must match.
           </p>
         )}
@@ -149,14 +151,18 @@ export function GenericImportReview({
           result.checks.moneyInDifference !== 0 && (
             <p>
               Money-in difference:{" "}
-              {displayMoney(result.checks.moneyInDifference, currency, true)}
+              <span className="amount">
+                {displayMoney(result.checks.moneyInDifference, currency, true)}
+              </span>
             </p>
           )}
         {result.checks.moneyOutDifference !== undefined &&
           result.checks.moneyOutDifference !== 0 && (
             <p>
               Money-out difference:{" "}
-              {displayMoney(result.checks.moneyOutDifference, currency, true)}
+              <span className="amount">
+                {displayMoney(result.checks.moneyOutDifference, currency, true)}
+              </span>
             </p>
           )}
         {result.checks.evidence.length === 0 && (

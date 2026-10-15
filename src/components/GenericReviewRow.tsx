@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { decimalMoney, parseMoney } from "../domain/money";
 import { parseDate } from "../domain/dates";
+import { displayDate } from "../domain/presentation";
 import type { RowCheck, RowReading, SourceRect } from "../import/generic/types";
 import {
   displayMoney,
@@ -77,7 +78,15 @@ function ReadingValues({
     <dl className="generic-reading-values">
       <div>
         <dt>Date</dt>
-        <dd>{reading.date ?? reading.rawDate ?? "Not read"}</dd>
+        <dd>
+          {reading.date ? (
+            <time className="date-value" dateTime={reading.date}>
+              {displayDate(reading.date)}
+            </time>
+          ) : (
+            (reading.rawDate ?? "Not read")
+          )}
+        </dd>
       </div>
       <div>
         <dt>Description</dt>

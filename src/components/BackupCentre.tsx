@@ -418,10 +418,18 @@ export function BackupCentre({
               ))}
             </dl>
             <p className="muted">
-              Saved {formatUkDate(pending.exportedAt.slice(0, 10))}
-              {dates.length
-                ? ` · ${formatDateRange(dates[0], dates.at(-1)!)}`
-                : ""}
+              Saved{" "}
+              <time className="date-value" dateTime={pending.exportedAt}>
+                {formatUkDate(pending.exportedAt.slice(0, 10))}
+              </time>
+              {dates.length > 0 && (
+                <>
+                  <br />
+                  <span className="date-value">
+                    {formatDateRange(dates[0], dates.at(-1)!)}
+                  </span>
+                </>
+              )}
             </p>
             {dates.some((date) => date > localToday()) && (
               <p className="notice warning">

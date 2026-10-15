@@ -853,7 +853,10 @@ function RefundEditor({
           ))}
           <p>
             Refunds are excluded from income. The arrival date stays{" "}
-            {displayDate(transaction.date)}.
+            <time className="date-value" dateTime={transaction.date}>
+              {displayDate(transaction.date)}
+            </time>
+            .
           </p>
           {previewError && <p role="alert">{previewError}</p>}
         </div>

@@ -121,7 +121,7 @@ export function ImportStatementReview({
       : entry.state === "saved"
         ? `${entry.imported ?? 0} imported`
         : entry.error
-          ? "Couldn't read this statement"
+          ? "Couldn't read PDF"
           : blocking
             ? entry.requiresBatchRecheck
               ? "Recheck statement"
@@ -161,9 +161,21 @@ export function ImportStatementReview({
         <span className="import-statement-heading-text">
           <h2>{d ? `${d.statement.institution} detected` : entry.file.name}</h2>
           <span>
-            {d
-              ? `${d.account.maskedAccountIdentifier} · ${formatDateRange(d.statement.statementPeriodStart, d.statement.statementPeriodEnd)} · ${d.transactions.length} transaction${d.transactions.length === 1 ? "" : "s"}`
-              : entry.progress || "Ready to check"}
+            {d ? (
+              <>
+                {d.account.maskedAccountIdentifier} ·{" "}
+                <span className="date-value">
+                  {formatDateRange(
+                    d.statement.statementPeriodStart,
+                    d.statement.statementPeriodEnd,
+                  )}
+                </span>{" "}
+                · {d.transactions.length} transaction
+                {d.transactions.length === 1 ? "" : "s"}
+              </>
+            ) : (
+              entry.progress || "Ready to check"
+            )}
           </span>
         </span>
         <StatusChip
@@ -211,10 +223,12 @@ export function ImportStatementReview({
                   : `${d.statement.extractionMethod} export`}
             </p>
             <p>
-              {formatDateRange(
-                d.statement.statementPeriodStart,
-                d.statement.statementPeriodEnd,
-              )}
+              <span className="date-value">
+                {formatDateRange(
+                  d.statement.statementPeriodStart,
+                  d.statement.statementPeriodEnd,
+                )}
+              </span>
               {d.statement.periodSource === "transaction-coverage" &&
                 " · transaction coverage"}
             </p>
@@ -358,7 +372,9 @@ export function ImportStatementReview({
             {notices.map((notice, index) => (
               <p className="coverage-note" key={`${notice.kind}-${index}`}>
                 <strong>{notice.kind === "gap" ? "Gap" : "Overlap"}:</strong>{" "}
-                {formatDateRange(notice.start, notice.end)}{" "}
+                <span className="date-value">
+                  {formatDateRange(notice.start, notice.end)}
+                </span>{" "}
                 {notice.kind === "gap"
                   ? "has no statement between these imports."
                   : "is also covered by another statement. Duplicate rows are skipped by default."}

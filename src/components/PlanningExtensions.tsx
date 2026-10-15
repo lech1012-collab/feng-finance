@@ -390,9 +390,18 @@ export function PotsPanel({
                   <strong>{p.name}</strong>
                   <small>
                     {p.type === "sinking" ? "Irregular cost" : "Savings goal"}
-                    {progress.nextTargetDate
-                      ? ` · due ${formatUkDate(progress.nextTargetDate)}`
-                      : ""}
+                    {progress.nextTargetDate && (
+                      <>
+                        {" "}
+                        · due{" "}
+                        <time
+                          className="date-value"
+                          dateTime={progress.nextTargetDate}
+                        >
+                          {formatUkDate(progress.nextTargetDate)}
+                        </time>
+                      </>
+                    )}
                   </small>
                 </span>
                 <strong>
@@ -1664,52 +1673,66 @@ export function DebtPanel({
             </div>
           )}
           {!result.reason && (
-            <table className="planning-compact-table">
-              <thead>
-                <tr>
-                  <th>Debt</th>
-                  <th>Estimated payoff</th>
-                </tr>
-              </thead>
-              <tbody>
-                {includedRows
-                  .filter((d) => !d.full && d.balance)
-                  .map((d) => (
-                    <tr key={d.account.id}>
-                      <td>{d.account.displayName}</td>
-                      <td>
-                        {result.payoff[d.account.id]
-                          ? monthLabel(result.payoff[d.account.id]!)
-                          : "Not determined"}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <div
+              className="table-scroll"
+              role="region"
+              tabIndex={0}
+              aria-label="Estimated debt payoff"
+            >
+              <table className="planning-compact-table">
+                <thead>
+                  <tr>
+                    <th>Debt</th>
+                    <th>Estimated payoff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {includedRows
+                    .filter((d) => !d.full && d.balance)
+                    .map((d) => (
+                      <tr key={d.account.id}>
+                        <td>{d.account.displayName}</td>
+                        <td>
+                          {result.payoff[d.account.id]
+                            ? monthLabel(result.payoff[d.account.id]!)
+                            : "Not determined"}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {!result.reason && (
             <details>
               <summary>Monthly payment schedule</summary>
-              <table className="planning-compact-table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Paid</th>
-                    <th>Interest</th>
-                    <th>Remaining</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.points.map((p) => (
-                    <tr key={p.month}>
-                      <td>{monthLabel(p.month)}</td>
-                      <td>{money(p.paidMinor, currency)}</td>
-                      <td>{money(p.interestMinor, currency)}</td>
-                      <td>{money(p.balanceMinor, currency)}</td>
+              <div
+                className="table-scroll"
+                role="region"
+                tabIndex={0}
+                aria-label="Monthly payment schedule values"
+              >
+                <table className="planning-compact-table">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Paid</th>
+                      <th>Interest</th>
+                      <th>Remaining</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {result.points.map((p) => (
+                      <tr key={p.month}>
+                        <td>{monthLabel(p.month)}</td>
+                        <td>{money(p.paidMinor, currency)}</td>
+                        <td>{money(p.interestMinor, currency)}</td>
+                        <td>{money(p.balanceMinor, currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </details>
           )}
         </>

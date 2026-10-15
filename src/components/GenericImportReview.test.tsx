@@ -205,7 +205,9 @@ afterEach(() => {
 describe("generic PDF evidence review", () => {
   it("shows a one-penny difference and requires explicit confirmation before import anyway", () => {
     const { onImportAnyway } = show();
-    expect(screen.getByText(/Balance difference: \+£0.01/)).toBeInTheDocument();
+    expect(screen.getByText(/^Balance difference:/)).toHaveTextContent(
+      "Balance difference: +£0.01. Every penny must match.",
+    );
     expect(
       screen.queryByText("Statement figures match exactly"),
     ).not.toBeInTheDocument();

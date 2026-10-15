@@ -578,17 +578,24 @@ time {
   gap: 4px;
 }
 @container (max-width: 18rem) {
-  .swipe-transaction .transaction-row {
+  .app .swipe-transaction .transaction-row {
     flex-wrap: wrap;
     gap: 12px;
   }
-  .transaction-row .transaction-description {
+  .app .transaction-row .transaction-description {
     flex: 1 0 100%;
     width: 100%;
   }
-  .transaction-row > strong {
+  .app .transaction-row > strong {
     margin-left: auto;
   }
+}
+.app .segmented-control {
+  flex-wrap: wrap;
+}
+.app .segmented-control > button {
+  flex: 1 1 auto;
+  min-width: max-content;
 }
 .app .transaction-row {
   gap: 12px;
@@ -609,15 +616,84 @@ time {
   gap: 8px;
   align-items: flex-start;
 }
-.app .card > a:not(.button):not(.ui-chip-target),
+:where(.app .card > a):not([class]),
 .app .totals dt > a,
 .app .beta-about p > a {
   display: inline-flex;
   align-items: center;
   min-height: 44px;
 }
-.app .card > a:not(.button):not(.ui-chip-target) {
+:where(.app .card > a):not([class]) {
   width: 100%;
+}
+.app .home-todo > span,
+.app .payment-timeline a > div {
+  gap: 4px;
+}
+.app .subscription-evidence > span > small {
+  display: block;
+  margin-top: 4px;
+}
+.app .v2-report-table td:nth-child(n + 2),
+.app .v2-report-table th:nth-child(n + 2) {
+  text-align: right;
+}
+.app .payment-timeline li {
+  border-bottom: 0;
+}
+.app .payment-timeline li + li {
+  border-top: 1px solid var(--line);
+}
+.app .payment-timeline a {
+  min-height: 64px;
+  gap: 12px;
+  padding-block: 16px;
+}
+.app .import-blocking-warning {
+  display: grid;
+  gap: 12px;
+}
+.ux-sheet .generic-column-mapping {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.beta-introduction .beta-notice-content {
+  justify-content: flex-start;
+}
+.beta-introduction .beta-notice-actions {
+  margin-top: 24px;
+}
+@container (max-width: 18rem) {
+  .app .planning-kpis > div,
+  .app .payment-timeline a {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .app .planning-kpis span,
+  .app .payment-timeline a > div {
+    max-width: 100%;
+    width: 100%;
+  }
+  .app .planning-kpis strong,
+  .app .payment-timeline a > strong {
+    align-self: flex-end;
+    text-align: right;
+  }
+  .app .generic-readings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .generic-reading-values > div,
+  .app .generic-balance-check > div {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .app .generic-reading-values dd,
+  .app .generic-balance-check dd {
+    max-width: 100%;
+  }
 }
 .recharts-tooltip-wrapper ul > li {
   display: flex;
@@ -648,18 +724,42 @@ time {
   border-block: 0;
 }
 .accuracy-dialog,
-.feedback-dialog {
+.feedback-dialog,
+.category-dialog,
+.ux-sheet {
   container-type: inline-size;
 }
 @container (max-width: 18rem) {
   .beta-about-metadata,
-  .feedback-context > div {
+  .feedback-dialog .feedback-context > div {
     grid-template-columns: minmax(0, 1fr);
   }
   .beta-about-metadata dd,
-  .feedback-context dd {
+  .feedback-dialog .feedback-context dd {
     margin: 0;
     min-width: 0;
+  }
+  .category-dialog .category-tile-grid,
+  .category-dialog .sorting-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .segmented-control {
+    flex-wrap: wrap;
+  }
+  .app .segmented-control > button {
+    flex: 1 1 auto;
+    min-width: max-content;
+  }
+}
+.colour-presets button {
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 899px) {
+  .ux-sheet .sheet-content .form-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 @media (max-width: 899px) {
