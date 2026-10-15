@@ -222,6 +222,22 @@ test("Native file input, visible skip link and unlabelled checkbox are detected"
   assert.ok(has(r, "skip-link-leaked"));
   assert.ok(has(r, "checkbox-unlabelled"));
 });
+test("A label-sized hit area does not hide a switch track shrunk by checkbox styles", async () => {
+  for (const checked of [false, true]) {
+    const body = `<label style="display:flex;align-items:center;min-height:48px;gap:16px"><input type="checkbox" role="switch" ${checked ? "checked" : ""}>Protect this backup</label>`;
+    const broken = await inspect(
+      body,
+      "input{appearance:none;width:20px;height:20px}",
+    );
+    assert.ok(has(broken, "switch-geometry"));
+    assert.ok(!has(broken, "target-size"));
+    const valid = await inspect(
+      body,
+      "input{appearance:none;width:51px;height:31px}",
+    );
+    assert.ok(!has(valid, "switch-geometry"));
+  }
+});
 test("Hit area measures associated label, not only small checkbox visual", async () => {
   const r = await inspect(
     '<label style="display:flex;align-items:center;min-height:44px;gap:8px"><input type="checkbox">I accept the replacement</label>',

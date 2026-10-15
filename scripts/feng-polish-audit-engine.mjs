@@ -104,6 +104,10 @@ export const AUDIT_RULES = {
     "high",
     "Every checkbox/radio has a visible associated label.",
   ],
+  "switch-geometry": [
+    "medium",
+    "Switch tracks remain wide enough to contain their thumb in both states.",
+  ],
   "target-size": [
     "medium",
     "Targets are at least 44 px mobile / 24 px desktop.",
@@ -278,6 +282,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     "file-input-leaked": ["medium"],
     "custom-select-native-arrow": ["low"],
     "checkbox-unlabelled": ["high"],
+    "switch-geometry": ["medium"],
     "target-size": ["medium"],
     "input-font": ["medium"],
     "text-font": ["medium"],
@@ -753,6 +758,18 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     const r = e.getBoundingClientRect(),
       s = cs(e);
     measurements.controls++;
+    if (
+      e.matches('input[type="checkbox"][role="switch"]') &&
+      (r.width < 36 - tolerance ||
+        r.height < 20 - tolerance ||
+        r.width < r.height * 1.5)
+    )
+      add(
+        "switch-geometry",
+        e,
+        { visualWidth: r.width, visualHeight: r.height, checked: e.checked },
+        "at least 36 × 20 px, with a track wider than the thumb",
+      );
     let hit = e;
     if (e.matches('input[type="checkbox"],input[type="radio"]')) {
       const labels = e.labels ? [...e.labels].filter((l) => visible(l)) : [];

@@ -435,7 +435,32 @@ time {
 }
 .app .account-filter-chip[aria-pressed="true"] .account-chip-visual {
   border-color: var(--accent);
-  background: var(--accent-soft);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.app .account-filter-chip[aria-pressed="true"] .account-chip-visual small {
+  color: inherit;
+}
+
+/* Attribute specificity keeps the 20px checkbox rule from shrinking a switch. */
+.switch-row input[type="checkbox"][role="switch"] {
+  width: 51px;
+  min-width: 51px;
+  height: 31px;
+  min-height: 31px;
+}
+.feedback-context dd > small,
+.month-review-page .totals dt > small {
+  display: block;
+  margin-top: 4px;
+}
+@media (min-width: 900px) {
+  .switch-row input[type="checkbox"][role="switch"] {
+    width: 36px;
+    min-width: 36px;
+    height: 20px;
+    min-height: 20px;
+  }
 }
 .app .transaction-status.ui-status-chip,
 .app .review-status.ui-status-chip {
@@ -689,6 +714,14 @@ time {
   font-family: Arial, sans-serif;
 }
 .app details[open] > summary::marker {
+  content: "▾ ";
+}
+.app-lock-screen details > summary::marker {
+  content: "▸ ";
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+}
+.app-lock-screen details[open] > summary::marker {
   content: "▾ ";
 }
 .app .transaction-row {

@@ -28,7 +28,11 @@ async function fixture(run) {
       setup: "iphone390-dark",
       id: "home-empty",
       phase: "after",
-      metrics: { entryScript: "/assets/index-same-build.js", sceneReady: true },
+      metrics: {
+        entryScript: "/assets/index-same-build.js",
+        stylesheets: ["/assets/index-same-build.css"],
+        sceneReady: true,
+      },
       audit: { axe: { passes: 25 } },
       image: "screen.png",
       fullImage: "screen.png",
@@ -70,6 +74,36 @@ test("rejects an after screenshot without a verified ready scene", async () =>
     );
     assert.equal(result.unreadyCaptureStates.length, 1);
     assert.equal(result.completeEvidence, false);
+  }));
+test("rejects mixed or unidentified stylesheets even when JavaScript entry points match", async () =>
+  fixture(async (directory, row) => {
+    const changed = {
+      ...row,
+      id: "settings",
+      metrics: {
+        ...row.metrics,
+        stylesheets: ["/assets/index-other-build.css"],
+      },
+    };
+    const mixed = await inspectCaptureEvidence(
+      [row, changed],
+      directory,
+      "after",
+    );
+    assert.equal(mixed.singleImmutableBuild, false);
+    assert.equal(mixed.completeEvidence, false);
+    const missing = await inspectCaptureEvidence(
+      [
+        {
+          ...row,
+          metrics: { entryScript: row.metrics.entryScript, sceneReady: true },
+        },
+      ],
+      directory,
+      "after",
+    );
+    assert.equal(missing.unidentifiedStylesheetStates.length, 1);
+    assert.equal(missing.completeEvidence, false);
   }));
 test("rejects a legacy capture without an identified entry script", async () =>
   fixture(async (directory, row) => {

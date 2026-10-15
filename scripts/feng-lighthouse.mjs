@@ -115,6 +115,11 @@ try {
           .locator('script[type="module"][src]')
           .first()
           .getAttribute("src"),
+        stylesheets: await page
+          .locator('link[rel="stylesheet"][href]')
+          .evaluateAll((links) =>
+            links.map((link) => link.getAttribute("href")).sort(),
+          ),
       };
       scores.push(row);
       console.log(JSON.stringify(row));

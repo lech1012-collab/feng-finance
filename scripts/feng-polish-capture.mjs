@@ -348,6 +348,9 @@ async function snap(page, id, title, { focus, full = true, scroll = 0 } = {}) {
     entryScript: document
       .querySelector('script[type="module"][src]')
       ?.getAttribute("src"),
+    stylesheets: [...document.querySelectorAll('link[rel="stylesheet"][href]')]
+      .map((link) => link.getAttribute("href"))
+      .sort(),
     route: location.hash,
     viewport: { width: innerWidth, height: innerHeight },
     documentWidth: document.documentElement.scrollWidth,

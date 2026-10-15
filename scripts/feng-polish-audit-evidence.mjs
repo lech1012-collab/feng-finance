@@ -7,6 +7,17 @@ export async function inspectCaptureEvidence(rows, directory, phase) {
     ...new Set(rows.map((row) => row.metrics?.entryScript).filter(Boolean)),
   ];
   const identify = (row) => ({ setup: row.setup, state: row.id });
+  const stylesheetBuilds = [
+    ...new Set(
+      rows
+        .filter((row) => row.metrics?.stylesheets?.length)
+        .map((row) => JSON.stringify(row.metrics.stylesheets)),
+    ),
+  ];
+  const unidentifiedStylesheetStates =
+    phase === "after"
+      ? rows.filter((row) => !row.metrics?.stylesheets?.length).map(identify)
+      : [];
   const unidentifiedBuildStates = rows
     .filter((row) => !row.metrics?.entryScript)
     .map(identify);
@@ -41,9 +52,14 @@ export async function inspectCaptureEvidence(rows, directory, phase) {
     )
   ).filter(Boolean);
   const singleImmutableBuild =
-    entryScripts.length === 1 && unidentifiedBuildStates.length === 0;
+    entryScripts.length === 1 &&
+    unidentifiedBuildStates.length === 0 &&
+    stylesheetBuilds.length <= 1 &&
+    unidentifiedStylesheetStates.length === 0;
   return {
     entryScripts,
+    stylesheetBuilds,
+    unidentifiedStylesheetStates,
     unidentifiedBuildStates,
     singleImmutableBuild,
     missingAccessibilityStates,
