@@ -780,7 +780,8 @@ time {
   white-space: nowrap;
   text-align: right;
 }
-.app .month-figures > a {
+.app .month-figures > a,
+.app .position-metrics > a {
   min-height: 44px;
 }
 .app .restore-warning {
