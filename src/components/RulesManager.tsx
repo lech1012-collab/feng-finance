@@ -1,3 +1,5 @@
+import { displayMerchant, displayDate } from "../domain/presentation";
+import { ListRow } from "./UIPrimitives";
 import { Sheet, SheetFooter } from "./Sheet";
 import { Toast } from "./Toast";
 import { formatUkDate } from "../domain/dates";
@@ -419,10 +421,26 @@ function RuleEditor({
             Matches {preview.length} existing transaction
             {preview.length === 1 ? "" : "s"}
           </h3>
-          <ul className="rule-preview-list">
+          <ul
+            className="rule-preview-list"
+            tabIndex={0}
+            aria-label="Matching transactions"
+          >
             {preview.slice(0, 30).map((t) => (
               <li key={t.id}>
-                {t.merchant} · {money(t.amount, t.currency)}
+                <ListRow
+                  title={displayMerchant(t)}
+                  meta={
+                    <time className="date-value" dateTime={t.date}>
+                      {displayDate(t.date)}
+                    </time>
+                  }
+                  amount={
+                    <span className="amount">
+                      {money(t.amount, t.currency)}
+                    </span>
+                  }
+                />
               </li>
             ))}
           </ul>

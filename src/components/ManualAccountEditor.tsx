@@ -118,9 +118,19 @@ export function ManualAccountEditor({ currency }: { currency: string }) {
                 <span>
                   <strong>{a.displayName}</strong>
                   <small>
-                    {v
-                      ? `${v.note?.startsWith("Estimated") ? "Estimated" : "Manual"} · as of ${formatUkDate(v.date)}`
-                      : "No value entered"}
+                    {v ? (
+                      <>
+                        {v.note?.startsWith("Estimated")
+                          ? "Estimated"
+                          : "Manual"}{" "}
+                        · as of{" "}
+                        <time className="date-value" dateTime={v.date}>
+                          {formatUkDate(v.date)}
+                        </time>
+                      </>
+                    ) : (
+                      "No value entered"
+                    )}
                     {v && valuationStale(a, v.date, localToday())
                       ? " · Update due"
                       : ""}

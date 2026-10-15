@@ -85,9 +85,7 @@ export function GenericImportReview({
   onImportAnyway,
   canImportAnyway = !!result.parsed,
 }: GenericImportReviewProps) {
-  const [showMapping, setShowMapping] = useState(
-    result.status === "mapping-required",
-  );
+  const [showMapping, setShowMapping] = useState(false);
   const [showOverride, setShowOverride] = useState(false);
   const overrideRef = useRef<HTMLButtonElement>(null);
   const [visibleRows, setVisibleRows] = useState(10);

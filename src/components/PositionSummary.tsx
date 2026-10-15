@@ -367,7 +367,11 @@ export function PositionSummary({
           <div className="position-metrics">
             <Link to="/transactions?allDates=1&accountScope=cash">
               <span>Cash</span>
-              <strong>
+              <strong
+                className={
+                  cash === undefined ? "metric-unavailable" : undefined
+                }
+              >
                 {cash === undefined
                   ? "Not imported"
                   : `${converted ? "≈ " : ""}${money(cash, currency)}${cashItems.every((i) => i.reliable) ? "" : "*"}`}
@@ -382,7 +386,11 @@ export function PositionSummary({
             </Link>
             <Link to="/transactions?allDates=1&accountScope=debt">
               <span>Card debt</span>
-              <strong>
+              <strong
+                className={
+                  cardDebt === undefined ? "metric-unavailable" : undefined
+                }
+              >
                 {cardDebt === undefined
                   ? "Unknown"
                   : `${converted ? "≈ " : ""}${money(cardDebt, currency)}${cards.every((i) => i.reliable) ? "" : "*"}`}
@@ -390,7 +398,13 @@ export function PositionSummary({
             </Link>
             <Link to={"/accounts"}>
               <span>Net worth</span>
-              <strong>
+              <strong
+                className={
+                  total === undefined || !complete
+                    ? "metric-unavailable"
+                    : undefined
+                }
+              >
                 {total === undefined || !complete
                   ? "Unavailable"
                   : `${converted ? "≈ " : ""}${money(total, currency)}${complete ? "" : "*"}`}

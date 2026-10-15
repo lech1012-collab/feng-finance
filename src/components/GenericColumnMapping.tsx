@@ -228,8 +228,19 @@ export function GenericColumnMapping({
           {result.checks.reconciledExactly
             ? "These columns reconcile exactly to the statement."
             : `${result.checks.balanceRowsPassed} rows match their running balance. The statement is not verified yet.`}
-          {result.checks.reconciliation.difference !== undefined &&
-            ` Difference ${money(result.checks.reconciliation.difference, result.parsed?.currency ?? currency)}.`}
+          {result.checks.reconciliation.difference !== undefined && (
+            <>
+              {" "}
+              Difference{" "}
+              <span className="amount">
+                {money(
+                  result.checks.reconciliation.difference,
+                  result.parsed?.currency ?? currency,
+                )}
+              </span>
+              .
+            </>
+          )}
         </p>
         <button
           type="submit"

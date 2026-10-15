@@ -83,27 +83,29 @@ function ToastView({
     };
   }, [bottom, currentDialog]);
   useEffect(() => {
-    const obstacles = currentDialog
-      ? Array.from(
-          currentDialog.querySelectorAll<HTMLElement>(
-            ".sheet-footer, .category-board-footer",
-          ),
-        )
-      : Array.from(
-          document.querySelectorAll<HTMLElement>(
-            ".mobile-navigation, .import-outcome-footer, .sticky-actions",
-          ),
-        );
+    const getObstacles = () =>
+      currentDialog
+        ? Array.from(
+            currentDialog.querySelectorAll<HTMLElement>(
+              ".sheet-footer, .category-board-footer",
+            ),
+          )
+        : Array.from(
+            document.querySelectorAll<HTMLElement>(
+              ".mobile-navigation, .import-outcome-footer, .sticky-actions, .review-footer",
+            ),
+          );
     const measure = () => {
       const viewportHeight = window.innerHeight;
       const next = currentDialog
         ? (footer?.getBoundingClientRect().height ?? 0) + 12
-        : obstacles.reduce((inset, element) => {
+        : getObstacles().reduce((inset, element) => {
             const rect = element.getBoundingClientRect();
             const style = window.getComputedStyle(element);
             return style.display !== "none" &&
               style.visibility !== "hidden" &&
-              style.position === "fixed" &&
+              (style.position === "fixed" ||
+                (style.position === "sticky" && style.bottom !== "auto")) &&
               rect.width > 0 &&
               rect.height > 0
               ? Math.max(inset, viewportHeight - rect.top + 12)
@@ -116,11 +118,23 @@ function ToastView({
       typeof ResizeObserver !== "undefined"
         ? new ResizeObserver(measure)
         : undefined;
-    obstacles.forEach((element) => observer?.observe(element));
+    getObstacles().forEach((element) => observer?.observe(element));
+    const mutations = new MutationObserver(measure);
+    mutations.observe(document.body, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
+    mutations.observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ["class", "style"],
+    });
     window.addEventListener("resize", measure);
     window.visualViewport?.addEventListener("resize", measure);
     return () => {
       observer?.disconnect();
+      mutations.disconnect();
       window.removeEventListener("resize", measure);
       window.visualViewport?.removeEventListener("resize", measure);
     };

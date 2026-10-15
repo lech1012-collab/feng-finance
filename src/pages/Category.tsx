@@ -32,6 +32,7 @@ import { shiftDate } from "../analytics/analysis-period";
 import { displayMerchant } from "../domain/presentation";
 import { compactMoney, money, currencyPrecision } from "../domain/money";
 import { MonthPicker, Metric, RangeControl } from "../components/common";
+import { useRootFontSize } from "../components/useRootFontSize";
 export default function CategoryPage({
   month,
   currency,
@@ -42,6 +43,7 @@ export default function CategoryPage({
   setMonth: (value: string) => void;
 }) {
   const { id = "uncategorized" } = useParams();
+  const chartRem = useRootFontSize();
   const [params] = useSearchParams();
   const [selected, setSelected] = useState(
     /^\d{4}-(0[1-9]|1[0-2])$/.test(params.get("month") ?? "")
@@ -408,6 +410,7 @@ export default function CategoryPage({
                 interval={window > 6 ? 1 : 0}
               />
               <YAxis
+                width={Math.max(60, Math.round(chartRem * 3.75))}
                 tickFormatter={(v) => compactMoney(Number(v), currency)}
                 tick={{ fill: "var(--muted)", fontSize: 13 }}
               />
@@ -573,7 +576,13 @@ export default function CategoryPage({
               >
                 <span>
                   {displayMerchant(t)}
-                  <small className="muted"> · {formatUkDate(t.date)}</small>
+                  <small className="muted">
+                    {" "}
+                    ·{" "}
+                    <time className="date-value" dateTime={t.date}>
+                      {formatUkDate(t.date)}
+                    </time>
+                  </small>
                 </span>
                 <strong>{money(t.amount, currency, true)}</strong>
               </Link>

@@ -155,11 +155,12 @@ time {
   white-space: nowrap;
 }
 .app .month-figures strong:not(.metric-unavailable),
-.app .position-metrics strong,
+.app .position-metrics strong:not(.metric-unavailable),
 .app .account-balance strong {
   white-space: nowrap;
 }
-.app .month-figures .metric-unavailable {
+.app .month-figures .metric-unavailable,
+.app .position-metrics .metric-unavailable {
   white-space: normal;
 }
 .app .account-overview-row,
@@ -242,6 +243,11 @@ time {
 }
 .app .account-overview-row > .account-balance {
   white-space: nowrap;
+  gap: 4px;
+}
+.app .insight-row > span {
+  width: 100%;
+  text-align: left;
 }
 @media (max-width: 899px) {
   .app .mobile-navigation {
@@ -255,7 +261,7 @@ time {
     grid-template-columns: minmax(0, 1fr) max-content;
   }
   .generic-column-navigation > button {
-    flex: 1 1 calc(50% - 8px);
+    flex: 1 1 min(100%, 9rem);
   }
   .generic-column-navigation > span {
     flex: 1 0 100%;
@@ -508,7 +514,7 @@ time {
   border-top: 1px solid var(--line);
 }
 @container (max-width: 18rem) {
-  .manual-account-editor .planning-v2-object {
+  .app .manual-account-editor .planning-v2-object {
     grid-template-columns: minmax(0, 1fr);
   }
 }
@@ -547,6 +553,8 @@ time {
   border-top: 0;
 }
 .ux-sheet .sheet-footer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
   gap: 16px;
 }
 .app .object-menu > button:first-of-type {
@@ -564,5 +572,149 @@ time {
       calc(var(--mobile-nav-height, 78px) + 48px + env(safe-area-inset-bottom)),
       calc(var(--feng-toast-clearance, 0px) + 24px)
     );
+  }
+}
+.app .transaction-description {
+  gap: 4px;
+}
+@container (max-width: 18rem) {
+  .swipe-transaction .transaction-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .transaction-row .transaction-description {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .transaction-row > strong {
+    margin-left: auto;
+  }
+}
+.app .transaction-row {
+  gap: 12px;
+  padding-block: 16px;
+}
+.app .date-scope {
+  gap: 8px;
+}
+.app .object-menu {
+  border-block: 0;
+}
+.app .month-review-page .card > a.button {
+  margin-top: 8px;
+}
+.app .ui-section-card-content:has(> button + button) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+.app .card > a:not(.button):not(.ui-chip-target),
+.app .totals dt > a,
+.app .beta-about p > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.app .card > a:not(.button):not(.ui-chip-target) {
+  width: 100%;
+}
+.recharts-tooltip-wrapper ul > li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.recharts-tooltip-wrapper .recharts-tooltip-item-value {
+  margin-left: auto;
+  white-space: nowrap;
+  text-align: right;
+}
+.app .month-figures > a {
+  min-height: 44px;
+}
+.app .restore-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.app .rule-preview-list {
+  padding: 0;
+  list-style: none;
+}
+.app .rule-preview-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.app-lock-screen > details {
+  border-block: 0;
+}
+.accuracy-dialog,
+.feedback-dialog {
+  container-type: inline-size;
+}
+@container (max-width: 18rem) {
+  .beta-about-metadata,
+  .feedback-context > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .beta-about-metadata dd,
+  .feedback-context dd {
+    margin: 0;
+    min-width: 0;
+  }
+}
+@media (max-width: 899px) {
+  .app textarea,
+  .ux-sheet textarea {
+    font-size: 1rem;
+    min-height: 48px;
+  }
+}
+:root[data-theme="light"]
+  .app
+  .account-filter-chip[aria-pressed="true"]
+  .account-chip-visual {
+  color: #1d293b;
+  background: #e8edf5;
+  border-color: #4c6688;
+}
+:root[data-theme="light"] .danger,
+:root[data-theme="light"] .app button.danger {
+  color: #9a342b;
+  border-color: #ac473d;
+}
+.app .category-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 12px;
+}
+@container (max-width: 18rem) {
+  .app .account-overview-row {
+    grid-template-columns: minmax(0, 1fr);
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .app .account-overview-row > span:first-child {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .app .account-overview-row > .account-balance {
+    width: 100%;
+    max-width: 100%;
+    justify-self: end;
+    margin-left: auto;
+  }
+  .app .totals > div,
+  .app .subscription-evidence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app .totals > div > dt,
+  .app .subscription-evidence > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .app .totals > div > dd,
+  .app .subscription-evidence > strong {
+    margin-left: auto;
   }
 }

@@ -153,7 +153,7 @@ export function BackupCentre({
       setSaving(false);
       setPassword("");
       setConfirmation("");
-      setNotice(`Backup ready: ${name}. Save it in Files.`);
+      setNotice("Backup ready. Save it in Files.");
     } catch (failure) {
       setError(
         failure instanceof Error

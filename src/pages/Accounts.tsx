@@ -197,9 +197,22 @@ export function AccountsContent() {
                       {account.currency}
                     </small>
                     <small>
-                      {displayedDate
-                        ? `As of ${formatUkDate(displayedDate)} · ${wallet ? "Manual cash balance" : evidence?.status === "reconciled" ? "Verified" : "Unverified"}`
-                        : "No statement balance"}
+                      {displayedDate ? (
+                        <>
+                          As of{" "}
+                          <time className="date-value" dateTime={displayedDate}>
+                            {formatUkDate(displayedDate)}
+                          </time>{" "}
+                          ·{" "}
+                          {wallet
+                            ? "Manual cash balance"
+                            : evidence?.status === "reconciled"
+                              ? "Verified"
+                              : "Unverified"}
+                        </>
+                      ) : (
+                        "No statement balance"
+                      )}
                     </small>
                     {!wallet && evidence?.reason && (
                       <small>{evidence.reason}</small>

@@ -504,7 +504,11 @@ export default function Home({
           <Link to={flowHref("income")} className="month-income">
             <span>Income</span>
             {coverage.hasIncomeSource ? (
-              <strong>
+              <strong
+                className={
+                  coverage.missingRates ? "metric-unavailable" : undefined
+                }
+              >
                 {coverage.missingRates
                   ? "Rates needed"
                   : `${projection.converted ? "≈ " : ""}${money(flow.income, currency)}${coverage.complete ? "" : "*"}`}
@@ -517,7 +521,13 @@ export default function Home({
           </Link>
           <Link to={flowHref("spending")} className="month-spending">
             <span>Spending</span>
-            <strong>
+            <strong
+              className={
+                !coverage.hasData || coverage.missingRates
+                  ? "metric-unavailable"
+                  : undefined
+              }
+            >
               {coverage.hasData
                 ? coverage.missingRates
                   ? "Rates needed"

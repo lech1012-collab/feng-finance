@@ -104,7 +104,14 @@ export function Sheet({
         </button>
       </header>
       <FooterContext.Provider value={footerHost}>
-        <div className="sheet-content">{children}</div>
+        <div
+          className="sheet-content"
+          tabIndex={0}
+          role="region"
+          aria-label={`${title} content`}
+        >
+          {children}
+        </div>
       </FooterContext.Provider>
       <footer ref={setFooterHost} className="sheet-footer">
         {footer}

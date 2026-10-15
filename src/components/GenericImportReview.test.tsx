@@ -210,7 +210,9 @@ describe("generic PDF evidence review", () => {
       screen.queryByText("Statement figures match exactly"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Close Map columns" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Map columns" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Import anyway…" }));
     const dialog = screen.getByRole("dialog");
     expect(
@@ -300,6 +302,7 @@ describe("generic PDF evidence review", () => {
 
   it("rechecks column changes and saves a named mapping without relying on filenames", () => {
     const { onMapping, onSaveTemplate } = show();
+    fireEvent.click(screen.getByRole("button", { name: "Map columns" }));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Role for Amount on page 1" }),
       { target: { value: "out" } },
@@ -429,6 +432,7 @@ describe("generic PDF evidence review", () => {
       '<img src="https://example.invalid/financial-data">';
     result.table.rows[0].cells[1].text = "<script>stealStatement()</script>";
     const { container } = show(result);
+    fireEvent.click(screen.getByRole("button", { name: "Map columns" }));
     expect(container.querySelectorAll("script,img")).toHaveLength(0);
     expect(
       screen.getByText("<script>stealStatement()</script>"),
@@ -442,7 +446,9 @@ describe("generic PDF evidence review", () => {
     expect(
       screen.getByText(/Not imported: unread pages 2, 3/),
     ).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Close Map columns" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Map columns" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Import anyway…" }));
     const dialog = screen.getByRole("dialog");
     expect(
