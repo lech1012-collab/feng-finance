@@ -196,3 +196,40 @@ test("Fixed footer coverage is detected and the original scroll position restore
     await context.close();
   }
 });
+test("Nested summaries inside a closed disclosure are not visible controls", async () => {
+  const r = await inspect(
+    "<details><summary>Outer disclosure</summary><details><summary>Hidden inner disclosure</summary><button>Hidden action</button></details></details>",
+    "details{display:block}summary{min-height:44px}",
+  );
+  assert.ok(!r.issues.some((i) => /Hidden inner|Hidden action/.test(i.text)));
+});
+test("Password reveal reserves space and does not excuse an unsafe overlap", async () => {
+  const body =
+    '<label for="password">Password</label><div class="password-field"><input id="password" type="password"><button aria-label="Show password">Show</button></div>';
+  const css =
+    ".password-field{position:relative;width:300px}.password-field input{width:100%;height:48px}.password-field button{position:absolute;right:0;top:0;width:64px;height:48px}";
+  const safe = await inspect(
+    body,
+    css + ".password-field input{padding-right:72px}",
+  );
+  assert.ok(!has(safe, "target-gap"));
+  assert.ok(safe.exceptions.some((e) => e.rule === "target-gap"));
+  const unsafe = await inspect(
+    body,
+    css + ".password-field input{padding-right:4px}",
+  );
+  assert.ok(has(unsafe, "target-gap") || has(unsafe, "control-overlap"));
+});
+test("The explicit two-line title allowance never excuses narrow three-line text", async () => {
+  const healthy = await inspect(
+    "<h1>Welcome to Feng</h1>",
+    "h1{width:160px;font-size:28px;line-height:1.4}",
+  );
+  assert.ok(!has(healthy, "text-squeezed"));
+  assert.ok(healthy.exceptions.some((e) => e.rule === "text-squeezed"));
+  const narrow = await inspect(
+    "<h1>Welcome to Feng</h1>",
+    "h1{width:90px;font-size:28px;line-height:1.4}",
+  );
+  assert.ok(has(narrow, "text-squeezed"));
+});

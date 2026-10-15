@@ -203,7 +203,14 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       return false;
     for (let p = e.parentElement; p; p = p.parentElement)
       if (Number(cs(p).opacity) === 0) return false;
-    if (e.closest("details:not([open])") && !e.closest("summary")) return false;
+    for (let p = e.parentElement; p; p = p.parentElement) {
+      if (
+        p.localName === "details" &&
+        !p.open &&
+        !p.querySelector(":scope > summary")?.contains(e)
+      )
+        return false;
+    }
     if (s.clip !== "auto" && s.clip !== "none") return false;
     if (s.clipPath !== "none" && (r.width <= 2 || r.height <= 2)) return false;
     if (r.right <= 0 || r.left >= innerWidth || r.bottom <= -100) return false;
@@ -492,6 +499,17 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       (average < 8 || (data.lines.length >= 3 && r.width < 120))
     ) {
       if (
+        e.matches("h1,.sheet-heading h2") &&
+        data.lines.length === 2 &&
+        r.width >= 120
+      )
+        except(
+          "text-squeezed",
+          e,
+          { width: round(r.width), lines, averageCharacters: round(average) },
+          "The brief explicitly allows page and sheet titles to wrap to two lines. This title has normal width; word splitting, clipping, sibling squeeze and overflow remain separate checks.",
+        );
+      else if (
         compoundFields.length + (ownText(e) ? 1 : 0) >= 2 &&
         compoundFields.every((c) => !c.querySelector("br"))
       )
@@ -900,6 +918,31 @@ export function collectGeometry({ mobile, setupId, stateId }) {
         axis = "vertical";
       } else continue;
       if (gap > 32) continue;
+      const passwordField = a.e.closest(".password-field");
+      if (
+        passwordField &&
+        passwordField.contains(b.e) &&
+        ((a.e.matches("input") && b.e.matches("button")) ||
+          (b.e.matches("input") && a.e.matches("button")))
+      ) {
+        const input = a.e.matches("input") ? a.e : b.e;
+        const button = a.e.matches("button") ? a.e : b.e;
+        const padding = parseFloat(cs(input).paddingRight);
+        const buttonWidth = button.getBoundingClientRect().width;
+        if (padding >= buttonWidth + 8) {
+          except(
+            "target-gap",
+            input,
+            {
+              button: selector(button),
+              reservedTextSpace: padding,
+              buttonWidth,
+            },
+            "Password reveal is an explicitly named composite control. The input reserves the reveal button's width plus 8px, so text and controls do not collide.",
+          );
+          continue;
+        }
+      }
       const destructivePair = destructive(a.e) || destructive(b.e);
       const required = destructivePair ? 16 : 8;
       const group = a.e.closest(
@@ -1198,6 +1241,16 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       const a = lines[i],
         b = lines[j];
       if (a.e === b.e || Math.min(a.width, b.width) < 40) continue;
+      const fixedOwner = (element) => {
+        for (let node = element; node; node = node.parentElement)
+          if (["fixed", "sticky"].includes(cs(node).position)) return node;
+        return null;
+      };
+      if (fixedOwner(a.e) !== fixedOwner(b.e)) {
+        // A fixed navigation edge and a scrolling card separator are different
+        // surfaces. Footer reachability checks cover actual obscured controls.
+        continue;
+      }
       const overlap = Math.min(a.right, b.right) - Math.max(a.left, b.left);
       if (
         Math.abs(a.y - b.y) <= 4 &&
@@ -1373,7 +1426,14 @@ export function collectElementInventory() {
       r.bottom <= -100
     )
       return false;
-    if (e.closest("details:not([open])") && !e.closest("summary")) return false;
+    for (let p = e.parentElement; p; p = p.parentElement) {
+      if (
+        p.localName === "details" &&
+        !p.open &&
+        !p.querySelector(":scope > summary")?.contains(e)
+      )
+        return false;
+    }
     const dialog = document.querySelector("dialog[open]");
     return !dialog || dialog.contains(e) || e.contains(dialog);
   };
@@ -1543,6 +1603,18 @@ async function auditReachability(page, setup, context) {
               ? "." + [...e.classList].slice(0, 2).map(CSS.escape).join(".")
               : "");
       const visible = (e) => {
+        for (
+          let parent = e.parentElement;
+          parent;
+          parent = parent.parentElement
+        ) {
+          if (
+            parent.localName === "details" &&
+            !parent.open &&
+            !parent.querySelector(":scope > summary")?.contains(e)
+          )
+            return false;
+        }
         const r = e.getBoundingClientRect(),
           s = getComputedStyle(e);
         const opaqueAncestors = (() => {
@@ -1555,6 +1627,8 @@ async function auditReachability(page, setup, context) {
           r.width > 0 &&
           r.height > 0 &&
           s.display !== "none" &&
+          (s.clip === "auto" || s.clip === "none") &&
+          !(s.clipPath !== "none" && (r.width <= 2 || r.height <= 2)) &&
           s.visibility !== "hidden" &&
           Number(s.opacity) > 0 &&
           !e.closest("[inert],[hidden]")
@@ -1848,7 +1922,7 @@ export async function renderAuditReport({
     .join(
       "",
     )}</tbody></table></details></section><section class="summary" id="summary"></section><section class="controls"><label>Setup<select id="setup"><option value="">All setups</option></select></label><label>Screen or state<input id="search" placeholder="Search title, route or issue"></label><label>Show<select id="issues"><option value="all">Every state</option><option value="findings">With findings</option><option value="blocking">High or medium</option></select></label></section><div id="states"></div></main><script type="application/json" id="data">${scriptSafe(rows)}</script><script>
-  const rows=JSON.parse(document.getElementById('data').textContent),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const setups=[...new Set(rows.map(r=>r.setup))];for(const s of setups){const o=document.createElement('option');o.value=s;o.textContent=s;document.getElementById('setup').append(o)}const groups=new Map();for(const r of rows){const k=r.setup+'/'+r.state;if(!groups.has(k))groups.set(k,{});groups.get(k)[r.phase]=r}document.getElementById('summary').innerHTML='<h2>Results by setup</h2><table><thead><tr><th>Setup</th><th>Before states / high / medium / low</th><th>After states / high / medium / low</th><th>Gate</th></tr></thead><tbody>'+setups.map(s=>{const phases=['before','after'].map(p=>{const list=rows.filter(r=>r.setup===s&&r.phase===p);return {states:list.length,high:list.reduce((n,r)=>n+(r.counts?.high||0),0),medium:list.reduce((n,r)=>n+(r.counts?.medium||0),0),low:list.reduce((n,r)=>n+(r.counts?.low||0),0)}});const complete=phases[1].states===phases[0].states&&phases[1].states>0,gate=complete&&!phases[1].high&&!phases[1].medium?'PASS':'FAIL';return '<tr><td>'+esc(s)+'</td>'+phases.map(p=>'<td>'+[p.states,p.high,p.medium,p.low].join(' / ')+'</td>').join('')+'<td class="'+(gate==='FAIL'?'status-fail':'')+'">'+gate+'</td></tr>'}).join('')+'</tbody></table>';function draw(){const setup=document.getElementById('setup').value,query=document.getElementById('search').value.toLowerCase(),mode=document.getElementById('issues').value;document.getElementById('states').innerHTML=[...groups].filter(([k,g])=>{const r=g.after||g.before;return(!setup||r.setup===setup)&&(!query||JSON.stringify(g).toLowerCase().includes(query))&&(mode==='all'||Object.values(g).some(p=>mode==='findings'?p.issues.length:p.counts?.high||p.counts?.medium))}).map(([k,g])=>{const r=g.after||g.before;return '<section class="state"><h2>'+esc(r.title||r.state)+'</h2><p class="muted">'+esc(r.setup)+' · '+esc(r.route||'')+'</p><div class="compare">'+['before','after'].map(phase=>{const p=g[phase];if(!p)return '<div><h3>'+phase+'</h3><p class="missing">Evidence not captured; this state cannot pass.</p></div>';return '<div><h3>'+phase+'</h3><p>'+['high','medium','low'].map(s=>'<span class="badge '+s+'">'+s+': '+(p.counts?.[s]||0)+'</span>').join('')+'</p>'+(p.screenshot?'<div class="shot"><a href="'+esc(p.screenshot)+'" target="_blank" rel="noopener"><img src="'+esc(p.screenshot)+'" alt="'+esc(p.title||p.state)+' '+phase+' screenshot" loading="lazy"></a></div>':'<p class="missing">Screenshot not supplied</p>')+'<details'+(p.issues.length?' open':'')+'><summary>'+p.issues.length+' measured findings</summary><div class="issues"><table><thead><tr><th>Severity / rule</th><th>Element</th><th>Measured / expected</th></tr></thead><tbody>'+p.issues.map(i=>'<tr><td class="'+i.severity+'">'+esc(i.severity)+'<br>'+esc(i.rule)+'</td><td><code>'+esc(i.selector)+'</code><br>'+esc(i.text)+'</td><td><pre>'+esc(JSON.stringify(i.measured,null,2))+'</pre>'+esc(i.expected)+(i.note?'<p>'+esc(i.note)+'</p>':'')+'</td></tr>').join('')+'</tbody></table></div></details><details><summary>'+p.exceptions.length+' evidence exceptions</summary><pre>'+esc(JSON.stringify(p.exceptions,null,2))+'</pre></details><details><summary>Raw text, target and scroll measurements</summary><pre>'+esc(JSON.stringify(p.measurements,null,2))+'</pre></details>'+'</div>'}).join('')+'</div></section>'}).join('')}for(const id of ['setup','search','issues'])document.getElementById(id).addEventListener('input',draw);draw();
+  const requiredStates=${Number(metadata.expectedStatesPerSetup) || 0},captures=${scriptSafe(metadata.afterCaptureCompleteBySetup || {})};const rows=JSON.parse(document.getElementById('data').textContent),esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));const setups=[...new Set(rows.map(r=>r.setup))];for(const s of setups){const o=document.createElement('option');o.value=s;o.textContent=s;document.getElementById('setup').append(o)}const groups=new Map();for(const r of rows){const k=r.setup+'/'+r.state;if(!groups.has(k))groups.set(k,{});groups.get(k)[r.phase]=r}document.getElementById('summary').innerHTML='<h2>Results by setup</h2><table><thead><tr><th>Setup</th><th>Before states / high / medium / low</th><th>After states / high / medium / low</th><th>Gate</th></tr></thead><tbody>'+setups.map(s=>{const phases=['before','after'].map(p=>{const list=rows.filter(r=>r.setup===s&&r.phase===p);return {states:list.length,high:list.reduce((n,r)=>n+(r.counts?.high||0),0),medium:list.reduce((n,r)=>n+(r.counts?.medium||0),0),low:list.reduce((n,r)=>n+(r.counts?.low||0),0)}});const complete=requiredStates>0&&captures[s]===true&&phases[0].states===requiredStates&&phases[1].states===requiredStates,gate=complete&&!phases[1].high&&!phases[1].medium?'PASS':'FAIL';return '<tr><td>'+esc(s)+'</td>'+phases.map(p=>'<td>'+[p.states,p.high,p.medium,p.low].join(' / ')+'</td>').join('')+'<td class="'+(gate==='FAIL'?'status-fail':'')+'">'+gate+'</td></tr>'}).join('')+'</tbody></table>';function draw(){const setup=document.getElementById('setup').value,query=document.getElementById('search').value.toLowerCase(),mode=document.getElementById('issues').value;document.getElementById('states').innerHTML=[...groups].filter(([k,g])=>{const r=g.after||g.before;return(!setup||r.setup===setup)&&(!query||JSON.stringify(g).toLowerCase().includes(query))&&(mode==='all'||Object.values(g).some(p=>mode==='findings'?p.issues.length:p.counts?.high||p.counts?.medium))}).map(([k,g])=>{const r=g.after||g.before;return '<section class="state"><h2>'+esc(r.title||r.state)+'</h2><p class="muted">'+esc(r.setup)+' · '+esc(r.route||'')+'</p><div class="compare">'+['before','after'].map(phase=>{const p=g[phase];if(!p)return '<div><h3>'+phase+'</h3><p class="missing">Evidence not captured; this state cannot pass.</p></div>';return '<div><h3>'+phase+'</h3><p>'+['high','medium','low'].map(s=>'<span class="badge '+s+'">'+s+': '+(p.counts?.[s]||0)+'</span>').join('')+'</p>'+(p.screenshot?'<div class="shot"><a href="'+esc(p.screenshot)+'" target="_blank" rel="noopener"><img src="'+esc(p.screenshot)+'" alt="'+esc(p.title||p.state)+' '+phase+' screenshot" loading="lazy"></a></div>':'<p class="missing">Screenshot not supplied</p>')+'<details'+(p.issues.length?' open':'')+'><summary>'+p.issues.length+' measured findings</summary><div class="issues"><table><thead><tr><th>Severity / rule</th><th>Element</th><th>Measured / expected</th></tr></thead><tbody>'+p.issues.map(i=>'<tr><td class="'+i.severity+'">'+esc(i.severity)+'<br>'+esc(i.rule)+'</td><td><code>'+esc(i.selector)+'</code><br>'+esc(i.text)+'</td><td><pre>'+esc(JSON.stringify(i.measured,null,2))+'</pre>'+esc(i.expected)+(i.note?'<p>'+esc(i.note)+'</p>':'')+'</td></tr>').join('')+'</tbody></table></div></details><details><summary>'+p.exceptions.length+' evidence exceptions</summary><pre>'+esc(JSON.stringify(p.exceptions,null,2))+'</pre></details><details><summary>Raw text, target and scroll measurements</summary><pre>'+esc(JSON.stringify(p.measurements,null,2))+'</pre></details>'+'</div>'}).join('')+'</div></section>'}).join('')}for(const id of ['setup','search','issues'])document.getElementById(id).addEventListener('input',draw);draw();
   </script></body></html>`;
   await mkdir(dirname(resolve(output)), { recursive: true });
   await writeFile(output, html);

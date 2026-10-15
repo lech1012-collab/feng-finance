@@ -1,0 +1,901 @@
+{
+  "baseline": "v2.2.6",
+  "fixtureToday": "2026-10-14T12:00:00Z",
+  "statementPeriod": "September 2026",
+  "privacy": "Fresh isolated browser contexts; all values fictitious; external requests blocked and recorded. No real PDF/transaction fixtures.",
+  "setups": [
+    {
+      "id": "iphone390-dark",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "textScale": 1,
+      "engine": "webkit"
+    },
+    {
+      "id": "iphone375-dark",
+      "width": 375,
+      "height": 667,
+      "theme": "dark",
+      "textScale": 1,
+      "engine": "webkit"
+    },
+    {
+      "id": "small320-dark",
+      "width": 320,
+      "height": 568,
+      "theme": "dark",
+      "textScale": 1,
+      "engine": "webkit"
+    },
+    {
+      "id": "iphone390-text200",
+      "width": 390,
+      "height": 844,
+      "theme": "dark",
+      "textScale": 2,
+      "engine": "webkit"
+    },
+    {
+      "id": "iphone390-light",
+      "width": 390,
+      "height": 844,
+      "theme": "light",
+      "textScale": 1,
+      "engine": "webkit"
+    },
+    {
+      "id": "desktop1440-dark",
+      "width": 1440,
+      "height": 900,
+      "theme": "dark",
+      "textScale": 1,
+      "engine": "chromium"
+    },
+    {
+      "id": "desktop1024-dark",
+      "width": 1024,
+      "height": 768,
+      "theme": "dark",
+      "textScale": 1,
+      "engine": "chromium"
+    }
+  ],
+  "states": [
+    {
+      "id": "whats-new",
+      "title": "Version-specific changes",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "feedback",
+      "title": "Feedback technical context and explicit send",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "self-assessment",
+      "title": "Self Assessment property summary",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-complete",
+      "title": "Home after confirming all demo account transfers",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-missing-rates",
+      "title": "Unknown converted figures show rates needed",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "forecast-missing-rates",
+      "title": "Forecast with missing exchange rates",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "first-launch",
+      "title": "First-launch beta notice",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-empty",
+      "title": "Home after cancelling first picker",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transactions-empty",
+      "title": "Transactions with no imported records",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "subscriptions-empty",
+      "title": "No recurring evidence yet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "pots-empty",
+      "title": "No goals or pots yet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "backup-empty",
+      "title": "No saved backup yet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transaction-filters",
+      "title": "Transaction filters sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transaction-filters-date",
+      "title": "Explicit date-range filters",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transaction-query-builder",
+      "title": "Advanced condition builder",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transaction-search-empty",
+      "title": "Search has no results and can be cleared",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transactions-uncategorised",
+      "title": "Uncategorised-only queue",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "sorting-sheet",
+      "title": "Sorting sheet with suggested categories",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "sorting-undo-toast",
+      "title": "Learning receipt and next transaction",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "transaction-detail",
+      "title": "Transaction detail and source trace",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "split-remaining",
+      "title": "Split editor with remaining allocation",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "split-balanced",
+      "title": "Split editor balanced to the source amount",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "refund-detail",
+      "title": "Refund source and counted month",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "refund-picker",
+      "title": "Refund same-merchant recent-purchase picker",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "manual-transaction",
+      "title": "Manual transaction bottom sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "rule-editor",
+      "title": "Rule editor with live matching preview",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "category-new",
+      "title": "Add category sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "category-edit",
+      "title": "Edit category sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "account-new",
+      "title": "Add bank account sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "asset-new",
+      "title": "Manual asset or liability sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "budget-editor",
+      "title": "Budget edit sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "pot-editor",
+      "title": "Goal or irregular-cost pot sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "pot-options",
+      "title": "Pot contribution and separated destructive options",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "series-editor",
+      "title": "Recurring payment series edit sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "debt-terms-editor",
+      "title": "APR and actual minimum payment terms",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "debt-plan-editor",
+      "title": "Repayment strategy and amount sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "what-if",
+      "title": "What-if adjustments separate from actual figures",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "report-editor",
+      "title": "Reports scope and condition edit sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-check",
+      "title": "Processing one selected PDF",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-review-one",
+      "title": "Native bank one-statement review",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-review-one-expanded",
+      "title": "Native statement figures and exact reconciliation",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-review-four",
+      "title": "Four native bank statements in one review",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-after-import",
+      "title": "Import completion with next action",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-safari-storage-warning",
+      "title": "Post-import storage warning state",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-duplicate",
+      "title": "Exact duplicate statement is skipped",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-generic",
+      "title": "Unfamiliar bank generic reader",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-map-columns",
+      "title": "Column role mapping exception workflow",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-t11-mismatch",
+      "title": "Synthetic T11 amount mismatch blocks confirmation",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-needs-review",
+      "title": "Needs review list with extracted rows and source proof",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-correct-row",
+      "title": "Problem row correction with source crop",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-invalid",
+      "title": "Damaged or unsupported PDF error",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "backup-protected-editor",
+      "title": "Default password-protected backup sheet",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "backup-protected-ready",
+      "title": "Protected backup ready for export",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "backup-saved-toast",
+      "title": "Backup download receipt",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "restore-unlock",
+      "title": "Encrypted backup password gate",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "restore-wrong-password",
+      "title": "Wrong password cannot change financial data",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "restore-preview",
+      "title": "Restore contents preview before acknowledgement",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "restore-acknowledged",
+      "title": "Explicit replacement acknowledgement",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "backup-readable-warning",
+      "title": "Optional readable backup warning",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "restore-invalid-file",
+      "title": "Invalid backup rejected without replacing data",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "danger-disabled",
+      "title": "Both delete options disabled without acknowledgement",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "danger-records-acknowledged",
+      "title": "Record-only deletion acknowledgement",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "danger-erase-acknowledged",
+      "title": "Full-erasure exact phrase gate",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "app-lock-enabled",
+      "title": "PIN protection configured",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "app-lock",
+      "title": "Locked workspace with six masked digits",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "app-lock-error",
+      "title": "Incorrect PIN stays locked",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "app-lock-recovery",
+      "title": "Forgot PIN explanation without recovery promises",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "safety-copy",
+      "title": "Actual schema migration previous-data safety copy",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "safety-restore-confirmation",
+      "title": "Safety copy replacement warning and preserved security",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-partial",
+      "title": "Home with full demo and qualified values",
+      "kind": "screen",
+      "route": "/"
+    },
+    {
+      "id": "transactions-list",
+      "title": "Transactions list",
+      "kind": "screen",
+      "route": "/transactions?allDates=1"
+    },
+    {
+      "id": "analyse-overview",
+      "title": "Analyse overview",
+      "kind": "screen",
+      "route": "/analysis"
+    },
+    {
+      "id": "analyse-property-report",
+      "title": "Property report",
+      "kind": "screen",
+      "route": "/property"
+    },
+    {
+      "id": "analyse-reports",
+      "title": "Reports result",
+      "kind": "screen",
+      "route": "/analysis?view=reports"
+    },
+    {
+      "id": "analyse-trips",
+      "title": "Tags and trips analysis",
+      "kind": "screen",
+      "route": "/analysis?view=trips"
+    },
+    {
+      "id": "subscriptions",
+      "title": "Subscriptions and bills",
+      "kind": "screen",
+      "route": "/subscriptions"
+    },
+    {
+      "id": "planning-budgets",
+      "title": "Monthly budgets",
+      "kind": "screen",
+      "route": "/planning?tab=budgets"
+    },
+    {
+      "id": "planning-pots",
+      "title": "Pots and goals",
+      "kind": "screen",
+      "route": "/planning?tab=pots"
+    },
+    {
+      "id": "planning-calendar",
+      "title": "Payments calendar",
+      "kind": "screen",
+      "route": "/planning?tab=calendar"
+    },
+    {
+      "id": "planning-debt",
+      "title": "Debt payoff summary",
+      "kind": "screen",
+      "route": "/planning?tab=debt"
+    },
+    {
+      "id": "planning-forecast",
+      "title": "Forecast summary",
+      "kind": "screen",
+      "route": "/planning?tab=forecast"
+    },
+    {
+      "id": "settings-home",
+      "title": "Grouped Settings",
+      "kind": "screen",
+      "route": "/settings"
+    },
+    {
+      "id": "accounts",
+      "title": "Bank/card accounts and manual assets",
+      "kind": "screen",
+      "route": "/accounts"
+    },
+    {
+      "id": "import-pick",
+      "title": "Import picker fallback",
+      "kind": "screen",
+      "route": "/import"
+    },
+    {
+      "id": "settings-appearance",
+      "title": "Settings: appearance",
+      "kind": "screen",
+      "route": "/settings?section=appearance"
+    },
+    {
+      "id": "settings-currency",
+      "title": "Settings: currency",
+      "kind": "screen",
+      "route": "/settings?section=currency"
+    },
+    {
+      "id": "settings-period",
+      "title": "Settings: period",
+      "kind": "screen",
+      "route": "/settings?section=period"
+    },
+    {
+      "id": "settings-categories",
+      "title": "Settings: categories",
+      "kind": "screen",
+      "route": "/settings?section=categories"
+    },
+    {
+      "id": "settings-rules",
+      "title": "Settings: rules",
+      "kind": "screen",
+      "route": "/settings?section=rules"
+    },
+    {
+      "id": "settings-tags",
+      "title": "Settings: tags",
+      "kind": "screen",
+      "route": "/settings?section=tags"
+    },
+    {
+      "id": "settings-reminders",
+      "title": "Settings: reminders",
+      "kind": "screen",
+      "route": "/settings?section=reminders"
+    },
+    {
+      "id": "settings-reports",
+      "title": "Settings: reports",
+      "kind": "screen",
+      "route": "/settings?section=reports"
+    },
+    {
+      "id": "settings-transfers",
+      "title": "Settings: transfers",
+      "kind": "screen",
+      "route": "/settings?section=transfers"
+    },
+    {
+      "id": "settings-security",
+      "title": "Settings: security",
+      "kind": "screen",
+      "route": "/settings?section=security"
+    },
+    {
+      "id": "settings-backup",
+      "title": "Settings: backup",
+      "kind": "screen",
+      "route": "/settings?section=backup"
+    },
+    {
+      "id": "settings-storage",
+      "title": "Settings: storage",
+      "kind": "screen",
+      "route": "/settings?section=storage"
+    },
+    {
+      "id": "settings-export",
+      "title": "Settings: export",
+      "kind": "screen",
+      "route": "/settings?section=export"
+    },
+    {
+      "id": "settings-changes",
+      "title": "Settings: changes",
+      "kind": "screen",
+      "route": "/settings?section=changes"
+    },
+    {
+      "id": "settings-demo",
+      "title": "Settings: demo",
+      "kind": "screen",
+      "route": "/settings?section=demo"
+    },
+    {
+      "id": "settings-imports",
+      "title": "Settings: imports",
+      "kind": "screen",
+      "route": "/settings?section=imports"
+    },
+    {
+      "id": "settings-diagnostics",
+      "title": "Settings: diagnostics",
+      "kind": "screen",
+      "route": "/settings?section=diagnostics"
+    },
+    {
+      "id": "settings-statements",
+      "title": "Settings: statements",
+      "kind": "screen",
+      "route": "/settings?section=statements"
+    },
+    {
+      "id": "settings-about",
+      "title": "Settings: about",
+      "kind": "screen",
+      "route": "/settings?section=about"
+    },
+    {
+      "id": "settings-danger",
+      "title": "Settings: danger",
+      "kind": "screen",
+      "route": "/settings?section=danger"
+    },
+    {
+      "id": "monthly-review-1",
+      "title": "Monthly review step 1",
+      "route": "/review?month=2026-09",
+      "kind": "screen",
+      "method": "Select actual review step"
+    },
+    {
+      "id": "monthly-review-2",
+      "title": "Monthly review step 2",
+      "route": "/review?month=2026-09",
+      "kind": "screen",
+      "method": "Select actual review step"
+    },
+    {
+      "id": "monthly-review-3",
+      "title": "Monthly review step 3",
+      "route": "/review?month=2026-09",
+      "kind": "screen",
+      "method": "Select actual review step"
+    },
+    {
+      "id": "monthly-review-4",
+      "title": "Monthly review step 4",
+      "route": "/review?month=2026-09",
+      "kind": "screen",
+      "method": "Select actual review step"
+    },
+    {
+      "id": "install-help",
+      "title": "Install instructions disclosure",
+      "kind": "disclosure",
+      "route": "/settings?section=about"
+    },
+    {
+      "id": "privacy",
+      "title": "Privacy disclosure",
+      "kind": "disclosure",
+      "route": "/settings?section=about"
+    },
+    {
+      "id": "manual-rate",
+      "title": "Manual exchange-rate entry",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "debt-calculated",
+      "title": "Debt payoff uses card minimums and excludes unpaid mortgage terms",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "import-unverified-confirmation",
+      "title": "Explicit unverified import warning",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-card-only",
+      "title": "Only card statement imported: income and cash unknown",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "home-known-missing-account",
+      "title": "Partial Home with a known missing statement account",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "sorting-direct-manipulation",
+      "title": "Desktop object drag and category destinations",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "what-if-editor",
+      "title": "Scenario editor: temporary adjustments",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "app-lock-setup",
+      "title": "Configure six-digit PIN protection",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "backup-with-downloaded-rates",
+      "title": "Backup containing a valid ECB quote outside supported ledger currencies",
+      "kind": "state",
+      "method": "Actual UI transition, fresh synthetic demo or PDF fixtures"
+    },
+    {
+      "id": "series-match-review",
+      "group": "recurrence",
+      "kind": "state",
+      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet"
+    },
+    {
+      "id": "series-match-undo",
+      "group": "recurrence",
+      "kind": "state",
+      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet"
+    },
+    {
+      "id": "monthly-review-contribution",
+      "group": "recurrence",
+      "kind": "state",
+      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet"
+    },
+    {
+      "id": "analyse-category",
+      "title": "Groceries category",
+      "group": "base",
+      "kind": "state",
+      "method": "Actual UI navigation or expanded supported-bank statement"
+    },
+    {
+      "id": "analyse-property",
+      "title": "Property category",
+      "group": "base",
+      "kind": "state",
+      "method": "Actual UI navigation or expanded supported-bank statement"
+    },
+    {
+      "id": "import-amex-expanded",
+      "title": "Native bank reconciliation: known-bank-amex",
+      "group": "imports",
+      "kind": "state",
+      "method": "Actual UI navigation or expanded supported-bank statement"
+    },
+    {
+      "id": "import-barclaycard-expanded",
+      "title": "Native bank reconciliation: known-bank-barclaycard",
+      "group": "imports",
+      "kind": "state",
+      "method": "Actual UI navigation or expanded supported-bank statement"
+    },
+    {
+      "id": "import-revolut-expanded",
+      "title": "Native bank reconciliation: known-bank-revolut",
+      "group": "imports",
+      "kind": "state",
+      "method": "Actual UI navigation or expanded supported-bank statement"
+    },
+    {
+      "id": "analyse-category-trends",
+      "title": "Category trend comparison and monthly source values",
+      "kind": "state",
+      "method": "Actual UI transition in a fresh fictitious context"
+    },
+    {
+      "id": "settings-rules-populated",
+      "title": "Explicit and remembered rules, match, category, hits and last use",
+      "kind": "state",
+      "method": "Actual UI transition in a fresh fictitious context"
+    },
+    {
+      "id": "analyse-cash-values",
+      "title": "Expanded cash-flow source values",
+      "kind": "state",
+      "method": "Actual expanded disclosure or chart control, fictitious records only"
+    },
+    {
+      "id": "property-cash-values",
+      "title": "Expanded property cash-flow source values",
+      "kind": "state",
+      "method": "Actual expanded disclosure or chart control, fictitious records only"
+    },
+    {
+      "id": "category-values",
+      "title": "Expanded category monthly source values",
+      "kind": "state",
+      "method": "Actual expanded disclosure or chart control, fictitious records only"
+    },
+    {
+      "id": "category-trend-monthly-values",
+      "title": "Expanded category trend source matrix",
+      "kind": "state",
+      "method": "Actual expanded disclosure or chart control, fictitious records only"
+    },
+    {
+      "id": "report-bar",
+      "title": "Report result: bar",
+      "kind": "state",
+      "method": "Actual expanded disclosure or chart control, fictitious records only"
+    },
+    {
+      "id": "report-line",
+      "title": "Report result: line",
+      "kind": "state",
+      "method": "Actual expanded disclosure or chart control, fictitious records only"
+    }
+  ],
+  "limitations": [
+    "OS-owned iOS Files and Add to Home Screen dialogs cannot be rendered by the web app; documented as manual real-device steps, not fabricated.",
+    "VoiceOver output needs a physical iPhone; automated accessibility tree and keyboard checks only.",
+    "Swiping/dragging evidence is captured at desktop where behaviour differs; same screenshot IDs use the equivalent available interaction on mobile.",
+    "An inventory state is not certified captured until present in capture-manifest results. Failed scenario groups are recorded explicitly."
+  ],
+  "captureScript": "scripts/feng-polish-capture.mjs",
+  "count": 127,
+  "sourceDocuments": [
+    "Complete UX Review v2.2.5",
+    "Developer Specification v2.0",
+    "Spec Amendment v2.2",
+    "Release Readiness Review",
+    "feng-ux-review.html",
+    "original feng-ui-audit.mjs"
+  ]
+}

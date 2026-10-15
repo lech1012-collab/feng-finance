@@ -8,11 +8,12 @@
 // Usage:
 // node scripts/feng-ui-audit.mjs http://localhost:4173 --phase after --output audit/after
 // node scripts/feng-ui-audit.mjs --report-only --before audit/before --after audit/after
-import { readdir, readFile, mkdir, writeFile } from "node:fs/promises";
+import { readdir, readFile, mkdir, writeFile, stat } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderAuditReport, AUDIT_RULES } from "./feng-polish-audit-engine.mjs";
+import { inspectCaptureEvidence } from "./feng-polish-audit-evidence.mjs";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
@@ -55,7 +56,8 @@ const readJson = async (file) => JSON.parse(await readFile(file, "utf8"));
 async function readCaptured(directory) {
   const results = [],
     errors = [],
-    network = [];
+    network = [],
+    runs = [];
   let files = [];
   try {
     files = await readdir(directory, { withFileTypes: true });
@@ -74,17 +76,105 @@ async function readCaptured(directory) {
       entry.name.endsWith(".json")
     ) {
       const manifest = await readJson(join(directory, entry.name));
-      errors.push(...(manifest.errors || []));
+      const info = await stat(join(directory, entry.name));
+      runs.push({
+        manifest,
+        file: entry.name,
+        time: Date.parse(manifest.run?.finishedAt || "") || info.mtimeMs,
+      });
       network.push(...(manifest.network || []));
     }
   }
   results.sort(
     (a, b) => a.setup.localeCompare(b.setup) || a.id.localeCompare(b.id),
   );
+  // Keep the latest actual outcome for each setup/group. A successful replay
+  // supersedes an older failure only for the exact group it reran; unresolved
+  // groups and unscoped errors remain failures. Historical outcomes are retained.
+  const outcomes = new Map(),
+    resolvedErrors = [];
+  const groupNames = [
+    "first",
+    "partial",
+    "base",
+    "transactions",
+    "planning",
+    "recurrence",
+    "imports",
+    "backup",
+    "fxbackup",
+    "safety",
+    "trends",
+    "rules",
+    "values",
+  ];
+  for (const { manifest, file, time } of runs.sort((a, b) => a.time - b.time)) {
+    const scope = manifest.run;
+    if (scope?.setups && scope?.groups) {
+      for (const setup of scope.setups) {
+        for (const group of scope.groups) {
+          const key = setup + "/" + group,
+            prior = outcomes.get(key);
+          const current = (manifest.errors || []).filter(
+            (error) =>
+              error.setup === setup && (error.group === group || !error.group),
+          );
+          if (prior?.errors.length)
+            resolvedErrors.push(
+              ...prior.errors.map((error) => ({
+                error,
+                priorManifest: prior.file,
+                replayedBy: file,
+                outcome: current.length
+                  ? "still failing"
+                  : "passed exact group",
+              })),
+            );
+          outcomes.set(key, { file, time, errors: current });
+        }
+        if (groupNames.every((group) => scope.groups.includes(group))) {
+          const key = setup + "/*",
+            prior = outcomes.get(key),
+            current = (manifest.errors || []).filter(
+              (error) => error.setup === setup && !error.group,
+            );
+          if (prior?.errors.length)
+            resolvedErrors.push(
+              ...prior.errors.map((error) => ({
+                error,
+                priorManifest: prior.file,
+                replayedBy: file,
+                outcome: current.length ? "still failing" : "passed full setup",
+              })),
+            );
+          outcomes.set(key, { file, time, errors: current });
+        }
+      }
+    } else
+      for (const error of manifest.errors || []) {
+        const key = (error.setup || "unknown") + "/" + (error.group || "*"),
+          prior = outcomes.get(key);
+        outcomes.set(key, {
+          file,
+          time,
+          errors: [...(prior?.errors || []), error],
+        });
+      }
+  }
+  const seenErrors = new Set();
+  for (const outcome of outcomes.values())
+    for (const error of outcome.errors) {
+      const key = JSON.stringify(error);
+      if (!seenErrors.has(key)) {
+        errors.push(error);
+        seenErrors.add(key);
+      }
+    }
   return {
     results,
     errors,
     network,
+    resolvedErrors,
     complete: !errors.length && results.length > 0,
   };
 }
@@ -133,6 +223,11 @@ async function writeArtifacts(directory, captured, artifactPhase = phase) {
     {},
   );
   const setups = [...new Set(captured.results.map((r) => r.setup))];
+  const evidence = await inspectCaptureEvidence(
+    captured.results,
+    directory,
+    artifactPhase,
+  );
   const perSetup = Object.fromEntries(
     setups.map((setup) => {
       const rows = captured.results.filter((r) => r.setup === setup),
@@ -147,6 +242,14 @@ async function writeArtifacts(directory, captured, artifactPhase = phase) {
           engine: rows[0].engine,
           issues: counts,
           auditedStates: rows.filter((r) => r.audit).length,
+          complete:
+            evidence.completeEvidence &&
+            rows.length === inventory.states.length &&
+            rows.every((r) => r.audit) &&
+            !missingStates.some((s) => s.setup === setup) &&
+            !captured.errors.some(
+              (error) => error.setup === setup || !error.setup,
+            ),
         },
       ];
     }),
@@ -165,13 +268,20 @@ async function writeArtifacts(directory, captured, artifactPhase = phase) {
     unauditedStates: missing.map((r) => ({ setup: r.setup, state: r.id })),
     missingStates,
     expectedStatesPerSetup: inventory.states.length,
+    ...evidence,
     errors: captured.errors,
+    resolvedErrors: captured.resolvedErrors,
     network: captured.network,
-    complete: captured.complete && !missing.length && !missingStates.length,
+    complete:
+      captured.complete &&
+      evidence.completeEvidence &&
+      !missing.length &&
+      !missingStates.length,
     gate:
       captured.complete &&
       !missing.length &&
       !missingStates.length &&
+      evidence.completeEvidence &&
       setups.length === 7 &&
       !bySev.high &&
       !bySev.medium
@@ -205,6 +315,7 @@ if (!args.includes("--report-only")) {
         ...process.env,
         FENG_AUDIT_URL: url,
         FENG_AUDIT_OUTPUT: output,
+        FENG_AUDIT_PHASE: phase,
         FENG_AUDIT_MODULE: join(here, "feng-polish-audit-engine.mjs"),
       },
     });
@@ -217,12 +328,14 @@ if (!args.includes("--report-only")) {
     other = join(parent, phase === "before" ? "after" : "before");
   const current = join(output, "results.json");
   const otherRows = await readCaptured(other);
-  if (otherRows.results.length)
-    await writeArtifacts(
-      other,
-      otherRows,
-      phase === "before" ? "after" : "before",
-    );
+  const otherSummary = otherRows.results.length
+    ? await writeArtifacts(
+        other,
+        otherRows,
+        phase === "before" ? "after" : "before",
+      )
+    : null;
+  const afterSummary = phase === "after" ? summary : otherSummary;
   await renderAuditReport({
     before:
       phase === "before"
@@ -240,6 +353,15 @@ if (!args.includes("--report-only")) {
     metadata: {
       url,
       phase,
+      automatedLayoutGate: afterSummary?.gate || "FAIL",
+      singleImmutableBuild: afterSummary?.singleImmutableBuild || false,
+      expectedStatesPerSetup: summary.expectedStatesPerSetup,
+      afterCaptureCompleteBySetup: Object.fromEntries(
+        Object.entries(afterSummary?.perSetup || {}).map(([setup, details]) => [
+          setup,
+          details.complete,
+        ]),
+      ),
       releaseGateSource:
         "Feng-Release-Readiness-Review.md, section 7 (Release gate)",
       source:
@@ -259,8 +381,12 @@ if (!args.includes("--report-only")) {
 } else {
   const b = await readCaptured(before),
     a = await readCaptured(after);
-  if (b.results.length) await writeArtifacts(before, b, "before");
-  if (a.results.length) await writeArtifacts(after, a, "after");
+  const bSummary = b.results.length
+    ? await writeArtifacts(before, b, "before")
+    : null;
+  const aSummary = a.results.length
+    ? await writeArtifacts(after, a, "after")
+    : null;
   const report = resolve(
     option("--report", join(dirname(after), "report.html")),
   );
@@ -270,13 +396,26 @@ if (!args.includes("--report-only")) {
     output: report,
     metadata: {
       url,
+      expectedStatesPerSetup:
+        aSummary?.expectedStatesPerSetup ||
+        bSummary?.expectedStatesPerSetup ||
+        0,
+      afterCaptureCompleteBySetup: Object.fromEntries(
+        Object.entries(aSummary?.perSetup || {}).map(([setup, details]) => [
+          setup,
+          details.complete,
+        ]),
+      ),
       releaseGateSource:
         "Feng-Release-Readiness-Review.md, section 7 (Release gate)",
       source: "Extended UX-designer feng-ui-audit.mjs",
       date: new Date().toISOString(),
-      beforeComplete: b.complete,
-      afterComplete: a.complete,
+      beforeComplete: bSummary?.complete || false,
+      afterComplete: aSummary?.complete || false,
+      automatedLayoutGate: aSummary?.gate || "FAIL",
+      singleImmutableBuild: aSummary?.singleImmutableBuild || false,
     },
   });
   console.log("[audit] report", report);
+  if (aSummary?.gate !== "PASS") process.exitCode = 1;
 }
