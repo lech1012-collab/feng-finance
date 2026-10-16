@@ -1011,6 +1011,20 @@ export function collectGeometry({ mobile, setupId, stateId }) {
             "Flow content can pass behind chrome while scrolling. The independent end-of-scroll reachability test verifies that this content can be brought above the bar.",
           );
       }
+      const scrollRegion = [a.e, b.e].find(
+        (element) =>
+          element.matches('[role="region"][tabindex]') &&
+          element.querySelector("button,a[href],input,select,textarea,summary"),
+      );
+      if (scrollRegion) {
+        except(
+          "target-gap",
+          scrollRegion,
+          { neighbour: selector(scrollRegion === a.e ? b.e : a.e) },
+          "This keyboard-focusable region scrolls a collection of controls; it is not an independent action beside the receipt. Its controls still receive individual target/spacing tests, and footer reachability and toast clearance are checked separately.",
+        );
+        continue;
+      }
       if (
         a.e.parentElement !== b.e.parentElement &&
         a.hit.parentElement !== b.hit.parentElement &&

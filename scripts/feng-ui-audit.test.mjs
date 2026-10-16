@@ -341,6 +341,26 @@ test("A toast inside the same modal must clear its actual sorting footer", async
     assert.equal(has(r, "toast-footer-clearance"), bottom < 86);
   }
 });
+test("A keyboard scroll region is not a standalone action beside a toast; its footer still needs clearance", async () => {
+  for (const bottom of [12, 86]) {
+    const r = await inspect(
+      `<dialog open style="position:fixed;inset:12px auto auto 16px;width:358px;height:500px;padding:14px;border:1px solid #777"><div role="region" tabindex="0" aria-label="Form content" style="position:absolute;inset:14px 14px 74px;overflow:auto"><input aria-label="Description" style="height:48px;width:100%"></div><footer class="category-board-footer" style="position:absolute;bottom:14px;left:14px;right:14px;height:60px"><button>Save</button></footer><div class="ux-toast" style="position:absolute;left:14px;right:14px;bottom:${bottom}px;height:56px">Saved <button>Undo</button></div></dialog>`,
+    );
+    assert.ok(
+      !r.issues.some(
+        (issue) => issue.rule === "target-gap" && issue.text === "Form content",
+      ),
+    );
+    assert.ok(
+      r.exceptions.some(
+        (entry) =>
+          entry.rule === "target-gap" &&
+          entry.reason?.includes("keyboard-focusable region"),
+      ),
+    );
+    assert.equal(has(r, "toast-footer-clearance"), bottom < 86);
+  }
+});
 test("Independent hit areas that overlap are reported", async () => {
   const r = await inspect(
     '<button>First</button><button style="margin-left:-20px">Second</button>',
