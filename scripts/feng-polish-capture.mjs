@@ -941,8 +941,16 @@ async function transactionStates(setup) {
       exact: true,
     });
     await expect(split).toBeVisible();
+    await split
+      .getByLabel("Split category 2", { exact: true })
+      .selectOption("shopping");
     await split.getByLabel("Split amount 1", { exact: true }).fill("5.00");
     await split.getByLabel("Split amount 2", { exact: true }).fill("3.19");
+    const saveSplit = split.getByRole("button", {
+      name: "Save split",
+      exact: true,
+    });
+    await expect(saveSplit).toBeDisabled();
     await snap(
       page,
       "split-remaining",
@@ -951,6 +959,7 @@ async function transactionStates(setup) {
     await split
       .getByLabel("Split amount 2", { exact: true })
       .fill(((Math.abs(expense.amount) - 500) / 100).toFixed(2));
+    await expect(saveSplit).toBeEnabled();
     await snap(
       page,
       "split-balanced",
