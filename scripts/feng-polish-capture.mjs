@@ -1860,6 +1860,16 @@ async function valueStates(setup) {
     const display = page.locator('[aria-label="Report display"]');
     for (const mode of ["Bar", "Line"]) {
       await display.getByRole("button", { name: mode, exact: true }).click();
+      if (
+        mode === "Line" &&
+        (process.env.FENG_AUDIT_PHASE ?? "before") === "after"
+      ) {
+        const axis = page.locator(
+          ".v2-report-chart .recharts-xAxis-tick-labels",
+        );
+        await expect(axis).not.toContainText("Uncategorized");
+        await expect(axis).toContainText("Uncategorised");
+      }
       await snap(
         page,
         "report-" + mode.toLowerCase(),

@@ -374,12 +374,17 @@ export function ReportBuilder({
                 <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="label"
+                  minTickGap={12}
                   tick={{
                     fontSize: chartTickFontSize(chartRem),
                     fill: "var(--muted)",
                   }}
                   tickFormatter={(label: string) =>
-                    report.groupBy === "month" ? label.slice(0, 3) : label
+                    report.groupBy === "month"
+                      ? label.slice(0, 3)
+                      : label === "Uncategorized"
+                        ? "Uncategorised"
+                        : label
                   }
                 />
                 <YAxis
@@ -395,13 +400,22 @@ export function ReportBuilder({
                   }
                 />
                 <Tooltip
+                  labelFormatter={(label) =>
+                    label === "Uncategorized" ? "Uncategorised" : label
+                  }
                   formatter={(v, _name, item) =>
                     format(Number(v), item.payload as ReportRow)
                   }
                 />
                 <Line
                   dataKey="value"
-                  name={report.measure}
+                  name={
+                    report.measure === "sum"
+                      ? "Net amount"
+                      : report.measure === "count"
+                        ? "Transactions"
+                        : "Average amount"
+                  }
                   stroke="var(--chart-net)"
                   strokeWidth={2}
                   isAnimationActive={false}
