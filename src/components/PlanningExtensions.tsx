@@ -323,7 +323,7 @@ export function PotsPanel({
                   value={account}
                   onChange={(e) => setAccount(e.target.value)}
                 >
-                  <option value="">Monthly contributions</option>
+                  <option value="">Contributions</option>
                   {data.accounts
                     .filter((a) => a.accountType === "savings")
                     .map((a) => (
@@ -333,6 +333,11 @@ export function PotsPanel({
                     ))}
                 </select>
               </label>
+              {!account && (
+                <p className="muted">
+                  Track the contributions you record each month.
+                </p>
+              )}
               {type === "sinking" && (
                 <label>
                   Spending category

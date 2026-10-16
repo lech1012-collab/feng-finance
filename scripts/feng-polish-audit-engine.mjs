@@ -1698,6 +1698,10 @@ export function collectElementInventory() {
       tag: e.localName,
       type: e.type || e.getAttribute("role") || "",
       name: name ?? label(e),
+      selectedOption:
+        e.localName === "select"
+          ? e.selectedOptions[0]?.textContent?.trim()
+          : undefined,
       selector: sel(e),
       x: r.x,
       y: r.y + scrollY,
