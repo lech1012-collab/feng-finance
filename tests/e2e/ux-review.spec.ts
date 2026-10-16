@@ -149,7 +149,7 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
       .first(),
   ).toBeVisible();
   await expect(
-    page.getByRole("button", { name: "Import statement", exact: true }),
+    page.getByRole("button", { name: "Import September", exact: true }),
   ).toBeVisible();
   await page.goto("/#/analysis");
   await page
