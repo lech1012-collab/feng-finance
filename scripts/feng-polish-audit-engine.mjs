@@ -69,6 +69,10 @@ export const AUDIT_RULES = {
     "List amounts share a right edge, within 1 px.",
   ],
   "label-alignment": ["low", "List labels share the content edge."],
+  "heading-label-alignment": [
+    "medium",
+    "A card's leading name stays at the content edge when its amount wraps.",
+  ],
   "heading-centred": [
     "low",
     "Card headings align with left-aligned sibling content.",
@@ -287,6 +291,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     "vertical-line-short": ["low"],
     "amount-alignment": ["medium"],
     "label-alignment": ["low"],
+    "heading-label-alignment": ["medium"],
     "heading-centred": ["low"],
     "spacing-token": ["low"],
     "mobile-card-margin": ["medium"],
@@ -1216,6 +1221,34 @@ export function collectGeometry({ mobile, setupId, stateId }) {
         (parseFloat(s.borderRightWidth) || 0),
     };
   };
+  for (const heading of document.querySelectorAll(
+    ".budget-card .section-heading",
+  )) {
+    const name = heading.firstElementChild;
+    const value = name?.nextElementSibling;
+    if (
+      name?.localName !== "strong" ||
+      !value ||
+      !visible(heading) ||
+      !visible(name) ||
+      /[£€$¥]/u.test(text(name)) ||
+      !/[£€$¥]/u.test(text(value))
+    )
+      continue;
+    const edge = contentBounds(heading).left;
+    const labelLeft = name.getBoundingClientRect().left;
+    if (Math.abs(labelLeft - edge) > tolerance)
+      add(
+        "heading-label-alignment",
+        name,
+        {
+          labelLeft: round(labelLeft),
+          contentLeft: round(edge),
+          difference: round(labelLeft - edge),
+        },
+        "leading name at the content edge, within 1 px",
+      );
+  }
   const lines = [];
   const hasBorder = (s, side) =>
     parseFloat(s["border" + side + "Width"]) > 0 &&

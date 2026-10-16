@@ -209,6 +209,23 @@ test("Lists expose amount alignment without flagging KPI columns", async () => {
   );
   assert.ok(has(r, "amount-alignment"));
 });
+test("Wrapped account names stay left aligned independently of budget amount alignment", async () => {
+  const body =
+    '<article class="budget-card"><div class="section-heading"><strong>Mortgage</strong><span>£280,000.00</span></div></article>';
+  const base =
+    ".section-heading{display:flex;flex-wrap:wrap;gap:12px;width:260px;font-size:32px}";
+  const broken = await inspect(
+    body,
+    base + ".section-heading>strong{margin-left:auto;white-space:nowrap}",
+  );
+  assert.ok(has(broken, "heading-label-alignment"));
+  const healthy = await inspect(
+    body,
+    base +
+      ".section-heading>strong:not(:first-child):last-child{margin-left:auto;white-space:nowrap}",
+  );
+  assert.ok(!has(healthy, "heading-label-alignment"));
+});
 test("Tables compare money within its own column and still detect a misaligned cell", async () => {
   const body =
     '<table><tbody><tr><th>April</th><td><span class="amount">£1,234.00</span></td><td><span class="amount">−£234.00</span></td></tr><tr><th>May</th><td><span class="amount">£12.00</span></td><td><span class="amount">−£2.00</span></td></tr></tbody></table>';

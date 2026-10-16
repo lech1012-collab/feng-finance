@@ -717,7 +717,7 @@ time {
   flex-wrap: wrap;
   gap: 12px;
 }
-.app .budget-card .section-heading > strong {
+.app .budget-card .section-heading > strong:not(:first-child):last-child {
   margin-left: auto;
   white-space: nowrap;
 }
