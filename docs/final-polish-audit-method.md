@@ -40,7 +40,7 @@ Exceptions are exported per node to `exceptions.csv` and shown in the report. Th
 - A calendar cell deliberately stacks a day number and a compact daily total. Those independent fields are measured individually; their combination is not an accidentally wrapped two-line label.
 - Text inside an actual horizontal scroll container can be reached by scrolling. Its original width and scroll-container selector are retained; page overflow and money/date wrapping remain checked.
 
-Thirty-five seeded browser tests plus eight evidence tests verify the detector against broken money/date strings and statement date ranges, mid-word wrapping, squeezed siblings, clipped text, misplaced/double separators (including border-only and background-only lines), vertical separators (including border-only lines), misaligned amounts within the same table column, destructive spacing, native file controls, leaked skip links, unlabelled checkboxes, small text/targets, overlapping hit regions, copy-format defects, fixed-footer reachability, closed nested disclosures, password-reveal text reservation and healthy reference rows. Transparent hover controls are checked when visible. Thresholds match the supplied specification.
+Thirty-six seeded browser tests plus eight evidence tests verify the detector against broken money/date strings and statement date ranges, mid-word wrapping, squeezed siblings, clipped text, misplaced/double separators (including border-only and background-only lines), vertical separators (including border-only lines), misaligned amounts within the same table column, destructive spacing, native file controls, leaked skip links, unlabelled checkboxes, small text/targets, overlapping hit regions, copy-format defects, fixed-footer reachability, closed nested disclosures, password-reveal text reservation and healthy reference rows. Transparent hover controls are checked when visible. Thresholds match the supplied specification.
 
 Playwright WebKit does not replace physical iPhone Safari or VoiceOver testing. Root-font scaling approximates Safari text sizing. Physical-device, beta-round and product-owner gates must retain their separate evidence.
 
@@ -52,7 +52,7 @@ Lighthouse tooling is optional and kept outside runtime dependencies. Use `FENG_
 
 The explicit two-line allowance for page and sheet titles is an exported exception. Narrow or three-line titles still fail, and clipping and word splitting are checked independently. Every new capture records its JavaScript entry and loaded CSS fingerprints. The main index stylesheet identifies the build; lazy route styles may be added during navigation. A mixed or unidentified after build cannot pass the gate. Earlier before captures identify the immutable baseline entry script; CSS fingerprinting and switch-track measurement were added during this pass.
 
-The final local snapshot uses port 8114 (immutable application source `4b4a771`). WebKit refused navigation on port 4190
+The final local snapshot uses port 8116 (immutable application source `3470985`). WebKit refused navigation on port 4190
 before emitting a document request, while Chromium and curl could reach it; the
 same immutable directory passed the independent WebKit opening probe on 8088.
 The abandoned 4190 run is retained as failed diagnostic evidence. A failed
@@ -66,7 +66,7 @@ The visual pass additionally found shrunken switch tracks, joined helper text an
 
 `node scripts/feng-polish-justify-lows.mjs audit` generates a separate per-occurrence justification file. It preserves every original numerical finding, refuses unknown patterns and reports completion only after the recorded visual review is complete. It does not suppress high or medium findings or turn an incomplete audit into a pass.
 
-A dedicated high-severity receipt-clearance check measures each floating toast against the actual dialog footer top, including modal border and padding. The healthy and overlapping modal examples are seeded independently. The original-size visual pass found that the sorting footer had no matching measurement wrapper; the new footer keeps Skip and View transaction details clear. All 43 audit/evidence tests and six Toast unit tests pass.
+A dedicated high-severity receipt-clearance check measures each floating toast against the actual dialog footer top, including modal border and padding. The healthy and overlapping modal examples are seeded independently. The original-size visual pass found that the sorting footer had no matching measurement wrapper; the new footer keeps Skip and View transaction details clear. All 44 audit/evidence tests and six Toast unit tests pass.
 
 Contact sheets pair each viewport with an overview of its full-page source. They are inspection aids; original PNGs are unchanged and hashed in the manifest. The visual review record records each viewed sheet by SHA-256. Financial and source-text details can be opened at original resolution.
 
@@ -104,3 +104,5 @@ embeds both image versions, journey explanations and element measurements, and
 works offline without a server. No native operating-system file picker screenshot
 is fabricated: the document explains that transition and the real-device checklist
 covers it.
+
+The original-size desktop rule-editor check caught a clipped selected Description option, which is rendered by the browser rather than ordinary text nodes. Condition rows now stack at desktop sheet widths too. The new `select-label-fit` check measures selected option text with the actual font and reserves its arrow/padding; a seeded clipped native option must fail. Rule-condition dates and range ends now use the same UK date control. The two browser engines test those boundaries under a US locale, without changing stored rule-date semantics.
