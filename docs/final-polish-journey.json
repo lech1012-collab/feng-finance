@@ -752,7 +752,7 @@
       "title": "Settings: security",
       "entry": "Open Settings, then security.",
       "action": "Configure six-digit PIN or supported platform authentication and lock delay.",
-      "result": "The screen explains that the app lock does not encrypt IndexedDB. Credential changes are confirmed; credential Undo awaits an owner decision.",
+      "result": "The screen explains that the app lock does not encrypt IndexedDB. PIN/passkey changes keep confirmation without Undo by owner decision; lock-delay changes retain Undo.",
       "evidence": "audit/after/iphone390-dark/settings-security.png"
     },
     {

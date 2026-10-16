@@ -36,6 +36,7 @@ Financial calculation changes remain limited to B1, B11, B28, B32 and B33, plus
 the explicitly approved B24 recurrence identity flow. The ECB backup-cache repair
 changes schema validation of cached quote codes, not conversion arithmetic or
 supported ledger currencies. No destructive schema migration is introduced.
-Credential-changing Undo is a pending owner decision; credential material must
-not enter persistent change logs or backups. Real iPhone, VoiceOver and beta
+The owner approved confirmation without credential-changing Undo; PIN/passkey
+material must not enter change logs or portable backups. Lock-delay changes keep
+their in-memory Undo. Real iPhone, VoiceOver and beta
 volunteer checks remain manual gates, never automatic passes.
