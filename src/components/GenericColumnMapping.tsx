@@ -106,11 +106,17 @@ export function GenericColumnMapping({
               })
             }
           >
-            <option value="auto">Detect from statement</option>
-            <option value="day-first">Day / month / year</option>
-            <option value="month-first">Month / day / year</option>
-            <option value="iso">Year-month-day</option>
-            <option value="named-month">Day and month name</option>
+            <option value="auto">Automatic</option>
+            <option value="day-first" aria-label="Day / month / year">
+              DD/MM/YYYY
+            </option>
+            <option value="month-first" aria-label="Month / day / year">
+              MM/DD/YYYY
+            </option>
+            <option value="iso" aria-label="Year / month / day">
+              YYYY-MM-DD
+            </option>
+            <option value="named-month">Named month</option>
           </select>
         </label>
       </div>
