@@ -1058,8 +1058,12 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
     "Enter the dates printed on the PDF",
   );
   await page.getByLabel("Enter statement dates from the source file").check();
-  await page.getByLabel("Statement start date").fill("2026-09-01");
-  await page.getByLabel("Statement end date").fill("2026-09-30");
+  await page
+    .getByRole("textbox", { name: "Statement start date", exact: true })
+    .fill("01/09/2026");
+  await page
+    .getByRole("textbox", { name: "Statement end date", exact: true })
+    .fill("30/09/2026");
   await page.getByRole("button", { name: "Parse again", exact: true }).click();
   await expect(
     page.getByText("✓ Statement reconciled", { exact: true }),
