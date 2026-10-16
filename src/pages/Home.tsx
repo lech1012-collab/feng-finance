@@ -351,7 +351,7 @@ export default function Home({
         {missingAccounts.length > 0 && (
           <ImportButton className="button primary import-main">
             <Upload size={18} />
-            Import statement
+            Import {monthName}
           </ImportButton>
         )}
       </div>

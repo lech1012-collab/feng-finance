@@ -332,6 +332,7 @@ export default function Settings({
                   .map((s) => (
                     <details key={s.id}>
                       <summary>
+                        {s.institution} ·{" "}
                         {data.accounts.find((a) => a.id === s.accountId)
                           ?.displayName ?? s.institution}{" "}
                         · {s.transactionCount} transaction
