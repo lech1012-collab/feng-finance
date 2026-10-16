@@ -166,9 +166,7 @@ it("keeps repayment-plan edits private until Done, discards closed drafts and of
       JSON.parse((await db.settings.get("debt-plan:GBP"))!.value).payment,
     ).toBe("450"),
   );
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Undo" }),
-  );
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
   await waitFor(async () =>
     expect(await db.settings.get("debt-plan:GBP")).toEqual(originalPlan),
   );
@@ -207,9 +205,7 @@ it("saves debt terms only on Done and restores the original account with Undo", 
   await waitFor(async () =>
     expect((await db.accounts.get("a3"))?.apr).toBe(19.9),
   );
-  fireEvent.click(
-    await screen.findByRole("button", { name: "Undo" }),
-  );
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
   await waitFor(async () =>
     expect(await db.accounts.get("a3")).toEqual(originalAccount),
   );

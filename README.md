@@ -445,6 +445,25 @@ are ignored and blocked.
   movement/cancellation of money. Property reporting is cash flow, not accrual,
   depreciation or a guaranteed tax treatment. Plans depend on imported evidence.
 
+## v2.2.7 verified UX beta
+
+[The final-polish report](FINAL-POLISH-REPORT.md) records all 44 blockers and 205
+findings, the approved scope exceptions, test results and remaining manual gates.
+The review covers 140 actual UI states on seven setups, with matching before and
+after screenshots, exact element dimensions and workflow explanations.
+
+[Download the review files](https://github.com/lech1012-collab/feng-finance/releases/tag/v2.2.7).
+The single HTML review embeds its screenshots and works without a server.
+The complete audit ZIP contains every setup, raw measurements, visual receipts,
+Lighthouse reports and verification logs. Smaller setup ZIPs open at `index.html`.
+Only fictitious demo and synthetic test data is included.
+
+Repayment-plan and debt-term drafts now save on **Done**, discard closed edits
+and retain Undo. The unset theme follows System; saved appearance choices remain.
+PIN/passkey changes use confirmation without credential Undo, as approved by the
+owner. Lock-delay changes retain Undo. Physical iPhone/VoiceOver, hardware, beta
+volunteer and owner sign-off checks remain separate gates; this is a beta.
+
 ## v2.2.6 UX review
 
 [The review implementation record](docs/ux-v225-review.md) maps all 44 blockers

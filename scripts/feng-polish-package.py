@@ -23,7 +23,7 @@ assert len(lh['scores']) == 6 and all((r['accessibility'] >= 95 and r['bestPract
 assert len(matrix['items']) == 249 and all((r['status'] == 'Fixed' and (not r['verificationPending']) for r in matrix['items']))
 out.mkdir(exist_ok=True)
 inventory = read(repo / 'scripts/feng-polish-screen-inventory.json')
-intro = 'Only fictitious demo and synthetic test data. Unzip the file and open index.html in a browser. Click a screenshot to inspect the original resolution. Measurements include controls and text, in CSS pixels. Physical iPhone, VoiceOver, beta-volunteer and owner sign-off checks remain manual; see FINAL-POLISH-REPORT.md.'
+intro = 'Only fictitious demo and synthetic test data. Unzip the file and open index.html in a browser. Click a screenshot to inspect the original resolution. Setup bundles cover one size; use index.html for that journey. Linked files from the complete report are supplied in the Complete-UX-Audit ZIP. Measurements include controls and text, in CSS pixels; X/Y use document coordinates including the captured scroll offset. Use the paired viewport image to inspect fixed-bar placement. Physical iPhone, VoiceOver, beta-volunteer and owner sign-off checks remain manual; see FINAL-POLISH-REPORT.md.'
 
 def add(z, path, name):
     z.write(path, name, compress_type=zipfile.ZIP_STORED if path.suffix == '.png' else zipfile.ZIP_DEFLATED)

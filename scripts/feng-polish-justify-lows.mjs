@@ -40,6 +40,14 @@ function reason(issue, state) {
       "src/final-polish.css",
     ];
   if (rule === "divider-at-edge" && measured.edge === "first top border") {
+    const reportRow = selector.match(
+      /table\.v2-report-table > tbody > tr:nth-of-type\((\d+)\)$/u,
+    );
+    if (state.id === "self-assessment" && reportRow && Number(reportRow[1]) > 1)
+      return [
+        `This is the separator between report rows ${Number(reportRow[1]) - 1} and ${reportRow[1]}. Both rows are rendered in the original full-page report; the earlier row is above the focused tax-summary viewport. The source uses tbody tr + tr, so this is not a leading card or first-data-row border.`,
+        "src/final-polish.css",
+      ];
     const row = selector.match(
       /(?:payment-timeline|category-trend-list) > li:nth-of-type\((\d+)\)$/u,
     );

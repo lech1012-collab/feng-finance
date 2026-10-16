@@ -632,7 +632,10 @@ async function baseStates(setup) {
       name: "Confirm pair",
       exact: true,
     });
-    if (await transfers.count()) {
+    // This synthetic profile deliberately includes a pending transfer. Do not
+    // silently omit the required complete-Home state before its query settles.
+    await expect(transfers.first()).toBeVisible();
+    {
       await transfers.first().click();
       const manual = await database(page, ["valuations"]);
       await put(page, {
@@ -1819,6 +1822,12 @@ async function valueStates(setup) {
       ["/property", "property-cash-values"],
     ]) {
       await go(page, route);
+      await expect(
+        page.getByRole("heading", {
+          name: route === "/property" ? "Property" : "Analyse",
+          exact: true,
+        }),
+      ).toBeVisible();
       const details = page.locator("details.chart-data").first();
       await details.locator(":scope > summary").click();
       await snap(page, id, "Expanded cash-flow source values", {
