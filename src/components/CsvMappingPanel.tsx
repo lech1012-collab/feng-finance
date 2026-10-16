@@ -303,7 +303,9 @@ export function CsvMappingPanel({
           ? "Positive purchases, negative credits."
           : "Positive in, negative out."}
       </p>
-      <p className="muted">First row: {table.rows[0]?.join(" · ")}</p>
+      <p className="muted" data-source-text>
+        First row: {table.rows[0]?.join(" · ")}
+      </p>
       {error && <p role="alert">{error}</p>}
       <button
         className="primary"
