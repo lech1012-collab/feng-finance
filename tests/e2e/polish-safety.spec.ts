@@ -1,5 +1,103 @@
 import { resolve } from "node:path";
 import { test, expect, type Locator, type Page } from "./fixtures";
+import { loadDemoUi } from "./flows";
+
+async function repaymentRecords(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<{
+        plan?: { key: string; value: string };
+        accounts: unknown[];
+      }>((resolve, reject) => {
+        const open = indexedDB.open("feng-finance");
+        open.onerror = () => reject(open.error);
+        open.onsuccess = () => {
+          const database = open.result;
+          const read = database.transaction(
+            ["settings", "accounts"],
+            "readonly",
+          );
+          const plan = read.objectStore("settings").get("debt-plan:GBP");
+          const accounts = read.objectStore("accounts").getAll();
+          read.oncomplete = () => {
+            database.close();
+            resolve({ plan: plan.result, accounts: accounts.result });
+          };
+          read.onerror = () => {
+            database.close();
+            reject(read.error);
+          };
+        };
+      }),
+  );
+}
+
+test("repayment drafts stay unsaved until Done and both editors preserve Undo and source records", async ({
+  page,
+}) => {
+  await loadDemoUi(page);
+  await page.goto("/#/planning?tab=debt");
+  const editPlan = page.getByRole("button", {
+    name: "Edit repayment plan",
+    exact: true,
+  });
+  await expect(editPlan).toBeVisible();
+  const before = await repaymentRecords(page);
+  const source = await ledger(page);
+  await editPlan.click();
+  let sheet = page.getByRole("dialog", { name: "Repayment plan", exact: true });
+  const oldAmount = await sheet
+    .getByLabel("Monthly amount available", { exact: true })
+    .inputValue();
+  await sheet
+    .getByLabel("Monthly amount available", { exact: true })
+    .fill("450.00");
+  await page.waitForTimeout(1100);
+  expect(await repaymentRecords(page)).toEqual(before);
+  await page.keyboard.press("Escape");
+  await editPlan.click();
+  sheet = page.getByRole("dialog", { name: "Repayment plan", exact: true });
+  await expect(
+    sheet.getByLabel("Monthly amount available", { exact: true }),
+  ).toHaveValue(oldAmount);
+  await sheet
+    .getByLabel("Monthly amount available", { exact: true })
+    .fill("450.00");
+  await sheet.getByRole("button", { name: "Done", exact: true }).click();
+  const savedPlan = page
+    .getByRole("status")
+    .filter({ hasText: "Repayment settings saved." });
+  await savedPlan.getByRole("button", { name: "Undo", exact: true }).click();
+  await expect.poll(() => repaymentRecords(page)).toEqual(before);
+
+  await page
+    .getByRole("button", { name: "Edit repayment terms", exact: true })
+    .first()
+    .click();
+  sheet = page.getByRole("dialog", { name: / terms$/ });
+  const apr = sheet.getByRole("textbox").first();
+  const oldApr = await apr.inputValue();
+  const nextApr = oldApr === "19.9" ? "20.1" : "19.9";
+  await apr.fill(nextApr);
+  await page.waitForTimeout(1100);
+  expect(await repaymentRecords(page)).toEqual(before);
+  await page.keyboard.press("Escape");
+  await page
+    .getByRole("button", { name: "Edit repayment terms", exact: true })
+    .first()
+    .click();
+  sheet = page.getByRole("dialog", { name: / terms$/ });
+  await expect(sheet.getByRole("textbox").first()).toHaveValue(oldApr);
+  await sheet.getByRole("textbox").first().fill(nextApr);
+  await sheet.getByRole("button", { name: "Done", exact: true }).click();
+  await page
+    .getByRole("status")
+    .filter({ hasText: "Debt terms saved." })
+    .getByRole("button", { name: "Undo", exact: true })
+    .click();
+  await expect.poll(() => repaymentRecords(page)).toEqual(before);
+  expect(await ledger(page)).toEqual(source);
+});
 
 async function tabTo(page: Page, target: Locator) {
   await expect(target).toBeVisible();

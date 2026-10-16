@@ -1,5 +1,7 @@
 import {
+  act,
   cleanup,
+  fireEvent,
   render,
   screen,
   waitFor,
@@ -122,6 +124,97 @@ it("includes an entered mortgage payment but hides interest and savings when the
   expect(screen.queryByText("Estimated debt-free")).not.toBeInTheDocument();
   expect(screen.queryByText(/minor units/)).not.toBeInTheDocument();
   expect((await db.accounts.get("mortgage"))?.minPaymentMinor).toBe(125912);
+});
+
+it("keeps repayment-plan edits private until Done, discards closed drafts and offers Undo after saving", async () => {
+  await seedCardAndMortgage();
+  const originalPlan = await db.settings.get("debt-plan:GBP");
+  const originalTransactions = await db.transactions.toArray();
+  render(
+    <MemoryRouter>
+      <DebtPanel currency="GBP" month="2026-09" />
+    </MemoryRouter>,
+  );
+  const edit = await screen.findByRole("button", {
+    name: "Edit repayment plan",
+  });
+  fireEvent.click(edit);
+  fireEvent.change(screen.getByLabelText("Monthly amount available"), {
+    target: { value: "450" },
+  });
+  await act(() => new Promise<void>((resolve) => setTimeout(resolve, 1000)));
+  expect(await db.settings.get("debt-plan:GBP")).toEqual(originalPlan);
+  fireEvent.click(screen.getByRole("button", { name: "Close Repayment plan" }));
+  fireEvent.click(edit);
+  expect(screen.getByLabelText("Monthly amount available")).toHaveValue("300");
+  fireEvent.change(screen.getByLabelText("Monthly amount available"), {
+    target: { value: "0" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  expect(
+    within(screen.getByRole("dialog", { name: "Repayment plan" })).getByRole(
+      "alert",
+    ),
+  ).toHaveTextContent("greater than zero");
+  expect(await db.settings.get("debt-plan:GBP")).toEqual(originalPlan);
+  fireEvent.change(screen.getByLabelText("Monthly amount available"), {
+    target: { value: "450" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  await waitFor(async () =>
+    expect(
+      JSON.parse((await db.settings.get("debt-plan:GBP"))!.value).payment,
+    ).toBe("450"),
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Undo" }),
+  );
+  await waitFor(async () =>
+    expect(await db.settings.get("debt-plan:GBP")).toEqual(originalPlan),
+  );
+  expect(await db.transactions.toArray()).toEqual(originalTransactions);
+});
+
+it("saves debt terms only on Done and restores the original account with Undo", async () => {
+  await seedCardAndMortgage();
+  const originalAccount = await db.accounts.get("a3");
+  const originalStatements = await db.statements.toArray();
+  const originalTransactions = await db.transactions.toArray();
+  render(
+    <MemoryRouter>
+      <DebtPanel currency="GBP" month="2026-09" />
+    </MemoryRouter>,
+  );
+  const card = (
+    await screen.findByText("Card", { selector: ".budget-card strong" })
+  ).closest("article")!;
+  const edit = within(card).getByRole("button", {
+    name: "Edit repayment terms",
+  });
+  fireEvent.click(edit);
+  fireEvent.change(screen.getByLabelText("Card APR"), {
+    target: { value: "19.9" },
+  });
+  await act(() => new Promise<void>((resolve) => setTimeout(resolve, 1000)));
+  expect(await db.accounts.get("a3")).toEqual(originalAccount);
+  fireEvent.click(screen.getByRole("button", { name: "Close Card terms" }));
+  fireEvent.click(edit);
+  expect(screen.getByLabelText("Card APR")).toHaveValue("24");
+  fireEvent.change(screen.getByLabelText("Card APR"), {
+    target: { value: "19.9" },
+  });
+  fireEvent.click(screen.getByRole("button", { name: "Done" }));
+  await waitFor(async () =>
+    expect((await db.accounts.get("a3"))?.apr).toBe(19.9),
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Undo" }),
+  );
+  await waitFor(async () =>
+    expect(await db.accounts.get("a3")).toEqual(originalAccount),
+  );
+  expect(await db.statements.toArray()).toEqual(originalStatements);
+  expect(await db.transactions.toArray()).toEqual(originalTransactions);
 });
 
 async function seedForecastHistory() {

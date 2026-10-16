@@ -1474,111 +1474,38 @@ export function DebtPanel({
     [ready, setReady] = useState(true);
   const [editingDebt, setEditingDebt] = useState<string>();
   const [editingPlan, setEditingPlan] = useState(false);
-  const f = useFeedback(async () => {
-    setTerms({});
-    planTouched.current = false;
-    const saved = await db.settings.get(`debt-plan:${currency}`);
+  const restorePlanDraft = (stored?: string) => {
     try {
-      const value = JSON.parse(saved?.value ?? "null") as {
+      const value = JSON.parse(stored ?? "null") as {
         payment?: string;
         strategy?: typeof strategy;
         custom?: string[];
       } | null;
       setPayment(value?.payment ?? "");
-      setStrategy(value?.strategy ?? "avalanche");
-      setCustom(value?.custom ?? []);
+      setStrategy(
+        value?.strategy &&
+          ["avalanche", "snowball", "custom"].includes(value.strategy)
+          ? value.strategy
+          : "avalanche",
+      );
+      setCustom(Array.isArray(value?.custom) ? value.custom : []);
     } catch {
       setPayment("");
+      setStrategy("avalanche");
+      setCustom([]);
     }
+  };
+  const f = useFeedback(async () => {
+    setTerms({});
+    const saved = await db.settings.get(`debt-plan:${currency}`);
+    restorePlanDraft(saved?.value);
   });
   const initialized = useRef("");
   useEffect(() => {
     if (!data || initialized.current === currency) return;
     initialized.current = currency;
-    try {
-      const saved = JSON.parse(data.settings?.value ?? "null") as {
-        payment: string;
-        strategy: typeof strategy;
-        custom: string[];
-      } | null;
-      if (saved) {
-        setPayment(saved.payment ?? "");
-        setStrategy(
-          ["avalanche", "snowball", "custom"].includes(saved.strategy)
-            ? saved.strategy
-            : "avalanche",
-        );
-        setCustom(Array.isArray(saved.custom) ? saved.custom : []);
-      }
-    } catch {
-      /* Older settings do not become a financial plan. */
-    }
+    restorePlanDraft(data.settings?.value);
   }, [data, currency]);
-  const planTouched = useRef(false);
-  const planSaving = useRef(false);
-  useEffect(() => {
-    if (!data || !planTouched.current || planSaving.current || !payment.trim())
-      return;
-    let amount: number;
-    try {
-      amount = parseMoney(payment, currency);
-      if (amount <= 0) return;
-    } catch {
-      return;
-    }
-    const value = JSON.stringify({ payment, strategy, custom });
-    if (value === data.settings?.value) return;
-    const timer = window.setTimeout(() => {
-      planSaving.current = true;
-      void f
-        .run(
-          () =>
-            auditedMutation("Save debt plan", ["settings"], () =>
-              db.settings.put({ key: `debt-plan:${currency}`, value }),
-            ),
-          "Repayment settings saved.",
-        )
-        .finally(() => {
-          planSaving.current = false;
-        });
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [
-    payment,
-    strategy,
-    JSON.stringify(custom),
-    data?.settings?.value,
-    currency,
-  ]);
-  useEffect(() => {
-    if (!data) return;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        for (const [accountId, draft] of Object.entries(terms)) {
-          const account = data.accounts.find((a) => a.id === accountId);
-          if (!account || !draft.apr.trim()) continue;
-          const apr = Number(draft.apr);
-          if (!Number.isFinite(apr) || apr < 0 || apr > 100) continue;
-          let minimum: number | undefined;
-          try {
-            minimum = draft.minimum.trim()
-              ? parseMoney(draft.minimum, account.currency)
-              : undefined;
-            if (minimum !== undefined && minimum < 0) continue;
-          } catch {
-            continue;
-          }
-          if (apr === account.apr && minimum === account.minPaymentMinor)
-            continue;
-          await f.run(
-            () => saveDebtTerms(accountId, apr, minimum),
-            "Debt terms saved.",
-          );
-        }
-      })();
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [JSON.stringify(terms), data?.accounts, currency]);
   if (!data) return <p role="status">Loading debt planner…</p>;
   const debtRows = debtBalances(
     data.accounts,
@@ -1814,14 +1741,22 @@ export function DebtPanel({
                 <p className="muted">Paid in full monthly, no plan needed.</p>
               ) : (
                 <>
-                  <button onClick={() => setEditingDebt(d.account.id)}>
+                  <button
+                    onClick={() => {
+                      setTerms({});
+                      setEditingDebt(d.account.id);
+                    }}
+                  >
                     Edit repayment terms
                   </button>
                   {editingDebt === d.account.id && (
                     <Sheet
                       title={`${d.account.displayName} terms`}
                       onClose={() => {
-                        if (!f.busy) setEditingDebt(undefined);
+                        if (!f.busy) {
+                          setTerms({});
+                          setEditingDebt(undefined);
+                        }
                       }}
                     >
                       <form
@@ -1846,7 +1781,10 @@ export function DebtPanel({
                                 "Debt terms saved.",
                               )
                               .then((ok) => {
-                                if (ok) setEditingDebt(undefined);
+                                if (ok) {
+                                  setTerms({});
+                                  setEditingDebt(undefined);
+                                }
                               });
                           } catch (e) {
                             f.setError(
@@ -1925,12 +1863,22 @@ export function DebtPanel({
           );
         })}
       </div>
-      <button onClick={() => setEditingPlan(true)}>Edit repayment plan</button>
+      <button
+        onClick={() => {
+          restorePlanDraft(data.settings?.value);
+          setEditingPlan(true);
+        }}
+      >
+        Edit repayment plan
+      </button>
       {editingPlan && (
         <Sheet
           title="Repayment plan"
           onClose={() => {
-            if (!f.busy) setEditingPlan(false);
+            if (!f.busy) {
+              restorePlanDraft(data.settings?.value);
+              setEditingPlan(false);
+            }
           }}
         >
           <form
@@ -1940,7 +1888,8 @@ export function DebtPanel({
               e.preventDefault();
               setReady(true);
               try {
-                parseMoney(payment, currency);
+                if (parseMoney(payment, currency) <= 0)
+                  throw new Error("Enter a monthly amount greater than zero.");
                 void f
                   .run(
                     () =>
@@ -1979,7 +1928,6 @@ export function DebtPanel({
                 inputMode="decimal"
                 value={payment}
                 onChange={(e) => {
-                  planTouched.current = true;
                   setPayment(e.target.value);
                 }}
               />
@@ -1993,7 +1941,6 @@ export function DebtPanel({
                     type="button"
                     aria-pressed={strategy === v}
                     onClick={() => {
-                      planTouched.current = true;
                       setStrategy(v);
                     }}
                   >
