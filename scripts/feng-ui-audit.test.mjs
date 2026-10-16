@@ -7,6 +7,7 @@ import {
   renderAuditReport,
   collectElementInventory,
   chartLabelOverlap,
+  chartLabelContrast,
 } from "./feng-polish-audit-engine.mjs";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -39,6 +40,26 @@ async function inspect(body, css = "", width = 390) {
   return result;
 }
 const has = (r, rule) => r.issues.some((i) => i.rule === rule);
+test("SVG axis contrast uses fill instead of the inherited HTML text colour", async () => {
+  const page = await browser.newPage();
+  try {
+    for (const [background, fill, fails] of [
+      ["#191f2c", "#666666", true],
+      ["#191f2c", "#abb6ca", false],
+      ["#ffffff", "#666666", false],
+    ]) {
+      await page.setContent(
+        `<main style="background:${background};color:white"><svg width="300" height="150"><g class="recharts-xAxis-tick-labels"><text x="10" y="30" font-size="12" fill="${fill}"><tspan>September</tspan></text></g></svg></main>`,
+      );
+      const elements = await page.evaluate(collectElementInventory);
+      const label = elements.find((e) => e.tag === "tspan");
+      assert.ok(label.fill);
+      assert.equal(chartLabelContrast(elements).length > 0, fails);
+    }
+  } finally {
+    await page.close();
+  }
+});
 test("SVG label collisions use the rendered font, including both horizontal and vertical axes", async () => {
   const page = await browser.newPage();
   try {

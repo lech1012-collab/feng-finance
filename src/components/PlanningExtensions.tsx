@@ -2227,12 +2227,18 @@ export function ScenarioPanel({
                 <XAxis
                   dataKey="date"
                   minTickGap={50}
-                  tick={{ fontSize: chartTickFontSize(chartRem) }}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
                   tickFormatter={(v) => formatUkDate(String(v))}
                 />
                 <YAxis
                   width={Math.max(60, Math.round(chartRem * 3.75))}
-                  tick={{ fontSize: chartTickFontSize(chartRem) }}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
                   tickFormatter={(v) => compactMoney(Number(v), currency)}
                 />
                 <Tooltip

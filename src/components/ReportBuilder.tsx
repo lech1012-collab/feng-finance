@@ -371,17 +371,23 @@ export function ReportBuilder({
           >
             <ResponsiveContainer width="100%" height="100%">
               <LineChart data={rows}>
-                <CartesianGrid strokeDasharray="3 3" />
+                <CartesianGrid stroke="var(--line)" strokeDasharray="3 3" />
                 <XAxis
                   dataKey="label"
-                  tick={{ fontSize: chartTickFontSize(chartRem) }}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
                   tickFormatter={(label: string) =>
                     report.groupBy === "month" ? label.slice(0, 3) : label
                   }
                 />
                 <YAxis
                   width={Math.max(60, Math.round(chartRem * 3.75))}
-                  tick={{ fontSize: chartTickFontSize(chartRem) }}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
                   tickFormatter={(v) =>
                     report.measure === "count"
                       ? String(v)

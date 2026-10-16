@@ -1658,7 +1658,9 @@ export function collectElementInventory() {
       if (l && vis(l)) hit = l;
     }
     const hr = hit.getBoundingClientRect(),
-      fg = parse(s.color),
+      fg = parse(
+        e.localName === "tspan" || e.localName === "text" ? s.fill : s.color,
+      ),
       bg = bgOf(e);
     const contrast =
       fg && bg
@@ -1681,6 +1683,7 @@ export function collectElementInventory() {
       fontWeight: parseInt(s.fontWeight, 10) || 400,
       lineHeight: s.lineHeight,
       color: s.color,
+      fill: e.localName === "tspan" || e.localName === "text" ? s.fill : null,
       background: s.backgroundColor,
       nearestSolidContrast:
         contrast === null ? null : Math.round(contrast * 100) / 100,
@@ -1949,6 +1952,38 @@ export function chartLabelOverlap(elements, context = {}) {
   return [...issues.values()];
 }
 
+/** axe excludes SVG text in some chart configurations; measure its actual fill. */
+export function chartLabelContrast(elements, context = {}) {
+  return elements
+    .filter(
+      (e) =>
+        e.tag === "tspan" &&
+        /recharts-[xy]Axis-tick-labels/u.test(e.selector) &&
+        e.w > 0 &&
+        e.h > 0 &&
+        e.nearestSolidContrast !== null &&
+        e.nearestSolidContrast <
+          (e.fontSize >= 24 || (e.fontWeight >= 700 && e.fontSize >= 18.66)
+            ? 3
+            : 4.5),
+    )
+    .map((e) => ({
+      rule: "chart-label-contrast",
+      severity: "medium",
+      selector: e.selector,
+      text: e.name,
+      measured: {
+        fill: e.fill,
+        contrast: e.nearestSolidContrast,
+        fontSize: e.fontSize,
+        fontWeight: e.fontWeight,
+      },
+      expected:
+        "WCAG AA contrast using the rendered SVG fill against the chart background",
+      ...context,
+    }));
+}
+
 export async function auditState(page, setup, context = {}) {
   const mobile = (setup.width || page.viewportSize()?.width || 390) < 768;
   const geometry = await page.evaluate(collectGeometry, {
@@ -1959,6 +1994,10 @@ export async function auditState(page, setup, context = {}) {
   const elements = await page.evaluate(collectElementInventory);
   geometry.issues.push(
     ...chartLabelOverlap(elements, {
+      setup: setup.id || setup.name,
+      state: context.id,
+    }),
+    ...chartLabelContrast(elements, {
       setup: setup.id || setup.name,
       state: context.id,
     }),
