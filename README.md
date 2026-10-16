@@ -49,8 +49,18 @@ specification to source code and verification. The
 beta safeguards. Read the
 [security notes](docs/security-v2.md), [privacy audit](docs/privacy.md) and
 [validation record](docs/validation.md) for limitations and current release checks.
-The [UX review implementation record](docs/ux-v225-review.md) maps the designer's
-44 blockers and 205 additional findings to the v2.2.6 changes and manual checks.
+The [final-polish report](FINAL-POLISH-REPORT.md) checks the designer's 44 blockers
+and 205 additional findings, with a [140-state journey guide](docs/final-polish-journey.json),
+seven browser setups, actual before/after screenshots and element dimensions.
+The [earlier implementation record](docs/ux-v225-review.md) remains as historical
+context for v2.2.6.
+
+The [2.2.7 beta review downloads](https://github.com/lech1012-collab/feng-finance/releases/tag/v2.2.7)
+include a single mobile HTML review with embedded images, seven smaller setup ZIPs
+and the complete audit. All review screenshots contain fictitious records.
+The [standalone mobile review](https://github.com/lech1012-collab/feng-finance/releases/download/v2.2.7/Feng-Finance-2.2.7-Mobile-UX-Review.html)
+can be downloaded and opened in a desktop browser without unzipping anything.
+Physical iPhone, VoiceOver and owner/beta-round checks remain separate release gates.
 
 ## Development
 

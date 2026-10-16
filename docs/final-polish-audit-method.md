@@ -85,3 +85,22 @@ The final original-size pass found Recharts default grey axis labels on report l
 Ordinary fake audit profiles explicitly store the installation-banner preference alongside their disabled rate-download preference. First-launch profiles do not store it and still exercise the actual notice and installation journey. This fixture choice avoids a racing setup click; it does not change the app or suppress financial warnings.
 
 The report chart uses UK Uncategorised in axis and tooltip labels, and readable measurement names such as Net amount instead of internal field identifiers. The after-state driver asserts the actual rendered UK axis label, including at 320px and 200% text. This final copy patch does not change report values, filtering, grouping or source links.
+
+## Download reproduction
+
+With the verified `audit` directory beside the repository, run:
+
+```sh
+python3 scripts/verify-polish-visual.py audit
+python3 scripts/feng-polish-standalone.py audit /tmp/feng-polish-downloads
+python3 scripts/feng-polish-package.py audit /tmp/feng-polish-downloads
+```
+
+The generators refuse incomplete matrices, missing visual receipts or failed audit
+gates. The full ZIP contains the raw measurements, original images, Lighthouse
+reports and inspection receipt chain. Setup ZIPs include a local HTML index and
+one CSV of exact element dimensions for each state. The standalone mobile HTML
+embeds both image versions, journey explanations and element measurements, and
+works offline without a server. No native operating-system file picker screenshot
+is fabricated: the document explains that transition and the real-device checklist
+covers it.
