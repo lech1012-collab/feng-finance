@@ -1220,6 +1220,11 @@ time {
 .app .review-row .form-grid {
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
 }
+.ux-sheet .rule-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
 .app .settings-preview {
   gap: 12px 24px;
 }

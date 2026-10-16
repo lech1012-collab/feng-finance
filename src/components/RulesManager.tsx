@@ -200,7 +200,7 @@ function RuleEditor({
                 >
                   {[
                     ["category", "Set category"],
-                    ["rename", "Set display name"],
+                    ["rename", "Display name"],
                     ["tag", "Add tags"],
                     ["kind", "Set type"],
                     ["split", "Split (%)"],
