@@ -777,6 +777,11 @@ time {
 .app .beta-about .beta-project-links {
   margin-top: 8px;
 }
+.app .not-counted a:has(> small) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
 :where(.app .card > a):not([class]) {
   width: 100%;
 }

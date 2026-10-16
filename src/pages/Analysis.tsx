@@ -1,3 +1,4 @@
+import { UKDateInput } from "../components/UKDateInput";
 import { merchantExpenses } from "../analytics/merchant-expenses";
 import { useSearchParams } from "react-router-dom";
 import { ReportBuilder } from "../components/ReportBuilder";
@@ -365,19 +366,14 @@ export default function Analysis({
         <div className="card form-grid">
           <label>
             From
-            <input
-              type="date"
+            <UKDateInput
               value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
+              onChange={(e) => setCustomFrom(e)}
             />
           </label>
           <label>
             To
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-            />
+            <UKDateInput value={customTo} onChange={(e) => setCustomTo(e)} />
           </label>
         </div>
       )}

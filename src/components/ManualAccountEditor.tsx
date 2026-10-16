@@ -1,3 +1,4 @@
+import { UKDateInput } from "./UKDateInput";
 import { Sheet, SheetFooter } from "./Sheet";
 import { ChevronRight } from "lucide-react";
 import { Toast } from "./Toast";
@@ -270,12 +271,11 @@ export function ManualAccountEditor({ currency }: { currency: string }) {
             </label>
             <label>
               Value as of
-              <input
-                type="date"
+              <UKDateInput
                 required
                 value={date}
                 max={localToday()}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => setDate(e)}
               />
             </label>
             <label>

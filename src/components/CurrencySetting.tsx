@@ -1,3 +1,4 @@
+import { UKDateInput } from "./UKDateInput";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
@@ -243,11 +244,10 @@ export function CurrencySetting() {
             </label>
             <label>
               Date
-              <input
-                type="date"
+              <UKDateInput
                 lang="en-GB"
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => setDate(e)}
               />
             </label>
             <label>

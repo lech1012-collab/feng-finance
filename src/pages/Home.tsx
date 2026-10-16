@@ -583,10 +583,12 @@ export default function Home({
               <Link
                 to={`/transactions?month=${month}&type=transfer&transferKind=internal`}
               >
-                {excluded.internal === undefined
-                  ? "Rate needed"
-                  : money(excluded.internal, currency)}{" "}
-                transfers
+                <span>
+                  {excluded.internal === undefined
+                    ? "Rate needed"
+                    : money(excluded.internal, currency)}{" "}
+                  transfers
+                </span>
                 {excluded.internal === undefined && (
                   <small>
                     Original:{" "}
@@ -602,10 +604,12 @@ export default function Home({
               <Link
                 to={`/transactions?month=${month}&type=transfer&transferKind=card`}
               >
-                {excluded.card === undefined
-                  ? "Rate needed"
-                  : money(excluded.card, currency)}{" "}
-                card repayments
+                <span>
+                  {excluded.card === undefined
+                    ? "Rate needed"
+                    : money(excluded.card, currency)}{" "}
+                  card repayments
+                </span>
                 {excluded.card === undefined && (
                   <small>
                     Original:{" "}

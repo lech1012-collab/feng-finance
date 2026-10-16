@@ -933,6 +933,7 @@ async function transactionStates(setup) {
     await snap(page, "transaction-tags", "Transaction tag choices and search", {
       focus: page.locator(".tag-picker").first(),
     });
+    await closeSheet(page);
     await go(page, "/transactions/" + expense.id);
     await page.getByRole("button", { name: "Split", exact: true }).click();
     const split = page.getByRole("dialog", {

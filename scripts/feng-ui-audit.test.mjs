@@ -214,6 +214,20 @@ test("Controls expose unsafe destructive spacing and below-scale gaps", async ()
   assert.ok(has(r, "destructive-gap"));
   assert.ok(has(r, "spacing-token"));
 });
+test("UK date entry has room for its complete value at the rendered font size", async () => {
+  const body =
+    '<input class="uk-date-text" aria-label="Date" value="30/09/2026">';
+  const crowded = await inspect(
+    body,
+    "input{font:32px Arial;width:120px;height:48px;padding:8px}",
+  );
+  assert.ok(has(crowded, "date-input-fit"));
+  const readable = await inspect(
+    body,
+    "input{font:32px Arial;width:300px;height:48px;padding:8px}",
+  );
+  assert.ok(!has(readable, "date-input-fit"));
+});
 test("A nested header action must leave space before the following input", async () => {
   const body =
     '<section><div class="header"><h2>Search</h2><button>Hide conditions</button></div><input aria-label="Query"></section>';

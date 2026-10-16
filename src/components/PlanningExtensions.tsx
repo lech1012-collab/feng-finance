@@ -1,3 +1,4 @@
+import { UKDateInput } from "./UKDateInput";
 import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
 import { reviewDate } from "../analytics/month-review-details";
 import { Sheet, SheetFooter } from "./Sheet";
@@ -314,11 +315,7 @@ export function PotsPanel({
               )}
               <label>
                 Due date
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
+                <UKDateInput value={date} onChange={(e) => setDate(e)} />
               </label>
               <label>
                 How progress is tracked
@@ -1336,20 +1333,16 @@ export function CalendarPanel({
             </label>
             <label>
               Next due
-              <input
+              <UKDateInput
                 required
-                type="date"
+
                 value={due}
-                onChange={(e) => setDue(e.target.value)}
+                onChange={(e) => setDue(e)}
               />
             </label>
             <label>
               End date
-              <input
-                type="date"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-              />
+              <UKDateInput value={end} onChange={(e) => setEnd(e)} />
             </label>
             {f.feedback}
             <details className="object-menu">
@@ -2412,23 +2405,19 @@ export function ScenarioPanel({
                 value={type}
                 onChange={(e) => setType(e.target.value as typeof type)}
               >
-                <option value="one-off">One-off income or expense</option>
-                <option value="recurring-change">
-                  Change recurring amount
-                </option>
-                <option value="pause">Pause a recurring series</option>
-                <option value="new-recurring">
-                  New monthly recurring item
-                </option>
+                <option value="one-off">One-off payment</option>
+                <option value="recurring-change">Change a payment</option>
+                <option value="pause">Pause a payment</option>
+                <option value="new-recurring">New monthly item</option>
               </select>
             </label>
             <label>
               From date
-              <input
+              <UKDateInput
                 required
-                type="date"
+
                 value={date}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => setDate(e)}
               />
             </label>
             {type !== "pause" && (
@@ -2487,11 +2476,7 @@ export function ScenarioPanel({
             {type !== "one-off" && (
               <label>
                 Until date (optional)
-                <input
-                  type="date"
-                  value={end}
-                  onChange={(e) => setEnd(e.target.value)}
-                />
+                <UKDateInput value={end} onChange={(e) => setEnd(e)} />
               </label>
             )}
             <button>Add adjustment</button>

@@ -1,3 +1,4 @@
+import { UKDateInput } from "../components/UKDateInput";
 import { displayAccountName } from "../domain/presentation";
 import { Sheet } from "../components/Sheet";
 import { StatusChip } from "../components/UIPrimitives";
@@ -1029,12 +1030,11 @@ export default function Transactions({
             {!allDates && (
               <label>
                 From
-                <input
-                  type="date"
+                <UKDateInput
                   value={from}
                   onChange={(e) => {
                     setAllDates(false);
-                    setFrom(e.target.value);
+                    setFrom(e);
                     reset();
                   }}
                 />
@@ -1043,12 +1043,11 @@ export default function Transactions({
             {!allDates && (
               <label>
                 To
-                <input
-                  type="date"
+                <UKDateInput
                   value={to}
                   onChange={(e) => {
                     setAllDates(false);
-                    setTo(e.target.value);
+                    setTo(e);
                     reset();
                   }}
                 />

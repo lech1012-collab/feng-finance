@@ -1,3 +1,4 @@
+import { UKDateInput } from "./UKDateInput";
 import { useEffect, useId, useState } from "react";
 import { decimalMoney, parseMoney } from "../domain/money";
 import { parseDate } from "../domain/dates";
@@ -311,12 +312,11 @@ export function GenericReviewRow({
             >
               <label>
                 Date
-                <input
-                  type="date"
+                <UKDateInput
                   required
                   disabled={busy}
                   value={date}
-                  onChange={(event) => setDate(event.target.value)}
+                  onChange={(event) => setDate(event)}
                 />
               </label>
               <label>

@@ -1,3 +1,4 @@
+import { UKDateInput } from "./UKDateInput";
 import { Sheet, SheetFooter } from "./Sheet";
 import { Toast } from "./Toast";
 import { localToday } from "../analytics/reminders";
@@ -131,11 +132,7 @@ export function ManualTransactionEditor({
             </label>
             <label>
               Date
-              <input
-                type="date"
-                value={date}
-                onChange={(event) => setDate(event.target.value)}
-              />
+              <UKDateInput value={date} onChange={(event) => setDate(event)} />
             </label>
             <label>
               Description

@@ -633,7 +633,9 @@ export function ReportBuilder({
                 Choose allowable expenses for your situation.
               </p>
               <fieldset className="report-allowable-list">
-                <legend>Allowable expense categories</legend>
+                <legend className="sr-only">
+                  Allowable expense categories
+                </legend>
                 {categories
                   .filter(
                     (c) => c.kind === "expense" && !c.archived && !c.parentId,

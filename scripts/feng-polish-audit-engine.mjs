@@ -121,6 +121,10 @@ export const AUDIT_RULES = {
     "Targets are at least 44 px mobile / 24 px desktop.",
   ],
   "input-font": ["medium", "Mobile form fields use at least 16 px text."],
+  "date-input-fit": [
+    "medium",
+    "The complete UK date fits its visible entry field.",
+  ],
   "text-font": ["medium", "No rendered text below 12 px."],
   "document-language": ["medium", "Document language is en-GB."],
   "copy-em-dash": ["low", "UI copy uses no em dashes."],
@@ -295,6 +299,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     "switch-geometry": ["medium"],
     "target-size": ["medium"],
     "input-font": ["medium"],
+    "date-input-fit": ["medium"],
     "text-font": ["medium"],
     "document-language": ["medium"],
     "copy-em-dash": ["low"],
@@ -884,6 +889,27 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       parseFloat(s.fontSize) < 16 - 0.1
     )
       add("input-font", e, { fontSize: parseFloat(s.fontSize) }, ">= 16 px");
+    if (e.matches("input.uk-date-text")) {
+      const date = e.value || e.placeholder;
+      if (/^\d{2}\/\d{2}\/\d{4}$/.test(date) || date === "DD/MM/YYYY") {
+        const available =
+          e.clientWidth -
+          parseFloat(s.paddingLeft) -
+          parseFloat(s.paddingRight);
+        const needed = textMeasure(date, e);
+        if (needed > available + tolerance)
+          add(
+            "date-input-fit",
+            e,
+            {
+              needed: round(needed),
+              available: round(available),
+              fontSize: s.fontSize,
+            },
+            "Full day/month/year value fits without clipping",
+          );
+      }
+    }
     if (e.matches('input[type="file"]'))
       add(
         "file-input-leaked",

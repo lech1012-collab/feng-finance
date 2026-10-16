@@ -1,3 +1,4 @@
+import { UKDateInput } from "./UKDateInput";
 import { displayMerchant } from "../domain/presentation";
 import { Link } from "react-router-dom";
 import { useState, type ReactNode } from "react";
@@ -639,14 +640,12 @@ export function ImportStatementReview({
                     <div className="form-grid">
                       <label>
                         Date
-                        <input
+                        <UKDateInput
                           disabled={busy}
-                          type="date"
+
                           value={t.date}
                           readOnly={!!d.bankSource}
-                          onChange={(e) =>
-                            correctSource(t, { date: e.target.value })
-                          }
+                          onChange={(e) => correctSource(t, { date: e })}
                         />
                       </label>
                       <label>
@@ -909,13 +908,13 @@ export function ImportStatementReview({
               <div className="form-grid">
                 <label>
                   Statement start date
-                  <input
+                  <UKDateInput
                     disabled={busy}
-                    type="date"
+
                     value={entry.periodStart}
                     onChange={(e) =>
                       patch({
-                        periodStart: e.target.value,
+                        periodStart: e,
                         optionsChanged: true,
                       })
                     }
@@ -923,12 +922,12 @@ export function ImportStatementReview({
                 </label>
                 <label>
                   Statement end date
-                  <input
+                  <UKDateInput
                     disabled={busy}
-                    type="date"
+
                     value={entry.periodEnd}
                     onChange={(e) =>
-                      patch({ periodEnd: e.target.value, optionsChanged: true })
+                      patch({ periodEnd: e, optionsChanged: true })
                     }
                   />
                 </label>

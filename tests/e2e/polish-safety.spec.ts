@@ -61,6 +61,50 @@ async function ledger(page: Page) {
   );
 }
 
+test.describe("UK date entry", () => {
+  test.use({ locale: "en-US" });
+  test("uses UK day/month order in a US browser and never saves a stale date after invalid entry", async ({
+    page,
+    baseURL,
+  }) => {
+    await page.clock.setFixedTime(new Date("2026-10-14T12:00:00Z"));
+    await page.setViewportSize({ width: 320, height: 568 });
+    await page.goto(`${baseURL}/#/transactions`);
+    await page
+      .getByRole("button", { name: "Add manual transaction", exact: true })
+      .click();
+    const sheet = page.getByRole("dialog", {
+      name: "Manual transaction",
+      exact: true,
+    });
+    const date = sheet.getByRole("textbox", { name: "Date", exact: true });
+    await expect(date).toHaveValue("14/10/2026");
+    await date.fill("09/01/2026");
+    await sheet
+      .getByLabel("Description", { exact: true })
+      .fill("Fictitious UK date payment");
+    await sheet.getByLabel(/Amount/).fill("12.34");
+    await sheet
+      .getByRole("button", { name: "Save manual transaction", exact: true })
+      .click();
+    await expect(sheet).toHaveCount(0);
+    const saved = await ledger(page);
+    expect(saved.transactions).toHaveLength(1);
+    expect(saved.transactions[0]).toMatchObject({
+      date: "2026-01-09",
+      amount: -1234,
+    });
+    await page
+      .getByRole("button", { name: "Add manual transaction", exact: true })
+      .click();
+    await date.fill("09/30/2026");
+    await date.press("Tab");
+    await expect(date).toHaveAttribute("aria-invalid", "true");
+    await expect(sheet.getByRole("alert")).toContainText("DD/MM/YYYY");
+    expect((await ledger(page)).transactions).toEqual(saved.transactions);
+  });
+});
+
 test("desktop keyboard import, Home and categorisation have accessible names, local-only requests and unchanged source money", async ({
   page,
   context,
