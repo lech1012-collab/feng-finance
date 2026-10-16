@@ -112,7 +112,7 @@
 .rule-action {
   display: flex;
   align-items: end;
-  gap: 8px;
+  gap: 16px;
   flex-wrap: wrap;
   padding: 12px;
   border: 1px solid var(--border);
@@ -121,6 +121,14 @@
 .rule-action label {
   flex: 1;
   min-width: 140px;
+}
+.rule-action > div {
+  display: grid;
+  gap: 16px;
+  width: 100%;
+}
+.rule-action .v2-inline-form {
+  gap: 16px;
 }
 .rule-preview-list {
   max-height: 220px;
