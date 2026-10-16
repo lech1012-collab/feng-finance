@@ -77,6 +77,23 @@ it("normalises an unambiguous ISO paste immediately to the visible UK format", (
   );
 });
 
+it("accepts the iPhone numeric keypad's eight digits in UK order while rejecting impossible and partial dates", () => {
+  const save = vi.fn();
+  render(<Harness save={save} />);
+  const input = screen.getByRole("textbox", { name: "Date" });
+  for (const draft of ["0901202", "09302026", "31042026"]) {
+    fireEvent.change(input, { target: { value: draft } });
+    expect(input).toHaveValue(draft);
+    expect(input).toBeInvalid();
+    expect(screen.getByLabelText("Stored ISO date")).toBeEmptyDOMElement();
+  }
+  fireEvent.change(input, { target: { value: "09012026" } });
+  expect(input).toHaveValue("09/01/2026");
+  expect(input).toBeValid();
+  fireEvent.click(screen.getByRole("button", { name: "Save" }));
+  expect(save).toHaveBeenCalledWith("2026-01-09");
+});
+
 it.each(["09/30/2026", "31/04/2026", "29/02/2027", "30/09/26", "2026-02-30"])(
   "rejects invalid or non-UK date %s without retaining a previous valid submission",
   (value) => {

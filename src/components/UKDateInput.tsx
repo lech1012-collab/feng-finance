@@ -27,7 +27,10 @@ function ukValue(iso: string) {
 function isoValue(raw: string) {
   // An ISO paste is unambiguous, and is immediately displayed in UK order.
   const iso = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
-  const uk = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw);
+  // The iPhone numeric keypad has no slash key. Eight digits are also UK order.
+  const uk =
+    /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(raw) ||
+    /^(\d{2})(\d{2})(\d{4})$/.exec(raw);
   try {
     if (iso) return isoDate(+iso[1], +iso[2], +iso[3]);
     if (uk) return isoDate(+uk[3], +uk[2], +uk[1]);
@@ -174,7 +177,7 @@ export function UKDateInput({
         )}
       </span>
       <span id={`${generated}-format`} className="sr-only">
-        Date format: day/month/year.
+        Date format: day/month/year. You can type eight digits without slashes.
       </span>
       {errorVisible && problem && (
         <span id={`${generated}-error`} className="field-error" role="alert">

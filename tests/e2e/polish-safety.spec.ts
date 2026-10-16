@@ -80,6 +80,9 @@ test.describe("UK date entry", () => {
     const date = sheet.getByRole("textbox", { name: "Date", exact: true });
     await expect(date).toHaveValue("14/10/2026");
     await date.fill("09/01/2026");
+    await expect(date).toHaveValue("09/01/2026");
+    await date.fill("09012026");
+    await expect(date).toHaveValue("09/01/2026");
     await sheet
       .getByLabel("Description", { exact: true })
       .fill("Fictitious UK date payment");
