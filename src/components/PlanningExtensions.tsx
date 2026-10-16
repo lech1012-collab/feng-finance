@@ -715,9 +715,12 @@ export function MonthlyBudgetsPanel({
               >
                 <option value="none">Nothing</option>
                 <option value="surplus">Surplus only</option>
-                <option value="both">Surplus and overspend</option>
+                <option value="both">Both</option>
               </select>
             </label>
+            {rollover === "both" && (
+              <p className="muted">Carry forward both surplus and overspend.</p>
+            )}
             {f.feedback}
             <SheetFooter>
               <button

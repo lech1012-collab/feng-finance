@@ -631,9 +631,7 @@ export function ImportStatementReview({
                               {formatUkDate(candidate.date)}
                             </option>
                           ))}
-                          <option value="keep">
-                            Keep both as separate transactions
-                          </option>
+                          <option value="keep">Keep both</option>
                         </select>
                       </label>
                     )}
@@ -827,9 +825,13 @@ export function ImportStatementReview({
                     })
                   }
                 >
-                  <option value="">Choose the date order in this file</option>
-                  <option value="day-first">Day / month / year (UK)</option>
-                  <option value="month-first">Month / day / year (US)</option>
+                  <option value="">Choose</option>
+                  <option value="day-first" aria-label="Day / month / year">
+                    DD/MM/YYYY
+                  </option>
+                  <option value="month-first" aria-label="Month / day / year">
+                    MM/DD/YYYY
+                  </option>
                 </select>
               </label>
             )}
@@ -846,7 +848,7 @@ export function ImportStatementReview({
                   })
                 }
               >
-                <option value="">Detect automatically</option>
+                <option value="">Automatic</option>
                 {["Barclays", "American Express", "Revolut", "Other"].map(
                   (b) => (
                     <option key={b}>{b}</option>
@@ -868,7 +870,7 @@ export function ImportStatementReview({
                   })
                 }
               >
-                <option value="">Detect automatically</option>
+                <option value="">Automatic</option>
                 {entry.accountOverride &&
                   !accounts.some(
                     (account) => account.id === entry.accountOverride?.id,

@@ -461,7 +461,9 @@ export default function Subscriptions({ currency }: { currency: string }) {
           onChange={(e) => setSort(e.target.value)}
         >
           <option value="review">Needs review first</option>
-          <option value="yearly">Yearly cost: highest first</option>
+          <option value="yearly" aria-label="Yearly cost: highest first">
+            Highest cost
+          </option>
           <option value="merchant">Merchant name</option>
         </select>
       </label>

@@ -202,10 +202,10 @@ function RuleEditor({
                     ["category", "Set category"],
                     ["rename", "Set display name"],
                     ["tag", "Add tags"],
-                    ["kind", "Set transaction kind"],
-                    ["split", "Split by percentage"],
+                    ["kind", "Set type"],
+                    ["split", "Split (%)"],
                     ["reviewed", "Mark reviewed"],
-                    ["recurring", "Link recurring series"],
+                    ["recurring", "Link bill"],
                   ].map(([v, name]) => (
                     <option key={v} value={v}>
                       {name}

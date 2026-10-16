@@ -91,7 +91,7 @@ export function GenericColumnMapping({
           >
             <option value="in_out_columns">In and out columns</option>
             <option value="signed_positive_in">One signed column</option>
-            <option value="signed_positive_out">Card spending column</option>
+            <option value="signed_positive_out">Card spending</option>
           </select>
         </label>
         <label>

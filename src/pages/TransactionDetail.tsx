@@ -503,7 +503,7 @@ function Editor({
               value={pair}
               onChange={(e) => setPair(e.target.value)}
             >
-              <option value="">Select a transaction</option>
+              <option value="">Choose</option>
               {possible.map((p) => (
                 <option key={p.id} value={p.id}>
                   <time className="date-value" dateTime={p.date}>
