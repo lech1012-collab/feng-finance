@@ -263,7 +263,14 @@ async function open(setup, { demo = true, ack = true } = {}) {
     ).toBeVisible();
     await applyScale(page);
   }
-  await put(page, { settings: [{ key: "fx:download", value: "false" }] });
+  await put(page, {
+    settings: [
+      { key: "fx:download", value: "false" },
+      // Ordinary review fixtures have already declined installation help.
+      // First-launch fixtures keep the actual notice and installation journey.
+      ...(ack ? [{ key: "installBannerNeverShow", value: "true" }] : []),
+    ],
+  });
   if (ack) {
     if (demo)
       await page
@@ -280,18 +287,6 @@ async function open(setup, { demo = true, ack = true } = {}) {
     if (demo) {
       const picker = page.locator("input[type=month]").first();
       if ((await picker.inputValue()) !== MONTH) await picker.fill(MONTH);
-    }
-    const banner = page.locator(".install-banner");
-    if (await banner.isVisible()) {
-      try {
-        await banner
-          .getByRole("button", { name: "Not now", exact: true })
-          .click({ timeout: 3000 });
-      } catch (error) {
-        // Home may replace this optional install nudge with its higher-priority
-        // notice while demo queries finish. A still-visible failure is real.
-        if (await banner.isVisible()) throw error;
-      }
     }
     await put(page, {
       settings: [
