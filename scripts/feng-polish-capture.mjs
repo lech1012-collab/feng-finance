@@ -949,7 +949,8 @@ async function transactionStates(setup) {
     });
     await expect(split).toBeVisible();
     await split
-      .getByLabel("Split category 2", { exact: true })
+      .getByRole("combobox", { name: "Category", exact: true })
+      .nth(1)
       .selectOption("shopping");
     await split.getByLabel("Split amount 1", { exact: true }).fill("5.00");
     await split.getByLabel("Split amount 2", { exact: true }).fill("3.19");
