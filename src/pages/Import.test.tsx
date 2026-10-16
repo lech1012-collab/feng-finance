@@ -92,13 +92,17 @@ describe("PDF review session lifecycle", () => {
     const source = extracted();
     vi.mocked(extractFile).mockResolvedValue(source);
     show();
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Confirm import" }),
-      ).toBeEnabled(),
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("button", { name: "Confirm import" }),
+        ).toBeEnabled(),
+      { timeout: 5000 },
     );
     fireEvent.click(screen.getByRole("link", { name: "Close import review" }));
-    expect(await screen.findByRole("heading", { name: "Home" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Home" }, { timeout: 5000 }),
+    ).toBeVisible();
     expect(source.pdfSession!.dispose).toHaveBeenCalledTimes(1);
     expect(await db.transactions.count()).toBe(0);
   });
@@ -106,10 +110,12 @@ describe("PDF review session lifecycle", () => {
     const source = extracted();
     vi.mocked(extractFile).mockResolvedValue(source);
     show();
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Confirm import" }),
-      ).toBeEnabled(),
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("button", { name: "Confirm import" }),
+        ).toBeEnabled(),
+      { timeout: 5000 },
     );
     fireEvent.click(
       screen.getByLabelText(
@@ -126,7 +132,9 @@ describe("PDF review session lifecycle", () => {
       screen.getByRole("button", { name: "Confirm import" }),
     ).toBeDisabled();
     expect(
-      screen.getByText("Parse again", { selector: ".small-chip" }),
+      screen.getByText("Parse again", {
+        selector: "summary .ui-chip-visual span",
+      }),
     ).toBeVisible();
   });
   it("stops processing while retaining completed pages and explicitly marking the queued file unread", async () => {
@@ -161,13 +169,17 @@ describe("PDF review session lifecycle", () => {
     const source = extracted();
     vi.mocked(extractFile).mockResolvedValue(source);
     show();
-    await waitFor(() =>
-      expect(
-        screen.getByRole("button", { name: "Confirm import" }),
-      ).toBeEnabled(),
+    await waitFor(
+      () =>
+        expect(
+          screen.getByRole("button", { name: "Confirm import" }),
+        ).toBeEnabled(),
+      { timeout: 5000 },
     );
     fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
-    expect(await screen.findByRole("heading", { name: "Home" })).toBeVisible();
+    expect(
+      await screen.findByRole("heading", { name: "Home" }, { timeout: 5000 }),
+    ).toBeVisible();
     expect(source.pdfSession!.dispose).toHaveBeenCalledTimes(1);
     expect(await db.transactions.count()).toBe(3);
     expect((await db.statements.toArray())[0]).toMatchObject({

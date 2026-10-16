@@ -31,6 +31,8 @@ import {
 } from "../storage/accuracy";
 import "./accuracy.css";
 import { Sheet, SheetFooter } from "./Sheet";
+import { ListRow } from "./UIPrimitives";
+import "./transaction-polish.css";
 
 export interface AccuracyChange {
   changeId: string;
@@ -44,6 +46,7 @@ export function TransactionAccuracy({
   initialMode,
   onClose,
   compact = false,
+  showRefundSummary = true,
 }: {
   transaction: Transaction;
   categories?: Category[];
@@ -51,6 +54,7 @@ export function TransactionAccuracy({
   initialMode?: "split" | "refund";
   onClose?: () => void;
   compact?: boolean;
+  showRefundSummary?: boolean;
 }) {
   const [mode, setMode] = useState<"split" | "refund" | "unsplit" | undefined>(
     initialMode,
@@ -220,12 +224,15 @@ export function TransactionAccuracy({
                   (category) => category.id === child.categoryId,
                 )?.name ?? "Needs category"}
               </span>
-              <strong>{money(child.amount, child.currency, true)}</strong>
+              <strong className="amount">
+                {money(child.amount, child.currency, true)}
+              </strong>
             </Link>
           ))}
         </div>
       )}
-      {transaction.kind === "refund" &&
+      {showRefundSummary &&
+        transaction.kind === "refund" &&
         !!transaction.refundAllocations?.length && (
           <p className="coverage-note">
             Refund · counted in{" "}
@@ -268,7 +275,9 @@ export function TransactionAccuracy({
         >
           <p>
             {displayMerchant(transaction)} ·{" "}
-            {money(transaction.amount, transaction.currency, true)}
+            <span className="amount">
+              {money(transaction.amount, transaction.currency, true)}
+            </span>
           </p>
           {mode === "split" ? (
             <SplitEditor
@@ -645,7 +654,9 @@ function RefundEditor({
 }) {
   const suggestions = refundCandidates(transaction, [...purchases, ...refunds]);
   const [search, setSearch] = useState("");
-  const [searchAll, setSearchAll] = useState(false);
+  const [searchAll, setSearchAll] = useState(
+    (transaction.refundAllocations?.length ?? 0) > 1,
+  );
   const [allocations, setAllocations] = useState<Record<string, string>>(
     Object.fromEntries(
       (transaction.refundAllocations ?? []).map((line) => [
@@ -755,12 +766,24 @@ function RefundEditor({
         {!shown.length && <p className="muted">No matching purchase found.</p>}
         {shown.map((purchase) => (
           <div key={purchase.id} className="refund-purchase">
-            <label className="refund-choice">
+            <label className="refund-choice refund-choice--row">
               <input
-                type="checkbox"
+                type={searchAll || selected.length > 1 ? "checkbox" : "radio"}
+                name={
+                  searchAll || selected.length > 1
+                    ? undefined
+                    : "original-refund-purchase"
+                }
                 checked={Object.hasOwn(allocations, purchase.id)}
                 onChange={(event) =>
                   setAllocations((current) => {
+                    if (!searchAll && selected.length <= 1)
+                      return {
+                        [purchase.id]: decimalMoney(
+                          transaction.amount,
+                          transaction.currency,
+                        ),
+                      };
                     const next = { ...current };
                     if (event.target.checked)
                       next[purchase.id] = decimalMoney(
@@ -772,14 +795,22 @@ function RefundEditor({
                   })
                 }
               />
-              <span>
-                <strong>{displayMerchant(purchase)}</strong>
-                <small>
-                  {displayDate(purchase.date)} ·{" "}
-                  {money(purchase.amount, purchase.currency)}
-                  {suggestedIds.has(purchase.id) ? " · Suggested" : ""}
-                </small>
-              </span>
+              <ListRow
+                title={displayMerchant(purchase)}
+                meta={
+                  <>
+                    <span className="date-value">
+                      {displayDate(purchase.date)}
+                    </span>
+                    {suggestedIds.has(purchase.id) ? " · Suggested" : ""}
+                  </>
+                }
+                amount={
+                  <span className="amount">
+                    {money(purchase.amount, purchase.currency)}
+                  </span>
+                }
+              />
             </label>
             {Object.hasOwn(allocations, purchase.id) && (
               <label>
@@ -822,7 +853,10 @@ function RefundEditor({
           ))}
           <p>
             Refunds are excluded from income. The arrival date stays{" "}
-            {displayDate(transaction.date)}.
+            <time className="date-value" dateTime={transaction.date}>
+              {displayDate(transaction.date)}
+            </time>
+            .
           </p>
           {previewError && <p role="alert">{previewError}</p>}
         </div>
@@ -833,31 +867,33 @@ function RefundEditor({
           purchase statement first.
         </p>
       )}
-      <p role="status">
-        <strong>
-          {remaining === undefined
-            ? "Check the refund amounts"
-            : `${money(remaining, transaction.currency)} unallocated`}
-        </strong>
-      </p>
-      {error && (
-        <p role="alert" className="notice warning">
-          {error}
+      <SheetFooter>
+        <p role="status">
+          <strong>
+            {remaining === undefined
+              ? "Check the refund amounts"
+              : `${money(remaining, transaction.currency)} unallocated`}
+          </strong>
         </p>
-      )}
-      <button
-        className="primary"
-        disabled={
-          busy ||
-          remaining !== 0 ||
-          !selected.length ||
-          !!previewError ||
-          parsedAllocations.some((line) => line.amount <= 0)
-        }
-        onClick={() => void save()}
-      >
-        Link refund
-      </button>
+        {error && (
+          <p role="alert" className="notice warning">
+            {error}
+          </p>
+        )}
+        <button
+          className="primary"
+          disabled={
+            busy ||
+            remaining !== 0 ||
+            !selected.length ||
+            !!previewError ||
+            parsedAllocations.some((line) => line.amount <= 0)
+          }
+          onClick={() => void save()}
+        >
+          Link refund
+        </button>
+      </SheetFooter>
     </div>
   );
 }

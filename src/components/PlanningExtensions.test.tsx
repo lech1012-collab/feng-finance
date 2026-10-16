@@ -11,6 +11,54 @@ import { db, initializeDatabase } from "../storage/database";
 import { accounts, transaction } from "../tests/helpers";
 import Planning from "../pages/Planning";
 import { CalendarPanel, PotsPanel, ScenarioPanel } from "./PlanningExtensions";
+import { savedBill } from "../tests/recurring-fixtures";
+
+it("asks before combining similar recurring names and lets Undo restore the question", async () => {
+  await db.recurringSeries.put(savedBill);
+  await db.transactions.bulkPut(
+    ["2026-07-04", "2026-08-04", "2026-09-04"].map((date, i) =>
+      transaction({
+        id: `match-${i}`,
+        date,
+        merchant: "NETFLIX.COM",
+        description: "NETFLIX.COM",
+        amount: -1249,
+        categoryId: "subscriptions",
+      }),
+    ),
+  );
+  const before = await db.transactions.toArray();
+  render(
+    <MemoryRouter>
+      <CalendarPanel currency="GBP" month="2026-10" />
+    </MemoryRouter>,
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Review possible match" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Is this the same as Netflix?" }),
+  ).toBeVisible();
+  expect(screen.getByText("Saved payment")).toBeVisible();
+  expect(screen.getByText("Detected payment")).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Same bill" }));
+  await waitFor(
+    () =>
+      expect(
+        screen.queryByRole("button", { name: "Review possible match" }),
+      ).not.toBeInTheDocument(),
+    { timeout: 5000 },
+  );
+  expect(await db.transactions.toArray()).toEqual(before);
+  fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+  expect(
+    await screen.findByRole(
+      "button",
+      { name: "Review possible match" },
+      { timeout: 5000 },
+    ),
+  ).toBeVisible();
+});
 
 beforeEach(async () => {
   await db.delete();
@@ -159,6 +207,7 @@ it("saving a new scenario selects it so a second save updates instead of duplica
     </MemoryRouter>,
   );
   await screen.findByRole("heading", { name: "What if?" });
+  fireEvent.click(screen.getByRole("button", { name: "Edit scenario" }));
   fireEvent.change(screen.getByRole("textbox", { name: /Amount \(GBP\)/ }), {
     target: { value: "-100" },
   });
@@ -169,6 +218,12 @@ it("saving a new scenario selects it so a second save updates instead of duplica
   fireEvent.click(screen.getByRole("button", { name: "Save scenario" }));
   await waitFor(async () => expect(await db.scenarios.count()).toBe(1));
   const first = (await db.scenarios.toArray())[0];
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("dialog", { name: "Edit scenario" }),
+    ).not.toBeInTheDocument(),
+  );
+  fireEvent.click(screen.getByRole("button", { name: "Edit scenario" }));
   await waitFor(() =>
     expect(
       screen.getByRole("combobox", { name: "Saved scenario" }),

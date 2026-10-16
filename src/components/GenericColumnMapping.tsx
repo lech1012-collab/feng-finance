@@ -1,5 +1,7 @@
 import { money } from "../domain/money";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
+import { useSwipe } from "./useSwipe";
+import { SheetFooter } from "./Sheet";
 import type { ColumnRole, LayoutMapping } from "../import/generic/types";
 import {
   roles,
@@ -18,9 +20,15 @@ export function GenericColumnMapping({
   "result" | "busy" | "onMapping" | "onSaveTemplate" | "currency"
 >) {
   const [mapping, setMapping] = useState(() => initialMapping(result));
-  const [name, setName] = useState("My statement layout");
+  const [name, setName] = useState(() =>
+    result.parsed
+      ? `${result.parsed.institution} ${result.parsed.accountType === "credit" ? "credit card" : "current account"}`
+      : "Current account statement",
+  );
+  const [columnIndex, setColumnIndex] = useState(0);
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
+  const layoutFormId = useId();
   const mappingKey = JSON.stringify(result.mapping);
   const columnsKey = JSON.stringify(
     result.table.columns.map((column) => column.id),
@@ -38,6 +46,29 @@ export function GenericColumnMapping({
   const pages = result.table.pages.length
     ? result.table.pages.map((page) => page.page)
     : [...new Set(result.table.rows.map((row) => row.rect.page))];
+  const previews = pages.flatMap((page) => {
+    const rows = result.table.rows
+      .filter(
+        (row) =>
+          row.rect.page === page &&
+          ["transaction", "unknown", "continuation"].includes(row.kind),
+      )
+      .slice(0, 12);
+    const ids = new Set(
+      rows.flatMap((row) => row.cells.map((cell) => cell.columnId)),
+    );
+    return result.table.columns
+      .filter((column) => ids.has(column.id))
+      .map((column) => ({ page, column, rows }));
+  });
+  const activeIndex = Math.min(columnIndex, Math.max(0, previews.length - 1));
+  const changeColumn = (offset: number) =>
+    setColumnIndex(
+      Math.max(0, Math.min(previews.length - 1, activeIndex + offset)),
+    );
+  const swipe = useSwipe((direction) =>
+    changeColumn(direction === "left" ? 1 : -1),
+  );
   return (
     <div className="generic-column-mapping">
       <p>
@@ -58,15 +89,9 @@ export function GenericColumnMapping({
               })
             }
           >
-            <option value="in_out_columns">
-              Separate money-in and money-out columns
-            </option>
-            <option value="signed_positive_in">
-              Signed amounts: positive means money in
-            </option>
-            <option value="signed_positive_out">
-              Card amounts: positive means spending
-            </option>
+            <option value="in_out_columns">In and out columns</option>
+            <option value="signed_positive_in">One signed column</option>
+            <option value="signed_positive_out">Card spending</option>
           </select>
         </label>
         <label>
@@ -81,14 +106,44 @@ export function GenericColumnMapping({
               })
             }
           >
-            <option value="auto">Detect from statement</option>
-            <option value="day-first">Day / month / year</option>
-            <option value="month-first">Month / day / year</option>
-            <option value="iso">Year-month-day</option>
-            <option value="named-month">Day and month name</option>
+            <option value="auto">Automatic</option>
+            <option value="day-first" aria-label="Day / month / year">
+              DD/MM/YYYY
+            </option>
+            <option value="month-first" aria-label="Month / day / year">
+              MM/DD/YYYY
+            </option>
+            <option value="iso" aria-label="Year / month / day">
+              YYYY-MM-DD
+            </option>
+            <option value="named-month">Named month</option>
           </select>
         </label>
       </div>
+      {previews.length > 0 && (
+        <div
+          className="generic-column-navigation"
+          aria-label="Column navigation"
+        >
+          <button
+            type="button"
+            disabled={busy || activeIndex === 0}
+            onClick={() => changeColumn(-1)}
+          >
+            Previous column
+          </button>
+          <span role="status">
+            Column {activeIndex + 1} of {previews.length}
+          </span>
+          <button
+            type="button"
+            disabled={busy || activeIndex === previews.length - 1}
+            onClick={() => changeColumn(1)}
+          >
+            Next column
+          </button>
+        </div>
+      )}
       {pages.map((page) => {
         const rows = result.table.rows
           .filter(
@@ -107,6 +162,7 @@ export function GenericColumnMapping({
         return (
           <div
             className="generic-mapping-columns"
+            data-active-page={previews[activeIndex]?.page === page}
             key={page}
             role="region"
             tabIndex={0}
@@ -114,7 +170,17 @@ export function GenericColumnMapping({
           >
             <h3>Page {page} columns</h3>
             {columns.map((column, index) => (
-              <section className="generic-mapping-column" key={column.id}>
+              <section
+                className={`generic-mapping-column${previews[activeIndex]?.page === page && previews[activeIndex]?.column.id === column.id ? " is-current" : ""}`}
+                key={column.id}
+                {...swipe.bind}
+                onClickCapture={(event) => {
+                  if (swipe.consumeClick()) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                  }
+                }}
+              >
                 <label>
                   {column.headerText || `Column ${index + 1}`}
                   <select
@@ -154,7 +220,7 @@ export function GenericColumnMapping({
                       {row.cells
                         .filter((cell) => cell.columnId === column.id)
                         .map((cell) => cell.text)
-                        .join(" ") || "—"}
+                        .join(" ") || "No value"}
                     </li>
                   ))}
                 </ul>
@@ -163,14 +229,35 @@ export function GenericColumnMapping({
           </div>
         );
       })}
-      <p className="generic-live-check" role="status">
-        {result.checks.reconciledExactly
-          ? "These columns reconcile exactly to the statement."
-          : `${result.checks.balanceRowsPassed} rows match their running balance. The statement is not verified yet.`}
-        {result.checks.reconciliation.difference !== undefined &&
-          ` Difference ${money(result.checks.reconciliation.difference, result.parsed?.currency ?? currency)}.`}
-      </p>
+      <SheetFooter>
+        <p className="generic-live-check" role="status">
+          {result.checks.reconciledExactly
+            ? "These columns reconcile exactly to the statement."
+            : `${result.checks.balanceRowsPassed} rows match their running balance. The statement is not verified yet.`}
+          {result.checks.reconciliation.difference !== undefined && (
+            <>
+              {" "}
+              Difference{" "}
+              <span className="amount">
+                {money(
+                  result.checks.reconciliation.difference,
+                  result.parsed?.currency ?? currency,
+                )}
+              </span>
+              .
+            </>
+          )}
+        </p>
+        <button
+          type="submit"
+          form={layoutFormId}
+          disabled={busy || !completeMapping(mapping) || !name.trim()}
+        >
+          Save layout
+        </button>
+      </SheetFooter>
       <form
+        id={layoutFormId}
         className="generic-save-layout"
         onSubmit={(event) => {
           event.preventDefault();
@@ -204,13 +291,12 @@ export function GenericColumnMapping({
             required
           />
         </label>
-        <button
-          type="submit"
-          disabled={busy || !completeMapping(mapping) || !name.trim()}
-        >
-          Save layout
-        </button>
       </form>
+      {!completeMapping(mapping) && (
+        <p className="muted">
+          Choose date, description and money columns to enable Save layout.
+        </p>
+      )}
       {error && <p role="alert">{error}</p>}
       {saved && (
         <p role="status">

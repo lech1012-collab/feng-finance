@@ -13,6 +13,8 @@ export function BetaNotice({
   useEffect(() => {
     const current = dialog.current;
     current?.showModal();
+    current?.querySelector<HTMLElement>("h1")?.focus({ preventScroll: true });
+    if (current) current.scrollTop = 0;
     return () => current?.close();
   }, []);
   const accept = async (choice: "demo" | "import") => {
@@ -37,7 +39,9 @@ export function BetaNotice({
     >
       <div className="beta-notice-content">
         <span className="small-chip">Private beta</span>
-        <h1 id="beta-notice-heading">Welcome to Feng</h1>
+        <h1 id="beta-notice-heading" tabIndex={-1}>
+          Welcome to Feng
+        </h1>
         <p>
           Feng is in beta. Check figures against your statements before relying
           on them.

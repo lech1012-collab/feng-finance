@@ -1,5 +1,6 @@
 import type { Account, Category, RuleCondition, Tag } from "../domain/models";
 import { decimalMoney, parseMoney } from "../domain/money";
+import { UKDateInput } from "./UKDateInput";
 
 const fields: { value: RuleCondition["field"]; name: string }[] = [
   { value: "description", name: "Description" },
@@ -90,7 +91,7 @@ export function ConditionEditor({
                 ["contains", "contains"],
                 ["starts-with", "starts with"],
                 ["equals", "equals"],
-                ["regex", "regular expression (advanced)"],
+                ["regex", "Text pattern"],
               ];
         const shown = (
           value: RuleCondition["value"] | RuleCondition["valueTo"],
@@ -166,9 +167,15 @@ export function ConditionEditor({
                     </option>
                   ))}
                 </select>
+              ) : c.field === "date" ? (
+                <UKDateInput
+                  aria-label={`Condition ${i + 1} value`}
+                  value={shown(c.value)}
+                  onChange={(raw) => update(i, { value: raw })}
+                />
               ) : (
                 <input
-                  type={c.field === "date" ? "date" : "text"}
+                  type="text"
                   inputMode={numeric ? "decimal" : undefined}
                   value={shown(c.value)}
                   placeholder={c.field === "amount" ? "10.00" : "Match value"}
@@ -179,17 +186,30 @@ export function ConditionEditor({
             {c.operator === "between" && (
               <label>
                 <span className="sr-only">Condition {i + 1} range end</span>
-                <input
-                  type={c.field === "date" ? "date" : "text"}
-                  inputMode={numeric ? "decimal" : undefined}
-                  value={shown(c.valueTo)}
-                  onChange={(e) =>
-                    update(i, {
-                      valueTo: value(e.target.value) as string | number,
-                    })
-                  }
-                />
+                {c.field === "date" ? (
+                  <UKDateInput
+                    aria-label={`Condition ${i + 1} range end`}
+                    value={shown(c.valueTo)}
+                    onChange={(raw) => update(i, { valueTo: raw })}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    inputMode={numeric ? "decimal" : undefined}
+                    value={shown(c.valueTo)}
+                    onChange={(e) =>
+                      update(i, {
+                        valueTo: value(e.target.value) as string | number,
+                      })
+                    }
+                  />
+                )}
               </label>
+            )}
+            {c.operator === "regex" && (
+              <p className="muted">
+                Advanced: enter a regular expression to match text.
+              </p>
             )}
             <button
               type="button"

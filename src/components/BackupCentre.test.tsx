@@ -73,8 +73,10 @@ it("saves encrypted by default, requires a strong confirmed password and exports
   const [content, mime, name] = download.mock.calls[0];
   expect(mime).toBe("application/vnd.feng.backup+json");
   expect(name).toMatch(/\.feng$/);
+  expect(name).not.toMatch(/\d{4}-\d{2}-\d{2}/);
   expect(String(content)).not.toContain("FICTITIOUS SHOP");
   expect(JSON.parse(String(content)).format).toBe("feng-encrypted-backup");
+  expect(await screen.findByRole("status")).toHaveTextContent(String(name));
   await waitFor(async () =>
     expect((await db.settings.get("backup:lastExportCount"))?.value).toBe("1"),
   );

@@ -96,7 +96,7 @@ it("autosaves the latest private note and keeps an edited display name separate 
   ).not.toBeInTheDocument();
 });
 
-it("groups Settings without rendering unrelated financial forms and provides a working Accounts entry", async () => {
+it("groups Settings without rendering unrelated financial forms or duplicating the Home Accounts entry", async () => {
   render(
     <MemoryRouter>
       <Settings />
@@ -109,10 +109,9 @@ it("groups Settings without rendering unrelated financial forms and provides a w
   expect(
     screen.queryByRole("button", { name: "Erase everything" }),
   ).not.toBeInTheDocument();
-  expect(screen.getByRole("link", { name: /Accounts/ })).toHaveAttribute(
-    "href",
-    "/accounts",
-  );
+  expect(
+    screen.queryByRole("link", { name: /Accounts/ }),
+  ).not.toBeInTheDocument();
 });
 
 it("shows the native credit-card balance and its verification reason in Accounts, with editing in a sheet", async () => {

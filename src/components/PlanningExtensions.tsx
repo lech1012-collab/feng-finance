@@ -1,3 +1,5 @@
+import { UKDateInput } from "./UKDateInput";
+import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
 import { reviewDate } from "../analytics/month-review-details";
 import { Sheet, SheetFooter } from "./Sheet";
 import { displayMerchant } from "../domain/presentation";
@@ -61,8 +63,17 @@ import { monthCoverage } from "../analytics/coverage";
 import { reportingPeriod } from "../domain/period";
 import { readBudget, budgetKey } from "../analytics/planning";
 import { detectSubscriptions } from "../analytics/subscriptions";
+import { resolveRecurringSeries } from "../analytics/recurring-identity";
+import { saveRecurringMatchDecision } from "../storage/recurring-identity";
 import "./planning-v2.css";
 import { Toast } from "./Toast";
+import {
+  KeyValueRow,
+  ListRow,
+  SegmentedControl,
+  StatusChip,
+  WarningBox,
+} from "./UIPrimitives";
 
 function useFeedback(onUndo?: () => void | Promise<void>) {
   const [message, setMessage] = useState(""),
@@ -171,13 +182,14 @@ export function PotsPanel({
       s.expectedAmountMinor < 0 &&
       !data.pots.some((p) => p.name === s.name),
   );
+  const suggestionDate = reviewDate(monthBounds(month)[1], localToday());
   const overview = potsOverview(
     data.pots,
     data.accounts,
     data.statements,
     data.transactions,
     currency,
-    reviewDate(monthBounds(month)[1], localToday()),
+    suggestionDate,
     data.rates,
     data.valuations,
   );
@@ -303,11 +315,7 @@ export function PotsPanel({
               )}
               <label>
                 Due date
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                />
+                <UKDateInput value={date} onChange={(e) => setDate(e)} />
               </label>
               <label>
                 How progress is tracked
@@ -315,7 +323,7 @@ export function PotsPanel({
                   value={account}
                   onChange={(e) => setAccount(e.target.value)}
                 >
-                  <option value="">Monthly contributions</option>
+                  <option value="">Contributions</option>
                   {data.accounts
                     .filter((a) => a.accountType === "savings")
                     .map((a) => (
@@ -325,6 +333,11 @@ export function PotsPanel({
                     ))}
                 </select>
               </label>
+              {!account && (
+                <p className="muted">
+                  Track the contributions you record each month.
+                </p>
+              )}
               {type === "sinking" && (
                 <label>
                   Spending category
@@ -379,9 +392,18 @@ export function PotsPanel({
                   <strong>{p.name}</strong>
                   <small>
                     {p.type === "sinking" ? "Irregular cost" : "Savings goal"}
-                    {progress.nextTargetDate
-                      ? ` · due ${formatUkDate(progress.nextTargetDate)}`
-                      : ""}
+                    {progress.nextTargetDate && (
+                      <>
+                        {" "}
+                        · due{" "}
+                        <time
+                          className="date-value"
+                          dateTime={progress.nextTargetDate}
+                        >
+                          {formatUkDate(progress.nextTargetDate)}
+                        </time>
+                      </>
+                    )}
                   </small>
                 </span>
                 <strong>
@@ -405,18 +427,44 @@ export function PotsPanel({
                 {money(progress.monthlyMinor, p.currency)} a month needed
                 {progress.covered ? " · Covered by pot" : ""}
               </p>
-              <p className="muted">
-                {progress.onTrack
-                  ? "On track"
-                  : `Behind by ${money(progress.behindMinor, p.currency)}`}
-              </p>
+              <StatusChip
+                tone={
+                  progress.linkedUnavailable || !progress.onTrack
+                    ? "warning"
+                    : "complete"
+                }
+              >
+                {progress.linkedUnavailable
+                  ? "Balance unavailable"
+                  : progress.onTrack
+                    ? "On track"
+                    : `Behind by ${money(progress.behindMinor, p.currency)}`}
+              </StatusChip>
+              <details>
+                <summary>How this suggestion works</summary>
+                <p className="muted">
+                  Calculated as of{" "}
+                  <time className="date-value" dateTime={suggestionDate}>
+                    {formatUkDate(suggestionDate)}
+                  </time>{" "}
+                  for the calendar month, including confirmed contributions. A
+                  payday-aligned review uses its own period end.
+                </p>
+              </details>
               {linked ? (
                 <p className="muted">
                   From {linked.displayName}
                   {balance === undefined ? " · Import a verified balance" : ""}.
-                  {info.sourceDate
-                    ? ` As of ${formatUkDate(info.sourceDate)}.`
-                    : ""}
+                  {info.sourceDate && (
+                    <>
+                      {" "}
+                      As of{" "}
+                      <time className="date-value" dateTime={info.sourceDate}>
+                        {formatUkDate(info.sourceDate)}
+                      </time>
+                      .
+                    </>
+                  )}
                   {info.sharedAccount
                     ? " This savings balance funds more than one goal; totals count it once."
                     : ""}
@@ -577,11 +625,8 @@ export function MonthlyBudgetsPanel({
     <section className="card">
       <div className="section-heading">
         <h2>Monthly budgets</h2>
-        <button onClick={() => setEditingBudget(true)}>Set budget</button>
       </div>
       <p className="muted">
-        {reportingPeriodLabel(month, data.settings, data.transactions)}. Budget
-        plus carried amount, minus spending, equals what is left.{" "}
         {coverage.status !== "Complete"
           ? "Recorded spending is partial until all accounts are imported and verified."
           : ""}
@@ -670,9 +715,12 @@ export function MonthlyBudgetsPanel({
               >
                 <option value="none">Nothing</option>
                 <option value="surplus">Surplus only</option>
-                <option value="both">Surplus and overspend</option>
+                <option value="both">Both</option>
               </select>
             </label>
+            {rollover === "both" && (
+              <p className="muted">Carry forward both surplus and overspend.</p>
+            )}
             {f.feedback}
             <SheetFooter>
               <button
@@ -708,6 +756,9 @@ export function MonthlyBudgetsPanel({
             <article className="budget-card" key={b.id}>
               <div className="section-heading">
                 <button
+                  className="budget-category-name"
+                  title="Edit budget"
+                  aria-haspopup="dialog"
                   onClick={() => {
                     setCategory(b.categoryId);
                     setAmount(decimalMoney(b.amountMinor, currency));
@@ -715,6 +766,15 @@ export function MonthlyBudgetsPanel({
                     setEditingBudget(true);
                   }}
                 >
+                  <span
+                    className="category-colour-dot"
+                    aria-hidden="true"
+                    style={{
+                      background:
+                        data.categories.find((c) => c.id === b.categoryId)
+                          ?.color ?? "var(--muted)",
+                    }}
+                  />
                   {data.categories.find((c) => c.id === b.categoryId)?.name ??
                     "Category"}
                 </button>
@@ -725,11 +785,22 @@ export function MonthlyBudgetsPanel({
                 </strong>
               </div>
               <p>
-                {money(b.amountMinor, currency)} budget +{" "}
-                {money(r.carryMinor, currency)} carried −{" "}
-                {missingCategoryRate
-                  ? "Spending needs exchange rates"
-                  : `${money(r.spentMinor, currency)} spent`}
+                <span className="amount">{money(b.amountMinor, currency)}</span>{" "}
+                budget{" "}
+                <span className="amount">
+                  + {money(r.carryMinor, currency)}
+                </span>{" "}
+                carried{" "}
+                {missingCategoryRate ? (
+                  "− Spending needs exchange rates"
+                ) : (
+                  <>
+                    <span className="amount">
+                      − {money(r.spentMinor, currency)}
+                    </span>{" "}
+                    spent
+                  </>
+                )}
               </p>
               <small className="muted">
                 {month < localToday().slice(0, 7)
@@ -743,6 +814,17 @@ export function MonthlyBudgetsPanel({
           );
         })}
       </div>
+      {!budgets.length && <p>No budgets yet.</p>}
+      <div className="budget-footer-actions">
+        <button onClick={() => setEditingBudget(true)}>Set budget</button>
+      </div>
+      <details>
+        <summary>How budgets work</summary>
+        <p>
+          {reportingPeriodLabel(month, data.settings, data.transactions)}.
+          Budget plus carried amount, minus spending, equals what is left.
+        </p>
+      </details>
     </section>
   );
 }
@@ -781,6 +863,10 @@ export function CalendarPanel({
     [end, setEnd] = useState(""),
     [account, setAccount] = useState("");
   const [moneyDirection, setMoneyDirection] = useState("out");
+  const [matching, setMatching] = useState<{
+    confirmed: RecurringSeries;
+    detected: RecurringSeries;
+  }>();
   const f = useFeedback();
   if (!data) return <p role="status">Loading payment calendar…</p>;
   const detected = [
@@ -793,27 +879,11 @@ export function CalendarPanel({
       data.settings,
     ),
   );
-  const series = [
-    ...data.series,
-    ...detected.filter(
-      (s) =>
-        !data.series.some(
-          (d) =>
-            d.matchKey === s.matchKey ||
-            (d.accountId === s.accountId &&
-              d.currency === s.currency &&
-              d.cadence === s.cadence &&
-              displayMerchant({
-                merchant: d.name,
-                description: d.name,
-              }).toLocaleLowerCase() ===
-                displayMerchant({
-                  merchant: s.name,
-                  description: s.name,
-                }).toLocaleLowerCase()),
-        ),
-    ),
-  ];
+  const { series, proposals: possibleMatches } = resolveRecurringSeries(
+    data.series,
+    detected,
+    data.settings,
+  );
   const priceRises = [...new Set(data.transactions.map((t) => t.currency))]
     .flatMap((native) =>
       detectSubscriptions(
@@ -839,7 +909,13 @@ export function CalendarPanel({
     data.accounts.find((a) => a.id === account)?.currency ??
     editing?.currency ??
     currency;
-  const items = recurringCalendar(series, data.transactions, month, "*");
+  const items = recurringCalendar(
+    series,
+    data.transactions,
+    month,
+    "*",
+    data.settings,
+  );
   const missingRates = items.some(
     (i) =>
       i.currency !== currency &&
@@ -897,6 +973,20 @@ export function CalendarPanel({
           ? " Some payments need exchange rates. Daily totals are partial until rates are available."
           : ""}
       </p>
+      {possibleMatches.length > 0 && (
+        <WarningBox
+          severity="warning"
+          title={`${possibleMatches.length} possible recurring bill match${possibleMatches.length === 1 ? "" : "es"}`}
+        >
+          <p>
+            Similar entries remain separate until you confirm they are the same
+            bill. Expected totals may include both.
+          </p>
+          <button onClick={() => setMatching(possibleMatches[0])}>
+            Review possible match
+          </button>
+        </WarningBox>
+      )}
       {priceRises.length > 0 && (
         <aside className="notice warning" aria-label="Recurring price changes">
           <h3>Recurring prices changed</h3>
@@ -1045,7 +1135,7 @@ export function CalendarPanel({
             onClick={() => edit(s)}
           >
             <span>
-              {s.name}
+              {displayMerchant({ merchant: s.name, description: s.name })}
               <small>
                 {s.cadence[0].toUpperCase() + s.cadence.slice(1)} ·{" "}
                 {s.status[0].toUpperCase() + s.status.slice(1)} ·{" "}
@@ -1058,6 +1148,97 @@ export function CalendarPanel({
           </button>
         ))}
       </details>
+      {matching && (
+        <Sheet
+          title={`Is this the same as ${displayMerchant({ merchant: matching.confirmed.name, description: matching.confirmed.name })}?`}
+          onClose={() => {
+            if (!f.busy) setMatching(undefined);
+          }}
+        >
+          <p>
+            Confirming uses the saved amount and due date for one expected bill.
+            Imported transactions and balances stay unchanged.
+          </p>
+          {[
+            { label: "Saved payment", value: matching.confirmed },
+            { label: "Detected payment", value: matching.detected },
+          ].map(({ label, value }) => (
+            <section key={label} aria-label={label}>
+              <h3>{label}</h3>
+              <KeyValueRow
+                label="Bill"
+                value={displayMerchant({
+                  merchant: value.name,
+                  description: value.name,
+                })}
+              />
+              <KeyValueRow
+                label="Amount"
+                value={money(value.expectedAmountMinor, value.currency)}
+              />
+              <KeyValueRow
+                label="Account"
+                value={
+                  data.accounts.find((a) => a.id === value.accountId)
+                    ?.displayName ?? "Account unavailable"
+                }
+              />
+              <KeyValueRow
+                label="Next due"
+                value={formatUkDate(value.nextDue)}
+              />
+              <KeyValueRow
+                label="Frequency"
+                value={value.cadence[0].toUpperCase() + value.cadence.slice(1)}
+              />
+            </section>
+          ))}
+          {f.feedback}
+          <SheetFooter>
+            <button
+              disabled={f.busy}
+              onClick={() =>
+                void f
+                  .run(
+                    () =>
+                      saveRecurringMatchDecision(
+                        matching.confirmed.id,
+                        matching.detected,
+                        "separate",
+                      ),
+                    "Recurring bills kept separate.",
+                  )
+                  .then((ok) => {
+                    if (ok) setMatching(undefined);
+                  })
+              }
+            >
+              Keep separate
+            </button>
+            <button
+              className="primary"
+              disabled={f.busy}
+              onClick={() =>
+                void f
+                  .run(
+                    () =>
+                      saveRecurringMatchDecision(
+                        matching.confirmed.id,
+                        matching.detected,
+                        "same",
+                      ),
+                    "Recurring bill match confirmed.",
+                  )
+                  .then((ok) => {
+                    if (ok) setMatching(undefined);
+                  })
+              }
+            >
+              Same bill
+            </button>
+          </SheetFooter>
+        </Sheet>
+      )}
       {editing && (
         <Sheet
           title="Recurring payment"
@@ -1136,16 +1317,15 @@ export function CalendarPanel({
                 ))}
               </select>
             </label>
-            <label>
-              Money direction
-              <select
-                value={moneyDirection}
-                onChange={(e) => setMoneyDirection(e.target.value)}
-              >
-                <option value="out">Money out</option>
-                <option value="in">Money in</option>
-              </select>
-            </label>
+            <SegmentedControl
+              label="Money direction"
+              value={moneyDirection}
+              onChange={setMoneyDirection}
+              options={[
+                { value: "out", label: "Money out" },
+                { value: "in", label: "Money in" },
+              ]}
+            />
             <label>
               Expected amount ({formCurrency})
               <input
@@ -1161,20 +1341,16 @@ export function CalendarPanel({
             </label>
             <label>
               Next due
-              <input
+              <UKDateInput
                 required
-                type="date"
+
                 value={due}
-                onChange={(e) => setDue(e.target.value)}
+                onChange={(e) => setDue(e)}
               />
             </label>
             <label>
               End date
-              <input
-                type="date"
-                value={end}
-                onChange={(e) => setEnd(e.target.value)}
-              />
+              <UKDateInput value={end} onChange={(e) => setEnd(e)} />
             </label>
             {f.feedback}
             <details className="object-menu">
@@ -1256,7 +1432,7 @@ export function CalendarPanel({
           </form>
         </Sheet>
       )}
-      {f.feedback}
+      {!matching && f.feedback}
     </section>
   );
 }
@@ -1298,111 +1474,38 @@ export function DebtPanel({
     [ready, setReady] = useState(true);
   const [editingDebt, setEditingDebt] = useState<string>();
   const [editingPlan, setEditingPlan] = useState(false);
-  const f = useFeedback(async () => {
-    setTerms({});
-    planTouched.current = false;
-    const saved = await db.settings.get(`debt-plan:${currency}`);
+  const restorePlanDraft = (stored?: string) => {
     try {
-      const value = JSON.parse(saved?.value ?? "null") as {
+      const value = JSON.parse(stored ?? "null") as {
         payment?: string;
         strategy?: typeof strategy;
         custom?: string[];
       } | null;
       setPayment(value?.payment ?? "");
-      setStrategy(value?.strategy ?? "avalanche");
-      setCustom(value?.custom ?? []);
+      setStrategy(
+        value?.strategy &&
+          ["avalanche", "snowball", "custom"].includes(value.strategy)
+          ? value.strategy
+          : "avalanche",
+      );
+      setCustom(Array.isArray(value?.custom) ? value.custom : []);
     } catch {
       setPayment("");
+      setStrategy("avalanche");
+      setCustom([]);
     }
+  };
+  const f = useFeedback(async () => {
+    setTerms({});
+    const saved = await db.settings.get(`debt-plan:${currency}`);
+    restorePlanDraft(saved?.value);
   });
   const initialized = useRef("");
   useEffect(() => {
     if (!data || initialized.current === currency) return;
     initialized.current = currency;
-    try {
-      const saved = JSON.parse(data.settings?.value ?? "null") as {
-        payment: string;
-        strategy: typeof strategy;
-        custom: string[];
-      } | null;
-      if (saved) {
-        setPayment(saved.payment ?? "");
-        setStrategy(
-          ["avalanche", "snowball", "custom"].includes(saved.strategy)
-            ? saved.strategy
-            : "avalanche",
-        );
-        setCustom(Array.isArray(saved.custom) ? saved.custom : []);
-      }
-    } catch {
-      /* Older settings do not become a financial plan. */
-    }
+    restorePlanDraft(data.settings?.value);
   }, [data, currency]);
-  const planTouched = useRef(false);
-  const planSaving = useRef(false);
-  useEffect(() => {
-    if (!data || !planTouched.current || planSaving.current || !payment.trim())
-      return;
-    let amount: number;
-    try {
-      amount = parseMoney(payment, currency);
-      if (amount <= 0) return;
-    } catch {
-      return;
-    }
-    const value = JSON.stringify({ payment, strategy, custom });
-    if (value === data.settings?.value) return;
-    const timer = window.setTimeout(() => {
-      planSaving.current = true;
-      void f
-        .run(
-          () =>
-            auditedMutation("Save debt plan", ["settings"], () =>
-              db.settings.put({ key: `debt-plan:${currency}`, value }),
-            ),
-          "Repayment settings saved.",
-        )
-        .finally(() => {
-          planSaving.current = false;
-        });
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [
-    payment,
-    strategy,
-    JSON.stringify(custom),
-    data?.settings?.value,
-    currency,
-  ]);
-  useEffect(() => {
-    if (!data) return;
-    const timer = window.setTimeout(() => {
-      void (async () => {
-        for (const [accountId, draft] of Object.entries(terms)) {
-          const account = data.accounts.find((a) => a.id === accountId);
-          if (!account || !draft.apr.trim()) continue;
-          const apr = Number(draft.apr);
-          if (!Number.isFinite(apr) || apr < 0 || apr > 100) continue;
-          let minimum: number | undefined;
-          try {
-            minimum = draft.minimum.trim()
-              ? parseMoney(draft.minimum, account.currency)
-              : undefined;
-            if (minimum !== undefined && minimum < 0) continue;
-          } catch {
-            continue;
-          }
-          if (apr === account.apr && minimum === account.minPaymentMinor)
-            continue;
-          await f.run(
-            () => saveDebtTerms(accountId, apr, minimum),
-            "Debt terms saved.",
-          );
-        }
-      })();
-    }, 700);
-    return () => window.clearTimeout(timer);
-  }, [JSON.stringify(terms), data?.accounts, currency]);
   if (!data) return <p role="status">Loading debt planner…</p>;
   const debtRows = debtBalances(
     data.accounts,
@@ -1539,52 +1642,66 @@ export function DebtPanel({
             </div>
           )}
           {!result.reason && (
-            <table className="planning-compact-table">
-              <thead>
-                <tr>
-                  <th>Debt</th>
-                  <th>Estimated payoff</th>
-                </tr>
-              </thead>
-              <tbody>
-                {includedRows
-                  .filter((d) => !d.full && d.balance)
-                  .map((d) => (
-                    <tr key={d.account.id}>
-                      <td>{d.account.displayName}</td>
-                      <td>
-                        {result.payoff[d.account.id]
-                          ? monthLabel(result.payoff[d.account.id]!)
-                          : "Not determined"}
-                      </td>
-                    </tr>
-                  ))}
-              </tbody>
-            </table>
+            <div
+              className="table-scroll"
+              role="region"
+              tabIndex={0}
+              aria-label="Estimated debt payoff"
+            >
+              <table className="planning-compact-table">
+                <thead>
+                  <tr>
+                    <th>Debt</th>
+                    <th>Estimated payoff</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {includedRows
+                    .filter((d) => !d.full && d.balance)
+                    .map((d) => (
+                      <tr key={d.account.id}>
+                        <td>{d.account.displayName}</td>
+                        <td>
+                          {result.payoff[d.account.id]
+                            ? monthLabel(result.payoff[d.account.id]!)
+                            : "Not determined"}
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
+            </div>
           )}
           {!result.reason && (
             <details>
               <summary>Monthly payment schedule</summary>
-              <table className="planning-compact-table">
-                <thead>
-                  <tr>
-                    <th>Month</th>
-                    <th>Paid</th>
-                    <th>Interest</th>
-                    <th>Remaining</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.points.map((p) => (
-                    <tr key={p.month}>
-                      <td>{monthLabel(p.month)}</td>
-                      <td>{money(p.paidMinor, currency)}</td>
-                      <td>{money(p.interestMinor, currency)}</td>
-                      <td>{money(p.balanceMinor, currency)}</td>
+              <div
+                className="table-scroll"
+                role="region"
+                tabIndex={0}
+                aria-label="Monthly payment schedule values"
+              >
+                <table className="planning-compact-table">
+                  <thead>
+                    <tr>
+                      <th>Month</th>
+                      <th>Paid</th>
+                      <th>Interest</th>
+                      <th>Remaining</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {result.points.map((p) => (
+                      <tr key={p.month}>
+                        <td>{monthLabel(p.month)}</td>
+                        <td>{money(p.paidMinor, currency)}</td>
+                        <td>{money(p.interestMinor, currency)}</td>
+                        <td>{money(p.balanceMinor, currency)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </details>
           )}
         </>
@@ -1624,14 +1741,22 @@ export function DebtPanel({
                 <p className="muted">Paid in full monthly, no plan needed.</p>
               ) : (
                 <>
-                  <button onClick={() => setEditingDebt(d.account.id)}>
+                  <button
+                    onClick={() => {
+                      setTerms({});
+                      setEditingDebt(d.account.id);
+                    }}
+                  >
                     Edit repayment terms
                   </button>
                   {editingDebt === d.account.id && (
                     <Sheet
                       title={`${d.account.displayName} terms`}
                       onClose={() => {
-                        if (!f.busy) setEditingDebt(undefined);
+                        if (!f.busy) {
+                          setTerms({});
+                          setEditingDebt(undefined);
+                        }
                       }}
                     >
                       <form
@@ -1656,7 +1781,10 @@ export function DebtPanel({
                                 "Debt terms saved.",
                               )
                               .then((ok) => {
-                                if (ok) setEditingDebt(undefined);
+                                if (ok) {
+                                  setTerms({});
+                                  setEditingDebt(undefined);
+                                }
                               });
                           } catch (e) {
                             f.setError(
@@ -1735,12 +1863,22 @@ export function DebtPanel({
           );
         })}
       </div>
-      <button onClick={() => setEditingPlan(true)}>Edit repayment plan</button>
+      <button
+        onClick={() => {
+          restorePlanDraft(data.settings?.value);
+          setEditingPlan(true);
+        }}
+      >
+        Edit repayment plan
+      </button>
       {editingPlan && (
         <Sheet
           title="Repayment plan"
           onClose={() => {
-            if (!f.busy) setEditingPlan(false);
+            if (!f.busy) {
+              restorePlanDraft(data.settings?.value);
+              setEditingPlan(false);
+            }
           }}
         >
           <form
@@ -1750,7 +1888,8 @@ export function DebtPanel({
               e.preventDefault();
               setReady(true);
               try {
-                parseMoney(payment, currency);
+                if (parseMoney(payment, currency) <= 0)
+                  throw new Error("Enter a monthly amount greater than zero.");
                 void f
                   .run(
                     () =>
@@ -1789,7 +1928,6 @@ export function DebtPanel({
                 inputMode="decimal"
                 value={payment}
                 onChange={(e) => {
-                  planTouched.current = true;
                   setPayment(e.target.value);
                 }}
               />
@@ -1803,7 +1941,6 @@ export function DebtPanel({
                     type="button"
                     aria-pressed={strategy === v}
                     onClick={() => {
-                      planTouched.current = true;
                       setStrategy(v);
                     }}
                   >
@@ -1875,6 +2012,7 @@ export function ScenarioPanel({
   currency: string;
   points: { date: string; balance: number }[];
 }) {
+  const chartRem = useRootFontSize();
   const data = useLiveQuery(
     async () => ({
       scenarios: await db.scenarios.toArray(),
@@ -1893,6 +2031,7 @@ export function ScenarioPanel({
     [end, setEnd] = useState(""),
     [changes, setChanges] = useState<Scenario["changes"]>([]);
   const [direction, setDirection] = useState("out");
+  const [editingScenario, setEditingScenario] = useState(false);
   const f = useFeedback();
   const capturedCurrency =
     data?.scenarios.find((s) => s.id === selected)?.currency ?? currency;
@@ -1968,281 +2107,401 @@ export function ScenarioPanel({
     ],
   );
   if (!data) return <p role="status">Loading scenarios…</p>;
+  const finalPoint = projected.at(-1);
+  const endDifference = finalPoint
+    ? finalPoint.scenario - finalPoint.balance
+    : undefined;
+  const save = () => {
+    const nextId = selected || crypto.randomUUID();
+    void f
+      .run(() => saveScenario({ ...scenario, id: nextId }), "Scenario saved.")
+      .then((ok) => {
+        if (ok) {
+          setSelected(nextId);
+          setEditingScenario(false);
+        }
+      });
+  };
   return (
     <section className="card">
-      <h2>What if?</h2>
-      <p className="muted">
-        Explore changes without editing any actual balances or transactions.
-        Save up to five scenarios.
-      </p>
-      <label>
-        Saved scenario
-        <select
-          value={selected}
-          onChange={(e) => {
-            setSelected(e.target.value);
-            const s = data.scenarios.find((s) => s.id === e.target.value);
-            setName(s?.name ?? "My scenario");
-            setChanges(s?.changes ?? []);
-          }}
-        >
-          <option value="">New scenario</option>
-          {data.scenarios.map((s) => (
-            <option key={s.id} value={s.id}>
-              {s.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <form
-        className="planning-v2-form"
-        onSubmit={(e) => {
-          e.preventDefault();
-          try {
-            const value =
-              type === "pause"
-                ? 0
-                : Math.abs(parseMoney(amount, capturedCurrency)) *
-                  (direction === "out" ? -1 : 1);
-            if ((type === "pause" || type === "recurring-change") && !seriesId)
-              throw new Error("Choose the recurring series to adjust.");
-            setChanges([
-              ...changes,
-              {
-                id: crypto.randomUUID(),
-                date,
-                amountMinor: value,
-                description: description || type,
-                type,
-                recurringSeriesId: seriesId || undefined,
-                endDate: end || undefined,
-              },
-            ]);
-            setAmount("");
-          } catch (e) {
-            f.setError(
-              e instanceof Error ? e.message : "Enter a valid adjustment.",
-            );
-          }
-        }}
-      >
-        <label>
-          Adjustment
-          <select
-            value={type}
-            onChange={(e) => setType(e.target.value as typeof type)}
-          >
-            <option value="one-off">One-off income or expense</option>
-            <option value="recurring-change">Change recurring amount</option>
-            <option value="pause">Pause a recurring series</option>
-            <option value="new-recurring">New monthly recurring item</option>
-          </select>
-        </label>
-        <label>
-          From date
-          <input
-            required
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-          />
-        </label>
-        {type !== "pause" && (
-          <label>
-            Amount ({capturedCurrency})
-            <input
-              required
-              inputMode="decimal"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-            />
-            <select
-              aria-label="Scenario money direction"
-              value={direction}
-              onChange={(e) => setDirection(e.target.value)}
-            >
-              <option value="out">Money out</option>
-              <option value="in">Money in</option>
-            </select>
-          </label>
-        )}
-        {(type === "pause" || type === "recurring-change") && (
-          <label>
-            Recurring series
-            <select
-              required
-              value={seriesId}
-              onChange={(e) => setSeriesId(e.target.value)}
-            >
-              <option value="">Choose series</option>
-              {data.series
-                .filter(
-                  (s) =>
-                    s.status !== "ignored" &&
-                    (!s.endDate || s.endDate >= localToday()),
-                )
-                .map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name} ({s.currency})
-                  </option>
-                ))}
-            </select>
-          </label>
-        )}
-        <label>
-          Label
-          <input
-            placeholder="e.g. Car repair"
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-        </label>
-        {type !== "one-off" && (
-          <label>
-            Until date (optional)
-            <input
-              type="date"
-              value={end}
-              onChange={(e) => setEnd(e.target.value)}
-            />
-          </label>
-        )}
-        <button>Add adjustment</button>
-      </form>
-      <div className="planning-v2-list">
-        {changes.map((c) => (
-          <div className="planning-v2-object" key={c.id}>
-            <span>
-              {c.description}
-              <small>
-                {formatUkDate(c.date)} · {c.type}
-              </small>
-            </span>
-            <strong>{money(c.amountMinor, capturedCurrency)}</strong>
-            <button
-              aria-label={`Remove ${c.description}`}
-              onClick={() => setChanges(changes.filter((x) => x.id !== c.id))}
-            >
-              Remove
-            </button>
-          </div>
-        ))}
+      <div className="section-heading">
+        <h2>What if?</h2>
+        <button onClick={() => setEditingScenario(true)}>Edit scenario</button>
       </div>
-      {changes.length > 0 && (
+      <p className="muted">
+        Preview changes without editing your actual finances.
+      </p>
+      {changes.length === 0 ? (
+        <p>
+          No adjustments yet. Edit a scenario to compare it with the baseline.
+        </p>
+      ) : (
+        <p>
+          {name} · {changes.length} adjustment{changes.length === 1 ? "" : "s"}
+        </p>
+      )}
+      {finalPoint &&
+        endDifference !== undefined &&
+        !missingRate &&
+        changes.length > 0 && (
+          <p className="scenario-end-summary">
+            {endDifference === 0 ? (
+              "No change to the baseline on "
+            ) : (
+              <>
+                <span className="amount">
+                  {money(Math.abs(endDifference), currency)}
+                </span>
+                {endDifference < 0 ? " less on " : " more on "}
+              </>
+            )}
+            <time dateTime={finalPoint.date}>
+              {formatUkDate(finalPoint.date)}
+            </time>
+            .
+            <small>
+              {" "}
+              Projected balance{" "}
+              <span className="amount">
+                {money(finalPoint.scenario, currency)}
+              </span>
+              .
+            </small>
+          </p>
+        )}
+      {projected.length > 0 && !missingRate ? (
         <>
+          <div
+            className="chart"
+            role="img"
+            aria-label="Solid baseline and dashed what-if balance"
+          >
+            <ResponsiveContainer width="100%" height={240}>
+              <LineChart data={projected}>
+                <CartesianGrid vertical={false} stroke="var(--line)" />
+                <XAxis
+                  dataKey="date"
+                  minTickGap={50}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
+                  tickFormatter={(v) => formatUkDate(String(v))}
+                />
+                <YAxis
+                  width={Math.max(60, Math.round(chartRem * 3.75))}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
+                  tickFormatter={(v) => compactMoney(Number(v), currency)}
+                />
+                <Tooltip
+                  labelFormatter={(v) => formatUkDate(String(v))}
+                  formatter={(v) => money(Number(v), currency)}
+                  contentStyle={{
+                    background: "var(--surface)",
+                    border: "1px solid var(--line)",
+                    color: "var(--ink)",
+                  }}
+                />
+                <Line
+                  name="Baseline"
+                  dataKey="balance"
+                  dot={false}
+                  stroke="var(--chart-income)"
+                  isAnimationActive={false}
+                />
+                <Line
+                  name="What-if scenario"
+                  dataKey="scenario"
+                  dot={false}
+                  stroke="var(--chart-net)"
+                  strokeDasharray="6 4"
+                  isAnimationActive={false}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          </div>
+          <details>
+            <summary>View values</summary>
+            <div
+              className="table-scroll"
+              role="region"
+              aria-label="Scenario values"
+              tabIndex={0}
+            >
+              <table>
+                <thead>
+                  <tr>
+                    <th>Date</th>
+                    <th>Baseline</th>
+                    <th>Scenario</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projected.map((point) => (
+                    <tr key={point.date}>
+                      <th>{formatUkDate(point.date)}</th>
+                      <td className="amount">
+                        {money(point.balance, currency)}
+                      </td>
+                      <td className="amount">
+                        {money(point.scenario, currency)}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </details>
+        </>
+      ) : (
+        <p className="muted">
+          {missingRate
+            ? "Cached exchange rates are needed for this scenario."
+            : "Import complete recent history to show a baseline and scenario chart. Your scenario can still be saved."}
+        </p>
+      )}
+      {changes.length > 0 && (
+        <div className="planning-v2-list">
+          {changes.map((c) => (
+            <ListRow
+              key={c.id}
+              title={c.description}
+              meta={formatUkDate(c.date)}
+              amount={<strong>{money(c.amountMinor, capturedCurrency)}</strong>}
+            />
+          ))}
+        </div>
+      )}
+      {editingScenario && (
+        <Sheet
+          title="Edit scenario"
+          onClose={() => {
+            if (!f.busy) setEditingScenario(false);
+          }}
+          footer={
+            <>
+              <button
+                type="button"
+                disabled={f.busy}
+                onClick={() => setEditingScenario(false)}
+              >
+                Done
+              </button>
+              <button
+                type="button"
+                className="primary"
+                disabled={f.busy || changes.length === 0 || !name.trim()}
+                onClick={save}
+              >
+                Save scenario
+              </button>
+            </>
+          }
+        >
           <label>
-            Scenario name
-            <input value={name} onChange={(e) => setName(e.target.value)} />
-          </label>
-          <div className="actions">
-            <button
-              disabled={f.busy}
-              onClick={() => {
-                const nextId = selected || crypto.randomUUID();
-                void f
-                  .run(
-                    () =>
-                      saveScenario({
-                        ...scenario,
-                        id: nextId,
-                      }),
-                    "Scenario saved.",
-                  )
-                  .then((ok) => {
-                    if (ok) setSelected(nextId);
-                  });
+            Saved scenario
+            <select
+              value={selected}
+              onChange={(e) => {
+                setSelected(e.target.value);
+                const s = data.scenarios.find((s) => s.id === e.target.value);
+                setName(s?.name ?? "My scenario");
+                setChanges(s?.changes ?? []);
               }}
             >
-              Save scenario
-            </button>
-            {selected && (
-              <details className="object-menu">
-                <summary>Scenario options</summary>
+              <option value="">New scenario</option>
+              {data.scenarios.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p className="muted">
+            Save up to five scenarios. Their values never become actual
+            balances.
+          </p>
+          <form
+            id="scenario-adjustment-form"
+            className="planning-v2-form"
+            onSubmit={(e) => {
+              e.preventDefault();
+              try {
+                const value =
+                  type === "pause"
+                    ? 0
+                    : Math.abs(parseMoney(amount, capturedCurrency)) *
+                      (direction === "out" ? -1 : 1);
+                if (
+                  (type === "pause" || type === "recurring-change") &&
+                  !seriesId
+                )
+                  throw new Error("Choose the recurring series to adjust.");
+                setChanges([
+                  ...changes,
+                  {
+                    id: crypto.randomUUID(),
+                    date,
+                    amountMinor: value,
+                    description: description || type,
+                    type,
+                    recurringSeriesId: seriesId || undefined,
+                    endDate: end || undefined,
+                  },
+                ]);
+                setAmount("");
+              } catch (e) {
+                f.setError(
+                  e instanceof Error ? e.message : "Enter a valid adjustment.",
+                );
+              }
+            }}
+          >
+            <label>
+              Adjustment
+              <select
+                value={type}
+                onChange={(e) => setType(e.target.value as typeof type)}
+              >
+                <option value="one-off">One-off payment</option>
+                <option value="recurring-change">Change a payment</option>
+                <option value="pause">Pause a payment</option>
+                <option value="new-recurring">New monthly item</option>
+              </select>
+            </label>
+            <label>
+              From date
+              <UKDateInput
+                required
+
+                value={date}
+                onChange={(e) => setDate(e)}
+              />
+            </label>
+            {type !== "pause" && (
+              <>
+                <label>
+                  Amount ({capturedCurrency})
+                  <input
+                    required
+                    inputMode="decimal"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                  />
+                </label>
+                <SegmentedControl
+                  label="Scenario money direction"
+                  value={direction}
+                  onChange={setDirection}
+                  options={[
+                    { value: "out", label: "Money out" },
+                    { value: "in", label: "Money in" },
+                  ]}
+                />
+              </>
+            )}
+            {(type === "pause" || type === "recurring-change") && (
+              <label>
+                Recurring series
+                <select
+                  required
+                  value={seriesId}
+                  onChange={(e) => setSeriesId(e.target.value)}
+                >
+                  <option value="">Choose series</option>
+                  {data.series
+                    .filter(
+                      (s) =>
+                        s.status !== "ignored" &&
+                        (!s.endDate || s.endDate >= localToday()),
+                    )
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name} ({s.currency})
+                      </option>
+                    ))}
+                </select>
+              </label>
+            )}
+            <label>
+              Label
+              <input
+                placeholder="e.g. Car repair"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </label>
+            {type !== "one-off" && (
+              <label>
+                Until date (optional)
+                <UKDateInput value={end} onChange={(e) => setEnd(e)} />
+              </label>
+            )}
+            <button>Add adjustment</button>
+          </form>
+          <div className="planning-v2-list">
+            {changes.map((c) => (
+              <div key={c.id}>
+                <ListRow
+                  title={c.description}
+                  meta={formatUkDate(c.date)}
+                  amount={
+                    <strong>{money(c.amountMinor, capturedCurrency)}</strong>
+                  }
+                />
                 <button
+                  type="button"
+                  aria-label={`Remove ${c.description}`}
                   onClick={() =>
-                    void f
-                      .run(() => removeScenario(selected), "Scenario deleted.")
-                      .then((ok) => {
-                        if (ok) {
-                          setSelected("");
-                          setChanges([]);
-                        }
-                      })
+                    setChanges(changes.filter((x) => x.id !== c.id))
                   }
                 >
-                  Delete scenario
+                  Remove adjustment
                 </button>
-              </details>
-            )}
+              </div>
+            ))}
           </div>
-          {projected.length > 0 && !missingRate && (
-            <p className="scenario-end-summary">
-              By {formatUkDate(projected.at(-1)!.date)}:{" "}
-              {money(projected.at(-1)!.scenario, currency)} ·{" "}
-              {money(
-                projected.at(-1)!.scenario - projected.at(-1)!.balance,
-                currency,
-                true,
-              )}{" "}
-              vs baseline
-            </p>
+          <label>
+            Scenario name
+            <input
+              value={name}
+              maxLength={100}
+              onChange={(e) => setName(e.target.value)}
+            />
+          </label>
+          {selected && (
+            <details className="object-menu">
+              <summary>Scenario options</summary>
+              <button
+                className="danger"
+                type="button"
+                onClick={() => {
+                  if (
+                    !window.confirm(`Delete ${name}? You can undo this change.`)
+                  )
+                    return;
+                  void f
+                    .run(() => removeScenario(selected), "Scenario deleted.")
+                    .then((ok) => {
+                      if (ok) {
+                        setSelected("");
+                        setChanges([]);
+                        setEditingScenario(false);
+                      }
+                    });
+                }}
+              >
+                Delete scenario
+              </button>
+            </details>
           )}
-          {points.length && !missingRate ? (
-            <div
-              className="chart"
-              role="img"
-              aria-label="Solid baseline and dashed what-if balance"
-            >
-              <ResponsiveContainer width="100%" height={240}>
-                <LineChart data={projected}>
-                  <CartesianGrid vertical={false} stroke="var(--line)" />
-                  <XAxis
-                    dataKey="date"
-                    minTickGap={50}
-                    tickFormatter={(v) => formatUkDate(String(v))}
-                  />
-                  <YAxis
-                    tickFormatter={(v) =>
-                      `${Math.round(Number(v) / 10 ** currencyPrecision(currency) / 1000)}k`
-                    }
-                  />
-                  <Tooltip
-                    labelFormatter={(v) => formatUkDate(String(v))}
-                    formatter={(v) => money(Number(v), currency)}
-                    contentStyle={{
-                      background: "var(--surface)",
-                      border: "1px solid var(--line)",
-                      color: "var(--ink)",
-                    }}
-                  />
-                  <Line
-                    name="Baseline"
-                    dataKey="balance"
-                    dot={false}
-                    stroke="var(--chart-income)"
-                    isAnimationActive={false}
-                  />
-                  <Line
-                    name="What-if scenario"
-                    dataKey="scenario"
-                    dot={false}
-                    stroke="var(--chart-net)"
-                    strokeDasharray="6 4"
-                    isAnimationActive={false}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          ) : (
-            <p className="muted">
-              {missingRate
-                ? "Cached exchange rates are needed for this scenario."
-                : "Import complete recent history to show a baseline and scenario chart. Your scenario can still be saved."}
-            </p>
-          )}
-        </>
+          {f.feedback}
+        </Sheet>
       )}
-      {f.feedback}
+      {!editingScenario && f.feedback}
     </section>
   );
 }

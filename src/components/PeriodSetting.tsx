@@ -1,4 +1,5 @@
 import { Toast } from "./Toast";
+import { SwitchRow } from "./UIPrimitives";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
 import { db } from "../storage/database";
@@ -18,6 +19,32 @@ export function PeriodSetting() {
   const [changeId, setChangeId] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const saveAutoClose = async (enabled: boolean) => {
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const result = await auditedMutation(
+        "Change automatic month close",
+        ["settings"],
+        () =>
+          db.settings.put({
+            key: "review:autoClose",
+            value: String(enabled),
+          }),
+      );
+      setChangeId(result.changeId);
+      setNotice("Automatic month close preference saved.");
+    } catch (failure) {
+      setError(
+        failure instanceof Error
+          ? failure.message
+          : "Automatic month close preference could not be saved.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   const save = async (value: PeriodStart) => {
     setBusy(true);
     setError("");
@@ -89,25 +116,12 @@ export function PeriodSetting() {
           </select>
         </label>
       )}
-      <label className="switch-row">
-        <input
-          role="switch"
-          type="checkbox"
-          checked={autoClose}
-          onChange={(e) =>
-            void auditedMutation(
-              "Change automatic month close",
-              ["settings"],
-              () =>
-                db.settings.put({
-                  key: "review:autoClose",
-                  value: String(e.target.checked),
-                }),
-            )
-          }
-        />
-        Automatically close complete, reviewed months after 60 days
-      </label>
+      <SwitchRow
+        label="Automatically close complete, reviewed months after 60 days"
+        checked={autoClose}
+        disabled={busy}
+        onChange={(enabled) => void saveAutoClose(enabled)}
+      />
       <p className="muted">
         Home, budgets and reviews use the same date range. Payday uses Salary
         entries, otherwise the last weekday.

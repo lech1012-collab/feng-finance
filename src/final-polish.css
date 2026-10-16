@@ -1,0 +1,1276 @@
+/* Shared release sizing. Text wraps at word boundaries; financial values do not. */
+.app {
+  --radius: 16px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+  font-size: 0.9375rem;
+}
+.app .header-states {
+  gap: 8px;
+}
+.app .mobile-header .brand {
+  min-width: 44px;
+  min-height: 44px;
+}
+.app .eyebrow,
+.app .brand-finance {
+  font-size: max(12px, 0.75rem);
+}
+.app .section-heading,
+.app .toolbar,
+.app .category-filter-buttons {
+  gap: 8px;
+}
+.app .categories-card > .review-link {
+  display: flex;
+  margin-top: 8px;
+  min-height: 44px;
+}
+.app .data-health .section-heading {
+  border-top: 0;
+}
+.app .planning-v2-object > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  white-space: nowrap;
+  flex: none;
+}
+.app .planning-v2-object {
+  flex-wrap: wrap;
+}
+.app .calendar-grid {
+  gap: 8px;
+  min-width: 356px;
+}
+.app .calendar-day {
+  gap: 4px;
+}
+.app .card {
+  padding: 16px;
+  border-radius: var(--radius);
+  margin-bottom: 12px;
+  container-type: inline-size;
+}
+.app select,
+.ux-sheet select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23778699' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px;
+  padding-right: 44px;
+}
+.app .review-pot-contribution {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.app .card h2 {
+  font-size: 1.0625rem;
+}
+.app .swipe-transaction .transaction-row {
+  border-block: 0;
+}
+.app .swipe-transaction + .swipe-transaction {
+  border-top: 1px solid var(--line);
+}
+.app p {
+  margin-bottom: 16px;
+}
+.app h2 {
+  margin-bottom: 16px;
+}
+.app h3 {
+  margin-bottom: 12px;
+}
+.app .section-heading h2 {
+  margin: 0;
+}
+.app label {
+  gap: 8px;
+}
+.app .toolbar {
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.app .section-heading {
+  flex-wrap: wrap;
+}
+.app .section-heading > h2 {
+  flex: 1 1 10rem;
+  min-width: 0;
+}
+.app .section-heading > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.amount,
+.financial-value,
+.date-value,
+time {
+  white-space: nowrap;
+  overflow-wrap: normal;
+  word-break: normal;
+  font-variant-numeric: tabular-nums;
+}
+.balance-axis-date {
+  font-size: max(12px, 0.75rem);
+}
+.app .storage-meter {
+  height: 8px;
+  width: 100%;
+  display: block;
+  border: 0;
+}
+.app .storage-meter::-webkit-meter-bar {
+  min-height: 8px;
+  height: 8px;
+  background: var(--raised);
+  border: 0;
+  border-radius: 4px;
+}
+.app .storage-meter::-webkit-meter-optimum-value,
+.app .storage-meter::-webkit-meter-suboptimum-value {
+  background: var(--income-color);
+}
+.app .storage-meter::-webkit-meter-even-less-good-value {
+  background: var(--warning-color);
+}
+.app .chart-data .table-scroll {
+  margin-top: 8px;
+  background: linear-gradient(to left, var(--surface), transparent 24px) right /
+    24px 100% no-repeat;
+}
+.app .chart-data th:first-child,
+.app .balance-chart table th:first-child {
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+  z-index: 1;
+  white-space: nowrap;
+}
+.app .month-figures strong:not(.metric-unavailable),
+.app .position-metrics strong:not(.metric-unavailable),
+.app .account-balance strong {
+  white-space: nowrap;
+}
+.app .month-figures .metric-unavailable,
+.app .position-metrics .metric-unavailable {
+  white-space: normal;
+  font-size: 1rem;
+}
+.app .account-overview-row,
+.app .settings-object-row {
+  border-bottom: 0;
+}
+.app .account-overview-row + .account-overview-row,
+.app .settings-object-row + .settings-object-row {
+  border-top: 1px solid var(--line);
+}
+.app .more-analysis > a,
+.app .setup-list > a {
+  border-bottom: 0;
+  justify-content: space-between;
+  gap: 16px;
+}
+.app .more-analysis > a + a,
+.app .setup-list > a + a {
+  border-top: 1px solid var(--line);
+}
+.app .setup-list .setup-state {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.app .setup-list .setup-state--complete {
+  color: var(--income-color);
+}
+.app .subscription-evidence:has(> .ui-list-row) {
+  display: block;
+  padding: 0;
+}
+.generic-column-navigation {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 16px;
+}
+.generic-column-navigation > span {
+  text-align: center;
+}
+.generic-mapping-controls,
+.generic-correction,
+.generic-save-layout {
+  gap: 16px;
+}
+.generic-mapping-column {
+  touch-action: pan-y;
+}
+.generic-mapping-column li {
+  margin-block: 8px;
+}
+.generic-live-check {
+  font-size: 0.8125rem;
+  margin: 0;
+}
+.app .page-heading h1 {
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.sorting-card {
+  display: flex;
+  flex-wrap: wrap;
+  grid-template-columns: 20px minmax(0, 1fr) max-content;
+  gap: 12px;
+}
+.sorting-card > div {
+  flex: 1 1 min(100%, 14rem);
+  min-width: min(100%, 14rem);
+}
+.sorting-card > div > strong,
+.sorting-card > div > small {
+  display: block;
+  white-space: normal;
+  overflow-wrap: normal;
+}
+.sorting-card > strong {
+  margin-left: auto;
+  white-space: nowrap;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.category-fixed-content .sorting-card > div > strong {
+  display: block;
+  -webkit-line-clamp: unset;
+  overflow: visible;
+}
+.app .account-overview-row > .account-balance {
+  white-space: nowrap;
+  gap: 4px;
+}
+.app .insight-row > span {
+  width: 100%;
+  text-align: left;
+}
+@media (max-width: 899px) {
+  .app .mobile-navigation {
+    gap: 8px;
+    padding: 4px 4px calc(4px + env(safe-area-inset-bottom));
+  }
+  .app .mobile-navigation > a {
+    gap: 4px;
+  }
+  .sorting-card {
+    grid-template-columns: minmax(0, 1fr) max-content;
+  }
+  .generic-column-navigation > button {
+    flex: 1 1 min(100%, 9rem);
+  }
+  .generic-column-navigation > span {
+    flex: 1 0 100%;
+    order: -1;
+  }
+  .generic-mapping-columns[data-active-page="false"],
+  .generic-mapping-column:not(.is-current) {
+    display: none;
+  }
+  .generic-mapping-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .generic-mapping-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (min-width: 900px) {
+  .app .sidebar {
+    width: 240px;
+  }
+  .app .main-wrap {
+    margin-left: 240px;
+    width: calc(100% - 240px);
+  }
+  .app .sidebar-import {
+    white-space: nowrap;
+    font-size: 0.9375rem;
+    padding-inline: 8px;
+  }
+  .app {
+    --radius: 12px;
+  }
+  .app .card {
+    padding: 20px;
+    margin-bottom: 16px;
+  }
+  .app .card h2 {
+    font-size: 1rem;
+  }
+  .generic-column-navigation {
+    display: none;
+  }
+  .category-dialog {
+    inset: 0 0 0 auto;
+    transform: none;
+    width: min(100%, 420px);
+    max-height: 100dvh;
+    margin: 0;
+    border-radius: 12px 0 0 12px;
+  }
+}
+/* Rem thresholds respond to the requested text-size setting, not just viewport width. */
+@container (max-width: 18rem) {
+  .app .position-metrics,
+  .app .month-figures,
+  .app .category-kpis,
+  .app .planning-v2-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .position-metrics > :last-child,
+  .app .category-kpis > :last-child,
+  .app .planning-v2-kpis > :last-child {
+    grid-column: auto;
+  }
+  .app .insight-row,
+  .app .category-meta {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .app .insight-row > strong,
+  .app .category-meta > strong {
+    justify-content: flex-end;
+    text-align: right;
+    align-self: flex-end;
+  }
+}
+@media (max-width: 359px) {
+  .sorting-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .month-figures,
+  .app .position-metrics,
+  .app .planning-v2-kpis,
+  .app .category-kpis {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .position-metrics > :last-child,
+  .app .planning-v2-kpis > :last-child,
+  .app .category-kpis > :last-child {
+    grid-column: auto;
+  }
+}
+.app .sidebar > .ui-demo-chip {
+  align-self: flex-start;
+  margin-top: 8px;
+}
+.app .category-rail {
+  gap: 8px;
+}
+.app .planning-v2-object > span > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.app .search-input {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 4px;
+}
+.app .search-input > input {
+  min-width: 0;
+  flex: 1;
+}
+.app .search-input > svg,
+.app .search-input > button {
+  flex: none;
+}
+.app .search-input input::-webkit-search-cancel-button {
+  display: none;
+}
+.app .account-filter-chips {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.app .account-filter-chip {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  flex: none;
+  max-width: none;
+}
+.app .account-filter-chip > .account-chip-visual {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  gap: 4px;
+  white-space: nowrap;
+  font-size: 0.8125rem;
+}
+.app .account-chip-visual strong {
+  font-size: inherit;
+}
+.app .account-chip-visual small {
+  color: var(--muted);
+  font-size: max(12px, 0.75rem);
+  font-weight: normal;
+}
+.app .account-filter-chip[aria-pressed="true"] .account-chip-visual {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.app .account-filter-chip[aria-pressed="true"] .account-chip-visual small {
+  color: inherit;
+}
+
+/* Attribute specificity keeps the 20px checkbox rule from shrinking a switch. */
+.switch-row input[type="checkbox"][role="switch"] {
+  width: 51px;
+  min-width: 51px;
+  height: 31px;
+  min-height: 31px;
+}
+.feedback-context dd > small,
+.month-review-page .totals dt > small {
+  display: block;
+  margin-top: 4px;
+}
+@media (min-width: 900px) {
+  .switch-row input[type="checkbox"][role="switch"] {
+    width: 36px;
+    min-width: 36px;
+    height: 20px;
+    min-height: 20px;
+  }
+}
+.app .transaction-status.ui-status-chip,
+.app .review-status.ui-status-chip {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  margin: 4px 0 0;
+  max-width: 100%;
+  color: var(--ink);
+  width: fit-content;
+}
+.app .transaction-status .ui-chip-visual {
+  max-width: 100%;
+  white-space: normal;
+}
+.app .calendar-grid {
+  min-width: max(356px, calc(19.25rem + 48px));
+}
+.app .metric-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+}
+@container (max-width: 18rem) {
+  .upcoming-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .upcoming-row > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .upcoming-row > strong {
+    margin-left: auto;
+    white-space: nowrap;
+  }
+}
+.app .category-rail .rail-tile {
+  margin-block: 8px;
+}
+@media (max-width: 899px) {
+  .app main {
+    padding-bottom: calc(
+      var(--mobile-nav-height, 78px) + 48px + env(safe-area-inset-bottom)
+    );
+  }
+}
+.app .chart-coverage {
+  gap: 8px;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  max-width: 100%;
+}
+.app .chart-coverage > * {
+  flex: none;
+}
+.app .backup-status {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+.app .backup-status > svg {
+  flex: none;
+  margin-top: 4px;
+}
+.app .backup-status > span {
+  flex: 1;
+  min-width: 0;
+}
+.backup-centre {
+  grid-template-columns: minmax(0, 1fr);
+}
+.app .import-change-files {
+  margin: 0;
+  gap: 8px;
+}
+.app .import-change-files .file-button {
+  padding-inline: 0;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  text-decoration: underline;
+  font-size: 0.8125rem;
+}
+.app .import-review-list {
+  gap: 12px;
+  padding-bottom: 24px;
+}
+.app .subscription-evidence {
+  display: flex;
+  width: 100%;
+  min-height: 64px;
+  border-bottom: 0;
+}
+.app .subscription-evidence + .subscription-evidence {
+  border-top: 1px solid var(--line);
+}
+.app .ux-sheet .report-allowable-list {
+  display: grid;
+  gap: 8px;
+}
+.app .ux-sheet .report-allowable-list > .ui-checkbox-row {
+  display: flex;
+  flex-direction: row-reverse;
+  min-height: 52px;
+  padding: 8px 0;
+}
+.app .ux-sheet:has(.report-allowable-list) > .sheet-footer {
+  border-top: 0;
+}
+.app .manual-account-editor .planning-v2-object {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  width: 100%;
+  gap: 12px;
+}
+.app .manual-account-editor .planning-v2-object > strong {
+  justify-self: end;
+}
+.app .demo-actions {
+  gap: 16px;
+}
+.app .file-button {
+  overflow: visible;
+  min-height: 48px;
+  margin-block: 0;
+}
+.app table {
+  border-collapse: collapse;
+}
+.app table td,
+.app table th {
+  border-top: 0;
+  border-bottom: 0;
+}
+.app table thead tr {
+  border-bottom: 1px solid var(--line);
+}
+.app table tbody tr + tr {
+  border-top: 1px solid var(--line);
+}
+@container (max-width: 18rem) {
+  .app .manual-account-editor .planning-v2-object {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.app .chart-coverage .ui-chip-target {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.app .chart-month-gap .ui-chip-visual {
+  border-style: dashed;
+  background: repeating-linear-gradient(
+    135deg,
+    transparent,
+    transparent 5px,
+    var(--line) 5px,
+    var(--line) 6px
+  );
+}
+.app .month-figures,
+.app .position-metrics,
+.app .home-todo,
+.app .upcoming-row {
+  gap: 12px;
+}
+.app .month-figures > a,
+.app .position-metrics > a,
+.app .upcoming-row > span,
+.app .metric {
+  gap: 4px;
+}
+.app .metric-strip,
+.app .chart-legend {
+  gap: 16px;
+}
+.app .other-periods {
+  border-top: 0;
+}
+.ux-sheet .sheet-footer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 16px;
+}
+.app .object-menu > button:first-of-type {
+  margin-top: 16px;
+}
+.app main {
+  padding-bottom: max(32px, calc(var(--feng-toast-clearance, 0px) + 24px));
+}
+.ux-sheet .sheet-content {
+  padding-bottom: max(16px, calc(var(--feng-toast-clearance, 0px) + 16px));
+}
+@media (max-width: 899px) {
+  .app main {
+    padding-bottom: max(
+      calc(var(--mobile-nav-height, 78px) + 48px + env(safe-area-inset-bottom)),
+      calc(var(--feng-toast-clearance, 0px) + 24px)
+    );
+  }
+}
+.app .transaction-description {
+  gap: 4px;
+}
+.app .swipe-transaction .transaction-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app .transaction-row .transaction-description {
+  flex: 1 1 min(100%, 14rem);
+  min-width: min(100%, 14rem);
+}
+.app .transaction-row > strong {
+  margin-left: auto;
+}
+.app .segmented-control {
+  flex-wrap: wrap;
+}
+.app .segmented-control > button {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+.app .segmented-control.ui-segmented-control.range-control {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(max-content, 1fr);
+  width: min(100%, 20rem);
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  flex: 1 1 100%;
+}
+.app .range-control > button {
+  min-width: 44px;
+}
+.app .budget-category-name {
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  justify-content: flex-start;
+  text-align: left;
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .budget-card .section-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app .budget-card .section-heading > strong:not(:first-child):last-child {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.app .budget-category-name .category-colour-dot {
+  flex: none;
+  margin-inline-end: 0;
+}
+.app .budget-footer-actions {
+  margin-top: 16px;
+}
+.app .budget-footer-actions + details {
+  margin-top: 8px;
+  border-block: 0;
+}
+.app details > summary::marker {
+  content: "▸ ";
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+}
+.app details[open] > summary::marker {
+  content: "▾ ";
+}
+.app-lock-screen details > summary::marker {
+  content: "▸ ";
+  color: var(--muted);
+  font-family: Arial, sans-serif;
+}
+.app-lock-screen details[open] > summary::marker {
+  content: "▾ ";
+}
+.app .transaction-row {
+  gap: 12px;
+  padding-block: 16px;
+}
+.app .date-scope {
+  gap: 8px;
+}
+.app .object-menu {
+  border-block: 0;
+}
+.app .month-review-page .card > a.button {
+  margin-top: 8px;
+}
+.app .ui-section-card-content:has(> button + button) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+}
+:where(.app .card > a):not([class]),
+.app .totals dt > a,
+.app .beta-about p > a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+}
+.app .beta-about .beta-project-links {
+  margin-top: 8px;
+}
+.app .not-counted a:has(> small) {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+:where(.app .card > a):not([class]) {
+  width: 100%;
+}
+.app .home-todo > span,
+.app .payment-timeline a > div {
+  gap: 4px;
+}
+.app .subscription-evidence > span > small {
+  display: block;
+  margin-top: 4px;
+}
+.app .v2-report-table td:nth-child(n + 2),
+.app .v2-report-table th:nth-child(n + 2) {
+  text-align: right;
+}
+.app .v2-report-table {
+  table-layout: auto;
+  min-width: max-content;
+}
+.app .planning-kpis,
+.app .planning-kpis > div {
+  gap: 12px;
+}
+.feedback-dialog .feedback-context {
+  gap: 8px;
+}
+.app .statement-history > details:first-child,
+.app #about-feedback > details:first-of-type {
+  border-top: 0;
+}
+.app .manual-account-value {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.app .period-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  flex: 1 1 100%;
+}
+.app .property-cost-rows > div {
+  min-height: 52px;
+  align-items: center;
+  padding-block: 0;
+}
+.app .payment-timeline li {
+  border-bottom: 0;
+}
+.app .payment-timeline li + li {
+  border-top: 1px solid var(--line);
+}
+.app .payment-timeline a {
+  min-height: 64px;
+  gap: 12px;
+  padding-block: 16px;
+}
+.app .import-blocking-warning {
+  display: grid;
+  gap: 12px;
+}
+.ux-sheet .generic-column-mapping {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+.beta-introduction .beta-notice-content {
+  justify-content: flex-start;
+}
+.beta-introduction .small-chip {
+  align-self: flex-start;
+}
+.app .month-review-page > .page-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 8px;
+}
+.app .month-review-page > .page-heading > h1 {
+  min-width: 0;
+}
+.app-lock-screen button:disabled {
+  background: var(--raised);
+  border-color: var(--line);
+  color: var(--muted);
+  opacity: 1;
+}
+.beta-introduction .beta-notice-actions {
+  margin-top: 24px;
+}
+@container (max-width: 18rem) {
+  .app .planning-kpis > div,
+  .app .payment-timeline a {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .app .planning-kpis span,
+  .app .payment-timeline a > div {
+    max-width: 100%;
+    width: 100%;
+  }
+  .app .planning-kpis strong,
+  .app .payment-timeline a > strong {
+    align-self: flex-end;
+    text-align: right;
+  }
+  .app .generic-readings {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .generic-reading-values > div,
+  .app .generic-balance-check > div {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+  }
+  .app .generic-reading-values dd,
+  .app .generic-balance-check dd {
+    max-width: 100%;
+  }
+}
+.recharts-tooltip-wrapper ul > li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.recharts-tooltip-wrapper .recharts-tooltip-item-value {
+  margin-left: auto;
+  white-space: nowrap;
+  text-align: right;
+}
+.app .month-figures > a,
+.app .position-metrics > a {
+  min-height: 44px;
+}
+.app .restore-warning {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.app .rule-preview-list {
+  padding: 0;
+  list-style: none;
+}
+.app .rule-preview-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.app-lock-screen > details {
+  border-block: 0;
+}
+.accuracy-dialog,
+.feedback-dialog,
+.category-dialog,
+.ux-sheet {
+  container-type: inline-size;
+}
+@container (max-width: 18rem) {
+  .beta-about-metadata,
+  .feedback-dialog .feedback-context > div {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .beta-about-metadata dd,
+  .feedback-dialog .feedback-context dd {
+    margin: 0;
+    min-width: 0;
+  }
+  .category-dialog .category-tile-grid,
+  .category-dialog .sorting-card {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .app .segmented-control {
+    flex-wrap: wrap;
+  }
+  .app .segmented-control > button {
+    flex: 1 1 auto;
+    min-width: max-content;
+  }
+}
+.colour-presets button {
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+@media (max-width: 899px) {
+  .ux-sheet .sheet-content .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 899px) {
+  .app textarea,
+  .ux-sheet textarea {
+    font-size: 1rem;
+    min-height: 48px;
+  }
+}
+:root[data-theme="light"]
+  .app
+  .account-filter-chip[aria-pressed="true"]
+  .account-chip-visual {
+  color: #1d293b;
+  background: #e8edf5;
+  border-color: #4c6688;
+}
+:root[data-theme="light"] .danger,
+:root[data-theme="light"] .app button.danger {
+  color: #9a342b;
+  border-color: #ac473d;
+}
+.app .category-kpis {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: 12px;
+}
+@container (max-width: 18rem) {
+  .app .account-overview-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 16px;
+    gap: 12px;
+  }
+  .app .account-overview-row > span:first-child {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+  .app .account-overview-row > .account-balance {
+    grid-column: 1;
+    width: 100%;
+    max-width: 100%;
+    justify-self: end;
+    margin-left: auto;
+  }
+  .app .account-overview-row > svg {
+    grid-column: 2;
+    justify-self: end;
+  }
+  .app .totals > div,
+  .app .subscription-evidence {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app .totals > div > dt,
+  .app .subscription-evidence > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .app .totals > div > dd,
+  .app .subscription-evidence > strong {
+    margin-left: auto;
+  }
+}
+.analysis-shortcuts {
+  display: grid;
+  gap: 8px;
+  margin-block: 16px;
+}
+.analysis-shortcuts > .button {
+  justify-self: start;
+}
+@media (max-width: 359px) {
+  .ui-list-row:has(> .ui-list-row-amount > svg) > .ui-list-row-text {
+    flex: 1 1 0;
+    min-width: 0;
+  }
+}
+
+.app .generic-review-row,
+.app .generic-parser-details,
+.app .generic-statement-proof {
+  padding: 16px;
+}
+.app .generic-reading {
+  padding: 12px;
+}
+.app .generic-reading-values .generic-original-description {
+  overflow-x: auto;
+  white-space: nowrap;
+  max-width: 100%;
+  min-width: 0;
+  text-align: left;
+  min-height: 44px;
+}
+.app .review-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.app .review-tabs > button {
+  flex: 1 1 auto;
+  min-width: max-content;
+}
+.app .pagination {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+@container (max-width: 18rem) {
+  .app .review-compact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .app .review-compact > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .app .review-compact > strong {
+    margin-left: auto;
+  }
+  .app .generic-review-row > summary {
+    flex-wrap: wrap;
+  }
+  .app .generic-review-row > summary > span {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+  .app .generic-review-row > summary > strong {
+    margin-left: auto;
+  }
+}
+.app .source-filename {
+  display: block;
+  min-width: 0;
+  flex: 1;
+  min-height: 44px;
+  overflow-x: auto;
+  padding-block: 8px;
+  white-space: nowrap;
+}
+.app .source-filename > strong {
+  display: inline-block;
+  min-width: max-content;
+}
+.app .import-outcome-footer,
+.app .import-statement-heading {
+  gap: 12px;
+}
+.app .import-outcome-footer {
+  padding: 16px;
+}
+.app .import-outcome-footer > div,
+.app .review-metrics > div {
+  gap: 4px;
+}
+.app .import-outcome-footer > div {
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .import-outcome-footer > .primary,
+.app .import-result > .button {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+.app .generic-correction textarea {
+  font-size: 1rem;
+}
+.category-dialog .category-tile-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 12px;
+}
+.category-board-footer {
+  display: grid;
+  flex: none;
+  gap: 8px;
+  padding-top: 8px;
+}
+.category-board-footer > .queue-progress {
+  margin: 0;
+}
+.category-board-footer > .sort-details {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  margin: 0;
+  padding-block: 8px;
+  border: 0;
+}
+.app .brand,
+.app .month-picker {
+  gap: 8px;
+}
+.app .content-grid,
+.app .transactions-workspace {
+  gap: 24px;
+}
+.app .category-months {
+  gap: 12px;
+}
+.app .notice:has(> strong),
+.ux-sheet .notice:has(> strong) {
+  display: block;
+}
+.app .category-monthly-values > .table-scroll {
+  margin-top: 8px;
+}
+.app .category-monthly-values td > a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 44px;
+  min-height: 44px;
+}
+.app .report-bar-object {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.app .report-bar-object > span:first-child {
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .report-bar-object > strong {
+  margin-left: auto;
+}
+.app .report-bar-track {
+  flex: 1 0 100%;
+  width: 100%;
+}
+.app .recharts-default-tooltip {
+  background-color: var(--surface) !important;
+  border-color: var(--line) !important;
+  color: var(--ink) !important;
+}
+.app .recharts-tooltip-label,
+.app .recharts-tooltip-item-name,
+.app .recharts-tooltip-item-value,
+.app .recharts-tooltip-item-separator {
+  color: var(--ink) !important;
+}
+.app .form-grid {
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+.app .review-row .form-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+}
+.ux-sheet .rule-action {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.app .settings-preview {
+  gap: 12px 24px;
+}
+.app .restore-count {
+  gap: 4px;
+}
+.app .restore-warning > details,
+.split-line-tags > details {
+  border-block: 0;
+}
+.app .rule-order-controls {
+  gap: 8px;
+}
+.app .rule-list-row,
+.app .transfer-tile,
+.app .queue-progress,
+.app .sorting-queue {
+  gap: 12px;
+}
+.app .rule-list-row:last-of-type {
+  border-bottom: 0;
+}
+.app .rule-list-row .v2-row-actions {
+  gap: 16px;
+}
+.category-trend-list {
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+.category-trend-list > li + li {
+  border-top: 1px solid var(--line);
+}
+.app .review-compact,
+.app .generic-review-row > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.app .review-compact > span,
+.app .generic-review-row > summary > span {
+  flex: 1 1 min(100%, 12rem);
+  min-width: min(100%, 12rem);
+}
+.app .review-compact > strong,
+.app .generic-review-row > summary > strong {
+  margin-left: auto;
+}

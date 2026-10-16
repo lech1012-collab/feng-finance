@@ -2,14 +2,14 @@
   position: fixed;
   inset: auto 0 var(--keyboard-inset, 0px);
   width: 100%;
-  max-width: 720px;
+  max-width: none;
   max-height: calc(
     var(--sheet-height, 100dvh) - max(16px, env(safe-area-inset-top))
   );
   margin: 0 auto;
   padding: 0;
   border: 1px solid var(--line);
-  border-radius: 20px 20px 0 0;
+  border-radius: 16px 16px 0 0;
   background: var(--surface, #fff);
   color: var(--ink);
   overflow: hidden;
@@ -24,10 +24,10 @@
 .sheet-grab {
   flex: none;
   width: 36px;
-  height: 4px;
+  height: 5px;
   border-radius: 4px;
   background: var(--muted);
-  margin: 10px auto 0;
+  margin: 8px auto 0;
 }
 .sheet-heading {
   display: flex;
@@ -38,11 +38,16 @@
   flex: none;
 }
 .sheet-heading h2 {
+  flex: 1;
+  min-width: 0;
   font-size: 1.25rem;
   margin: 0;
   overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 .sheet-content {
+  flex: 1 1 auto;
   overflow-y: auto;
   overscroll-behavior: contain;
   padding: 8px 16px 24px;
@@ -85,6 +90,7 @@
   margin-inline: auto;
   min-height: 48px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   padding: 8px 12px;
@@ -97,13 +103,16 @@
 }
 .ux-toast > span {
   flex: 1;
-  min-width: 0;
-  overflow-wrap: anywhere;
+  min-width: min(100%, 16ch);
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
 }
 .ux-toast > button {
   flex: none;
 }
 .ux-toast--sheet {
+  position: absolute;
   z-index: 10001;
 }
 .password-field {
@@ -133,9 +142,10 @@
   min-width: 0;
 }
 .switch-row input {
-  width: 42px;
-  height: 24px;
-  min-height: 24px;
+  order: -1;
+  width: 51px;
+  height: 31px;
+  min-height: 31px;
   margin: 0;
   appearance: none;
   border-radius: 20px;
@@ -147,8 +157,8 @@
 .switch-row input::before {
   content: "";
   display: block;
-  width: 18px;
-  height: 18px;
+  width: 25px;
+  height: 25px;
   border-radius: 50%;
   background: var(--muted);
   transition: transform 0.15s;
@@ -158,8 +168,8 @@
   border-color: var(--accent);
 }
 .switch-row input:checked::before {
-  transform: translateX(16px);
-  background: var(--ink);
+  transform: translateX(20px);
+  background: var(--on-accent, #fff);
 }
 .switch-row input:focus-visible {
   outline: 3px solid var(--accent);
@@ -186,6 +196,7 @@
 }
 .refund-choice {
   display: flex !important;
+  flex-direction: row;
   align-items: center;
   gap: 12px;
   min-height: 64px;
@@ -193,7 +204,10 @@
 }
 .refund-choice input {
   width: 20px;
+  height: 20px;
   min-height: 20px;
+  padding: 0;
+  margin: 0;
   flex: none;
 }
 .refund-choice > span {
@@ -220,13 +234,49 @@
 }
 @media (min-width: 900px) {
   .ux-sheet {
-    inset: 50% 16px auto;
-    transform: translateY(-50%);
-    border-radius: 16px;
-    max-height: calc(100dvh - 48px);
+    inset: 0 0 var(--keyboard-inset, 0px) auto;
+    width: min(420px, calc(100vw - 32px));
+    height: var(--sheet-height, 100dvh);
+    max-height: var(--sheet-height, 100dvh);
+    margin: 0;
+    border-radius: 12px 0 0 12px;
+    padding-top: env(safe-area-inset-top);
+  }
+  .sheet-grab {
+    display: none;
+  }
+  .sheet-heading .icon-button {
+    width: 32px;
+    min-width: 32px;
+    min-height: 32px;
+    height: 32px;
+    padding: 4px;
+  }
+  .switch-row input {
+    width: 36px;
+    height: 20px;
+    min-height: 20px;
+  }
+  .switch-row input::before {
+    width: 14px;
+    height: 14px;
+  }
+  .switch-row input:checked::before {
+    transform: translateX(16px);
   }
   .ux-toast {
-    bottom: 24px;
+    bottom: 12px;
+  }
+}
+@media (max-width: 359px) {
+  .ux-toast {
+    flex-wrap: wrap;
+  }
+  .ux-toast > span {
+    flex-basis: 100%;
+  }
+  .ux-toast > .icon-button {
+    margin-left: auto;
   }
 }
 @media (prefers-reduced-motion: reduce) {

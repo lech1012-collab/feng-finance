@@ -1,6 +1,8 @@
+import { UKDateInput } from "./UKDateInput";
 import { useEffect, useId, useState } from "react";
 import { decimalMoney, parseMoney } from "../domain/money";
 import { parseDate } from "../domain/dates";
+import { displayDate, displayMerchant } from "../domain/presentation";
 import type { RowCheck, RowReading, SourceRect } from "../import/generic/types";
 import {
   displayMoney,
@@ -77,11 +79,29 @@ function ReadingValues({
     <dl className="generic-reading-values">
       <div>
         <dt>Date</dt>
-        <dd>{reading.date ?? reading.rawDate ?? "Not read"}</dd>
+        <dd>
+          {reading.date ? (
+            <time className="date-value" dateTime={reading.date}>
+              {displayDate(reading.date)}
+            </time>
+          ) : (
+            (reading.rawDate ?? "Not read")
+          )}
+        </dd>
       </div>
       <div>
         <dt>Description</dt>
-        <dd>{reading.description || "Not read"}</dd>
+        <dd>
+          <div
+            className="generic-original-description"
+            data-source-text
+            tabIndex={0}
+            role="region"
+            aria-label="Original transaction description"
+          >
+            <span>{reading.description || "Not read"}</span>
+          </div>
+        </dd>
       </div>
       <div>
         <dt>Amount</dt>
@@ -174,7 +194,12 @@ export function GenericReviewRow({
     >
       <summary>
         <span>
-          <strong>{reading?.description || "Unread transaction"}</strong>
+          <strong>
+            {displayMerchant({
+              merchant: "",
+              description: reading?.description || "Unread transaction",
+            })}
+          </strong>
           <small>
             Page {row.rect.page} · {state}
           </small>
@@ -237,9 +262,7 @@ export function GenericReviewRow({
                     })
                   }
                 >
-                  {index === 0
-                    ? "Accept extracted values"
-                    : `Accept alternative ${index}`}
+                  Use reading {index + 1}
                 </button>
                 {!validReading(option) && (
                   <p className="muted">
@@ -289,12 +312,11 @@ export function GenericReviewRow({
             >
               <label>
                 Date
-                <input
-                  type="date"
+                <UKDateInput
                   required
                   disabled={busy}
                   value={date}
-                  onChange={(event) => setDate(event.target.value)}
+                  onChange={(event) => setDate(event)}
                 />
               </label>
               <label>
@@ -335,7 +357,7 @@ export function GenericReviewRow({
               {error && <p role="alert">{error}</p>}
               <div className="generic-action-row">
                 <button type="submit" disabled={busy || !currency}>
-                  Save correction
+                  Save row
                 </button>
                 <button
                   type="button"
@@ -349,14 +371,14 @@ export function GenericReviewRow({
           ) : (
             <div className="generic-action-row">
               <button type="button" disabled={busy} onClick={startCorrection}>
-                Correct this row
+                Correct row
               </button>
               <button
                 type="button"
                 disabled={busy || excluded}
                 onClick={() => onAction(row.rowId, { kind: "exclude" })}
               >
-                Exclude this row
+                Exclude row
               </button>
             </div>
           )}

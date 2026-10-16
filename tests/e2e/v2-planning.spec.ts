@@ -126,6 +126,9 @@ test("manual assets, earmarked pots, debt plans and scenarios keep actual bank r
     page.getByText("Estimated debt-free", { exact: true }),
   ).toBeVisible();
   await page.getByRole("tab", { name: "Forecast", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Edit scenario", exact: true })
+    .click();
   await page.getByLabel("Amount (GBP)").fill("200");
   await page.getByLabel("Label", { exact: true }).fill("Fictitious repair");
   await page
@@ -142,6 +145,9 @@ test("manual assets, earmarked pots, debt plans and scenarios keep actual bank r
   expect(await records(page, "transactions")).toEqual(originalTransactions);
   expect(await records(page, "statements")).toEqual(originalStatements);
   await page.reload();
+  await page
+    .getByRole("button", { name: "Edit scenario", exact: true })
+    .click();
   await page
     .getByRole("combobox", { name: "Saved scenario", exact: true })
     .selectOption({ label: "Repair plan" });

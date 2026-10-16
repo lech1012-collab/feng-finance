@@ -15,7 +15,8 @@ export function blockedRepositoryPaths(paths) {
         !normalized.endsWith(".env.example")) ||
       /(?:^|\/)(?:id_rsa|id_ed25519)$/i.test(normalized) ||
       /\.(?:feng|pem|key)$/i.test(normalized) ||
-      /(?:^|\/)feng-finance-backup-.*\.json$/i.test(normalized)
+      /(?:^|\/)feng-finance-backup-.*\.json$/i.test(normalized) ||
+      /(?:^|\/)Feng [^/]*\.json$/i.test(normalized)
     );
   });
 }

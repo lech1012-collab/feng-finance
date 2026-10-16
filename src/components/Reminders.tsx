@@ -1,11 +1,12 @@
 import { Toast } from "./Toast";
-import { auditedMutation } from "../storage/audit";
+import { auditedMutation, undoChange } from "../storage/audit";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { ImportButton } from "./ImportPicker";
 import { db } from "../storage/database";
 import { download } from "../storage/backup";
+import { SwitchRow } from "./UIPrimitives";
 import {
   financeReminders,
   localToday,
@@ -24,6 +25,8 @@ export function Reminders({
   const today = localToday();
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [changeId, setChangeId] = useState("");
+  const [busy, setBusy] = useState(false);
   const [localConfig, setLocalConfig] = useState<ReminderConfig>();
   const data = useLiveQuery(
     async () => ({
@@ -56,21 +59,37 @@ export function Reminders({
     config,
   );
   const save = async (patch: Partial<ReminderConfig>) => {
+    if (busy) return;
+    setBusy(true);
     setLocalConfig((current) => ({ ...(current ?? data.config), ...patch }));
     try {
-      await auditedMutation("Change reminders", ["settings"], async () => {
-        const current = readReminderConfig(
-          (await db.settings.get(REMINDER_KEY))?.value,
-        );
-        await db.settings.put({
-          key: REMINDER_KEY,
-          value: JSON.stringify({ ...current, ...patch }),
-        });
-      });
+      const receipt = await auditedMutation(
+        "Change reminders",
+        ["settings"],
+        async () => {
+          const current = readReminderConfig(
+            (await db.settings.get(REMINDER_KEY))?.value,
+          );
+          await db.settings.put({
+            key: REMINDER_KEY,
+            value: JSON.stringify({ ...current, ...patch }),
+          });
+        },
+      );
       setError("");
+      setChangeId(receipt.changeId);
+      setNotice(
+        patch.day === undefined
+          ? patch.enabled
+            ? "Reminders turned on."
+            : "Reminders turned off."
+          : "Monthly review day saved.",
+      );
     } catch {
       setLocalConfig(data.config);
       setError("Reminder settings could not be saved.");
+    } finally {
+      setBusy(false);
     }
   };
   if (!settings && (!config.enabled || !reminders.length)) return null;
@@ -82,20 +101,18 @@ export function Reminders({
       </div>
       {settings && (
         <>
-          <label className="switch-row">
-            <input
-              role="switch"
-              type="checkbox"
-              checked={config.enabled}
-              onChange={(e) => void save({ enabled: e.target.checked })}
-            />{" "}
-            Show statement and bill reminders
-          </label>
+          <SwitchRow
+            label="Show statement and bill reminders"
+            checked={config.enabled}
+            onChange={(enabled) => void save({ enabled })}
+            disabled={busy}
+          />
           <label className="reminder-day">
             Monthly statement review day
             <select
               aria-label="Monthly statement review day"
               value={config.day}
+              disabled={busy}
               onChange={(e) => void save({ day: Number(e.target.value) })}
             >
               {Array.from({ length: 28 }, (_, i) => (
@@ -117,6 +134,7 @@ export function Reminders({
                 "text/calendar",
                 "feng-finance-reminders.ics",
               );
+              setChangeId("");
               setNotice(
                 "Calendar file prepared. Import it into your calendar and enable alerts.",
               );
@@ -163,7 +181,25 @@ export function Reminders({
           {reminders.length - 4 === 1 ? "" : "s"}
         </Link>
       )}
-      {notice && <Toast message={notice} />}
+      {notice && (
+        <Toast
+          message={notice}
+          id={changeId || notice}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  const restored = readReminderConfig(
+                    (await db.settings.get(REMINDER_KEY))?.value,
+                  );
+                  setLocalConfig(restored);
+                  setNotice("");
+                  setChangeId("");
+                }
+              : undefined
+          }
+        />
+      )}
       {error && <p role="alert">{error}</p>}
     </section>
   );

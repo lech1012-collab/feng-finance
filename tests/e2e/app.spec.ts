@@ -134,7 +134,7 @@ test("manual category memory survives deleting imports and reimporting the same 
     .click();
   await expect(
     page.getByText(
-      "Imported records deleted. Accounts and saved categorization rules kept.",
+      "Imported records deleted. Accounts and saved categorisation rules kept.",
     ),
   ).toBeVisible();
   await page.reload();
@@ -159,7 +159,7 @@ test("manual category memory survives deleting imports and reimporting the same 
     .click();
   await expect(
     page.getByText(
-      "Imported records deleted. Accounts and saved categorization rules kept.",
+      "Imported records deleted. Accounts and saved categorisation rules kept.",
     ),
   ).toBeVisible();
   await openImport(page);
@@ -715,7 +715,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
     .click();
   await expect(
     page.getByText(
-      "Imported records deleted. Accounts and saved categorization rules kept.",
+      "Imported records deleted. Accounts and saved categorisation rules kept.",
     ),
   ).toBeVisible();
   await openImport(page);
@@ -1030,7 +1030,9 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("1 to 30 Sep 2026", { exact: true }),
+    page
+      .locator(".import-statement-card > summary")
+      .getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   const statement = page.locator(".import-statement-card");
   await statement
@@ -1040,24 +1042,28 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
     .getByRole("combobox", { name: "Bank", exact: true })
     .selectOption("Barclays");
   await expect(statement).toHaveClass(/import-statement-blocking/);
-  await expect(statement.locator(":scope > summary .small-chip")).toHaveText(
-    "Parse again",
-  );
+  await expect(
+    statement.locator(":scope > summary .ui-chip-visual"),
+  ).toHaveText("Parse again");
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
   await page.getByRole("button", { name: "Parse again", exact: true }).click();
-  await expect(statement.locator(":scope > summary .small-chip")).toHaveText(
-    "✓ Reconciled",
-  );
+  await expect(
+    statement.locator(":scope > summary .ui-chip-visual"),
+  ).toHaveText("✓ Reconciled");
   await expect(statement).not.toHaveClass(/import-statement-blocking/);
   await selectStatement(page, "barclays-no-period");
   await expect(page.getByRole("alert")).toContainText(
     "Enter the dates printed on the PDF",
   );
   await page.getByLabel("Enter statement dates from the source file").check();
-  await page.getByLabel("Statement start date").fill("2026-09-01");
-  await page.getByLabel("Statement end date").fill("2026-09-30");
+  await page
+    .getByRole("textbox", { name: "Statement start date", exact: true })
+    .fill("01/09/2026");
+  await page
+    .getByRole("textbox", { name: "Statement end date", exact: true })
+    .fill("30/09/2026");
   await page.getByRole("button", { name: "Parse again", exact: true }).click();
   await expect(
     page.getByText("✓ Statement reconciled", { exact: true }),
@@ -1072,7 +1078,9 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await openImport(page);
   await selectStatement(page, "barclays-october");
   await expect(
-    page.getByText("1 to 31 Oct 2026", { exact: true }),
+    page
+      .locator(".import-statement-card > summary")
+      .getByText("1 to 31 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     page.getByLabel("Enter statement dates from the source file"),
@@ -1168,7 +1176,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
     .click();
   await expectTransactionCount(page, 0);
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toHaveCount(0);
   // Deleting the demo removes its planning, transfer and valuation records too.
   const emptyDownload = page.waitForEvent("download");
@@ -1219,7 +1227,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
       .filter({ hasText: "Backup restored successfully." }),
   ).toBeVisible();
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
 });
 
@@ -1258,7 +1266,7 @@ test("offline launch, local PDF import, backup and no financial upload", async (
   const event = page.waitForEvent("download");
   await saveReadableBackup(page);
   expect((await event).suggestedFilename()).toMatch(
-    /feng-finance-backup-.*\.json/,
+    /^Feng \d{1,2}-[A-Za-z]{3}-\d{4}\.json$/,
   );
   expect(unexpected).toEqual([]);
 });
@@ -1333,7 +1341,7 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     page.getByRole("status").filter({ hasText: "Fictitious demo data added." }),
   ).toBeVisible();
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
   await page
     .getByRole("navigation", { name: "Main navigation" })
@@ -1479,7 +1487,9 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     }),
   ).toBeVisible();
   await expect(
-    amex.getByText("6 Sep to 5 Oct 2026", { exact: true }),
+    amex
+      .locator(":scope > summary")
+      .getByText("6 Sep to 5 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     amex.getByText(
@@ -1508,7 +1518,9 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     revolut.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    revolut.getByText("1 to 30 Sep 2026", { exact: true }),
+    revolut
+      .locator(":scope > summary")
+      .getByText("1 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     revolut.locator(
@@ -1651,7 +1663,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   ).toBeVisible();
 });
 
-test("dark default, persistent appearance and mobile layouts without overlapping controls", async ({
+test("System default, persistent appearance and mobile layouts without overlapping controls", async ({
   page,
 }) => {
   test.setTimeout(120000);
@@ -1663,14 +1675,23 @@ test("dark default, persistent appearance and mobile layouts without overlapping
   await expect(
     page.getByRole("status").filter({ hasText: "Rate preference saved." }),
   ).toBeVisible();
-  await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await settingsSection(page, "demo");
   await page
     .getByRole("button", { name: "Load demo data", exact: true })
     .click();
   await expectTransactionCount(page, 176);
   await settingsSection(page, "appearance");
+  await expect(
+    page.getByRole("button", { name: "System", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.getByRole("button", { name: "Light", exact: true }).click();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Appearance saved." }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "Light", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await page.reload();
   await expect(
@@ -1818,7 +1839,7 @@ test("personal rule corrections update existing transactions and future imports 
   ).toBeVisible();
   await expect(
     page.getByRole("button", { name: "To check (0)", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await confirmImport(page);
   await gotoRoute(page, "/settings");
   await page.getByRole("link", { name: "Rules", exact: true }).click();
@@ -2024,13 +2045,13 @@ test("subscription notification centre supports review, cancellation plans and p
   await page.getByRole("button", { name: /Try fictitious demo data/ }).click();
   await expectTransactionCount(page, 176);
   await expect(
-    page.locator(".header-demo").filter({ visible: true }),
+    page.locator(".ui-demo-chip").filter({ visible: true }),
   ).toBeVisible();
   // Home shows the three most urgent tasks. The seeded transfer and statement
   // gaps can outrank recurring review, which remains available at its route.
   await gotoRoute(page, "/subscriptions");
   await expect(
-    page.getByRole("heading", { name: "Subscriptions and bills", exact: true }),
+    page.getByRole("heading", { name: "Subscriptions", exact: true }),
   ).toBeVisible();
   const netflix = page.getByRole("article", { name: /Netflix/i });
   await expect(netflix).toBeVisible();
@@ -2067,7 +2088,12 @@ test("subscription notification centre supports review, cancellation plans and p
     netflix.getByRole("button", { name: "I cancelled", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await netflix.getByText(/View .*charges? and source evidence/).click();
-  await expect(netflix.locator(".subscription-evidence").first()).toBeVisible();
+  const evidence = netflix.getByRole("group", {
+    name: "Charge evidence",
+    exact: true,
+  });
+  await expect(evidence).toBeVisible();
+  await expect(evidence.getByRole("link").first()).toBeVisible();
   await netflix.getByRole("button", { name: "Review", exact: true }).click();
   await expect(
     netflix.getByRole("button", { name: "Review", exact: true }),

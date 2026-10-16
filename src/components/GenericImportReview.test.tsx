@@ -205,11 +205,16 @@ afterEach(() => {
 describe("generic PDF evidence review", () => {
   it("shows a one-penny difference and requires explicit confirmation before import anyway", () => {
     const { onImportAnyway } = show();
-    expect(screen.getByText(/Balance difference: \+£0.01/)).toBeInTheDocument();
+    expect(screen.getByText(/^Balance difference:/)).toHaveTextContent(
+      "Balance difference: +£0.01. Every penny must match.",
+    );
     expect(
       screen.queryByText("Statement figures match exactly"),
     ).not.toBeInTheDocument();
     expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Map columns" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Import anyway…" }));
     const dialog = screen.getByRole("dialog");
     expect(
@@ -245,33 +250,29 @@ describe("generic PDF evidence review", () => {
     expect(screen.getByText("? Sept")).toBeInTheDocument();
     expect(screen.getByText("2?.99")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Accept extracted values" }),
+      screen.getByRole("button", { name: "Use reading 1" }),
     ).toBeDisabled();
     expect(
       screen.getByRole("button", { name: "Import anyway…" }),
     ).toBeDisabled();
-    expect(
-      screen.getByRole("button", { name: "Correct this row" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Correct row" })).toBeEnabled();
   });
 
   it("emits the chosen alternative, exact signed correction and source-row exclusion", () => {
     const { onAction } = show();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Accept alternative 1" }),
-    );
+    fireEvent.click(screen.getByRole("button", { name: "Use reading 2" }));
     expect(onAction).toHaveBeenLastCalledWith("row-1", {
       kind: "accept",
       readingId: "reading-ocr",
     });
-    fireEvent.click(screen.getByRole("button", { name: "Correct this row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Correct row" }));
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "-25.00" },
     });
     fireEvent.change(screen.getByLabelText("Description", { exact: true }), {
       target: { value: "Corrected fictional store" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
     expect(onAction).toHaveBeenLastCalledWith("row-1", {
       kind: "correct",
       date: "2026-09-05",
@@ -279,7 +280,7 @@ describe("generic PDF evidence review", () => {
       amount: -2500,
       balanceAfterTransaction: 7500,
     });
-    fireEvent.click(screen.getByRole("button", { name: "Exclude this row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Exclude row" }));
     expect(onAction).toHaveBeenLastCalledWith("row-1", { kind: "exclude" });
     expect(
       screen.getByText(/Duplicate rows are handled separately/),
@@ -288,17 +289,18 @@ describe("generic PDF evidence review", () => {
 
   it("rejects ambiguous or excess-precision corrections without emitting a mutation", () => {
     const { onAction } = show();
-    fireEvent.click(screen.getByRole("button", { name: "Correct this row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Correct row" }));
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "25.001" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save correction" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid date");
     expect(onAction).not.toHaveBeenCalled();
   });
 
   it("rechecks column changes and saves a named mapping without relying on filenames", () => {
     const { onMapping, onSaveTemplate } = show();
+    fireEvent.click(screen.getByRole("button", { name: "Map columns" }));
     fireEvent.change(
       screen.getByRole("combobox", { name: "Role for Amount on page 1" }),
       { target: { value: "out" } },
@@ -428,6 +430,7 @@ describe("generic PDF evidence review", () => {
       '<img src="https://example.invalid/financial-data">';
     result.table.rows[0].cells[1].text = "<script>stealStatement()</script>";
     const { container } = show(result);
+    fireEvent.click(screen.getByRole("button", { name: "Map columns" }));
     expect(container.querySelectorAll("script,img")).toHaveLength(0);
     expect(
       screen.getByText("<script>stealStatement()</script>"),
@@ -441,6 +444,9 @@ describe("generic PDF evidence review", () => {
     expect(
       screen.getByText(/Not imported: unread pages 2, 3/),
     ).toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Map columns" }),
+    ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Import anyway…" }));
     const dialog = screen.getByRole("dialog");
     expect(
@@ -482,11 +488,7 @@ describe("generic PDF evidence review", () => {
         /Preview unavailable. Compare this row with the original PDF/,
       ),
     ).toBeInTheDocument();
-    expect(
-      screen.getByRole("button", { name: "Correct this row" }),
-    ).toBeEnabled();
-    expect(
-      screen.getByRole("button", { name: "Accept alternative 1" }),
-    ).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Correct row" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Use reading 2" })).toBeEnabled();
   });
 });

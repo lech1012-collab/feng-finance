@@ -25,6 +25,48 @@ beforeEach(async () => {
 afterEach(cleanup);
 
 describe("reviewable rule workflow", () => {
+  it("requires confirmation to delete a rule and Undo restores it without changing transactions", async () => {
+    const rule = {
+      id: "fictitious-rule-delete",
+      name: "Fictitious store",
+      match: "contains" as const,
+      direction: "negative" as const,
+      pattern: "FICTITIOUS STORE",
+      categoryId: "shopping",
+      priority: 100,
+      builtIn: false,
+    };
+    const row = transaction({
+      merchant: "FICTITIOUS STORE",
+      categoryId: "shopping",
+    });
+    await db.rules.put(rule);
+    await db.transactions.put(row);
+    expect(await db.rules.get(rule.id)).toEqual(rule);
+    expect(await db.categories.count()).toBeGreaterThan(0);
+    const confirmation = vi.spyOn(window, "confirm").mockReturnValue(false);
+    render(<RulesManager />);
+    const remove = await screen.findByRole(
+      "button",
+      { name: "Delete" },
+      { timeout: 5000 },
+    );
+    fireEvent.click(remove);
+    expect(confirmation).toHaveBeenCalledWith(
+      expect.stringContaining("Existing transactions keep their categories"),
+    );
+    expect(await db.rules.get(rule.id)).toEqual(rule);
+    confirmation.mockReturnValue(true);
+    fireEvent.click(remove);
+    await waitFor(async () =>
+      expect(await db.rules.get(rule.id)).toBeUndefined(),
+    );
+    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    await waitFor(async () =>
+      expect(await db.rules.get(rule.id)).toEqual(rule),
+    );
+    expect(await db.transactions.get(row.id)).toEqual(row);
+  });
   it("previews matches, applies a rule to existing records and offers Undo", async () => {
     const t = transaction({
       description: "AMZN DIGITAL",
@@ -252,6 +294,7 @@ describe("search, tags and report controls", () => {
       screen.getByRole("rowheader", { name: "Entertainment" }),
     ).toBeVisible();
     expect(screen.getByText("−£3.49")).toBeVisible();
+    fireEvent.click(screen.getByRole("button", { name: "Edit report" }));
     fireEvent.change(screen.getByLabelText("Report name"), {
       target: { value: "My categories" },
     });

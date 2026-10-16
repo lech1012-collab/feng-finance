@@ -1,3 +1,5 @@
+import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
+import { StatusChip } from "./UIPrimitives";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -78,6 +80,7 @@ export function CashChart({
   property?: boolean;
   showValues?: boolean;
 }) {
+  const chartRem = useRootFontSize();
   const hatchId = `missing-${useId().replaceAll(":", "")}`;
   const [selectedGap, setSelectedGap] = useState<string>();
   const factor = 10 ** currencyPrecision(currency);
@@ -111,7 +114,7 @@ export function CashChart({
         <ResponsiveContainer width="100%" height={210}>
           <ComposedChart
             data={displayed}
-            margin={{ top: 12, right: 8, left: -16, bottom: 0 }}
+            margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
           >
             <defs>
               <pattern
@@ -164,7 +167,10 @@ export function CashChart({
               minTickGap={12}
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 13, fill: "var(--muted)" }}
+              tick={{
+                fontSize: chartTickFontSize(chartRem),
+                fill: "var(--muted)",
+              }}
               tickFormatter={(label) => {
                 const point = data.find((item) => item.label === label);
                 const short = String(label)
@@ -174,10 +180,13 @@ export function CashChart({
               }}
             />
             <YAxis
-              width="auto"
+              width={Math.max(60, Math.round(chartRem * 3.75))}
               tickLine={false}
               axisLine={false}
-              tick={{ fontSize: 13, fill: "var(--muted)" }}
+              tick={{
+                fontSize: chartTickFontSize(chartRem),
+                fill: "var(--muted)",
+              }}
               tickFormatter={(v) => {
                 return compactMoney(Number(v), currency);
               }}
@@ -300,14 +309,16 @@ export function CashChart({
         <>
           <div
             className="chart-coverage"
+            role="group"
             aria-label="Monthly statement coverage"
           >
             {data.map((point, index) =>
               missing(point) ? (
-                <button
+                <StatusChip
+                  tone="warning"
                   className="chart-month-gap"
                   key={index}
-                  aria-label={`${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`}
+                  ariaLabel={`${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`}
                   onClick={() =>
                     setSelectedGap(
                       `${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`,
@@ -315,10 +326,19 @@ export function CashChart({
                   }
                 >
                   {point.label.replace("Sept", "Sep")}
-                </button>
+                </StatusChip>
               ) : (
-                <span
+                <StatusChip
                   key={index}
+                  ariaLabel={`${point.label.replace("Sept", "Sep")}: ${point.coverage?.status ?? "Imported statements"}`}
+                  tone={
+                    point.coverage?.status === "Partial" ? "warning" : "neutral"
+                  }
+                  onClick={() =>
+                    setSelectedGap(
+                      `${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Partial" ? "Partial month, from imported accounts only." : point.coverage?.status === "Complete" ? "Complete statement coverage." : "Coverage unavailable."}`,
+                    )
+                  }
                   className={
                     point.coverage?.status === "Partial"
                       ? "chart-month-partial"
@@ -327,7 +347,7 @@ export function CashChart({
                 >
                   {point.label.replace("Sept", "Sep")}
                   {point.coverage?.status === "Partial" ? "*" : ""}
-                </span>
+                </StatusChip>
               ),
             )}
           </div>

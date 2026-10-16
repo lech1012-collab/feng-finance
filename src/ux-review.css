@@ -23,6 +23,14 @@
   color: var(--ink);
   border-color: var(--line);
 }
+/* Conditions remain readable in narrow side panels and enlarged query filters. */
+.ux-sheet .form-grid,
+.ux-sheet .v2-inline-form,
+.condition-editor .condition-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
 .app input:user-invalid,
 .ux-sheet input:user-invalid,
 input[aria-invalid="true"] {
@@ -390,7 +398,7 @@ input[aria-invalid="true"] {
 .app .category-meta > span {
   min-width: 0;
   flex: 1;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   font-size: 0.9375rem;
 }
 .app .category-meta > strong {
@@ -424,7 +432,7 @@ input[aria-invalid="true"] {
 }
 .app .insight-row > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .insight-row small {
   display: block;
@@ -432,7 +440,7 @@ input[aria-invalid="true"] {
 }
 .app .position-metrics strong {
   font-size: clamp(1.25rem, 4.8vw, 1.75rem);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .position-metrics > a {
   min-width: 0;
@@ -502,7 +510,7 @@ input[aria-invalid="true"] {
   flex: none;
   text-align: right;
   max-width: 48%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .transaction-tools {
   display: flex;
@@ -549,12 +557,12 @@ input[aria-invalid="true"] {
 }
 .app .detail-meta dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .detail-description {
   font-size: 0.8125rem;
   color: var(--muted);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .detail-action-row {
   margin-top: 16px;
@@ -629,7 +637,7 @@ input[aria-invalid="true"] {
 }
 .app .planning-v2-object > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .more-analysis,
 .app .setup-list {
@@ -656,10 +664,10 @@ input[aria-invalid="true"] {
 }
 .app .v2-report-table th:first-child {
   width: 45%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .v2-report-table td:last-child {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .rule-order-controls {
   display: inline-flex;
@@ -686,7 +694,7 @@ input[aria-invalid="true"] {
   min-width: 0;
 }
 .generic-mapping-column li {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .generic-mapping-column ul {
   padding-left: 20px;
@@ -777,13 +785,6 @@ input[aria-invalid="true"] {
   .app .search-line {
     gap: 4px;
   }
-  .ux-sheet .form-grid,
-  .ux-sheet .v2-inline-form,
-  .ux-sheet .condition-row {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
   .app .generic-mapping-columns {
     grid-template-columns: minmax(0, 1fr);
   }
@@ -809,7 +810,7 @@ input[aria-invalid="true"] {
 }
 @media (max-width: 359px) {
   .app .page-heading h1 {
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
   }
   .app .calendar-day span {
     font-size: 0.75rem;
@@ -900,7 +901,7 @@ input[aria-invalid="true"] {
   min-height: 64px;
 }
 .app .report-bar-object > span:first-child {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .app .report-bar-object > strong {
   text-align: right;

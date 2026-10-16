@@ -44,7 +44,7 @@ Only after those checks, test private real statements from ignored `private-fixt
 
 ## Version 1.1 appearance and review
 
-- [ ] Starts dark; Settings → Appearance → Light persists through relaunch.
+- [ ] With no saved theme, follows System. Settings → Appearance → Light and Dark each persist through relaunch; System follows the device preference.
 - [ ] Home, Import, Analyse and transaction details have readable, non-overlapping controls at the device's default and enlarged text sizes.
 - [ ] Import is reachable from the bottom navigation; confirmation remains above the home indicator and the last editable field can scroll fully into view.
 - [ ] The review starts with extraction exceptions; All transactions reveals editable rows without obscuring the confirmation button.
@@ -98,3 +98,14 @@ Only after those checks, test private real statements from ignored `private-fixt
 - [ ] Restore preview counts and labels stay separate at 320px and 200% text. Invalid, incompatible or inconsistent backups explain recovery without exposing their contents or changing local records.
 - [ ] Change bank or statement dates in an otherwise reconciled import. The statement header asks for a new parse and confirmation remains unavailable until review succeeds.
 - [ ] On desktop, hover/focus/select a transaction: Select and Categorize remain beside its amount without covering it. Dragging disables those actions.
+
+## Final-polish candidate: physical checks still required
+
+The seven browser setups and the screenshots in `FINAL-POLISH-REPORT.md` are automated evidence, not a substitute for this list. Record the device, iOS version, date and result for each check.
+
+- [ ] At default and enlarged text, enter DD/MM/YYYY or eight UK-order digits in filters, a manual transaction and a planning due date. The full date stays visible. Invalid edits must not save the old date.
+- [ ] Open the named calendar action in iPhone Safari and installed mode, choose a date, and confirm the visible UK date and saved date agree.
+- [ ] With VoiceOver, complete Import → Home → sorting → Undo. Check focus trapping, announcements and restoration to the triggering object.
+- [ ] Verify the real keyboard and home indicator do not hide the final date field, transaction row, toast Undo or sheet footer.
+- [ ] Compare a small iPhone, a large iPhone and a desktop; record any chart, light-theme or 200%-text issue.
+- [ ] Review a recurring same-bill/separate-bills choice and Undo without changing original imported amounts.

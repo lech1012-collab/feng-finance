@@ -1,0 +1,63 @@
+.report-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 16px;
+}
+.report-controls .ui-segmented-control {
+  flex: 1 1 180px;
+  max-width: 320px;
+}
+.report-tax-years {
+  margin: 16px 0;
+}
+.report-tax-years > p {
+  margin: 0 0 8px;
+}
+.report-tax-period {
+  white-space: nowrap;
+}
+.app .report-tax-years .segmented-control.ui-segmented-control,
+.ux-sheet .report-tax-years .segmented-control.ui-segmented-control {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.report-allowable-list {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.ux-sheet .report-allowable-list .ui-checkbox-row {
+  display: flex;
+  min-height: 52px;
+  flex-direction: row-reverse;
+  padding: 8px 0;
+}
+.report-allowable-list .ui-checkbox-row + .ui-checkbox-row {
+  border-top: 1px solid var(--line);
+}
+.property-tax-summary .ui-key-value-row {
+  flex-wrap: wrap;
+}
+.property-tax-summary .ui-key-value-row > :first-child {
+  flex: 1;
+  min-width: min(100%, 14ch);
+}
+.property-tax-summary .ui-key-value-row > :last-child {
+  margin-left: auto;
+  white-space: nowrap;
+}
+.property-tax-summary .report-net {
+  font-weight: 700;
+}
+#report-builder .v2-report-table th a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  text-decoration: none;
+}
+#report-builder .v2-report-table th svg {
+  flex: none;
+}

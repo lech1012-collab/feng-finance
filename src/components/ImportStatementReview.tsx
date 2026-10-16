@@ -1,3 +1,4 @@
+import { UKDateInput } from "./UKDateInput";
 import { displayMerchant } from "../domain/presentation";
 import { Link } from "react-router-dom";
 import { useState, type ReactNode } from "react";
@@ -32,6 +33,7 @@ import {
   type FileReview,
 } from "../import/review-model";
 import type { RowReviewAction } from "../import/generic/types";
+import { StatusChip } from "./UIPrimitives";
 
 export function ImportStatementReview({
   entry,
@@ -69,6 +71,9 @@ export function ImportStatementReview({
   const exactSkipped =
     d?.exactDuplicate && !d.duplicateOverride && !entry.requiresBatchRecheck;
   const checks = d?.transactions.filter((t) => needsRowCheck(t, d)) ?? [];
+  const duplicateCount =
+    d?.transactions.filter((transaction) => transaction.duplicate !== "none")
+      .length ?? 0;
   const updateDraft = (update: Partial<ImportDraft>) =>
     d && patch({ draft: { ...d, ...update } });
   const updateRow = (
@@ -117,7 +122,7 @@ export function ImportStatementReview({
       : entry.state === "saved"
         ? `${entry.imported ?? 0} imported`
         : entry.error
-          ? "Couldn't read this statement"
+          ? "Couldn't read PDF"
           : blocking
             ? entry.requiresBatchRecheck
               ? "Recheck statement"
@@ -157,14 +162,38 @@ export function ImportStatementReview({
         <span className="import-statement-heading-text">
           <h2>{d ? `${d.statement.institution} detected` : entry.file.name}</h2>
           <span>
-            {d
-              ? `${d.account.maskedAccountIdentifier} · ${formatDateRange(d.statement.statementPeriodStart, d.statement.statementPeriodEnd)} · ${d.transactions.length} transaction${d.transactions.length === 1 ? "" : "s"}`
-              : entry.progress || "Ready to check"}
+            {d ? (
+              <>
+                {d.account.maskedAccountIdentifier} ·{" "}
+                <span className="date-value">
+                  {formatDateRange(
+                    d.statement.statementPeriodStart,
+                    d.statement.statementPeriodEnd,
+                  )}
+                </span>{" "}
+                · {d.transactions.length} transaction
+                {d.transactions.length === 1 ? "" : "s"}
+              </>
+            ) : (
+              entry.progress || "Ready to check"
+            )}
           </span>
         </span>
-        <span className={`small-chip ${blocking ? "blocking-chip" : ""}`}>
+        <StatusChip
+          tone={
+            blocking
+              ? "error"
+              : entry.skip || exactSkipped
+                ? "neutral"
+                : validation?.status === "warning"
+                  ? "warning"
+                  : validation?.status === "reconciled"
+                    ? "complete"
+                    : "neutral"
+          }
+        >
           {status}
-        </span>
+        </StatusChip>
         <ChevronDown size={18} aria-hidden="true" />
       </summary>
       <div className="import-statement-content">
@@ -195,10 +224,12 @@ export function ImportStatementReview({
                   : `${d.statement.extractionMethod} export`}
             </p>
             <p>
-              {formatDateRange(
-                d.statement.statementPeriodStart,
-                d.statement.statementPeriodEnd,
-              )}
+              <span className="date-value">
+                {formatDateRange(
+                  d.statement.statementPeriodStart,
+                  d.statement.statementPeriodEnd,
+                )}
+              </span>
               {d.statement.periodSource === "transaction-coverage" &&
                 " · transaction coverage"}
             </p>
@@ -342,7 +373,9 @@ export function ImportStatementReview({
             {notices.map((notice, index) => (
               <p className="coverage-note" key={`${notice.kind}-${index}`}>
                 <strong>{notice.kind === "gap" ? "Gap" : "Overlap"}:</strong>{" "}
-                {formatDateRange(notice.start, notice.end)}{" "}
+                <span className="date-value">
+                  {formatDateRange(notice.start, notice.end)}
+                </span>{" "}
                 {notice.kind === "gap"
                   ? "has no statement between these imports."
                   : "is also covered by another statement. Duplicate rows are skipped by default."}
@@ -389,14 +422,12 @@ export function ImportStatementReview({
                 </label>
               </div>
             )}
-            <p>
-              {d.transactions.filter((t) => t.duplicate !== "none").length}{" "}
-              possible or confirmed duplicate transaction
-              {d.transactions.filter((t) => t.duplicate !== "none").length === 1
-                ? ""
-                : "s"}
-              ; excluded by default.
-            </p>
+            {duplicateCount > 0 && (
+              <p>
+                {duplicateCount} possible or confirmed duplicate transaction
+                {duplicateCount === 1 ? "" : "s"}; excluded by default.
+              </p>
+            )}
             {!exactSkipped && (d.warnings.length > 0 || outsideDates) && (
               <div
                 className={`notice ${d.reviewedWarnings ? "warning" : "import-blocking-warning"}`}
@@ -440,7 +471,8 @@ export function ImportStatementReview({
             {checks.some((t) => t.include) && (
               <p>
                 <strong>
-                  {checks.filter((t) => t.include).length} transactions to
+                  {checks.filter((t) => t.include).length} transaction
+                  {checks.filter((t) => t.include).length === 1 ? "" : "s"} to
                   check.
                 </strong>
               </p>
@@ -469,7 +501,7 @@ export function ImportStatementReview({
                   aria-pressed={!entry.showAll}
                   onClick={() => patch({ showAll: false })}
                 >
-                  To check ({checks.length})
+                  To check{checks.length > 0 && ` (${checks.length})`}
                 </button>
                 <button
                   disabled={busy}
@@ -509,9 +541,12 @@ export function ImportStatementReview({
                   >
                     <summary className="review-compact">
                       <span>
-                        <strong>{t.merchant || t.description}</strong>
+                        <strong>{displayMerchant(t)}</strong>
                         <small>
-                          {formatUkDate(t.date, true)} ·{" "}
+                          <time className="date-value" dateTime={t.date}>
+                            {formatUkDate(t.date, true)}
+                          </time>{" "}
+                          ·{" "}
                           {t.isTransfer
                             ? "Transfer"
                             : (categories.find((c) => c.id === t.categoryId)
@@ -542,6 +577,10 @@ export function ImportStatementReview({
                         {t.sourcePage}
                       </span>
                     </div>
+                    <details>
+                      <summary>Original description</summary>
+                      <p>{t.description}</p>
+                    </details>
                     {t.duplicate !== "none" && (
                       <p className="warning-text">
                         {t.duplicate === "certain"
@@ -592,23 +631,19 @@ export function ImportStatementReview({
                               {formatUkDate(candidate.date)}
                             </option>
                           ))}
-                          <option value="keep">
-                            Keep both as separate transactions
-                          </option>
+                          <option value="keep">Keep both</option>
                         </select>
                       </label>
                     )}
                     <div className="form-grid">
                       <label>
                         Date
-                        <input
+                        <UKDateInput
                           disabled={busy}
-                          type="date"
+
                           value={t.date}
                           readOnly={!!d.bankSource}
-                          onChange={(e) =>
-                            correctSource(t, { date: e.target.value })
-                          }
+                          onChange={(e) => correctSource(t, { date: e })}
                         />
                       </label>
                       <label>
@@ -790,9 +825,13 @@ export function ImportStatementReview({
                     })
                   }
                 >
-                  <option value="">Choose the date order in this file</option>
-                  <option value="day-first">Day / month / year (UK)</option>
-                  <option value="month-first">Month / day / year (US)</option>
+                  <option value="">Choose</option>
+                  <option value="day-first" aria-label="Day / month / year">
+                    DD/MM/YYYY
+                  </option>
+                  <option value="month-first" aria-label="Month / day / year">
+                    MM/DD/YYYY
+                  </option>
                 </select>
               </label>
             )}
@@ -809,7 +848,7 @@ export function ImportStatementReview({
                   })
                 }
               >
-                <option value="">Detect automatically</option>
+                <option value="">Automatic</option>
                 {["Barclays", "American Express", "Revolut", "Other"].map(
                   (b) => (
                     <option key={b}>{b}</option>
@@ -831,7 +870,7 @@ export function ImportStatementReview({
                   })
                 }
               >
-                <option value="">Detect automatically</option>
+                <option value="">Automatic</option>
                 {entry.accountOverride &&
                   !accounts.some(
                     (account) => account.id === entry.accountOverride?.id,
@@ -871,13 +910,13 @@ export function ImportStatementReview({
               <div className="form-grid">
                 <label>
                   Statement start date
-                  <input
+                  <UKDateInput
                     disabled={busy}
-                    type="date"
+
                     value={entry.periodStart}
                     onChange={(e) =>
                       patch({
-                        periodStart: e.target.value,
+                        periodStart: e,
                         optionsChanged: true,
                       })
                     }
@@ -885,12 +924,12 @@ export function ImportStatementReview({
                 </label>
                 <label>
                   Statement end date
-                  <input
+                  <UKDateInput
                     disabled={busy}
-                    type="date"
+
                     value={entry.periodEnd}
                     onChange={(e) =>
-                      patch({ periodEnd: e.target.value, optionsChanged: true })
+                      patch({ periodEnd: e, optionsChanged: true })
                     }
                   />
                 </label>

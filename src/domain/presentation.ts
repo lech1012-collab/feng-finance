@@ -1,4 +1,4 @@
-import type { Account } from "./models";
+import type { Account, Category } from "./models";
 import type { Transaction } from "./models";
 import { normalizeDescription } from "./normalize";
 import { formatUkDate, formatDateRange } from "./dates";
@@ -47,6 +47,28 @@ export function displayMerchant(
 }
 export const displayDate = (iso: string) => formatUkDate(iso, true);
 export const displayDateRange = formatDateRange;
+export function displayCategory(category: Category, categories: Category[]) {
+  const parent = categories.find((c) => c.id === category.parentId);
+  return parent ? `${parent.name} · ${category.name}` : category.name;
+}
+
+export function displayAccountType(type: Account["accountType"]) {
+  const names: Partial<Record<Account["accountType"], string>> = {
+    current: "Current account",
+    savings: "Savings account",
+    credit: "Credit card",
+    credit_card: "Credit card",
+    mortgage: "Mortgage",
+    loan: "Loan",
+    property: "Property",
+    vehicle: "Vehicle",
+    pension: "Pension",
+    investment: "Investment",
+    other_asset: "Other asset",
+    other_liability: "Other liability",
+  };
+  return names[type] ?? "Account";
+}
 
 /** Friendly fallback only for the generic names supplied by bank statements. */
 export function displayAccountName(

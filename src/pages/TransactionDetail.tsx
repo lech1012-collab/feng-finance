@@ -19,6 +19,7 @@ import type { Rule } from "../domain/models";
 import { TransactionAccuracy } from "../components/TransactionAccuracy";
 import { TransferReview } from "../components/TransferReview";
 import { TagPicker } from "../components/TagManager";
+import { createTagForTransaction } from "../storage/tags";
 import { AttachmentManager } from "../components/AttachmentManager";
 import { authorizeMonthEdit } from "../storage/month-review";
 import {
@@ -28,13 +29,37 @@ import {
 import { conflictingCategoryRule } from "../categorization/rule-conflict";
 import { useGlobalCurrency } from "../components/CurrencySetting";
 import { convertMinor } from "../analytics/fx";
+import { KeyValueRow } from "../components/UIPrimitives";
+import { Sheet } from "../components/Sheet";
+import {
+  refundCountedMonths,
+  refundMonthName,
+} from "../analytics/refund-impact";
+import "../components/transaction-polish.css";
 export default function TransactionDetail() {
   const { id: tid } = useParams();
   const data = useLiveQuery(async () => {
     const t = await db.transactions.get(tid!);
     if (!t) return null;
+    const refundMonths =
+      t.kind === "refund" && t.refundAllocations?.length
+        ? refundCountedMonths(
+            t,
+            (
+              await db.transactions.bulkGet(
+                t.refundAllocations.map((line) => line.transactionId),
+              )
+            ).filter((row): row is Transaction => !!row),
+            await db.settings.toArray(),
+            await db.transactions
+              .where("categoryId")
+              .equals("salary")
+              .toArray(),
+          )
+        : [];
     return {
       t,
+      refundMonths,
       account: await db.accounts.get(t.accountId),
       statement: await db.statements.get(t.statementId),
       rule: t.categoryRuleId ? await db.rules.get(t.categoryRuleId) : undefined,
@@ -71,7 +96,9 @@ export default function TransactionDetail() {
     return (
       <p>
         Transaction not found.{" "}
-        <Link to="/transactions">Back to transactions</Link>
+        <Link className="back-link" to="/transactions">
+          ‹ Transactions
+        </Link>
       </p>
     );
   return <Editor key={data.t.id} data={data} />;
@@ -86,9 +113,11 @@ function Editor({
     categories: Category[];
     possible: Transaction[];
     rule?: Rule;
+    refundMonths: string[];
   };
 }) {
-  const { t, account, statement, categories, possible, rule } = data;
+  const { t, account, statement, categories, possible, rule, refundMonths } =
+    data;
   const reportingCurrency = useGlobalCurrency();
   const rates = useLiveQuery(() => db.fxRates.toArray(), [], []);
   const conversion =
@@ -112,6 +141,7 @@ function Editor({
   const [busy, setBusy] = useState(false);
   const [conflict, setConflict] = useState<Rule>();
   const [receipt, setReceipt] = useState<string>();
+  const [tagSheetOpen, setTagSheetOpen] = useState(false);
   type Patch = Pick<
     Transaction,
     "merchant" | "categoryId" | "subcategoryId" | "type" | "tags"
@@ -191,19 +221,44 @@ function Editor({
       </Link>
       <section className="card detail-card">
         <p className="eyebrow">
-          {displayDate(t.date)} ·{" "}
+          <span className="date-value">{displayDate(t.date)}</span> ·{" "}
           {account ? displayAccountName(account) : "Account"}
         </p>
         <h1 className="detail-amount">{money(t.amount, t.currency, true)}</h1>
+        {t.kind === "refund" && !!t.refundAllocations?.length && (
+          <p className="detail-refund-month">
+            {refundMonths.length
+              ? `Refund · counted in ${refundMonths.map((month) => refundMonthName(month, true)).join(", ")}`
+              : "Refund · original purchase unavailable"}
+          </p>
+        )}
+        <h2>{displayMerchant(t)}</h2>
+        <div className="detail-action-row">
+          <TransactionAccuracy
+            transaction={t}
+            categories={categories}
+            showRefundSummary={false}
+          />
+          {t.kind !== "split_parent" &&
+            !(t.kind === "refund" && t.refundAllocations?.length) && (
+              <button type="button" onClick={() => setTagSheetOpen(true)}>
+                Add tag
+              </button>
+            )}
+        </div>
         {t.currency !== reportingCurrency && (
           <p className="coverage-note">
             {conversion ? (
               <>
                 Reporting amount{" "}
-                {money(conversion.amount, reportingCurrency, true, true)} · 1{" "}
-                {t.currency} = {conversion.rate} {reportingCurrency} ·{" "}
-                {displayDate(conversion.date)} ·{" "}
-                {conversion.source === "manual" ? "Manual rate" : "ECB rate"}
+                <span className="amount">
+                  {money(conversion.amount, reportingCurrency, true, true)}
+                </span>{" "}
+                · 1 {t.currency} = {conversion.rate} {reportingCurrency} ·{" "}
+                <span className="date-value">
+                  {displayDate(conversion.date)}
+                </span>{" "}
+                · {conversion.source === "manual" ? "Manual rate" : "ECB rate"}
               </>
             ) : (
               <>
@@ -214,7 +269,6 @@ function Editor({
             )}
           </p>
         )}
-        <h2>{displayMerchant(t)}</h2>
         <p className="detail-description">{t.description}</p>
         {(rule || t.categorySource) && (
           <p className="category-origin-note">
@@ -235,61 +289,42 @@ function Editor({
             )}
           </p>
         )}
-        <div className="detail-action-row">
-          <TransactionAccuracy transaction={t} categories={categories} />
-          {t.kind !== "split_parent" &&
-            !(t.kind === "refund" && t.refundAllocations?.length) && (
-              <>
-                <details>
-                  <summary>Add tag</summary>
-                  <TagPicker
-                    value={tags}
-                    onChange={(value) => {
-                      setTags(value);
-                      void save(undefined, { tags: value });
-                    }}
-                  />
-                </details>
-              </>
-            )}
-        </div>
         <details className="detail-source">
           <summary>Source</summary>
-          <dl className="detail-meta">
-            <div>
-              <dt>Account</dt>
-              <dd>
-                {account ? displayAccountName(account) : "Account"} ·{" "}
-                {account?.maskedAccountIdentifier}
-              </dd>
-            </div>
-            <div>
-              <dt>Statement</dt>
-              <dd>
-                {t.source === "manual"
+          <div className="detail-source-rows">
+            <KeyValueRow
+              label="Account"
+              value={
+                <>
+                  {account ? displayAccountName(account) : "Account"} ·{" "}
+                  {account?.maskedAccountIdentifier}
+                </>
+              }
+            />
+            <KeyValueRow
+              label="Statement"
+              value={
+                t.source === "manual"
                   ? "Manual entry"
                   : (statement?.sourceFilename ??
-                    "Source statement unavailable")}
-              </dd>
-            </div>
+                    "Source statement unavailable")
+              }
+            />
             {t.parentId && (
-              <div>
-                <dt>Original transaction</dt>
-                <dd>
+              <KeyValueRow
+                label="Original transaction"
+                value={
                   <Link to={`/transactions/${t.parentId}`}>
                     View split parent
                   </Link>
-                </dd>
-              </div>
+                }
+              />
             )}
-            <div>
-              <dt>Source page</dt>
-              <dd>{t.sourcePage}</dd>
-            </div>
-            <div>
-              <dt>Source check</dt>
-              <dd>
-                {t.checkLevel === "balance"
+            <KeyValueRow label="Source page" value={t.sourcePage} />
+            <KeyValueRow
+              label="Source check"
+              value={
+                t.checkLevel === "balance"
                   ? "Checked against running balance"
                   : t.checkLevel === "total"
                     ? "Checked against statement total"
@@ -299,20 +334,20 @@ function Editor({
                         ? "Imported as unverified"
                         : t.checkLevel === "review"
                           ? "Needs review"
-                          : "Original import check"}
-              </dd>
-            </div>
-            <div>
-              <dt>Transfer status</dt>
-              <dd>
-                {t.transferPairId
+                          : "Original import check"
+              }
+            />
+            <KeyValueRow
+              label="Transfer status"
+              value={
+                t.transferPairId
                   ? "Linked to another account"
                   : t.isTransfer
                     ? `${t.kind === "card_repayment" ? "Card repayment" : "Transfer"} · other side not in Feng`
-                    : "Not a transfer"}
-              </dd>
-            </div>
-          </dl>
+                    : "Not a transfer"
+              }
+            />
+          </div>
         </details>
         {t.kind !== "split_parent" &&
           !(t.kind === "refund" && t.refundAllocations?.length) && (
@@ -445,7 +480,7 @@ function Editor({
                   flow. A refund reduces the original spending.
                 </p>
               </details>
-              {error && (
+              {error && !tagSheetOpen && (
                 <p role="alert" className="warning-text">
                   {error}
                 </p>
@@ -468,11 +503,13 @@ function Editor({
               value={pair}
               onChange={(e) => setPair(e.target.value)}
             >
-              <option value="">Select a transaction</option>
+              <option value="">Choose</option>
               {possible.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {displayDate(p.date)} · {p.description} ·{" "}
-                  {money(p.amount, p.currency, true)}
+                  <time className="date-value" dateTime={p.date}>
+                    {displayDate(p.date)}
+                  </time>{" "}
+                  · {displayMerchant(p)} · {money(p.amount, p.currency, true)}
                 </option>
               ))}
             </select>
@@ -498,6 +535,40 @@ function Editor({
         </section>
       )}
       <AttachmentManager transactionId={t.id} />
+      {tagSheetOpen && (
+        <Sheet
+          title="Add tag"
+          onClose={() => setTagSheetOpen(false)}
+          footer={
+            <button
+              type="button"
+              className="primary"
+              onClick={() => setTagSheetOpen(false)}
+            >
+              Done
+            </button>
+          }
+        >
+          <TagPicker
+            value={tags}
+            onCreate={async (name) => {
+              if (!(await authorizeMonthEdit([t]))) return;
+              const result = await createTagForTransaction(t.id, name);
+              setTags(result.result.tags);
+              setReceipt(result.changeId);
+            }}
+            onChange={(value) => {
+              setTags(value);
+              void save(undefined, { tags: value });
+            }}
+          />
+          {error && (
+            <p role="alert" className="warning-text">
+              {error}
+            </p>
+          )}
+        </Sheet>
+      )}
       {receipt && (
         <Toast
           id={receipt}

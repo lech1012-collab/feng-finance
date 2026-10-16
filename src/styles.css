@@ -15,6 +15,9 @@
 * {
   box-sizing: border-box;
 }
+[hidden] {
+  display: none !important;
+}
 body {
   margin: 0;
 }
@@ -868,7 +871,7 @@ main {
 .detail-description {
   font-size: 1rem;
   color: #545a66;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .detail-meta {
   font-size: 0.875rem;
@@ -888,7 +891,7 @@ main {
 }
 .detail-meta dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .rule-offer {
   background: #f4f5f7;
@@ -1111,7 +1114,7 @@ details p {
 }
 .review-row-title strong {
   font-size: 0.875rem;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .review-row.uncertain {
   background: #fffbf2;
@@ -1187,7 +1190,7 @@ details p {
   transform: none;
 }
 .statement-history details p {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 @media (min-width: 1450px) {
   main {
@@ -1404,7 +1407,7 @@ details p {
   .hero-number {
     font-size: 3.15rem;
     margin: 21px 0 13px;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
   }
   .hero .eyebrow {
     font-size: 0.6875rem;
@@ -1643,7 +1646,7 @@ details p {
   }
   .totals dd {
     max-width: 56%;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
   }
   .check {
     font-size: 0.875rem;
@@ -1875,7 +1878,7 @@ details p,
   font-weight: 600;
   letter-spacing: -0.055em;
   font-size: clamp(2.1rem, 6vw, 3.8rem);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .hero-footer {
   border-color: var(--line);
@@ -1902,7 +1905,7 @@ label,
 }
 .metric strong,
 .review-metrics strong {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   font-variant-numeric: tabular-nums;
 }
 .section-heading,
@@ -1912,7 +1915,7 @@ label,
 }
 .section-heading h2 {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .section-heading > a,
 .totals .total dt,
@@ -1928,7 +1931,7 @@ label,
 }
 .totals dd {
   max-width: none;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .category-meta {
   display: grid;
@@ -1956,7 +1959,7 @@ label,
   border-color: var(--line);
 }
 .notice {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .notice > div,
 .notice > span {
@@ -2099,7 +2102,7 @@ label,
 }
 .review-compact > span strong {
   display: block;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   font-size: 0.875rem;
 }
 .review-compact small {
@@ -2433,7 +2436,7 @@ label,
   }
   .transaction-description strong {
     white-space: normal;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
   }
   .notice {
     font-size: 0.875rem;
@@ -2445,7 +2448,7 @@ label,
     padding: 15px 0;
   }
   .account-tile p {
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
   }
   .local-note {
     font-size: 0.75rem;
@@ -2513,7 +2516,7 @@ label,
 /* Keep currency signs attached to amounts beside long merchant references. */
 .insight-row > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .insight-row > strong {
   flex-shrink: 0;
@@ -2532,7 +2535,7 @@ label,
 }
 .category-meta > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .chart-legend {
   flex-wrap: wrap;
@@ -2545,7 +2548,7 @@ label,
     height: 100%;
   }
   .sidebar nav a {
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
     text-align: center;
     justify-content: center;
   }
@@ -2567,7 +2570,7 @@ h1,
 h2,
 h3 {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .page-heading > div {
   min-width: 0;
@@ -2577,7 +2580,7 @@ h3 {
   min-width: 0;
   max-width: 100%;
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .pagination {
   flex-wrap: wrap;
@@ -2650,7 +2653,7 @@ h3 {
   padding: 13px 0;
   min-height: 44px;
   border-bottom: 1px solid var(--line);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .financial-insight span {
   color: var(--muted);
@@ -2764,7 +2767,7 @@ h3 {
 }
 .sorting-card > div {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .sorting-card small {
   display: block;
@@ -2799,7 +2802,7 @@ h3 {
   min-width: 0;
   min-height: 96px;
   text-align: center;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
   font-size: 0.875rem;
   border: 2px solid var(--line);
 }
@@ -2834,7 +2837,7 @@ h3 {
 }
 .category-feedback span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .sort-details {
   display: inline-flex;
@@ -2929,7 +2932,7 @@ h3 {
 }
 .subscription-swipe h2,
 .subscription-swipe p {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .subscription-swipe > div {
   min-width: 0;
@@ -2953,7 +2956,7 @@ h3 {
 }
 .subscription-evidence span {
   flex: 1 1 180px;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .subscription-card summary {
   min-height: 44px;
@@ -3071,7 +3074,7 @@ h3 {
 }
 .planning-kpis strong {
   font-size: clamp(1.2rem, 3vw, 1.8rem);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .planning-category {
   display: flex;
@@ -3160,7 +3163,7 @@ h3 {
   flex-direction: column;
   gap: 5px;
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .payment-timeline span,
 .payment-timeline small {
@@ -3268,7 +3271,7 @@ h3 {
 .category-kpis strong {
   display: block;
   font-size: clamp(1.3rem, 5vw, 2rem);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .category-kpis small {
   display: block;
@@ -3297,7 +3300,7 @@ h3 {
   border: 1px solid var(--line);
   border-radius: 12px;
   min-height: 44px;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .category-months small {
   color: var(--muted);
@@ -3499,7 +3502,7 @@ h3 {
 }
 .balance-account > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .balance-account small {
   display: block;
@@ -3574,7 +3577,7 @@ h3 {
 .balance-total {
   min-width: 0;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .balance-summary .section-heading > a {
   min-height: 44px;
@@ -3653,7 +3656,7 @@ h3 {
 .card,
 .hero,
 .flow-card {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .eyebrow,
 .small-chip,
@@ -3717,7 +3720,7 @@ h3 {
   font-variant-numeric: tabular-nums;
   font-size: clamp(1.2rem, 3vw, 2rem);
   line-height: 1.25;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .position-metrics .balance-total {
   margin: 0;
@@ -3725,7 +3728,7 @@ h3 {
 .position-metrics small {
   font-size: 0.8125rem;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .balance-account-main {
   display: flex;
@@ -3908,7 +3911,7 @@ h3 {
   align-self: stretch;
   min-width: 0;
   max-width: 100%;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .uncategorized-primary {
   border-style: dashed;
@@ -4068,7 +4071,7 @@ kbd {
 .restore-count dt {
   font-size: 0.875rem;
   line-height: 1.4;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .restore-count dd {
   order: -1;
@@ -4101,7 +4104,7 @@ kbd {
 }
 .rule-item summary > span {
   min-width: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .rule-details,
 .rule-editor {
@@ -4197,7 +4200,7 @@ kbd {
   min-width: 0;
 }
 .import-statement-card > summary strong {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .import-statement-card > summary h2 {
   margin: 0;
@@ -4234,7 +4237,7 @@ kbd {
   align-items: center;
 }
 .import-processing-file strong {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .import-processing-file p {
   color: var(--muted);
@@ -4574,7 +4577,7 @@ summary {
 .review-steps button {
   flex: 1 1 150px;
   min-width: min(100%, 8rem);
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 
 .month-review-page .insight-row,
@@ -4602,7 +4605,7 @@ summary {
 
 .month-review-page .insight-row > strong {
   white-space: normal;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .review-status {
   display: inline-flex;
@@ -4614,7 +4617,7 @@ summary {
   width: fit-content;
 }
 .transaction-description {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .position-history {
   display: block;
@@ -4623,7 +4626,7 @@ summary {
   min-width: 0;
 }
 .position-summary .position-metrics strong {
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .position-summary .balance-account {
   padding: 16px 0;
@@ -4781,7 +4784,7 @@ textarea {
   .currency-view-notice > span {
     min-width: 0;
     flex: 1;
-    overflow-wrap: anywhere;
+    overflow-wrap: normal;
   }
 
   .currency-view-notice > a {

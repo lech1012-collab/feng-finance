@@ -1,7 +1,7 @@
 import { displayAccountName } from "../domain/presentation";
 import { localToday } from "../analytics/reminders";
 import { Link } from "react-router-dom";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type {
   Account,
   Statement,
@@ -25,6 +25,7 @@ import { money, safeSum } from "../domain/money";
 import { potsOverview } from "../analytics/planning-v2";
 import { manualCashBalance } from "../analytics/manual-cash";
 import { reportingBalanceHistory } from "../analytics/reporting-balance-history";
+import { SegmentedControl } from "./UIPrimitives";
 export function PositionSummary({
   accounts,
   statements,
@@ -192,16 +193,30 @@ export function PositionSummary({
     .toISOString()
     .slice(0, 10);
   const prior = snapshot(priorDate);
-  const chart = reportingBalanceHistory(
-    accounts,
-    statements,
-    transactions,
-    valuations,
-    rates,
-    month,
-    currency,
-    period,
-    today,
+  const chart = useMemo(
+    () =>
+      reportingBalanceHistory(
+        accounts,
+        statements,
+        transactions,
+        valuations,
+        rates,
+        month,
+        currency,
+        period,
+        today,
+      ),
+    [
+      accounts,
+      statements,
+      transactions,
+      valuations,
+      rates,
+      month,
+      currency,
+      period,
+      today,
+    ],
   );
   const priorPoint = chart.data.find((point) => point.date === priorDate);
   const priorSum =
@@ -213,11 +228,58 @@ export function PositionSummary({
   const comparable =
     complete && total !== undefined && priorSum !== undefined && priorSum !== 0;
   const [breakdown, setBreakdown] = useState(false);
-  const meaningfulHistory =
-    chart.data.filter((point) => point.complete && point.total !== null)
-      .length > 1 ||
-    (breakdown && chart.meaningful);
+  const rangeHistory = useMemo(
+    () =>
+      historyOnly && period !== 12
+        ? reportingBalanceHistory(
+            accounts,
+            statements,
+            transactions,
+            valuations,
+            rates,
+            month,
+            currency,
+            12,
+            today,
+          )
+        : chart,
+    [
+      historyOnly,
+      period,
+      accounts,
+      statements,
+      transactions,
+      valuations,
+      rates,
+      month,
+      currency,
+      today,
+      chart,
+    ],
+  );
+  const rangeOptions = [1, 3, 6, 12].map((n) => {
+    const targetMonth = monthOffset(rangeHistory.end.slice(0, 7), -n);
+    const lastDay = new Date(
+      Date.parse(`${monthBounds(targetMonth)[1]}T12:00:00Z`) - 86400000,
+    ).getUTCDate();
+    const threshold = `${targetMonth}-${String(Math.min(Number(rangeHistory.end.slice(8)), lastDay)).padStart(2, "0")}`;
+    const points = rangeHistory.data.filter((point) => point.date >= threshold);
+    const available =
+      points.filter((point) => point.complete && point.total !== null).length >
+        1 ||
+      (breakdown &&
+        rangeHistory.accounts.some(
+          (account) =>
+            points.filter(
+              (point) =>
+                point.verified[account.id] && point.values[account.id] !== null,
+            ).length > 1,
+        ));
+    return { value: n, label: `${n}M`, disabled: !available };
+  });
+  const meaningfulHistory = rangeOptions.some((option) => !option.disabled);
   const [plotWidth, setPlotWidth] = useState(690);
+  const tickCount = plotWidth >= 480 ? 4 : 3;
   const plot = useRef<SVGSVGElement>(null);
   const palette = ["#6EA8FF", "#A99BD6", "#F08A7E", "#E7C46A", "#A6B3C6"];
   const plotted = chart.data.flatMap((p) =>
@@ -305,7 +367,11 @@ export function PositionSummary({
           <div className="position-metrics">
             <Link to="/transactions?allDates=1&accountScope=cash">
               <span>Cash</span>
-              <strong>
+              <strong
+                className={
+                  cash === undefined ? "metric-unavailable" : undefined
+                }
+              >
                 {cash === undefined
                   ? "Not imported"
                   : `${converted ? "≈ " : ""}${money(cash, currency)}${cashItems.every((i) => i.reliable) ? "" : "*"}`}
@@ -320,7 +386,11 @@ export function PositionSummary({
             </Link>
             <Link to="/transactions?allDates=1&accountScope=debt">
               <span>Card debt</span>
-              <strong>
+              <strong
+                className={
+                  cardDebt === undefined ? "metric-unavailable" : undefined
+                }
+              >
                 {cardDebt === undefined
                   ? "Unknown"
                   : `${converted ? "≈ " : ""}${money(cardDebt, currency)}${cards.every((i) => i.reliable) ? "" : "*"}`}
@@ -328,7 +398,13 @@ export function PositionSummary({
             </Link>
             <Link to={"/accounts"}>
               <span>Net worth</span>
-              <strong>
+              <strong
+                className={
+                  total === undefined || !complete
+                    ? "metric-unavailable"
+                    : undefined
+                }
+              >
                 {total === undefined || !complete
                   ? "Unavailable"
                   : `${converted ? "≈ " : ""}${money(total, currency)}${complete ? "" : "*"}`}
@@ -360,7 +436,7 @@ export function PositionSummary({
             </p>
           )}
           <Link className="accounts-overview-link" to="/accounts">
-            {items.length} accounts ›
+            {items.length} {items.length === 1 ? "account" : "accounts"} ›
           </Link>
         </section>
       )}
@@ -373,21 +449,20 @@ export function PositionSummary({
             </span>
           </div>
           {meaningfulHistory && (
-            <div
-              className="balance-periods"
-              role="group"
-              aria-label="Balance comparison period"
-            >
-              {[1, 3, 6, 12].map((n) => (
-                <button
-                  key={n}
-                  aria-pressed={period === n}
-                  onClick={() => onPeriodChange(n)}
-                >
-                  {n}M
-                </button>
-              ))}
-            </div>
+            <>
+              <SegmentedControl
+                className="balance-periods"
+                label="Balance comparison period"
+                value={period}
+                options={rangeOptions}
+                onChange={onPeriodChange}
+              />
+              {rangeOptions.some((option) => option.disabled) && (
+                <p className="muted">
+                  Unavailable ranges need two verified balance points.
+                </p>
+              )}
+            </>
           )}
           <button
             className="balance-breakdown"
@@ -521,18 +596,39 @@ export function PositionSummary({
                     strokeDasharray="6 4"
                   />
                 ))}
-                <text x="35" y="178" fill="var(--muted)" fontSize="13">
-                  {formatUkDate(chart.start)}
-                </text>
-                <text
-                  x={plotWidth - 35}
-                  y="178"
-                  textAnchor="end"
-                  fill="var(--muted)"
-                  fontSize="13"
-                >
-                  {formatUkDate(chart.end)}
-                </text>
+                {Array.from({ length: tickCount }, (_, index) => {
+                  const fraction = index / (tickCount - 1);
+                  const date = new Date(
+                    Date.parse(`${chart.start}T12:00:00Z`) +
+                      (Date.parse(`${chart.end}T12:00:00Z`) -
+                        Date.parse(`${chart.start}T12:00:00Z`)) *
+                        fraction,
+                  );
+                  return (
+                    <text
+                      key={index}
+                      x={plotWidth * fraction}
+                      y="178"
+                      textAnchor={
+                        index === 0
+                          ? "start"
+                          : index === tickCount - 1
+                            ? "end"
+                            : "middle"
+                      }
+                      fill="var(--muted)"
+                      className="balance-axis-date"
+                    >
+                      {date
+                        .toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          timeZone: "UTC",
+                        })
+                        .replace(/\bSept\b/g, "Sep")}
+                    </text>
+                  );
+                })}
               </svg>
               <div className="chart-legend">
                 {breakdown &&

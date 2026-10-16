@@ -84,10 +84,12 @@ describe("import review corrections", () => {
     const { container } = await showReview(entry);
     const card = container.querySelector(".import-statement-card");
     expect(card).toHaveClass("import-statement-blocking");
-    expect(card?.querySelector("summary .small-chip")).toHaveTextContent(label);
-    expect(card?.querySelector("summary .small-chip")).not.toHaveTextContent(
-      "✓ Reconciled",
+    expect(card?.querySelector("summary .ui-chip-visual")).toHaveTextContent(
+      label,
     );
+    expect(
+      card?.querySelector("summary .ui-chip-visual"),
+    ).not.toHaveTextContent("✓ Reconciled");
     // Date validation can fail even when the arithmetic difference is zero.
     // Keep the figures visible without calling the whole statement reconciled.
     if (kind === "invalid date") {
@@ -108,9 +110,9 @@ describe("import review corrections", () => {
     expect(container.querySelector(".import-statement-card")).not.toHaveClass(
       "import-statement-blocking",
     );
-    expect(container.querySelector("summary .small-chip")).toHaveTextContent(
-      "✓ Reconciled",
-    );
+    expect(
+      container.querySelector("summary .ui-chip-visual"),
+    ).toHaveTextContent("✓ Reconciled");
   });
 
   it("keeps an exact duplicate blocked when batch changes require rechecking", async () => {
@@ -122,9 +124,9 @@ describe("import review corrections", () => {
     expect(container.querySelector(".import-statement-card")).toHaveClass(
       "import-statement-blocking",
     );
-    expect(container.querySelector("summary .small-chip")).toHaveTextContent(
-      "Recheck statement",
-    );
+    expect(
+      container.querySelector("summary .ui-chip-visual"),
+    ).toHaveTextContent("Recheck statement");
   });
 
   it("shows a skipped file without a blocking warning", async () => {
@@ -136,9 +138,45 @@ describe("import review corrections", () => {
     expect(container.querySelector(".import-statement-card")).not.toHaveClass(
       "import-statement-blocking",
     );
-    expect(container.querySelector("summary .small-chip")).toHaveTextContent(
-      "Will be skipped",
+    expect(
+      container.querySelector("summary .ui-chip-visual"),
+    ).toHaveTextContent("Will be skipped");
+  });
+
+  it("hides empty duplicate notices while retaining the statement figures and original description", async () => {
+    const entry = await reviewEntry();
+    entry.showAll = true;
+    const row = entry.draft!.transactions[0];
+    row.description = "CARD PAYMENT TO WAITROSE FULHAM";
+    row.merchant = "WAITROSE FULHAM";
+    const source = structuredClone(entry.draft);
+    const { container } = await showReview(entry);
+    expect(
+      screen.queryByText(/possible or confirmed duplicate transaction/),
+    ).not.toBeInTheDocument();
+    expect(container.querySelector(".review-compact strong")).toHaveTextContent(
+      "Waitrose",
     );
+    expect(screen.getByText(row.description)).toBeInTheDocument();
+    expect(screen.getByText("Opening balance")).toBeInTheDocument();
+    expect(
+      screen.getByText("Money in (including transfers)"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Money out (including transfers)"),
+    ).toBeInTheDocument();
+    expect(entry.draft).toEqual(source);
+  });
+
+  it("retains a duplicate warning when any extracted row is a potential duplicate", async () => {
+    const entry = await reviewEntry();
+    entry.draft!.transactions[0].duplicate = "possible";
+    entry.draft!.transactions[0].include = false;
+    await showReview(entry);
+    expect(
+      screen.getByText(/1 possible or confirmed duplicate transaction/),
+    ).toBeInTheDocument();
+    expect(entry.draft!.transactions[0].include).toBe(false);
   });
 
   it("clears a property subcategory when the payment becomes an internal transfer", async () => {

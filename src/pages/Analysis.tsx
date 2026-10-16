@@ -1,3 +1,4 @@
+import { UKDateInput } from "../components/UKDateInput";
 import { merchantExpenses } from "../analytics/merchant-expenses";
 import { useSearchParams } from "react-router-dom";
 import { ReportBuilder } from "../components/ReportBuilder";
@@ -38,8 +39,9 @@ import { localToday } from "../analytics/reminders";
 import { financialType } from "../domain/transaction-type";
 import { displayMerchant } from "../domain/presentation";
 import { money } from "../domain/money";
-import { MonthPicker, Metric, RangeControl } from "../components/common";
+import { MonthPicker, Metric, PeriodControl } from "../components/common";
 import { CashChart } from "../components/Chart";
+import { ListRow } from "../components/UIPrimitives";
 export default function Analysis({
   month,
   setMonth,
@@ -204,6 +206,15 @@ export default function Analysis({
     ),
     currency,
   );
+  const previousCategoryAmounts = new Map(
+    categorySpending(
+      data.transactions.filter(
+        (t) => t.date >= scope.previousStart && t.date < scope.previousEnd,
+      ),
+      data.categories,
+      currency,
+    ).map((category) => [category.id, category.amount]),
+  );
   const regular = recurring(relevant, currency);
   const series = scope.months.length
     ? reportingMonthlySeries(
@@ -347,65 +358,33 @@ export default function Analysis({
           <h1>{property ? "Property" : "Analyse"}</h1>
         </div>
       </div>
-      {!property && (
-        <>
-          <CategoryAnalysisPicker month={month} />
-          <Link to={`/review?month=${month}`} className="button">
-            Review month
-          </Link>
-        </>
-      )}
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
-        <RangeControl value={period} onChange={(n) => setPeriod(String(n))} />
-        <details className="other-periods">
-          <summary>Other periods</summary>
-          <label className="period-label">
-            Period
-            <select value={period} onChange={(e) => setPeriod(e.target.value)}>
-              {["1", "3", "6", "12", "ytd", "annual", "tax", "custom"].map(
-                (v) => (
-                  <option key={v} value={v}>
-                    {v === "ytd"
-                      ? "Year to date"
-                      : v === "annual"
-                        ? "Calendar year"
-                        : v === "tax"
-                          ? "UK tax year"
-                          : v === "custom"
-                            ? "Custom period"
-                            : `${v} month${v === "1" ? "" : "s"}`}
-                  </option>
-                ),
-              )}
-            </select>
-          </label>
-        </details>
+        <PeriodControl value={period} onChange={setPeriod} />
       </div>
       {period === "custom" && (
         <div className="card form-grid">
           <label>
             From
-            <input
-              type="date"
+            <UKDateInput
               value={customFrom}
-              onChange={(e) => setCustomFrom(e.target.value)}
+              onChange={(e) => setCustomFrom(e)}
             />
           </label>
           <label>
             To
-            <input
-              type="date"
-              value={customTo}
-              onChange={(e) => setCustomTo(e.target.value)}
-            />
+            <UKDateInput value={customTo} onChange={(e) => setCustomTo(e)} />
           </label>
         </div>
       )}
       <p className="muted">
-        {scope.valid
-          ? formatDateRange(start, shiftDate(end, -1))
-          : "Choose a valid date range"}
+        {scope.valid ? (
+          <span className="date-value">
+            {formatDateRange(start, shiftDate(end, -1))}
+          </span>
+        ) : (
+          "Choose a valid date range"
+        )}
         {scope.valid &&
           ` · ${complete ? "Complete" : coverage.some((c) => c.hasData) ? "Partial or unverified" : "No data"}`}
         {" · transfers excluded"}
@@ -424,7 +403,6 @@ export default function Analysis({
           <div className="metric">
             <span>{property ? "Rental income" : "Income"}</span>
             <strong>Not imported</strong>
-            <small>No income source imported</small>
           </div>
         )}
         {coverage.some((c) => c.hasData) ? (
@@ -484,6 +462,14 @@ export default function Analysis({
         </p>
       )}
       {!property && (
+        <div className="analysis-shortcuts">
+          <CategoryAnalysisPicker month={month} />
+          <Link to={`/review?month=${month}`} className="button">
+            Review month
+          </Link>
+        </div>
+      )}
+      {!property && (
         <DeeperInsights
           transactions={data.transactions}
           accounts={data.accounts}
@@ -518,10 +504,10 @@ export default function Analysis({
         )}
       </section>
       <div className="content-grid">
-        <section className="card">
+        <section className="card" id="category-spending">
           <h2>{property ? "Property costs" : "Category spending"}</h2>
           {property ? (
-            <dl className="totals">
+            <dl className="totals property-cost-rows">
               {subcategories.map((c) => (
                 <div key={c.id}>
                   <dt>
@@ -538,23 +524,31 @@ export default function Analysis({
                   <dd>{money(c.amount, currency)}</dd>
                 </div>
               ))}
-              <div>
-                <dt>Unspecified property cost</dt>
-                <dd>
-                  {money(
-                    -selectedItems
-                      .filter(
-                        (t) =>
-                          t.categoryId === "property" &&
-                          !t.subcategoryId &&
-                          !t.isTransfer &&
-                          t.amount < 0,
-                      )
-                      .reduce((s, t) => s + t.amount, 0),
-                    currency,
-                  )}
-                </dd>
-              </div>
+              {selectedItems.some(
+                (t) =>
+                  t.categoryId === "property" &&
+                  !t.subcategoryId &&
+                  !t.isTransfer &&
+                  t.amount < 0,
+              ) && (
+                <div>
+                  <dt>Unspecified property cost</dt>
+                  <dd>
+                    {money(
+                      -selectedItems
+                        .filter(
+                          (t) =>
+                            t.categoryId === "property" &&
+                            !t.subcategoryId &&
+                            !t.isTransfer &&
+                            t.amount < 0,
+                        )
+                        .reduce((s, t) => s + t.amount, 0),
+                      currency,
+                    )}
+                  </dd>
+                </div>
+              )}
             </dl>
           ) : (
             spending.map((c) => (
@@ -656,9 +650,20 @@ export default function Analysis({
               </div>
             </dl>
             <p className="coverage-note">
-              {comparable
-                ? `Compared with ${formatDateRange(scope.previousStart, shiftDate(scope.previousEnd, -1))}; both periods have complete verified coverage.`
-                : "Not comparable yet: both periods need complete verified statement coverage."}
+              {comparable ? (
+                <>
+                  Compared with{" "}
+                  <span className="date-value">
+                    {formatDateRange(
+                      scope.previousStart,
+                      shiftDate(scope.previousEnd, -1),
+                    )}
+                  </span>
+                  ; both periods have complete verified coverage.
+                </>
+              ) : (
+                "Not comparable yet: both periods need complete verified statement coverage."
+              )}
               {average !== undefined &&
                 ` Monthly average uses ${verifiedSeries.length} verified month${verifiedSeries.length === 1 ? "" : "s"}.`}
             </p>
@@ -666,51 +671,90 @@ export default function Analysis({
           <details className="card">
             <summary>Category trends</summary>
             <p className="muted">
-              Monthly expenses in the selected period. Tap a value to inspect
-              it.
+              Verified periods can be compared; incomplete history stays
+              unavailable.
             </p>
-            <div className="table-scroll">
-              <table>
-                <thead>
-                  <tr>
-                    <th>Category</th>
-                    {scope.months.map((m) => (
-                      <th key={m}>{monthLabel(m)}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {spending.map((c) => (
-                    <tr key={c.id}>
-                      <th>{c.name}</th>
-                      {scope.months.map((m, index) => (
-                        <td key={m}>
-                          <Link
-                            to={`/transactions?category=${c.id}&month=${m}`}
-                          >
-                            {series[index]?.expenses === null
-                              ? "No verified statements"
-                              : money(
-                                  categorySpending(
-                                    selectedItems.filter((t) =>
-                                      t.date.startsWith(m),
-                                    ),
-                                    data.categories,
-                                    currency,
-                                  ).find((x) => x.id === c.id)?.amount ?? 0,
-                                  currency,
-                                )}
-                            {series[index]?.coverage.status === "Partial"
-                              ? " · partial"
-                              : ""}
-                          </Link>
-                        </td>
+            <div className="category-trend-summary">
+              <p className="muted">
+                Change against the previous period. Open a category for its
+                monthly plot.
+              </p>
+              <ul className="category-trend-list">
+                {spending.map((category) => (
+                  <li key={category.id}>
+                    <ListRow
+                      title={category.name}
+                      key={category.id}
+                      to={
+                        category.id === "uncategorized"
+                          ? "/transactions?uncategorized=1&allDates=1"
+                          : `/categories/${category.id}?month=${month}`
+                      }
+                      amount={
+                        comparable
+                          ? money(
+                              category.amount -
+                                (previousCategoryAmounts.get(category.id) ?? 0),
+                              currency,
+                              true,
+                            )
+                          : "Not comparable"
+                      }
+                    />
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <details className="category-monthly-values">
+              <summary>Monthly values</summary>
+              <div
+                className="table-scroll"
+                role="region"
+                aria-label="Category monthly values"
+                tabIndex={0}
+              >
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Category</th>
+                      {scope.months.map((m) => (
+                        <th key={m}>{monthLabel(m)}</th>
                       ))}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {spending.map((c) => (
+                      <tr key={c.id}>
+                        <th>{c.name}</th>
+                        {scope.months.map((m, index) => (
+                          <td key={m}>
+                            <Link
+                              to={`/transactions?category=${c.id}&month=${m}`}
+                            >
+                              {series[index]?.expenses === null
+                                ? "No verified statements"
+                                : money(
+                                    categorySpending(
+                                      selectedItems.filter((t) =>
+                                        t.date.startsWith(m),
+                                      ),
+                                      data.categories,
+                                      currency,
+                                    ).find((x) => x.id === c.id)?.amount ?? 0,
+                                    currency,
+                                  )}
+                              {series[index]?.coverage.status === "Partial"
+                                ? " · partial"
+                                : ""}
+                            </Link>
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </details>
           </details>
         </>
       )}

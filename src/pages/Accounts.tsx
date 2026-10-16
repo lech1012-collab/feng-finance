@@ -1,4 +1,5 @@
-import { displayAccountName } from "../domain/presentation";
+import { displayAccountName, displayAccountType } from "../domain/presentation";
+import { ChevronRight } from "lucide-react";
 import { manualCashBalance } from "../analytics/manual-cash";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -186,12 +187,32 @@ export function AccountsContent() {
                   <span>
                     <strong>{displayAccountName(account)}</strong>
                     <small>
-                      {account.institution} · {account.maskedAccountIdentifier}
+                      {account.tracking === "manual"
+                        ? "Manual"
+                        : account.institution}{" "}
+                      · {account.maskedAccountIdentifier}
                     </small>
                     <small>
-                      {displayedDate
-                        ? `As of ${formatUkDate(displayedDate)} · ${wallet ? "Manual cash balance" : evidence?.status === "reconciled" ? "Verified" : "Unverified"}`
-                        : "No statement balance"}
+                      {displayAccountType(account.accountType)} ·{" "}
+                      {account.currency}
+                    </small>
+                    <small>
+                      {displayedDate ? (
+                        <>
+                          As of{" "}
+                          <time className="date-value" dateTime={displayedDate}>
+                            {formatUkDate(displayedDate)}
+                          </time>{" "}
+                          ·{" "}
+                          {wallet
+                            ? "Manual cash balance"
+                            : evidence?.status === "reconciled"
+                              ? "Verified"
+                              : "Unverified"}
+                        </>
+                      ) : (
+                        "No statement balance"
+                      )}
                     </small>
                     {!wallet && evidence?.reason && (
                       <small>{evidence.reason}</small>
@@ -218,6 +239,7 @@ export function AccountsContent() {
                       </small>
                     )}
                   </span>
+                  <ChevronRight size={16} aria-hidden="true" />
                 </button>
               );
             })}

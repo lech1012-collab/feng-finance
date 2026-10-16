@@ -22,7 +22,7 @@ import { formatDateRange, formatUkDate } from "../domain/dates";
 import { localToday } from "../analytics/reminders";
 import { Sheet } from "./Sheet";
 import { Toast } from "./Toast";
-import { Eye, EyeOff } from "lucide-react";
+import { Eye, EyeOff, Archive } from "lucide-react";
 
 function Password({
   label,
@@ -143,7 +143,15 @@ export function BackupCentre({
         ...metadata,
       ];
       const payload = protect ? await encryptBackup(backup, password) : backup;
-      const name = `feng-finance-backup-${backup.exportedAt.slice(0, 10)}.${protect ? "feng" : "json"}`;
+      // Keep the actual download name recognisable in its receipt without
+      // exposing an ISO timestamp in routine UI copy.
+      const date = new Date(backup.exportedAt).toLocaleDateString("en-GB", {
+        day: "numeric",
+        month: "short",
+        year: "numeric",
+        timeZone: "UTC",
+      });
+      const name = `Feng ${date.replace(/\bSept\b/g, "Sep").replace(/\s+/g, "-")}.${protect ? "feng" : "json"}`;
       download(
         JSON.stringify(payload),
         protect ? "application/vnd.feng.backup+json" : "application/json",
@@ -153,7 +161,7 @@ export function BackupCentre({
       setSaving(false);
       setPassword("");
       setConfirmation("");
-      setNotice(`Backup ready: ${name}. Save it in Files.`);
+      setNotice(`Backup ready. ${name}. Save it in Files.`);
     } catch (failure) {
       setError(
         failure instanceof Error
@@ -215,9 +223,20 @@ export function BackupCentre({
         protection happens on this device.
       </p>
       <p className="backup-status">
-        {data?.last
-          ? `Last backup: ${formatUkDate(data.last.slice(0, 10))} · ${data.exported ?? 0} transactions`
-          : "No backup saved yet. Save your first backup."}
+        <Archive size={16} aria-hidden="true" />
+        <span>
+          {data?.last ? (
+            <>
+              Last backup:{" "}
+              <time className="date-value" dateTime={data.last}>
+                {formatUkDate(data.last.slice(0, 10))}
+              </time>{" "}
+              · {data.exported ?? 0} transactions
+            </>
+          ) : (
+            "No backup saved yet. Save your first backup."
+          )}
+        </span>
       </p>
       <div className="actions">
         <button className="primary" onClick={openSave} disabled={busy}>
@@ -359,8 +378,13 @@ export function BackupCentre({
         >
           <p>
             Encrypted backup from{" "}
-            {formatUkDate(passwordFile.header.createdAt.slice(0, 10))}. Your
-            data stays unchanged until you confirm replacement.
+            <time
+              className="date-value"
+              dateTime={passwordFile.header.createdAt}
+            >
+              {formatUkDate(passwordFile.header.createdAt.slice(0, 10))}
+            </time>
+            . Your data stays unchanged until you confirm replacement.
           </p>
           <form
             id={passwordForm}
@@ -418,10 +442,18 @@ export function BackupCentre({
               ))}
             </dl>
             <p className="muted">
-              Saved {formatUkDate(pending.exportedAt.slice(0, 10))}
-              {dates.length
-                ? ` · ${formatDateRange(dates[0], dates.at(-1)!)}`
-                : ""}
+              Saved{" "}
+              <time className="date-value" dateTime={pending.exportedAt}>
+                {formatUkDate(pending.exportedAt.slice(0, 10))}
+              </time>
+              {dates.length > 0 && (
+                <>
+                  <br />{" "}
+                  <span className="date-value">
+                    {formatDateRange(dates[0], dates.at(-1)!)}
+                  </span>
+                </>
+              )}
             </p>
             {dates.some((date) => date > localToday()) && (
               <p className="notice warning">

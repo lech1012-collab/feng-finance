@@ -1,0 +1,135 @@
+.app .detail-action-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-block: 16px;
+}
+.app .detail-action-row > .accuracy-actions {
+  display: contents;
+}
+.app .detail-action-row > .accuracy-split-summary,
+.app .detail-action-row > [role="alert"] {
+  flex-basis: 100%;
+}
+.detail-refund-month {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  margin-block: 8px 12px;
+}
+.detail-source-rows .ui-key-value-row {
+  align-items: baseline;
+  flex-wrap: wrap;
+}
+.detail-source-rows .ui-key-value-row > :first-child {
+  min-width: min(100%, 12ch);
+}
+.detail-source-rows .ui-key-value-row > :last-child {
+  flex: 1;
+  min-width: min(100%, 16ch);
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.refund-purchases > .refund-purchase {
+  border: 0;
+  padding: 0;
+  border-radius: 0;
+}
+.refund-purchases > .refund-purchase + .refund-purchase {
+  border-top: 1px solid var(--line);
+}
+.refund-choice.refund-choice--row {
+  min-height: 64px;
+  padding: 0;
+  gap: 12px;
+}
+.refund-choice--row > input[type="radio"],
+.refund-choice--row > input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  min-height: 20px;
+  padding: 0;
+  margin: 0;
+  flex: 0 0 20px;
+}
+.refund-choice--row > .ui-list-row {
+  flex: 1;
+  width: auto;
+}
+.refund-choice--row .ui-list-row span {
+  display: block;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.refund-choice--row .ui-list-row-meta .date-value {
+  display: inline;
+}
+.refund-purchase > label:not(.refund-choice) {
+  margin-bottom: 16px;
+}
+.app .tag-picker .tag-option.tag-chip-target,
+.ux-sheet .tag-picker .tag-option.tag-chip-target,
+.tag-picker .tag-option.tag-chip-target {
+  position: relative;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+}
+.tag-chip-target > .tag-chip-visual {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 0.8125rem;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+.tag-chip-target:has(input:checked) > .tag-chip-visual {
+  border-color: var(--accent);
+  background: var(--raised, var(--surface));
+}
+.tag-chip-target:focus-within {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.app .tag-picker .tag-option.tag-chip-target > input,
+.ux-sheet .tag-picker .tag-option.tag-chip-target > input,
+.tag-picker .tag-option.tag-chip-target > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.tag-chip-check {
+  width: 16px;
+  flex: none;
+  text-align: center;
+}
+.tag-management-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+.tag-colour-control .colour-presets button {
+  color: #101217;
+}
+@media (min-width: 900px) {
+  .tag-chip-target > .tag-chip-visual {
+    min-height: 28px;
+  }
+}

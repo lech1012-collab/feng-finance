@@ -73,7 +73,7 @@
 }
 .beta-about-metadata dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 @media (max-width: 600px) {
   .beta-notice-content {

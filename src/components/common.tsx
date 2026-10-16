@@ -2,6 +2,51 @@ import { useSwipe } from "./useSwipe";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { monthLabel, monthOffset } from "../domain/dates";
 import { money } from "../domain/money";
+import { EmptyState, SegmentedControl } from "./UIPrimitives";
+export function PeriodControl({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  const advanced = ["annual", "tax", "custom"];
+  return (
+    <div className="period-control">
+      <SegmentedControl
+        className="range-control"
+        label="Time range"
+        value={value}
+        onChange={onChange}
+        options={[
+          ...[1, 3, 6, 12].map((n) => ({
+            value: String(n),
+            label: `${n}M`,
+            ariaLabel: `${n} month${n === 1 ? "" : "s"}`,
+          })),
+          { value: "ytd", label: "YTD", ariaLabel: "Year to date" },
+        ]}
+      />
+      <details className="other-periods">
+        <summary>Other periods</summary>
+        <label className="period-label">
+          Period
+          <select
+            value={advanced.includes(value) ? value : ""}
+            onChange={(e) => onChange(e.target.value)}
+          >
+            <option value="" disabled>
+              Choose a period
+            </option>
+            <option value="annual">Calendar year</option>
+            <option value="tax">UK tax year</option>
+            <option value="custom">Custom period</option>
+          </select>
+        </label>
+      </details>
+    </div>
+  );
+}
 export function RangeControl({
   value,
   onChange,
@@ -12,22 +57,17 @@ export function RangeControl({
   label?: string;
 }) {
   return (
-    <div
-      className="segmented-control range-control"
-      role="group"
-      aria-label={label}
-    >
-      {[1, 3, 6, 12].map((n) => (
-        <button
-          key={n}
-          aria-pressed={String(value) === String(n)}
-          aria-label={`${n} month${n === 1 ? "" : "s"}`}
-          onClick={() => onChange(n)}
-        >
-          <span>{n}M</span>
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      className="range-control"
+      label={label}
+      value={Number(value)}
+      onChange={onChange}
+      options={[1, 3, 6, 12].map((n) => ({
+        value: n,
+        label: `${n}M`,
+        ariaLabel: `${n} month${n === 1 ? "" : "s"}`,
+      }))}
+    />
   );
 }
 export function MonthPicker({
@@ -94,12 +134,7 @@ export function Empty({
   title: string;
   children?: React.ReactNode;
 }) {
-  return (
-    <div className="empty">
-      <h2>{title}</h2>
-      {children}
-    </div>
-  );
+  return <EmptyState title={title}>{children}</EmptyState>;
 }
 export function Metric({
   label,

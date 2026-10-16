@@ -1,3 +1,10 @@
+import {
+  displayMerchant,
+  displayDate,
+  displayCategory,
+} from "../domain/presentation";
+import { displayRuleMatch } from "../domain/rule-presentation";
+import { ListRow, StatusChip } from "./UIPrimitives";
 import { Sheet, SheetFooter } from "./Sheet";
 import { Toast } from "./Toast";
 import { formatUkDate } from "../domain/dates";
@@ -193,12 +200,12 @@ function RuleEditor({
                 >
                   {[
                     ["category", "Set category"],
-                    ["rename", "Set display name"],
+                    ["rename", "Display name"],
                     ["tag", "Add tags"],
-                    ["kind", "Set transaction kind"],
-                    ["split", "Split by percentage"],
+                    ["kind", "Set type"],
+                    ["split", "Split (%)"],
                     ["reviewed", "Mark reviewed"],
-                    ["recurring", "Link recurring series"],
+                    ["recurring", "Link bill"],
                   ].map(([v, name]) => (
                     <option key={v} value={v}>
                       {name}
@@ -219,7 +226,7 @@ function RuleEditor({
                     <option value="">Choose</option>
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
-                        {c.name}
+                        {displayCategory(c, categories)}
                       </option>
                     ))}
                   </select>
@@ -419,10 +426,26 @@ function RuleEditor({
             Matches {preview.length} existing transaction
             {preview.length === 1 ? "" : "s"}
           </h3>
-          <ul className="rule-preview-list">
+          <ul
+            className="rule-preview-list"
+            tabIndex={0}
+            aria-label="Matching transactions"
+          >
             {preview.slice(0, 30).map((t) => (
               <li key={t.id}>
-                {t.merchant} · {money(t.amount, t.currency)}
+                <ListRow
+                  title={displayMerchant(t)}
+                  meta={
+                    <time className="date-value" dateTime={t.date}>
+                      {displayDate(t.date)}
+                    </time>
+                  }
+                  amount={
+                    <span className="amount">
+                      {money(t.amount, t.currency)}
+                    </span>
+                  }
+                />
               </li>
             ))}
           </ul>
@@ -543,7 +566,7 @@ export function RulesManager({
   return (
     <section className="card" id="categorization-rules">
       <div className="v2-filter-header">
-        <h2>Categorisation rules</h2>
+        <h2>Rules</h2>
         <button
           className="primary"
           onClick={() =>
@@ -645,12 +668,24 @@ export function RulesManager({
               </button>
             </span>
             {(rule.auto || rule.createdFrom === "auto") && (
-              <span className="count-chip">Auto</span>
+              <StatusChip>Auto</StatusChip>
             )}
             <div className="muted">
-              {rule.stats?.lastHit || rule.lastUsedAt
-                ? `Last used ${formatUkDate((rule.stats?.lastHit ?? rule.lastUsedAt!).slice(0, 10))}`
-                : "Not used yet"}
+              {rule.stats?.lastHit || rule.lastUsedAt ? (
+                <>
+                  Last used{" "}
+                  <time
+                    className="date-value"
+                    dateTime={rule.stats?.lastHit ?? rule.lastUsedAt!}
+                  >
+                    {formatUkDate(
+                      (rule.stats?.lastHit ?? rule.lastUsedAt!).slice(0, 10),
+                    )}
+                  </time>
+                </>
+              ) : (
+                "Not used yet"
+              )}
               {rule.singleUse ? " · Once" : ""}
               {rule.enabled === false ? " · Paused" : ""}
               {rule.stats
@@ -658,6 +693,9 @@ export function RulesManager({
                 : " · 0 matches"}
             </div>
           </div>
+          <p className="muted">
+            {displayRuleMatch(rule, accounts, categories)}
+          </p>
           <p className="muted">
             {rule.actions
               ?.map((a) =>
@@ -680,7 +718,7 @@ export function RulesManager({
               .join(" · ") ??
               (rule.type === "transfer"
                 ? "Transfer"
-                : categories.find((c) => c.id === rule.categoryId)?.name)}
+                : categories.find((c) => c.id === rule.categoryId)?.name)}{" "}
             <br />
             {rule.conditions?.find((c) => c.field === "accountId")
               ? (accounts.find(
@@ -717,7 +755,14 @@ export function RulesManager({
               {rule.enabled === false ? "Enable" : "Pause"}
             </button>
             <button
+              className="danger"
               onClick={async () => {
+                if (
+                  !window.confirm(
+                    `Delete ${rule.name}? Existing transactions keep their categories. You can undo this change.`,
+                  )
+                )
+                  return;
                 try {
                   const result = await auditedMutation(
                     "Delete rule",

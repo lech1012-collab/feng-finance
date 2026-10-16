@@ -1,0 +1,1127 @@
+{
+  "version": "2.2.7",
+  "data": "Fictitious fixtures only",
+  "method": "Actual captured states with explicit entry, action and resulting behaviour. Native operating-system pickers are described, not fabricated screenshots.",
+  "states": [
+    {
+      "id": "whats-new",
+      "title": "Version-specific changes",
+      "entry": "Launch an updated version, or choose What’s new in About.",
+      "action": "Read the short change list and testing prompts; choose Done.",
+      "result": "The notice is version-specific and does not edit financial data.",
+      "evidence": "audit/after/iphone390-dark/whats-new.png"
+    },
+    {
+      "id": "feedback",
+      "title": "Feedback technical context and explicit send",
+      "entry": "Choose Send feedback from About.",
+      "action": "Read the no-real-statements warning and technical context, then explicitly open email.",
+      "result": "Only feedback chosen by the user leaves the app. The technical context excludes financial records.",
+      "evidence": "audit/after/iphone390-dark/feedback.png"
+    },
+    {
+      "id": "self-assessment",
+      "title": "Self Assessment property summary",
+      "entry": "Open the property tax summary within Reports.",
+      "action": "Select a UK tax year, choose allowable expenses and inspect the income/cost/net summary.",
+      "result": "The user chooses allowable categories for their circumstances. The screen explicitly does not provide tax advice.",
+      "evidence": "audit/after/iphone390-dark/self-assessment.png"
+    },
+    {
+      "id": "home-complete",
+      "title": "Home after confirming all demo account transfers",
+      "entry": "Use the fully covered synthetic account scenario.",
+      "action": "Read cash, card debt and net worth, then inspect the selected month and history.",
+      "result": "Verified balance context remains explicit; saved pots are included in cash rather than added again.",
+      "evidence": "audit/after/iphone390-dark/home-complete.png"
+    },
+    {
+      "id": "home-missing-rates",
+      "title": "Unknown converted figures show rates needed",
+      "entry": "Open a mixed-currency workspace without a required rate.",
+      "action": "Review original account amounts or obtain a rate in Settings.",
+      "result": "Converted figures show Rates needed or Unavailable; missing conversion is never represented as zero.",
+      "evidence": "audit/after/iphone390-dark/home-missing-rates.png"
+    },
+    {
+      "id": "forecast-missing-rates",
+      "title": "Forecast with missing exchange rates",
+      "entry": "Open Forecast with a missing account-currency rate.",
+      "action": "Use Import recent statements or Currency settings to resolve the missing basis.",
+      "result": "The projected total remains unavailable instead of presenting an unsupported estimate.",
+      "evidence": "audit/after/iphone390-dark/forecast-missing-rates.png"
+    },
+    {
+      "id": "first-launch",
+      "title": "First-launch beta notice",
+      "entry": "Open Feng in a fresh browser profile.",
+      "action": "Read the beta, privacy and backup notice; choose demo or import your own statements.",
+      "result": "The next choice opens the local workspace or Files picker. No account or server login is required.",
+      "evidence": "audit/after/iphone390-dark/first-launch.png"
+    },
+    {
+      "id": "home-empty",
+      "title": "Home after cancelling first picker",
+      "entry": "Cancel the first file picker or start without records.",
+      "action": "Use Import to choose local PDFs, or explore fictitious demo data.",
+      "result": "Unknown balances stay unavailable until statements exist; empty history is not a zero balance.",
+      "evidence": "audit/after/iphone390-dark/home-empty.png"
+    },
+    {
+      "id": "transactions-empty",
+      "title": "Transactions with no imported records",
+      "entry": "Open Transactions before importing records.",
+      "action": "Use Import or add a deliberate manual record.",
+      "result": "The empty state gives a next action without fabricated rows.",
+      "evidence": "audit/after/iphone390-dark/transactions-empty.png"
+    },
+    {
+      "id": "subscriptions-empty",
+      "title": "No recurring evidence yet",
+      "entry": "Open recurring review without sufficient transaction history.",
+      "action": "Import more history or return to the main workflow.",
+      "result": "No subscription is invented without evidence.",
+      "evidence": "audit/after/iphone390-dark/subscriptions-empty.png"
+    },
+    {
+      "id": "pots-empty",
+      "title": "No goals or pots yet",
+      "entry": "Open Pots before creating goals.",
+      "action": "Choose the create action when ready.",
+      "result": "The empty state explains the purpose rather than displaying fictional progress.",
+      "evidence": "audit/after/iphone390-dark/pots-empty.png"
+    },
+    {
+      "id": "backup-empty",
+      "title": "No saved backup yet",
+      "entry": "Open backup settings before saving any backup.",
+      "action": "Choose Save backup.",
+      "result": "The status says no backup has been saved rather than inventing a last-saved date.",
+      "evidence": "audit/after/iphone390-dark/backup-empty.png"
+    },
+    {
+      "id": "transaction-filters",
+      "title": "Transaction filters sheet",
+      "entry": "Choose Filters in Transactions.",
+      "action": "Set account, category, type, amount bounds or review status.",
+      "result": "The footer reports matching transactions and applies the view without editing financial records.",
+      "evidence": "audit/after/iphone390-dark/transaction-filters.png"
+    },
+    {
+      "id": "transaction-filters-date",
+      "title": "Explicit date-range filters",
+      "entry": "Choose Date range in Filters.",
+      "action": "Enter From and To as DD/MM/YYYY or use each calendar action.",
+      "result": "A complete valid range filters the list; invalid drafts never silently reuse a previous date.",
+      "evidence": "audit/after/iphone390-dark/transaction-filters-date.png"
+    },
+    {
+      "id": "transaction-query-builder",
+      "title": "Advanced condition builder",
+      "entry": "Choose Build a filter or show conditions.",
+      "action": "Combine the existing condition fields and operators; inspect the matching count.",
+      "result": "The query changes a saved/view filter, not the original transaction data.",
+      "evidence": "audit/after/iphone390-dark/transaction-query-builder.png"
+    },
+    {
+      "id": "transaction-search-empty",
+      "title": "Search has no results and can be cleared",
+      "entry": "Search for a value absent from the synthetic records.",
+      "action": "Clear the search or change filters.",
+      "result": "The empty result is distinct from an empty database.",
+      "evidence": "audit/after/iphone390-dark/transaction-search-empty.png"
+    },
+    {
+      "id": "transactions-uncategorised",
+      "title": "Uncategorised-only queue",
+      "entry": "Select Uncategorised from Home or transaction prefilters.",
+      "action": "Start sorting, tap a row, or drag its object on desktop.",
+      "result": "The all-dates queue removes a transaction as soon as its category is saved; Undo restores it.",
+      "evidence": "audit/after/iphone390-dark/transactions-uncategorised.png"
+    },
+    {
+      "id": "sorting-sheet",
+      "title": "Sorting sheet with suggested categories",
+      "entry": "Open sorting for an uncategorised transaction.",
+      "action": "Drop the transaction on a category object, or tap a suggested tile. Search all categories when suggestions do not fit.",
+      "result": "The choice saves immediately and becomes a matching default for the same account and money direction.",
+      "evidence": "audit/after/iphone390-dark/sorting-sheet.png"
+    },
+    {
+      "id": "sorting-undo-toast",
+      "title": "Learning receipt and next transaction",
+      "entry": "Choose a category while sorting.",
+      "action": "Read the learning receipt; use Undo to reverse the category and its learned default.",
+      "result": "The next transaction is ready. The toast remains clear of Skip and the transaction-detail footer.",
+      "evidence": "audit/after/iphone390-dark/sorting-undo-toast.png"
+    },
+    {
+      "id": "transaction-detail",
+      "title": "Transaction detail and source trace",
+      "entry": "Select a transaction row.",
+      "action": "Inspect the amount and source; change category/type/name or open Split, Tags or attachments.",
+      "result": "Category/type/tag edits save immediately with Undo. Manual categorisation learns its future default automatically.",
+      "evidence": "audit/after/iphone390-dark/transaction-detail.png"
+    },
+    {
+      "id": "split-remaining",
+      "title": "Split editor with remaining allocation",
+      "entry": "Open Split from a purchase detail.",
+      "action": "Allocate amounts and a category to each line.",
+      "result": "Save stays disabled while a remainder or missing required category exists; the original ledger amount stays unchanged.",
+      "evidence": "audit/after/iphone390-dark/split-remaining.png"
+    },
+    {
+      "id": "split-balanced",
+      "title": "Split editor balanced to the source amount",
+      "entry": "Complete both split categories and allocate exactly the original purchase amount.",
+      "action": "Check Remaining is zero, then Save split.",
+      "result": "The allocation changes category analysis while preserving the original statement amount and reconciliation.",
+      "evidence": "audit/after/iphone390-dark/split-balanced.png"
+    },
+    {
+      "id": "refund-detail",
+      "title": "Refund source and counted month",
+      "entry": "Open a positive transaction linked as a refund.",
+      "action": "Inspect which original purchase month receives the reduction; use Refund of to correct the link.",
+      "result": "Refunds reduce original spending, including closed months, rather than inflating income.",
+      "evidence": "audit/after/iphone390-dark/refund-detail.png"
+    },
+    {
+      "id": "refund-picker",
+      "title": "Refund same-merchant recent-purchase picker",
+      "entry": "Choose Refund of from the refund detail.",
+      "action": "Select a likely recent purchase from the same merchant, check the allocation, or Search all purchases.",
+      "result": "Link refund is enabled when the amount is allocated. The arrival date stays visible separately from the original spending month.",
+      "evidence": "audit/after/iphone390-dark/refund-picker.png"
+    },
+    {
+      "id": "manual-transaction",
+      "title": "Manual transaction bottom sheet",
+      "entry": "Choose Add manual transaction.",
+      "action": "Select account, UK date, description, direction, amount and category; complete any optional note.",
+      "result": "Save records the signed amount locally. Later matching statement rows can replace the manual entry without counting it twice.",
+      "evidence": "audit/after/iphone390-dark/manual-transaction.png"
+    },
+    {
+      "id": "rule-editor",
+      "title": "Rule editor with live matching preview",
+      "entry": "Choose Create rule or edit a rule from Settings.",
+      "action": "Name it, define match conditions and actions, and inspect the matching-count preview.",
+      "result": "Explicit rules are prioritised; Save applies the existing local rule engine and offers a reversible receipt.",
+      "evidence": "audit/after/iphone390-dark/rule-editor.png"
+    },
+    {
+      "id": "category-new",
+      "title": "Add category sheet",
+      "entry": "Choose Add category in Settings.",
+      "action": "Enter name, parent, financial kind and preset colour.",
+      "result": "Save creates a local category without changing imported amounts.",
+      "evidence": "audit/after/iphone390-dark/category-new.png"
+    },
+    {
+      "id": "category-edit",
+      "title": "Edit category sheet",
+      "entry": "Select an existing category.",
+      "action": "Edit its name or colour, or use the visually separated Archive action.",
+      "result": "Existing parent and financial role are preserved by the owner-approved scope decision.",
+      "evidence": "audit/after/iphone390-dark/category-edit.png"
+    },
+    {
+      "id": "account-new",
+      "title": "Add bank account sheet",
+      "entry": "Choose Add bank account from Accounts.",
+      "action": "Enter nickname, institution, type, mask, currency and net-worth inclusion.",
+      "result": "Save creates the local account; no API login or credential upload occurs.",
+      "evidence": "audit/after/iphone390-dark/account-new.png"
+    },
+    {
+      "id": "asset-new",
+      "title": "Manual asset or liability sheet",
+      "entry": "Choose Add account in Assets and liabilities.",
+      "action": "Enter asset/liability type, UK valuation date, amount and any reminder interval.",
+      "result": "The dated valuation affects net worth, not income/spending; stale values are labelled.",
+      "evidence": "audit/after/iphone390-dark/asset-new.png"
+    },
+    {
+      "id": "budget-editor",
+      "title": "Budget edit sheet",
+      "entry": "Select a budget category.",
+      "action": "Enter its monthly amount and carry setting, then save.",
+      "result": "The budget changes, while actual transactions remain unchanged.",
+      "evidence": "audit/after/iphone390-dark/budget-editor.png"
+    },
+    {
+      "id": "pot-editor",
+      "title": "Goal or irregular-cost pot sheet",
+      "entry": "Choose a pot or create one.",
+      "action": "Enter its type, target, UK due date and tracking method.",
+      "result": "Save records the goal or irregular-cost plan locally.",
+      "evidence": "audit/after/iphone390-dark/pot-editor.png"
+    },
+    {
+      "id": "pot-options",
+      "title": "Pot contribution and separated destructive options",
+      "entry": "Open a pot’s options.",
+      "action": "Record a contribution or use the separated destructive option if it is no longer needed.",
+      "result": "Reversible changes produce Undo; account cash is not counted twice.",
+      "evidence": "audit/after/iphone390-dark/pot-options.png"
+    },
+    {
+      "id": "series-editor",
+      "title": "Recurring payment series edit sheet",
+      "entry": "Open an expected payment series from Calendar.",
+      "action": "Set account, cadence, direction, expected amount, next date and optional end date.",
+      "result": "Confirm series stores an estimate separately from imported paid transactions.",
+      "evidence": "audit/after/iphone390-dark/series-editor.png"
+    },
+    {
+      "id": "debt-terms-editor",
+      "title": "APR and actual minimum payment terms",
+      "entry": "Choose repayment terms on a debt account.",
+      "action": "Enter the actual APR and monthly minimum/payment inputs.",
+      "result": "Validated terms enable an eligible payoff estimate; mortgage terms are not guessed.",
+      "evidence": "audit/after/iphone390-dark/debt-terms-editor.png"
+    },
+    {
+      "id": "debt-plan-editor",
+      "title": "Repayment strategy and amount sheet",
+      "entry": "Open the debt plan editor.",
+      "action": "Choose the existing repayment strategy and planned amount.",
+      "result": "Save changes planning inputs with Undo, without changing statement balances.",
+      "evidence": "audit/after/iphone390-dark/debt-plan-editor.png"
+    },
+    {
+      "id": "what-if",
+      "title": "What-if adjustments separate from actual figures",
+      "entry": "Scroll to What if within Forecast.",
+      "action": "Compare the baseline preview and use Edit scenario for temporary changes.",
+      "result": "Scenario values are separate from the actual ledger; an empty scenario does not pretend to have saved changes.",
+      "evidence": "audit/after/iphone390-dark/what-if.png"
+    },
+    {
+      "id": "report-editor",
+      "title": "Reports scope and condition edit sheet",
+      "entry": "Choose Edit report from a result.",
+      "action": "Change report name, grouping, measure, tax year or filters.",
+      "result": "View report previews the result; Save report persists the selected report definition locally.",
+      "evidence": "audit/after/iphone390-dark/report-editor.png"
+    },
+    {
+      "id": "import-check",
+      "title": "Processing one selected PDF",
+      "entry": "Select a supported digital PDF.",
+      "action": "Wait while the local reader detects the bank and checks the statement.",
+      "result": "The file remains on the device. Progress leads to a single combined review; this is not a manual mapping step.",
+      "evidence": "audit/after/iphone390-dark/import-check.png"
+    },
+    {
+      "id": "import-review-one",
+      "title": "Native bank one-statement review",
+      "entry": "Finish local reading of one supported-bank statement.",
+      "action": "Check the detected account, period and status; expand the statement if more detail is needed.",
+      "result": "Nothing is saved until Confirm import. Reconciled supported layouts avoid unnecessary row-by-row verification.",
+      "evidence": "audit/after/iphone390-dark/import-review-one.png"
+    },
+    {
+      "id": "import-review-one-expanded",
+      "title": "Native statement figures and exact reconciliation",
+      "entry": "Expand the detected statement in review.",
+      "action": "Compare opening balance, Money in, Money out, closing balance and difference with the PDF.",
+      "result": "Statement movements include transfers and card repayments. Dashboard income and spending exclude confirmed internal transfers.",
+      "evidence": "audit/after/iphone390-dark/import-review-one-expanded.png"
+    },
+    {
+      "id": "import-review-four",
+      "title": "Four native bank statements in one review",
+      "entry": "Select Barclays current account, Barclaycard, Amex and Revolut synthetic files together.",
+      "action": "Review all four detected statements in one place, correcting only exceptions.",
+      "result": "One confirmation imports the selected valid rows and returns Home.",
+      "evidence": "audit/after/iphone390-dark/import-review-four.png"
+    },
+    {
+      "id": "home-after-import",
+      "title": "Import completion with next action",
+      "entry": "Confirm the combined import.",
+      "action": "Read the imported count, then choose Sort now if transactions need a category.",
+      "result": "Home updates immediately and gives a clear next action. Income/spending retain coverage qualifications.",
+      "evidence": "audit/after/iphone390-dark/home-after-import.png"
+    },
+    {
+      "id": "home-safari-storage-warning",
+      "title": "Post-import storage warning state",
+      "entry": "Use Feng in a Safari tab after importing.",
+      "action": "Read any storage or installation guidance and save a portable backup before moving to the installed app.",
+      "result": "Tab and installed storage should not be assumed shared; the screenshot records the actual conditional state.",
+      "evidence": "audit/after/iphone390-dark/home-safari-storage-warning.png"
+    },
+    {
+      "id": "import-duplicate",
+      "title": "Exact duplicate statement is skipped",
+      "entry": "Select an already imported PDF.",
+      "action": "Read the exact-file duplicate status and review the selected rows.",
+      "result": "The duplicate is skipped by default; overriding it is explicit.",
+      "evidence": "audit/after/iphone390-dark/import-duplicate.png"
+    },
+    {
+      "id": "import-generic",
+      "title": "Unfamiliar bank generic reader",
+      "entry": "Select an unfamiliar-bank statement.",
+      "action": "Review the generic reader’s source proof and suggested structure.",
+      "result": "The generic route is reserved for unsupported layouts; it does not replace supported-bank detection.",
+      "evidence": "audit/after/iphone390-dark/import-generic.png"
+    },
+    {
+      "id": "import-map-columns",
+      "title": "Column role mapping exception workflow",
+      "entry": "Open mapping when the generic reader cannot determine column roles safely.",
+      "action": "Assign the visible date, description and amount/balance roles against the source preview.",
+      "result": "The app recalculates extracted rows and reconciliation before import; mapping is an exception workflow.",
+      "evidence": "audit/after/iphone390-dark/import-map-columns.png"
+    },
+    {
+      "id": "import-t11-mismatch",
+      "title": "Synthetic T11 amount mismatch blocks confirmation",
+      "entry": "Import synthetic T11 with an incorrect amount.",
+      "action": "Compare its discrepancy and source evidence; correct or exclude the problem row.",
+      "result": "Confirmation is blocked while unresolved validation requirements remain.",
+      "evidence": "audit/after/iphone390-dark/import-t11-mismatch.png"
+    },
+    {
+      "id": "import-needs-review",
+      "title": "Needs review list with extracted rows and source proof",
+      "entry": "Open Needs review for the malformed synthetic statement.",
+      "action": "Inspect highlighted rows against the original page crop.",
+      "result": "Corrections recheck statement proof immediately. No transaction is silently discarded.",
+      "evidence": "audit/after/iphone390-dark/import-needs-review.png"
+    },
+    {
+      "id": "import-correct-row",
+      "title": "Problem row correction with source crop",
+      "entry": "Choose the highlighted statement row.",
+      "action": "Compare extracted date, description, amount and balance with its source before correcting.",
+      "result": "Reconciliation updates immediately; valid selected rows remain visible.",
+      "evidence": "audit/after/iphone390-dark/import-correct-row.png"
+    },
+    {
+      "id": "import-invalid",
+      "title": "Damaged or unsupported PDF error",
+      "entry": "Select the damaged/unsupported synthetic PDF.",
+      "action": "Read the actionable error and retry another file.",
+      "result": "No partial financial database write occurs.",
+      "evidence": "audit/after/iphone390-dark/import-invalid.png"
+    },
+    {
+      "id": "backup-protected-editor",
+      "title": "Default password-protected backup sheet",
+      "entry": "Choose Save backup.",
+      "action": "Keep password protection on; enter and confirm a password and choose attachment inclusion.",
+      "result": "The file is encrypted locally; passwords are not recoverable by the developer.",
+      "evidence": "audit/after/iphone390-dark/backup-protected-editor.png"
+    },
+    {
+      "id": "backup-protected-ready",
+      "title": "Protected backup ready for export",
+      "entry": "Complete both valid backup password fields.",
+      "action": "Save backup and use Files to retain the downloaded file.",
+      "result": "The named file contains the complete portable dataset and selected attachments.",
+      "evidence": "audit/after/iphone390-dark/backup-protected-ready.png"
+    },
+    {
+      "id": "backup-saved-toast",
+      "title": "Backup download receipt",
+      "entry": "Finish creating a backup download.",
+      "action": "Read the dated file receipt and save it in Files.",
+      "result": "A browser download receipt does not itself prove the user has retained the file.",
+      "evidence": "audit/after/iphone390-dark/backup-saved-toast.png"
+    },
+    {
+      "id": "restore-unlock",
+      "title": "Encrypted backup password gate",
+      "entry": "Choose Restore and a protected Feng file.",
+      "action": "Enter its password and choose Unlock and preview.",
+      "result": "Current records remain unchanged until a later explicit replacement acknowledgement.",
+      "evidence": "audit/after/iphone390-dark/restore-unlock.png"
+    },
+    {
+      "id": "restore-wrong-password",
+      "title": "Wrong password cannot change financial data",
+      "entry": "Submit the synthetic backup with an incorrect password.",
+      "action": "Read the wrong-password/damaged-file error and retry or cancel.",
+      "result": "No current records are changed.",
+      "evidence": "audit/after/iphone390-dark/restore-wrong-password.png"
+    },
+    {
+      "id": "restore-preview",
+      "title": "Restore contents preview before acknowledgement",
+      "entry": "Unlock a valid backup or select a supported readable backup.",
+      "action": "Inspect account/transaction/statement/rule counts, dates and details; back up current data first if needed.",
+      "result": "Replacement remains disabled until acknowledgement.",
+      "evidence": "audit/after/iphone390-dark/restore-preview.png"
+    },
+    {
+      "id": "restore-acknowledged",
+      "title": "Explicit replacement acknowledgement",
+      "entry": "Check the replacement acknowledgement after preview.",
+      "action": "Use Replace data with backup, or Cancel restore.",
+      "result": "Replacement is transactional; it does not merge unknown schemas or partially overwrite the database.",
+      "evidence": "audit/after/iphone390-dark/restore-acknowledged.png"
+    },
+    {
+      "id": "backup-readable-warning",
+      "title": "Optional readable backup warning",
+      "entry": "Turn off password protection in the backup sheet.",
+      "action": "Read that the file contains readable financial data before saving.",
+      "result": "Readable backup remains an explicit option with its privacy warning.",
+      "evidence": "audit/after/iphone390-dark/backup-readable-warning.png"
+    },
+    {
+      "id": "restore-invalid-file",
+      "title": "Invalid backup rejected without replacing data",
+      "entry": "Select an invalid or unsupported newer backup.",
+      "action": "Read the schema/version error and select a supported backup.",
+      "result": "The existing workspace remains intact.",
+      "evidence": "audit/after/iphone390-dark/restore-invalid-file.png"
+    },
+    {
+      "id": "danger-disabled",
+      "title": "Both delete options disabled without acknowledgement",
+      "entry": "Open the danger section without accepting its warnings.",
+      "action": "Read the separate record deletion and full-erasure consequences.",
+      "result": "Both destructive actions are disabled initially.",
+      "evidence": "audit/after/iphone390-dark/danger-disabled.png"
+    },
+    {
+      "id": "danger-records-acknowledged",
+      "title": "Record-only deletion acknowledgement",
+      "entry": "Acknowledge deleting imported records.",
+      "action": "Confirm the record-only action if intended.",
+      "result": "Learned categories/rules remain available for a clean reimport test; this differs from full erasure.",
+      "evidence": "audit/after/iphone390-dark/danger-records-acknowledged.png"
+    },
+    {
+      "id": "danger-erase-acknowledged",
+      "title": "Full-erasure exact phrase gate",
+      "entry": "Read full-erasure consequences and type ERASE exactly.",
+      "action": "Confirm only after retaining any needed backup.",
+      "result": "Full local erasure is intentionally irreversible; the exact-phrase gate is distinct from routine Undo.",
+      "evidence": "audit/after/iphone390-dark/danger-erase-acknowledged.png"
+    },
+    {
+      "id": "app-lock-enabled",
+      "title": "PIN protection configured",
+      "entry": "Finish configuring the synthetic PIN.",
+      "action": "Inspect enabled protection and lock-delay context.",
+      "result": "Credential changes remain confirmed and private; no credential history is added.",
+      "evidence": "audit/after/iphone390-dark/app-lock-enabled.png"
+    },
+    {
+      "id": "app-lock",
+      "title": "Locked workspace with six masked digits",
+      "entry": "Lock or reopen the protected test workspace.",
+      "action": "Enter the six-digit PIN or use a supported configured platform authenticator.",
+      "result": "The workspace remains hidden until authentication succeeds.",
+      "evidence": "audit/after/iphone390-dark/app-lock.png"
+    },
+    {
+      "id": "app-lock-error",
+      "title": "Incorrect PIN stays locked",
+      "entry": "Enter an incorrect PIN in the isolated test workspace.",
+      "action": "Read the error and retry through the masked keypad.",
+      "result": "The workspace stays locked; a wrong PIN does not reveal data.",
+      "evidence": "audit/after/iphone390-dark/app-lock-error.png"
+    },
+    {
+      "id": "app-lock-recovery",
+      "title": "Forgot PIN explanation without recovery promises",
+      "entry": "Choose Forgot PIN from the lock screen.",
+      "action": "Read the backup-only recovery explanation.",
+      "result": "There is no developer reset or invented remote recovery service.",
+      "evidence": "audit/after/iphone390-dark/app-lock-recovery.png"
+    },
+    {
+      "id": "safety-copy",
+      "title": "Actual schema migration previous-data safety copy",
+      "entry": "Open previous-data recovery after an actual synthetic schema upgrade.",
+      "action": "Inspect the dated local safety snapshot and expiry context.",
+      "result": "This is local migration recovery, separate from portable backup.",
+      "evidence": "audit/after/iphone390-dark/safety-copy.png"
+    },
+    {
+      "id": "safety-restore-confirmation",
+      "title": "Safety copy replacement warning and preserved security",
+      "entry": "Request restoring the previous-data safety copy.",
+      "action": "Read which later edits will be replaced before confirming.",
+      "result": "The snapshot restores prior records and security consistently while keeping the additive database schema.",
+      "evidence": "audit/after/iphone390-dark/safety-restore-confirmation.png"
+    },
+    {
+      "id": "home-partial",
+      "title": "Home with full demo and qualified values",
+      "entry": "Open Home with incomplete demo statement coverage.",
+      "action": "Choose the month, inspect cash and card debt, then use account or category objects for detail.",
+      "result": "Partial, stale and missing balances are labelled. Net worth is withheld when required information is missing.",
+      "evidence": "audit/after/iphone390-dark/home-partial.png"
+    },
+    {
+      "id": "transactions-list",
+      "title": "Transactions list",
+      "entry": "Choose Activity on mobile or Transactions on desktop.",
+      "action": "Search, select an account, use the limited prefilters or open Filters. Select a row for its source and edits.",
+      "result": "The list preserves signed amounts and category status. Account chips provide compact balance context.",
+      "evidence": "audit/after/iphone390-dark/transactions-list.png"
+    },
+    {
+      "id": "analyse-overview",
+      "title": "Analyse overview",
+      "entry": "Choose Analyse.",
+      "action": "Read income, expenses and net cash flow before charts; choose a range or a category.",
+      "result": "Transfers are excluded. Partial coverage and approximate conversion are visible beside the figures.",
+      "evidence": "audit/after/iphone390-dark/analyse-overview.png"
+    },
+    {
+      "id": "analyse-property-report",
+      "title": "Property report",
+      "entry": "Open the dedicated property report.",
+      "action": "Choose month/range, review rental income, costs and net cash flow, then inspect monthly values.",
+      "result": "It is a cash-flow report with source and coverage qualifications, not a tax or profitability guarantee.",
+      "evidence": "audit/after/iphone390-dark/analyse-property-report.png"
+    },
+    {
+      "id": "analyse-reports",
+      "title": "Reports result",
+      "entry": "Open Reports from Analyse.",
+      "action": "Read the current result; change table/bar/line or use Edit report to change the scope.",
+      "result": "Results appear before the editor, and category rows open supporting transactions.",
+      "evidence": "audit/after/iphone390-dark/analyse-reports.png"
+    },
+    {
+      "id": "analyse-trips",
+      "title": "Tags and trips analysis",
+      "entry": "Open Tags and trips from Analyse.",
+      "action": "Select a tag to review the associated spending and source transactions.",
+      "result": "Tags provide additional grouping without changing original financial amounts.",
+      "evidence": "audit/after/iphone390-dark/analyse-trips.png"
+    },
+    {
+      "id": "subscriptions",
+      "title": "Subscriptions and bills",
+      "entry": "Open Subscriptions and bills from the relevant Home/Planning entry.",
+      "action": "Review recurring candidates, changes in price, and whether to keep or plan cancellation.",
+      "result": "Recurring evidence is a suggestion, not proof of a subscription or confirmation that a provider has cancelled it.",
+      "evidence": "audit/after/iphone390-dark/subscriptions.png"
+    },
+    {
+      "id": "planning-budgets",
+      "title": "Monthly budgets",
+      "entry": "Open Planning, then Budgets.",
+      "action": "Read budget status before editing; choose the category object to set or amend a budget.",
+      "result": "Imported spending remains separate from the planned limit and any carry amount.",
+      "evidence": "audit/after/iphone390-dark/planning-budgets.png"
+    },
+    {
+      "id": "planning-pots",
+      "title": "Pots and goals",
+      "entry": "Open Planning, then Pots.",
+      "action": "Inspect progress towards goals or irregular costs; open a pot for editing or contribution options.",
+      "result": "Set-aside money is already included in cash and is not an additional account balance.",
+      "evidence": "audit/after/iphone390-dark/planning-pots.png"
+    },
+    {
+      "id": "planning-calendar",
+      "title": "Payments calendar",
+      "entry": "Open Planning, then Calendar.",
+      "action": "Review filled imported payments and outlined expected payments; inspect possible recurring matches.",
+      "result": "Expected dates and amounts are estimates. Similar bills remain separate until the user confirms they are the same.",
+      "evidence": "audit/after/iphone390-dark/planning-calendar.png"
+    },
+    {
+      "id": "planning-debt",
+      "title": "Debt payoff summary",
+      "entry": "Open Planning, then Debt.",
+      "action": "Read the payoff summary and assumptions; open repayment terms or strategy to change inputs.",
+      "result": "Loans and mortgages require actual monthly payment terms before inclusion; a mortgage balance alone is not treated as card debt.",
+      "evidence": "audit/after/iphone390-dark/planning-debt.png"
+    },
+    {
+      "id": "planning-forecast",
+      "title": "Forecast summary",
+      "entry": "Open Planning, then Forecast.",
+      "action": "Choose the horizon and inspect the projected total, upcoming payments and what-if preview.",
+      "result": "Forecasts are labelled estimates based on available verified balances and history; they do not edit actual finances.",
+      "evidence": "audit/after/iphone390-dark/planning-forecast.png"
+    },
+    {
+      "id": "settings-home",
+      "title": "Grouped Settings",
+      "entry": "Open Settings, then home.",
+      "action": "Choose one of the grouped destinations.",
+      "result": "Groups separate data management, preferences, privacy/storage and About.",
+      "evidence": "audit/after/iphone390-dark/settings-home.png"
+    },
+    {
+      "id": "accounts",
+      "title": "Bank/card accounts and manual assets",
+      "entry": "Open Accounts from Home or Transactions.",
+      "action": "Read institution, nickname, account type, currency, dated balance and verification state; select a row to edit.",
+      "result": "Credit-card balances are shown as debt owed. Manual assets and liabilities remain distinct from cash flow.",
+      "evidence": "audit/after/iphone390-dark/accounts.png"
+    },
+    {
+      "id": "import-pick",
+      "title": "Import picker fallback",
+      "entry": "Open Import from navigation, or return after cancelling Files.",
+      "action": "Select one or several PDF statements from the native file picker.",
+      "result": "Normal Home and navigation imports open Files directly. This page is the cancellation/retry fallback.",
+      "evidence": "audit/after/iphone390-dark/import-pick.png"
+    },
+    {
+      "id": "settings-appearance",
+      "title": "Settings: appearance",
+      "entry": "Open Settings, then appearance.",
+      "action": "Choose System, Light or Dark.",
+      "result": "System is the unset default; explicit choices persist and have Undo.",
+      "evidence": "audit/after/iphone390-dark/settings-appearance.png"
+    },
+    {
+      "id": "settings-currency",
+      "title": "Settings: currency",
+      "entry": "Open Settings, then currency.",
+      "action": "Choose the reporting currency or manage public/manual rates.",
+      "result": "Original transaction currencies remain traceable; missing rates never become zero.",
+      "evidence": "audit/after/iphone390-dark/settings-currency.png"
+    },
+    {
+      "id": "settings-period",
+      "title": "Settings: period",
+      "entry": "Open Settings, then period.",
+      "action": "Choose calendar, fixed-day or payday-driven month boundaries.",
+      "result": "The existing period validation remains in force.",
+      "evidence": "audit/after/iphone390-dark/settings-period.png"
+    },
+    {
+      "id": "settings-categories",
+      "title": "Settings: categories",
+      "entry": "Open Settings, then categories.",
+      "action": "Select a category to edit, or add one.",
+      "result": "Parent changes for existing categories remain outside this approved pass.",
+      "evidence": "audit/after/iphone390-dark/settings-categories.png"
+    },
+    {
+      "id": "settings-rules",
+      "title": "Settings: rules",
+      "entry": "Open Settings, then rules.",
+      "action": "Create a rule or import/export personal rules.",
+      "result": "Every manual category choice already learns automatically; a second Remember action is not required.",
+      "evidence": "audit/after/iphone390-dark/settings-rules.png"
+    },
+    {
+      "id": "settings-tags",
+      "title": "Settings: tags",
+      "entry": "Open Settings, then tags.",
+      "action": "Open a tag object or create a named tag with a preset colour.",
+      "result": "Tags group transactions without changing amounts.",
+      "evidence": "audit/after/iphone390-dark/settings-tags.png"
+    },
+    {
+      "id": "settings-reminders",
+      "title": "Settings: reminders",
+      "entry": "Open Settings, then reminders.",
+      "action": "Configure the existing statement and backup reminders.",
+      "result": "The PWA shows local reminders; web notification availability depends on browser/platform permission.",
+      "evidence": "audit/after/iphone390-dark/settings-reminders.png"
+    },
+    {
+      "id": "settings-reports",
+      "title": "Settings: reports",
+      "entry": "Open Settings, then reports.",
+      "action": "Manage saved report definitions.",
+      "result": "Editing the definition affects the view, not the original financial records.",
+      "evidence": "audit/after/iphone390-dark/settings-reports.png"
+    },
+    {
+      "id": "settings-transfers",
+      "title": "Settings: transfers",
+      "entry": "Open Settings, then transfers.",
+      "action": "Review matching mode and date window.",
+      "result": "Manual confirmation remains the default; suggested pairs are not silently confirmed.",
+      "evidence": "audit/after/iphone390-dark/settings-transfers.png"
+    },
+    {
+      "id": "settings-security",
+      "title": "Settings: security",
+      "entry": "Open Settings, then security.",
+      "action": "Configure six-digit PIN or supported platform authentication and lock delay.",
+      "result": "The screen explains that the app lock does not encrypt IndexedDB. PIN/passkey changes keep confirmation without Undo by owner decision; lock-delay changes retain Undo.",
+      "evidence": "audit/after/iphone390-dark/settings-security.png"
+    },
+    {
+      "id": "settings-backup",
+      "title": "Settings: backup",
+      "entry": "Open Settings, then backup.",
+      "action": "Choose Save backup or Restore.",
+      "result": "Password protection is the default. Both protected and legacy readable formats enter a preview before replacement.",
+      "evidence": "audit/after/iphone390-dark/settings-backup.png"
+    },
+    {
+      "id": "settings-storage",
+      "title": "Settings: storage",
+      "entry": "Open Settings, then storage.",
+      "action": "Review browser persistence information and request protected storage where supported.",
+      "result": "A permission result is reported honestly; a saved backup is still needed.",
+      "evidence": "audit/after/iphone390-dark/settings-storage.png"
+    },
+    {
+      "id": "settings-export",
+      "title": "Settings: export",
+      "entry": "Open Settings, then export.",
+      "action": "Choose the current transaction CSV export.",
+      "result": "CSV is portability output, separate from a full restorable backup.",
+      "evidence": "audit/after/iphone390-dark/settings-export.png"
+    },
+    {
+      "id": "settings-changes",
+      "title": "Settings: changes",
+      "entry": "Open Settings, then changes.",
+      "action": "Inspect recent changes and their affected-record count.",
+      "result": "Undo reverses eligible local mutations rather than recalculating source statement amounts.",
+      "evidence": "audit/after/iphone390-dark/settings-changes.png"
+    },
+    {
+      "id": "settings-demo",
+      "title": "Settings: demo",
+      "entry": "Open Settings, then demo.",
+      "action": "Confirm removal of fictitious demo records or load a demonstration.",
+      "result": "Deleting demo is separate from deleting real imported records and offers Undo.",
+      "evidence": "audit/after/iphone390-dark/settings-demo.png"
+    },
+    {
+      "id": "settings-imports",
+      "title": "Settings: imports",
+      "entry": "Open Settings, then imports.",
+      "action": "Review locally remembered generic layouts.",
+      "result": "Supported-bank adapters retain their direct route; layout memory supports unfamiliar statement formats.",
+      "evidence": "audit/after/iphone390-dark/settings-imports.png"
+    },
+    {
+      "id": "settings-diagnostics",
+      "title": "Settings: diagnostics",
+      "entry": "Open Settings, then diagnostics.",
+      "action": "Review optional local extraction diagnostics.",
+      "result": "Raw retention is off by default and turning it off clears retained diagnostics; shared diagnostics use placeholders.",
+      "evidence": "audit/after/iphone390-dark/settings-diagnostics.png"
+    },
+    {
+      "id": "settings-statements",
+      "title": "Settings: statements",
+      "entry": "Open Settings, then statements.",
+      "action": "Expand a month, then a statement.",
+      "result": "Rows identify bank, account nickname, transaction count and reconciliation; original PDFs are not retained by default.",
+      "evidence": "audit/after/iphone390-dark/settings-statements.png"
+    },
+    {
+      "id": "settings-about",
+      "title": "Settings: about",
+      "entry": "Open Settings, then about.",
+      "action": "Inspect version/build, What’s new, feedback, install help and privacy.",
+      "result": "Technical details remain separate from financial records.",
+      "evidence": "audit/after/iphone390-dark/settings-about.png"
+    },
+    {
+      "id": "settings-danger",
+      "title": "Settings: danger",
+      "entry": "Open Settings, then danger.",
+      "action": "Choose record-only deletion or full erasure, then read the required acknowledgement.",
+      "result": "Record deletion preserves learned configuration; full erasure requires the exact ERASE phrase.",
+      "evidence": "audit/after/iphone390-dark/settings-danger.png"
+    },
+    {
+      "id": "monthly-review-1",
+      "title": "Monthly review step 1",
+      "entry": "Choose Review month from Analyse.",
+      "action": "Read the selected month totals and comparison basis; continue to the next step.",
+      "result": "Step 1 of 4 explains the month before asking for any categorisation.",
+      "evidence": "audit/after/iphone390-dark/monthly-review-1.png"
+    },
+    {
+      "id": "monthly-review-2",
+      "title": "Monthly review step 2",
+      "entry": "Continue to What changed.",
+      "action": "Inspect the largest category changes and coverage labels; open source categories if needed.",
+      "result": "Unavailable comparisons read Not comparable rather than a misleading percentage.",
+      "evidence": "audit/after/iphone390-dark/monthly-review-2.png"
+    },
+    {
+      "id": "monthly-review-3",
+      "title": "Monthly review step 3",
+      "entry": "Continue to Pots and goals.",
+      "action": "Inspect dated contribution suggestions; choose a pot row to confirm a contribution or open Manage pots.",
+      "result": "Linked-account pots show their source balance instead of a manual contribution. Earmarked progress does not reduce account cash.",
+      "evidence": "audit/after/iphone390-dark/monthly-review-3.png"
+    },
+    {
+      "id": "monthly-review-4",
+      "title": "Monthly review step 4",
+      "entry": "Continue to Housekeeping.",
+      "action": "Review learned rules and backup freshness. Close the month only when all required review and verified coverage conditions are met.",
+      "result": "The final step clearly explains outstanding work; saving a backup and closing a month remain separate actions.",
+      "evidence": "audit/after/iphone390-dark/monthly-review-4.png"
+    },
+    {
+      "id": "install-help",
+      "title": "Install instructions disclosure",
+      "entry": "Expand Install help in About.",
+      "action": "Follow Safari Share → Add to Home Screen on iPhone, or the desktop browser’s install path.",
+      "result": "Installation uses the existing PWA and static assets; there is no App Store onboarding.",
+      "evidence": "audit/after/iphone390-dark/install-help.png"
+    },
+    {
+      "id": "privacy",
+      "title": "Privacy disclosure",
+      "entry": "Expand Privacy in About.",
+      "action": "Read local processing, optional public rates, feedback and browser-storage limits.",
+      "result": "The screen explains backups and the distinction between an app lock and database encryption.",
+      "evidence": "audit/after/iphone390-dark/privacy.png"
+    },
+    {
+      "id": "manual-rate",
+      "title": "Manual exchange-rate entry",
+      "entry": "Choose Enter a manual rate in Currency settings.",
+      "action": "Select currencies, enter the UK date and public conversion value, then save.",
+      "result": "The original ledger currencies and amounts are preserved; the quote supports reporting conversion.",
+      "evidence": "audit/after/iphone390-dark/manual-rate.png"
+    },
+    {
+      "id": "debt-calculated",
+      "title": "Debt payoff uses card minimums and excludes unpaid mortgage terms",
+      "entry": "Save valid repayment terms and view Debt.",
+      "action": "Read total interest, estimated debt-free date, savings and the monthly schedule.",
+      "result": "The calculation lists assumptions and excludes a mortgage without actual payment terms.",
+      "evidence": "audit/after/iphone390-dark/debt-calculated.png"
+    },
+    {
+      "id": "import-unverified-confirmation",
+      "title": "Explicit unverified import warning",
+      "entry": "Request importing valid selected rows from an unverified statement.",
+      "action": "Read the warning and explicitly acknowledge the unverified figures, or Continue reviewing.",
+      "result": "Unverified status is retained on the account/statement; a failed proof is never relabelled reconciled.",
+      "evidence": "audit/after/iphone390-dark/import-unverified-confirmation.png"
+    },
+    {
+      "id": "home-card-only",
+      "title": "Only card statement imported: income and cash unknown",
+      "entry": "Import a credit-card statement without cash-account statements.",
+      "action": "Read card debt and use Import for missing accounts.",
+      "result": "Cash and income remain unknown; card repayments are not a source of salary.",
+      "evidence": "audit/after/iphone390-dark/home-card-only.png"
+    },
+    {
+      "id": "home-known-missing-account",
+      "title": "Partial Home with a known missing statement account",
+      "entry": "Open Home when a known account lacks a required statement.",
+      "action": "Inspect the coverage label and import the missing statement.",
+      "result": "The application withholds a misleading complete net-worth total.",
+      "evidence": "audit/after/iphone390-dark/home-known-missing-account.png"
+    },
+    {
+      "id": "sorting-direct-manipulation",
+      "title": "Desktop object drag and category destinations",
+      "entry": "Start dragging a transaction object on desktop.",
+      "action": "Keep dragging to reveal category destinations and drop on the desired tile.",
+      "result": "A successful drop saves once; cancelling or dropping elsewhere makes no change. Tapping and keyboard controls remain available.",
+      "evidence": "audit/after/iphone390-dark/sorting-direct-manipulation.png"
+    },
+    {
+      "id": "what-if-editor",
+      "title": "Scenario editor: temporary adjustments",
+      "entry": "Choose Edit scenario.",
+      "action": "Select an adjustment, date, money direction, amount and label, then save the named scenario.",
+      "result": "Only the forecast scenario changes. Done exits the editor; no trial amount becomes an actual balance.",
+      "evidence": "audit/after/iphone390-dark/what-if-editor.png"
+    },
+    {
+      "id": "app-lock-setup",
+      "title": "Configure six-digit PIN protection",
+      "entry": "Enable PIN protection in Security.",
+      "action": "Enter and confirm six numeric digits using the masked slots.",
+      "result": "The local app lock is configured; it is not encryption of the database.",
+      "evidence": "audit/after/iphone390-dark/app-lock-setup.png"
+    },
+    {
+      "id": "backup-with-downloaded-rates",
+      "title": "Backup containing a valid ECB quote outside supported ledger currencies",
+      "entry": "Restore a valid backup containing cached public ECB quotes.",
+      "action": "Inspect its contents and acknowledgement before replacement.",
+      "result": "Valid cached quote codes do not reject an otherwise restorable backup; account-currency support is unchanged.",
+      "evidence": "audit/after/iphone390-dark/backup-with-downloaded-rates.png"
+    },
+    {
+      "id": "series-match-review",
+      "title": "Explicit recurring bill identity review; baseline silently combines similar names",
+      "entry": "Open Review possible match from the payment calendar.",
+      "action": "Compare both recurring entries; choose Same bill or Separate bills.",
+      "result": "The decision is stored locally. A payment cannot fulfil two entries explicitly confirmed as separate bills.",
+      "evidence": "audit/after/iphone390-dark/series-match-review.png"
+    },
+    {
+      "id": "series-match-undo",
+      "title": "Recurring bill match Undo; baseline has no confirmation to reverse",
+      "entry": "Confirm a recurring-entry identity decision.",
+      "action": "Use the local Undo receipt to reverse it.",
+      "result": "Both the matching decision and affected series grouping are restored atomically; source transactions are unchanged.",
+      "evidence": "audit/after/iphone390-dark/series-match-undo.png"
+    },
+    {
+      "id": "monthly-review-contribution",
+      "title": "Monthly review contribution form in a sheet",
+      "entry": "Reach the monthly-review contribution section with a synthetic pot.",
+      "action": "Inspect the suggested contribution and its existing progress context.",
+      "result": "Contributions track set-aside progress rather than adding money to account balances.",
+      "evidence": "audit/after/iphone390-dark/monthly-review-contribution.png"
+    },
+    {
+      "id": "analyse-category",
+      "title": "Groceries category",
+      "entry": "Choose Groceries from Home or the Analyse category selector.",
+      "action": "Read this month, monthly average, income share and comparison; scroll to the trend and underlying transactions.",
+      "result": "Incomplete periods do not produce an unsupported deviation. Average and standard deviation use qualifying history.",
+      "evidence": "audit/after/iphone390-dark/analyse-category.png"
+    },
+    {
+      "id": "analyse-property",
+      "title": "Property category",
+      "entry": "Choose Property as a category.",
+      "action": "Inspect property spending, average and income share, then the rent/cost/net section.",
+      "result": "The same category-detail pattern is used; property-specific context appears within it.",
+      "evidence": "audit/after/iphone390-dark/analyse-property.png"
+    },
+    {
+      "id": "import-amex-expanded",
+      "title": "Native bank reconciliation: known-bank-amex",
+      "entry": "Select the supported American Express statement and expand its review.",
+      "action": "Compare the identified account, period, movements, opening and closing figures.",
+      "result": "The native adapter is used. Card debt uses a negative ledger balance; reconciled figures show a zero difference. Confirm once for the selected files.",
+      "evidence": "audit/after/iphone390-dark/import-amex-expanded.png"
+    },
+    {
+      "id": "import-barclaycard-expanded",
+      "title": "Native bank reconciliation: known-bank-barclaycard",
+      "entry": "Select the supported Barclaycard statement and expand its review.",
+      "action": "Compare the identified account, period, movements, opening and closing figures.",
+      "result": "The native adapter is used. Card debt uses a negative ledger balance; reconciled figures show a zero difference. Confirm once for the selected files.",
+      "evidence": "audit/after/iphone390-dark/import-barclaycard-expanded.png"
+    },
+    {
+      "id": "import-revolut-expanded",
+      "title": "Native bank reconciliation: known-bank-revolut",
+      "entry": "Select the supported Revolut statement and expand its review.",
+      "action": "Compare the identified account, period, movements, opening and closing figures.",
+      "result": "The native adapter is used. Card debt uses a negative ledger balance; reconciled figures show a zero difference. Confirm once for the selected files.",
+      "evidence": "audit/after/iphone390-dark/import-revolut-expanded.png"
+    },
+    {
+      "id": "analyse-category-trends",
+      "title": "Category trend comparison and monthly source values",
+      "entry": "Expand Category trends in Analyse.",
+      "action": "Compare qualifying periods and open a category for its plot.",
+      "result": "Incomplete history remains Not comparable; the source matrix can be expanded separately.",
+      "evidence": "audit/after/iphone390-dark/analyse-category-trends.png"
+    },
+    {
+      "id": "settings-rules-populated",
+      "title": "Explicit and remembered rules, match, category, hits and last use",
+      "entry": "Open Settings, then rules populated.",
+      "action": "Inspect match, resulting category, hits and last use; reorder, edit or pause.",
+      "result": "Explicit and Auto rules remain distinguishable; destructive deletion is separated.",
+      "evidence": "audit/after/iphone390-dark/settings-rules-populated.png"
+    },
+    {
+      "id": "analyse-cash-values",
+      "title": "Expanded cash-flow source values",
+      "entry": "Expand View chart values beneath cash flow.",
+      "action": "Read each month’s coverage, income, negative spending and net.",
+      "result": "This is an accessible source table for the same plot, not a second calculation.",
+      "evidence": "audit/after/iphone390-dark/analyse-cash-values.png"
+    },
+    {
+      "id": "property-cash-values",
+      "title": "Expanded property cash-flow source values",
+      "entry": "Expand View chart values beneath property cash flow.",
+      "action": "Read the monthly coverage and net values.",
+      "result": "No-data months say No statements rather than showing a zero profit.",
+      "evidence": "audit/after/iphone390-dark/property-cash-values.png"
+    },
+    {
+      "id": "category-values",
+      "title": "Expanded category monthly source values",
+      "entry": "Expand View values in a category detail.",
+      "action": "Inspect monthly amount and income percentage cards.",
+      "result": "Partial-month cards are labelled; each value supports the plotted trend.",
+      "evidence": "audit/after/iphone390-dark/category-values.png"
+    },
+    {
+      "id": "category-trend-monthly-values",
+      "title": "Expanded category trend source matrix",
+      "entry": "Expand Monthly values under category trends.",
+      "action": "Scroll the table horizontally to inspect all months.",
+      "result": "Amounts stay atomic; partial months are labelled and the page itself does not overflow.",
+      "evidence": "audit/after/iphone390-dark/category-trend-monthly-values.png"
+    },
+    {
+      "id": "report-bar",
+      "title": "Report result: bar",
+      "entry": "Switch Reports to Bar.",
+      "action": "Compare category amounts through the graphical row objects and open sources.",
+      "result": "The report uses the same signed values as its table.",
+      "evidence": "audit/after/iphone390-dark/report-bar.png"
+    },
+    {
+      "id": "report-line",
+      "title": "Report result: line",
+      "entry": "Switch Reports to Line.",
+      "action": "Inspect the axis/points and the full source table below.",
+      "result": "Axis labels use theme contrast and readable sizes; this is a visual view of the same report values.",
+      "evidence": "audit/after/iphone390-dark/report-line.png"
+    },
+    {
+      "id": "budget-status",
+      "title": "Populated past-period budget status before editing",
+      "entry": "Open Budgets for a populated past period.",
+      "action": "Read spent, budget, carry and ended/on-track context before opening edit.",
+      "result": "The screen begins with status rather than an empty form.",
+      "evidence": "audit/after/iphone390-dark/budget-status.png"
+    },
+    {
+      "id": "subscription-evidence",
+      "title": "Recurring charges and price-change evidence",
+      "entry": "Open a recurring candidate and its charge history.",
+      "action": "Compare dates and amounts; inspect the price-change notice before choosing a status.",
+      "result": "The evidence links to real source transactions in the local workspace. Cancellation still requires action with the provider.",
+      "evidence": "audit/after/iphone390-dark/subscription-evidence.png"
+    },
+    {
+      "id": "tag-editor",
+      "title": "Tag name and preset colours",
+      "entry": "Create or edit a tag from Settings.",
+      "action": "Enter its name and select a preset colour.",
+      "result": "The selected colour has a visible check; save changes its grouping label without altering amounts.",
+      "evidence": "audit/after/iphone390-dark/tag-editor.png"
+    },
+    {
+      "id": "self-assessment-expenses",
+      "title": "Allowable expense choices",
+      "entry": "Choose allowable expenses in the tax summary.",
+      "action": "Check the categories relevant to the user’s circumstances, then View tax summary.",
+      "result": "The report preference saves with Undo. It does not recategorise transactions or assert tax eligibility.",
+      "evidence": "audit/after/iphone390-dark/self-assessment-expenses.png"
+    },
+    {
+      "id": "transaction-tags",
+      "title": "Transaction tag choices and search",
+      "entry": "Choose Add tag from a transaction.",
+      "action": "Search or choose an existing tag object, then Done.",
+      "result": "The tag changes locally; a concurrent categorisation receipt remains clear of the footer.",
+      "evidence": "audit/after/iphone390-dark/transaction-tags.png"
+    }
+  ]
+}

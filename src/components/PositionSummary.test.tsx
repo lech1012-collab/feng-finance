@@ -73,7 +73,7 @@ it("shows dated card debt but leaves cash and net position unavailable when no c
   expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
     "Unavailable",
   );
-  expect(screen.getByRole("link", { name: "1 accounts ›" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "1 account ›" })).toHaveAttribute(
     "href",
     "/accounts",
   );
@@ -122,7 +122,7 @@ it("a removed stored card row invalidates debt and net while keeping the reporte
   expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
     "Unavailable",
   );
-  expect(screen.getByRole("link", { name: "1 accounts ›" })).toHaveAttribute(
+  expect(screen.getByRole("link", { name: "1 account ›" })).toHaveAttribute(
     "href",
     "/accounts",
   );

@@ -1,14 +1,17 @@
+import { UKDateInput } from "./UKDateInput";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { db } from "../storage/database";
-import { auditedMutation } from "../storage/audit";
+import { auditedMutation, undoChange } from "../storage/audit";
 import { currencyPrecision } from "../domain/money";
 import { downloadEcbRates, workingDayAge } from "../analytics/fx";
 import { formatUkDate } from "../domain/dates";
 import { localToday } from "../analytics/reminders";
 import { convertMinor } from "../analytics/fx";
 import { Toast } from "./Toast";
+import { Sheet } from "./Sheet";
+import { SwitchRow } from "./UIPrimitives";
 
 export function useGlobalCurrency() {
   const setting = useLiveQuery(() => db.settings.get("currency"), []);
@@ -21,7 +24,7 @@ export function useGlobalCurrency() {
 }
 async function refreshRates() {
   const rates = await downloadEcbRates();
-  await auditedMutation(
+  return auditedMutation(
     "Update exchange rates",
     ["fxRates", "settings"],
     async () => {
@@ -46,7 +49,9 @@ export function CurrencySetting() {
   );
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [changeId, setChangeId] = useState("");
   const [busy, setBusy] = useState(false);
+  const [manualRateOpen, setManualRateOpen] = useState(false);
   const [requestedEnabled, setRequestedEnabled] = useState<boolean>();
   useEffect(() => {
     if (data && requestedEnabled === data.enabled)
@@ -56,14 +61,21 @@ export function CurrencySetting() {
   const [to, setTo] = useState("GBP");
   const [rate, setRate] = useState("");
   const [date, setDate] = useState(new Date().toISOString().slice(0, 10));
-  const run = async (operation: () => Promise<unknown>, message: string) => {
+  const run = async (
+    operation: () => Promise<{ changeId: string }>,
+    message: string,
+  ) => {
     setBusy(true);
     setError("");
+    setNotice("");
     try {
-      await operation();
+      const result = await operation();
+      setChangeId(result.changeId);
       setNotice(message);
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Rates could not be saved.");
+      return false;
     } finally {
       setBusy(false);
     }
@@ -89,7 +101,7 @@ export function CurrencySetting() {
       <select
         id="reporting-currency"
         value={currency}
-        disabled={busy}
+        disabled={busy || !data}
         onChange={(e) => {
           const nextCurrency = e.target.value;
           void run(
@@ -109,42 +121,46 @@ export function CurrencySetting() {
         Totals convert all accounts. Statements and account details keep their
         original currency.
       </p>
-      <label className="switch-row">
-        <span>Download daily rates (ECB)</span>
-        <input
-          type="checkbox"
-          role="switch"
-          checked={requestedEnabled ?? data?.enabled ?? true}
-          disabled={busy}
-          onChange={(e) => {
-            const enabled = e.target.checked;
-            setRequestedEnabled(enabled);
-            void run(async () => {
-              try {
-                await auditedMutation(
-                  enabled
-                    ? "Turned on rate downloads"
-                    : "Turned off rate downloads",
-                  ["settings"],
-                  () =>
-                    db.settings.put({
-                      key: "fx:download",
-                      value: String(enabled),
-                    }),
-                );
-              } catch (error) {
-                setRequestedEnabled(undefined);
-                throw error;
-              }
-            }, "Rate preference saved.");
-          }}
-        />
-      </label>
+      <SwitchRow
+        label="Download daily rates (ECB)"
+        checked={requestedEnabled ?? data?.enabled ?? true}
+        disabled={busy || !data}
+        onChange={(enabled) => {
+          setRequestedEnabled(enabled);
+          void run(async () => {
+            try {
+              return await auditedMutation(
+                enabled
+                  ? "Turned on rate downloads"
+                  : "Turned off rate downloads",
+                ["settings"],
+                () =>
+                  db.settings.put({
+                    key: "fx:download",
+                    value: String(enabled),
+                  }),
+              );
+            } catch (error) {
+              setRequestedEnabled(undefined);
+              throw error;
+            }
+          }, "Rate preference saved.");
+        }}
+      />
       <p className="muted">
         No personal data is sent.
-        {last
-          ? ` Cached rates: ${formatUkDate(last)}.`
-          : " No rates downloaded yet."}
+        {last ? (
+          <>
+            {" "}
+            Cached rates:{" "}
+            <time className="date-value" dateTime={last}>
+              {formatUkDate(last)}
+            </time>
+            .
+          </>
+        ) : (
+          " No rates downloaded yet."
+        )}
       </p>
       {(requestedEnabled ?? data?.enabled ?? true) && (
         <button
@@ -154,78 +170,114 @@ export function CurrencySetting() {
           {busy ? "Updating…" : "Update rates"}
         </button>
       )}
-      <details>
-        <summary>Enter a manual rate</summary>
-        <div className="form-grid">
-          <label>
-            From
-            <input
-              value={from}
-              maxLength={3}
-              onChange={(e) => setFrom(e.target.value.toUpperCase())}
-            />
-          </label>
-          <label>
-            To
-            <input
-              value={to}
-              maxLength={3}
-              onChange={(e) => setTo(e.target.value.toUpperCase())}
-            />
-          </label>
-          <label>
-            Date
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-            />
-          </label>
-          <label>
-            1 {from} equals
-            <input
-              inputMode="decimal"
-              value={rate}
-              onChange={(e) => setRate(e.target.value)}
-            />
-          </label>
-        </div>
-        <button
-          disabled={busy}
-          onClick={() =>
-            void run(async () => {
-              currencyPrecision(from);
-              currencyPrecision(to);
-              if (
-                from === to ||
-                !/^\d+(?:\.\d{1,12})?$/.test(rate) ||
-                Number(rate) <= 0 ||
-                !/^\d{4}-\d{2}-\d{2}$/.test(date)
-              )
-                throw new Error(
-                  "Enter two different currencies, a date and a positive rate.",
-                );
-              await auditedMutation(
-                "Save manual exchange rate",
-                ["fxRates"],
-                () =>
-                  db.fxRates.put({
-                    id: `manual:${date}:${from}:${to}`,
-                    date,
-                    base: from,
-                    quote: to,
-                    rate,
-                    source: "manual",
-                  }),
-              );
-            }, "Manual rate saved.")
+      <button
+        onClick={() => {
+          setError("");
+          setManualRateOpen(true);
+        }}
+      >
+        Enter a manual rate
+      </button>
+      {manualRateOpen && (
+        <Sheet
+          title="Enter a manual rate"
+          onClose={() => setManualRateOpen(false)}
+          footer={
+            <>
+              <button disabled={busy} onClick={() => setManualRateOpen(false)}>
+                Cancel
+              </button>
+              <button
+                className="primary"
+                disabled={busy}
+                onClick={async () => {
+                  const saved = await run(async () => {
+                    currencyPrecision(from);
+                    currencyPrecision(to);
+                    if (
+                      from === to ||
+                      !/^\d+(?:\.\d{1,12})?$/.test(rate) ||
+                      Number(rate) <= 0 ||
+                      !/^\d{4}-\d{2}-\d{2}$/.test(date)
+                    )
+                      throw new Error(
+                        "Enter two different currencies, a date and a positive rate.",
+                      );
+                    return auditedMutation(
+                      "Save manual exchange rate",
+                      ["fxRates"],
+                      () =>
+                        db.fxRates.put({
+                          id: `manual:${date}:${from}:${to}`,
+                          date,
+                          base: from,
+                          quote: to,
+                          rate,
+                          source: "manual",
+                        }),
+                    );
+                  }, "Manual rate saved.");
+                  if (saved) setManualRateOpen(false);
+                }}
+              >
+                Save manual rate
+              </button>
+            </>
           }
         >
-          Save manual rate
-        </button>
-      </details>
-      {error && <p role="alert">{error}</p>}
-      {notice && <Toast message={notice} />}
+          <div className="form-grid">
+            <label>
+              From
+              <input
+                value={from}
+                maxLength={3}
+                onChange={(e) => setFrom(e.target.value.toUpperCase())}
+              />
+            </label>
+            <label>
+              To
+              <input
+                value={to}
+                maxLength={3}
+                onChange={(e) => setTo(e.target.value.toUpperCase())}
+              />
+            </label>
+            <label>
+              Date
+              <UKDateInput
+                lang="en-GB"
+                value={date}
+                onChange={(e) => setDate(e)}
+              />
+            </label>
+            <label>
+              1 {from} equals
+              <input
+                inputMode="decimal"
+                value={rate}
+                onChange={(e) => setRate(e.target.value)}
+              />
+            </label>
+          </div>
+          {error && <p role="alert">{error}</p>}
+        </Sheet>
+      )}
+      {error && !manualRateOpen && <p role="alert">{error}</p>}
+      {notice && (
+        <Toast
+          id={changeId}
+          message={notice}
+          undo={
+            changeId
+              ? async () => {
+                  await undoChange(changeId);
+                  setChangeId("");
+                  setNotice("");
+                }
+              : undefined
+          }
+        />
+      )}
     </section>
   );
 }

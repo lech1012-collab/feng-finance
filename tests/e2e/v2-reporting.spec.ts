@@ -427,17 +427,24 @@ test("first run and the main pages fit narrow screens and large text without ove
         await page
           .getByRole("button", { name: "Edit report", exact: true })
           .click();
-        const taxYear = page.getByRole("combobox", {
-          name: "UK tax year",
+        const editor = page.getByRole("dialog", {
+          name: "Edit report",
           exact: true,
         });
-        expect(
-          await taxYear.evaluate((element) => {
-            const label = element.closest("label")!;
-            return label.scrollWidth <= label.clientWidth + 1;
-          }),
-          `${width}px ${route}: the tax-year choice must fit inside its field`,
-        ).toBe(true);
+        for (const field of await editor.locator("input,select").all()) {
+          expect(
+            await field.evaluate((element) => {
+              const bounds = element.getBoundingClientRect();
+              const parent = element.closest("label")?.getBoundingClientRect();
+              return (
+                bounds.width === 0 ||
+                !parent ||
+                bounds.right <= parent.right + 1
+              );
+            }),
+            `${width}px: report field must fit its label`,
+          ).toBe(true);
+        }
       }
       if (route === "/analysis") {
         await page

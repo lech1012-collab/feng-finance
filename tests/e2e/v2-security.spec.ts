@@ -105,6 +105,9 @@ test("app lock hides finances after background timeout and remains usable at 320
   await settingsSection(page, "security");
   const security = page.locator("#security");
   await security
+    .getByRole("button", { name: "Set up app lock", exact: true })
+    .click();
+  await security
     .getByLabel("Choose a 6-digit app PIN", { exact: true })
     .fill("628391");
   await security.getByLabel("Confirm PIN", { exact: true }).fill("628391");
@@ -190,7 +193,20 @@ test("encrypted backups expose no financial text and wrong-password/cancel resto
     encryption: "AES-256-GCM",
     iterations: 600000,
   });
-  await expect(page.getByRole("status")).toContainText("Backup ready:");
+  await expect(page.getByRole("status")).toContainText("Backup ready.");
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "200%";
+  });
+  await expect
+    .poll(() =>
+      page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
+    )
+    .toBeLessThanOrEqual(1);
+  await expect(page.locator(".backup-status")).toContainText("Last backup:");
+  await expect(page.locator(".backup-status time")).toBeVisible();
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = "";
+  });
   const tables = [
     "accounts",
     "statements",

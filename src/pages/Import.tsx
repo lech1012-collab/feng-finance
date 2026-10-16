@@ -29,6 +29,7 @@ import { previewImportTransfers } from "../import/transfer-review";
 import { ImportTransferReview } from "../components/ImportTransferReview";
 import { importMonthGuardDates } from "../import/month-guards";
 import { GenericImportReview } from "../components/GenericImportReview";
+import { Stepper } from "../components/UIPrimitives";
 import type { LayoutMapping, RowReviewAction } from "../import/generic/types";
 import type { PdfImportSession } from "../import/pdf-session-types";
 import { FeedbackLink } from "../components/FeedbackPanel";
@@ -57,6 +58,7 @@ export default function ImportPage({
   );
   const initialTransferLinkIds = useRef(new Set<string>());
   const navigate = useNavigate();
+  const localPicker = useRef<HTMLInputElement>(null);
   const accounts = useLiveQuery(
     () => db.accounts.filter((a) => !a.isDemo).toArray(),
     [],
@@ -803,6 +805,26 @@ export default function ImportPage({
               ? `Review ${entries.length} statement${entries.length === 1 ? "" : "s"}`
               : "Import statements"}
           </h1>
+          {entries.length > 0 && (
+            <div className="import-change-files">
+              <label className={`button file-button ${busy ? "disabled" : ""}`}>
+                Choose different statements
+                <input
+                  aria-label="Select statements"
+                  type="file"
+                  accept={STATEMENT_FILE_ACCEPT}
+                  multiple
+                  disabled={busy}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files ?? []);
+                    e.target.value = "";
+                    void selectFiles(files);
+                  }}
+                />
+              </label>
+              <span className="muted">Nothing is saved until you confirm.</span>
+            </div>
+          )}
         </div>
         {entries.length > 0 && (
           <Link className="icon-button" to="/" aria-label="Close import review">
@@ -810,23 +832,24 @@ export default function ImportPage({
           </Link>
         )}
       </div>
-      <ol className="import-steps" aria-label="Import progress">
-        {(["pick", "check", "review", "done"] as const).map((step, index) => (
-          <li key={step} aria-current={phase === step ? "step" : undefined}>
-            <span>{index + 1}</span>
-            {step === "pick"
-              ? "Pick"
-              : step === "check"
-                ? "Check"
-                : step === "review"
-                  ? "Review"
-                  : "Done"}
-          </li>
-        ))}
-      </ol>
+      <Stepper
+        label="Import progress"
+        steps={["Pick", "Check", "Review", "Done"]}
+        current={["pick", "check", "review", "done"].indexOf(phase)}
+      />
       {entries.length === 0 && (
         <section
           className="card upload-card"
+          onClick={(event) => {
+            const target = event.target;
+            if (
+              !busy &&
+              target instanceof Element &&
+              !target.closest("input, label, button, a")
+            ) {
+              localPicker.current?.click();
+            }
+          }}
           onDragOver={(e) => {
             e.preventDefault();
             e.dataTransfer.dropEffect = busy ? "none" : "copy";
@@ -848,6 +871,7 @@ export default function ImportPage({
             <Upload size={18} />
             Select statements
             <input
+              ref={localPicker}
               aria-label="Select statements"
               type="file"
               accept={STATEMENT_FILE_ACCEPT}
@@ -861,31 +885,12 @@ export default function ImportPage({
             />
           </label>
           <p className="muted">
-            Digital PDFs work best. Scanned pages use local OCR. Up to 30 MB /
-            100 pages per PDF.
+            Digital PDFs work best. Scanned pages are read on this device. Up to
+            30 MB and 100 pages per PDF.
           </p>
         </section>
       )}
-      {entries.length > 0 && (
-        <div className="import-change-files">
-          <label className={`button file-button ${busy ? "disabled" : ""}`}>
-            Choose different statements
-            <input
-              aria-label="Select statements"
-              type="file"
-              accept={STATEMENT_FILE_ACCEPT}
-              multiple
-              disabled={busy}
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
-                e.target.value = "";
-                void selectFiles(files);
-              }}
-            />
-          </label>
-          <span className="muted">Nothing is saved until you confirm.</span>
-        </div>
-      )}
+
       {phase === "check" && (
         <section
           className="card import-processing-list"
@@ -914,7 +919,14 @@ export default function ImportPage({
                 ) : entry.state === "error" ? (
                   <AlertTriangle size={18} />
                 ) : null}
-                <strong>{entry.file.name}</strong>
+                <span
+                  className="source-filename"
+                  role="region"
+                  aria-label="Source filename"
+                  tabIndex={0}
+                >
+                  <strong>{entry.file.name}</strong>
+                </span>
               </span>
               <p role={entry.state === "checking" ? "status" : undefined}>
                 {entry.draft

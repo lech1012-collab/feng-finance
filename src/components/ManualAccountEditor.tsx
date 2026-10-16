@@ -1,4 +1,6 @@
+import { UKDateInput } from "./UKDateInput";
 import { Sheet, SheetFooter } from "./Sheet";
+import { ChevronRight } from "lucide-react";
 import { Toast } from "./Toast";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -118,9 +120,19 @@ export function ManualAccountEditor({ currency }: { currency: string }) {
                 <span>
                   <strong>{a.displayName}</strong>
                   <small>
-                    {v
-                      ? `${v.note?.startsWith("Estimated") ? "Estimated" : "Manual"} · as of ${formatUkDate(v.date)}`
-                      : "No value entered"}
+                    {v ? (
+                      <>
+                        {v.note?.startsWith("Estimated")
+                          ? "Estimated"
+                          : "Manual"}{" "}
+                        · as of{" "}
+                        <time className="date-value" dateTime={v.date}>
+                          {formatUkDate(v.date)}
+                        </time>
+                      </>
+                    ) : (
+                      "No value entered"
+                    )}
                     {v && valuationStale(a, v.date, localToday())
                       ? " · Update due"
                       : ""}
@@ -129,15 +141,18 @@ export function ManualAccountEditor({ currency }: { currency: string }) {
                       : ""}
                   </small>
                 </span>
-                <strong>
-                  {v
-                    ? money(
-                        liabilityTypes.has(a.accountType)
-                          ? -Math.abs(v.valueMinor)
-                          : v.valueMinor,
-                        a.currency,
-                      )
-                    : "Not entered"}
+                <strong className="manual-account-value">
+                  <span className="amount">
+                    {v
+                      ? money(
+                          liabilityTypes.has(a.accountType)
+                            ? -Math.abs(v.valueMinor)
+                            : v.valueMinor,
+                          a.currency,
+                        )
+                      : "Not entered"}
+                  </span>
+                  <ChevronRight size={16} aria-hidden="true" />
                 </strong>
               </button>
             );
@@ -256,12 +271,11 @@ export function ManualAccountEditor({ currency }: { currency: string }) {
             </label>
             <label>
               Value as of
-              <input
-                type="date"
+              <UKDateInput
                 required
                 value={date}
                 max={localToday()}
-                onChange={(e) => setDate(e.target.value)}
+                onChange={(e) => setDate(e)}
               />
             </label>
             <label>

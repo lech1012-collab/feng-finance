@@ -170,7 +170,7 @@ test("recognised digital Barclays, Barclaycard, Amex and Revolut import together
       card.getByLabel(/I compared the extracted rows with the source file/),
     ).toHaveCount(0);
     await expect(
-      card.getByRole("button", { name: "Accept extracted values" }),
+      card.getByRole("button", { name: "Use reading 1" }),
     ).not.toBeVisible();
   }
   const confirm = page.getByRole("button", {
@@ -328,7 +328,7 @@ test("a bank-reader source correction opens generic review only on request and r
   const nativeRow = card
     .locator(".review-row")
     .filter({ hasText: "FICTIONAL GROCER" });
-  await nativeRow.locator("summary").click();
+  await nativeRow.locator(":scope > summary").click();
   await expect(nativeRow.getByLabel("Date", { exact: true })).toHaveAttribute(
     "readonly",
   );
@@ -351,13 +351,9 @@ test("a bank-reader source correction opens generic review only on request and r
   const row = proof.locator(".generic-review-row").filter({
     has: page.locator("summary strong", { hasText: "FICTIONAL GROCER" }),
   });
-  await row
-    .getByRole("button", { name: "Correct this row", exact: true })
-    .click();
+  await row.getByRole("button", { name: "Correct row", exact: true }).click();
   await row.getByLabel("Amount (GBP)", { exact: true }).fill("-80.00");
-  await row
-    .getByRole("button", { name: "Save correction", exact: true })
-    .click();
+  await row.getByRole("button", { name: "Save row", exact: true }).click();
   await expect(proof).toContainText("Statement figures match exactly");
   const confirm = page.getByRole("button", {
     name: "Confirm import",

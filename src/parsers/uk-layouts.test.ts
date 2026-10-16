@@ -58,7 +58,7 @@ describe("UK Amex layout", () => {
       difference: 0,
     });
     expect(s.warnings).toEqual([
-      "1 transaction dates fall outside the statement period. Review them before import.",
+      "1 transaction date is outside the statement period. Review them before import.",
     ]);
   });
   it("does not substitute payment due dates for the statement period", () => {

@@ -18,7 +18,7 @@
 }
 .feedback-context dd {
   margin: 0;
-  overflow-wrap: anywhere;
+  overflow-wrap: normal;
 }
 .feedback-context dt {
   color: var(--muted);

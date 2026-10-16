@@ -8,6 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { createPortal } from "react-dom";
+import { StickyFooter } from "./UIPrimitives";
 import "./ux-controls.css";
 const FooterContext = createContext<HTMLElement | null>(null);
 export function SheetFooter({ children }: { children: ReactNode }) {
@@ -15,7 +16,7 @@ export function SheetFooter({ children }: { children: ReactNode }) {
   return host ? (
     createPortal(children, host)
   ) : (
-    <div className="sticky-actions">{children}</div>
+    <StickyFooter className="sticky-actions">{children}</StickyFooter>
   );
 }
 
@@ -38,10 +39,20 @@ export function Sheet({
   const titleId = useId();
   const close = useRef(onClose);
   close.current = onClose;
+  // React can focus an autoFocus child during commit, before this effect runs.
+  // Capture the opener during render so closing still returns to the actual trigger.
+  const opener = useRef<HTMLElement | null>(null);
+  const wasOpen = useRef(false);
+  if (open && !wasOpen.current)
+    opener.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : null;
+  wasOpen.current = open;
   useEffect(() => {
     if (!open) return;
     const dialog = ref.current!;
-    const previous = document.activeElement as HTMLElement | null;
+    const previous = opener.current;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     if (dialog.showModal) dialog.showModal();
@@ -93,7 +104,14 @@ export function Sheet({
         </button>
       </header>
       <FooterContext.Provider value={footerHost}>
-        <div className="sheet-content">{children}</div>
+        <div
+          className="sheet-content"
+          tabIndex={0}
+          role="region"
+          aria-label={`${title} content`}
+        >
+          {children}
+        </div>
       </FooterContext.Provider>
       <footer ref={setFooterHost} className="sheet-footer">
         {footer}

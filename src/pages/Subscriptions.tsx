@@ -20,6 +20,7 @@ import { formatUkDate } from "../domain/dates";
 import { auditedMutation } from "../storage/audit";
 import { undoChange } from "../storage/audit";
 import "../components/planning-v2.css";
+import { ListRow, StatusChip } from "../components/UIPrimitives";
 const statuses: [SubscriptionStatus, string][] = [
   ["review", "Review"],
   ["keep", "Keep"],
@@ -102,12 +103,17 @@ function SubscriptionCard({
           <h2>
             {displayMerchant({ merchant: s.merchant, description: s.merchant })}
           </h2>
-          <span className="small-chip">
-            {statuses.find(([value]) => value === s.status)?.[1] ??
-              "Needs review"}
-          </span>
+          <StatusChip tone={s.needsReview ? "warning" : "neutral"}>
+            {s.status === "review"
+              ? "Needs review"
+              : (statuses.find(([value]) => value === s.status)?.[1] ??
+                "Needs review")}
+          </StatusChip>
           <p className="muted">
-            {account} · Last charged {formatUkDate(s.charges.at(-1)!.date)}
+            {account} · Last charged{" "}
+            <time className="date-value" dateTime={s.charges.at(-1)!.date}>
+              {formatUkDate(s.charges.at(-1)!.date)}
+            </time>
           </p>
         </div>
         <strong className="subscription-amount">
@@ -212,21 +218,35 @@ function SubscriptionCard({
           Regular payments are candidates, not proof of a subscription or
           non-use. Bills and essential services can also recur.
         </p>
-        {s.charges
-          .slice()
-          .reverse()
-          .map((t) => (
-            <Link
-              className="subscription-evidence"
-              to={`/transactions/${t.id}`}
-              key={t.id}
-            >
-              <span>
-                {formatUkDate(t.date)} · {t.description}
-              </span>
-              <strong>{money(t.amount, t.currency)}</strong>
-            </Link>
-          ))}
+        <div
+          className="subscription-evidence-list"
+          role="group"
+          aria-label="Charge evidence"
+        >
+          {s.charges
+            .slice()
+            .reverse()
+            .map((t) => (
+              <ListRow
+                className="recurring-charge-row"
+                to={`/transactions/${t.id}`}
+                key={t.id}
+                title={displayMerchant(t)}
+                meta={
+                  <>
+                    <time dateTime={t.date}>{formatUkDate(t.date)}</time>
+                    {s.increase > 0 && t.id === s.charges.at(-1)?.id && (
+                      <>
+                        {" · "}
+                        <StatusChip tone="warning">Price changed</StatusChip>
+                      </>
+                    )}
+                  </>
+                }
+                amount={<strong>{money(t.amount, t.currency)}</strong>}
+              />
+            ))}
+        </div>
       </details>
     </article>
   );
@@ -301,17 +321,19 @@ export default function Subscriptions({ currency }: { currency: string }) {
   return (
     <>
       <div className="page-heading">
-        <div>
-          <p className="eyebrow">NOTIFICATION CENTRE</p>
-          <h1>Subscriptions and bills</h1>
-        </div>
+        <h1>Subscriptions</h1>
       </div>
       <p className="muted">
         Find charges you may have forgotten. Based on up to three years of
         imported statements
-        {data.lastDate
-          ? `, with transactions through ${formatUkDate(data.lastDate)}`
-          : ""}
+        {data.lastDate && (
+          <>
+            , with transactions through{" "}
+            <time dateTime={data.lastDate} className="date-value">
+              {formatUkDate(data.lastDate)}
+            </time>
+          </>
+        )}
         . Your data stays on this device.
       </p>
       <section className="card">
@@ -439,7 +461,9 @@ export default function Subscriptions({ currency }: { currency: string }) {
           onChange={(e) => setSort(e.target.value)}
         >
           <option value="review">Needs review first</option>
-          <option value="yearly">Yearly cost: highest first</option>
+          <option value="yearly" aria-label="Yearly cost: highest first">
+            Highest cost
+          </option>
           <option value="merchant">Merchant name</option>
         </select>
       </label>

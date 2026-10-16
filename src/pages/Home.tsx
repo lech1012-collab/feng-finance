@@ -15,7 +15,8 @@ import { ImportButton } from "../components/ImportPicker";
 import { MonthPicker } from "../components/common";
 import { CashChart } from "../components/Chart";
 import { db } from "../storage/database";
-import { auditedMutation } from "../storage/audit";
+import { auditedMutation, undoChange } from "../storage/audit";
+import { SegmentedControl, StatusChip } from "../components/UIPrimitives";
 import { loadDemo } from "../storage/demo";
 import { monthBounds, monthLabel, monthOffset } from "../domain/dates";
 import { displayDate, displayMerchant } from "../domain/presentation";
@@ -55,6 +56,11 @@ export default function Home({
   const location = useLocation();
   const [share, setShare] = useState("spending");
   const [balancePeriod, setBalancePeriod] = useState(1);
+  const [setupNotice, setSetupNotice] = useState<{
+    message: string;
+    changeId: string;
+  }>();
+  const [setupError, setSetupError] = useState("");
   const today = localToday();
   const data = useLiveQuery(
     () =>
@@ -345,7 +351,7 @@ export default function Home({
         {missingAccounts.length > 0 && (
           <ImportButton className="button primary import-main">
             <Upload size={18} />
-            Import statement
+            Import {monthName}
           </ImportButton>
         )}
       </div>
@@ -404,23 +410,76 @@ export default function Home({
             <div className="section-heading">
               <h2>Ready for next month</h2>
               <button
-                onClick={() =>
-                  void auditedMutation("Dismiss setup tips", ["settings"], () =>
-                    db.settings.put({ key: "setup:dismissed", value: "true" }),
-                  )
-                }
+                onClick={async () => {
+                  setSetupError("");
+                  try {
+                    const { changeId } = await auditedMutation(
+                      "Dismiss setup tips",
+                      ["settings"],
+                      () =>
+                        db.settings.put({
+                          key: "setup:dismissed",
+                          value: "true",
+                        }),
+                    );
+                    setSetupNotice({
+                      message: "Setup tips dismissed.",
+                      changeId,
+                    });
+                  } catch {
+                    setSetupError(
+                      "Your choice could not be saved. Please try again.",
+                    );
+                  }
+                }}
               >
                 Dismiss
               </button>
             </div>
             <p>Protect access and keep a copy of your data.</p>
             <div className="setup-list">
-              <Link to="/settings#security">Set app lock</Link>
-              <Link to="/settings#backup">Save backup</Link>
-              <Link to="/settings#transfers">Transfer matching</Link>
+              <Link to="/settings#security">
+                <span>Set app lock</span>
+                <span className="setup-state">
+                  {data.settings.some(
+                    (s) => s.key === "security:enabled" && s.value === "true",
+                  )
+                    ? "✓ Set up"
+                    : "Not set up"}
+                </span>
+              </Link>
+              <Link to="/settings#backup">
+                <span>Save backup</span>
+                <span className="setup-state">
+                  {health.lastExportAt ? "✓ Saved" : "Not saved"}
+                </span>
+              </Link>
+              <Link to="/settings#transfers">
+                <span>Transfer matching</span>
+                <span className="setup-state">
+                  ✓{" "}
+                  {data.settings.some(
+                    (s) =>
+                      s.key === "transferMatching" && s.value === "automatic",
+                  )
+                    ? "Automatic"
+                    : "Manual"}
+                </span>
+              </Link>
             </div>
           </section>
         )}
+      {setupNotice && (
+        <Toast
+          id={setupNotice.changeId}
+          message={setupNotice.message}
+          undo={async () => {
+            await undoChange(setupNotice.changeId);
+            setSetupNotice(undefined);
+          }}
+        />
+      )}
+      {setupError && <p role="alert">{setupError}</p>}
       <PositionSummary
         transactions={data.transactions}
         period={balancePeriod}
@@ -437,17 +496,19 @@ export default function Home({
       <section className="card month-summary">
         <div className="section-heading">
           <h2>This month</h2>
-          <span
-            className={`coverage-chip coverage-${coverage.status.toLowerCase().replaceAll(" ", "-")}`}
-          >
+          <StatusChip tone={coverage.complete ? "complete" : "warning"}>
             {coverage.status}
-          </span>
+          </StatusChip>
         </div>
         <div className="month-figures">
           <Link to={flowHref("income")} className="month-income">
             <span>Income</span>
             {coverage.hasIncomeSource ? (
-              <strong>
+              <strong
+                className={
+                  coverage.missingRates ? "metric-unavailable" : undefined
+                }
+              >
                 {coverage.missingRates
                   ? "Rates needed"
                   : `${projection.converted ? "≈ " : ""}${money(flow.income, currency)}${coverage.complete ? "" : "*"}`}
@@ -460,7 +521,13 @@ export default function Home({
           </Link>
           <Link to={flowHref("spending")} className="month-spending">
             <span>Spending</span>
-            <strong>
+            <strong
+              className={
+                !coverage.hasData || coverage.missingRates
+                  ? "metric-unavailable"
+                  : undefined
+              }
+            >
               {coverage.hasData
                 ? coverage.missingRates
                   ? "Rates needed"
@@ -516,10 +583,12 @@ export default function Home({
               <Link
                 to={`/transactions?month=${month}&type=transfer&transferKind=internal`}
               >
-                {excluded.internal === undefined
-                  ? "Rate needed"
-                  : money(excluded.internal, currency)}{" "}
-                transfers
+                <span>
+                  {excluded.internal === undefined
+                    ? "Rate needed"
+                    : money(excluded.internal, currency)}{" "}
+                  transfers
+                </span>
                 {excluded.internal === undefined && (
                   <small>
                     Original:{" "}
@@ -535,10 +604,12 @@ export default function Home({
               <Link
                 to={`/transactions?month=${month}&type=transfer&transferKind=card`}
               >
-                {excluded.card === undefined
-                  ? "Rate needed"
-                  : money(excluded.card, currency)}{" "}
-                card repayments
+                <span>
+                  {excluded.card === undefined
+                    ? "Rate needed"
+                    : money(excluded.card, currency)}{" "}
+                  card repayments
+                </span>
                 {excluded.card === undefined && (
                   <small>
                     Original:{" "}
@@ -625,24 +696,26 @@ export default function Home({
           <h2>Where did my money go?</h2>
           <ShoppingBag size={19} />
         </div>
-        <div
+        <SegmentedControl
           className="share-options"
-          role="group"
-          aria-label="Category percentage basis"
-        >
-          {["spending", "income"].map((value) => (
-            <button
-              key={value}
-              aria-label={`Share of ${value}`}
-              aria-pressed={share === value}
-              onClick={() => setShare(value)}
-            >
-              {value === "spending" ? "Spending %" : "Income %"}
-            </button>
-          ))}
-        </div>
+          label="Category percentage basis"
+          value={share}
+          onChange={setShare}
+          options={[
+            {
+              value: "spending",
+              label: "Spending %",
+              ariaLabel: "Share of spending",
+            },
+            {
+              value: "income",
+              label: "Income %",
+              ariaLabel: "Share of income",
+            },
+          ]}
+        />
         {categories.length ? (
-          categories.map((category) => (
+          categories.slice(0, 5).map((category) => (
             <Link
               key={category.id}
               className={`category-row${category.id === "uncategorized" ? " category-uncategorized" : ""}`}
@@ -681,6 +754,11 @@ export default function Home({
               ? "No spending for this month."
               : "Import statements to see spending."}
           </p>
+        )}
+        {categories.length > 5 && (
+          <Link className="review-link" to="/analysis#category-spending">
+            All categories <ChevronRight size={16} />
+          </Link>
         )}
         {data.uncategorized > 0 && (
           <Link
@@ -784,8 +862,11 @@ export default function Home({
                   })}
                 </strong>
                 <small>
-                  Expected {displayDate(payment.date)} · {payment.evidence}{" "}
-                  imported payments
+                  Expected{" "}
+                  <time dateTime={payment.date} className="date-value">
+                    {displayDate(payment.date)}
+                  </time>{" "}
+                  · {payment.evidence} imported payments
                 </small>
               </span>
               <strong>
@@ -854,17 +935,33 @@ export default function Home({
             health.warning && data.count > 0 ? "backup-warning" : "muted"
           }
         >
-          {health.lastExportAt
-            ? `Last backup export: ${displayDate(health.lastExportAt.slice(0, 10))}${health.exportedCount === undefined ? "" : ` · ${health.exportedCount} transaction${health.exportedCount === 1 ? "" : "s"}`}`
-            : "No backup exported yet."}
+          {health.lastExportAt ? (
+            <>
+              Last backup:{" "}
+              <time className="date-value" dateTime={health.lastExportAt}>
+                {displayDate(health.lastExportAt.slice(0, 10))}
+              </time>
+              {health.exportedCount === undefined
+                ? ""
+                : ` · ${health.exportedCount} transaction${health.exportedCount === 1 ? "" : "s"}`}
+            </>
+          ) : (
+            "No backup exported yet."
+          )}
           {health.lastExportAt &&
             health.warning &&
             " Save a new backup to include recent imports and changes."}
         </p>
         <p className="muted">
           {data.count} transaction{data.count === 1 ? "" : "s"} on this device
-          {health.reviewDate &&
-            ` · next statement review ${displayDate(health.reviewDate)}`}
+          {health.reviewDate && (
+            <>
+              {" · next statement review "}
+              <time className="date-value" dateTime={health.reviewDate}>
+                {displayDate(health.reviewDate)}
+              </time>
+            </>
+          )}
         </p>
       </section>
     </>

@@ -1,5 +1,7 @@
+import { UKDateInput } from "../components/UKDateInput";
 import { displayAccountName } from "../domain/presentation";
 import { Sheet } from "../components/Sheet";
+import { StatusChip } from "../components/UIPrimitives";
 import { Link } from "react-router-dom";
 import { Toast } from "../components/Toast";
 import { ManualTransactionEditor } from "../components/ManualTransactionEditor";
@@ -699,7 +701,7 @@ export default function Transactions({
   };
   const totalPages = Math.max(1, Math.ceil(filtered.length / 60));
   const currentPage = Math.min(page, totalPages - 1);
-  const items = filtered.slice(currentPage * 60, (currentPage + 1) * 60);
+  const items = filtered.slice(0, (currentPage + 1) * 60);
   const railSelection = (railDrag?.ids ?? selectedIds)
     .map((id) => data?.items.find((t) => t.id === id))
     .filter((t): t is Transaction => !!t);
@@ -812,7 +814,7 @@ export default function Transactions({
               reset();
             }}
           >
-            All accounts
+            <span className="account-chip-visual">All accounts</span>
           </button>
           {data.accounts.map((a) => {
             const snapshot = accountSnapshot(a, data.statements, selectedMonth);
@@ -845,11 +847,13 @@ export default function Transactions({
                   reset();
                 }}
               >
-                <strong>
-                  {displayAccountName(a) || `${a.institution} account`}
-                </strong>
-                <span>
-                  {`${value}${kind}${snapshot.asOfDate ? ` · ${displayDate(snapshot.asOfDate)}` : " · No statement"}${reported && evidence?.status !== "reconciled" ? " · Reported · Unverified" : reported && !snapshot.current ? " · Older statement" : ""}`}
+                <span className="account-chip-visual">
+                  <strong>
+                    {displayAccountName(a) || `${a.institution} account`}
+                  </strong>
+                  <small>
+                    {`${value}${kind}${snapshot.asOfDate ? ` · ${displayDate(snapshot.asOfDate)}` : " · No statement"}${reported && evidence?.status !== "reconciled" ? " · Reported · Unverified" : reported && !snapshot.current ? " · Older statement" : ""}`}
+                  </small>
                 </span>
               </button>
             );
@@ -867,9 +871,11 @@ export default function Transactions({
       </div>
       <section className="card filters">
         <div className="search-line">
-          <label className="search-input">
-            <Search size={18} />
-            <span className="sr-only">Search transactions</span>
+          <div className="search-input">
+            <Search size={18} aria-hidden="true" />
+            <label className="sr-only" htmlFor="transaction-search">
+              Search transactions
+            </label>
             <input
               id="transaction-search"
               type="search"
@@ -880,19 +886,20 @@ export default function Transactions({
                 reset();
               }}
             />
-          </label>
-          {search && (
-            <button
-              className="icon-button"
-              aria-label="Clear search"
-              onClick={() => {
-                setSearch("");
-                reset();
-              }}
-            >
-              ×
-            </button>
-          )}
+            {search && (
+              <button
+                className="icon-button"
+                aria-label="Clear search"
+                onClick={() => {
+                  setSearch("");
+                  reset();
+                  document.getElementById("transaction-search")?.focus();
+                }}
+              >
+                ×
+              </button>
+            )}
+          </div>
           <button
             aria-expanded={advanced}
             onClick={() => {
@@ -1023,12 +1030,11 @@ export default function Transactions({
             {!allDates && (
               <label>
                 From
-                <input
-                  type="date"
+                <UKDateInput
                   value={from}
                   onChange={(e) => {
                     setAllDates(false);
-                    setFrom(e.target.value);
+                    setFrom(e);
                     reset();
                   }}
                 />
@@ -1037,12 +1043,11 @@ export default function Transactions({
             {!allDates && (
               <label>
                 To
-                <input
-                  type="date"
+                <UKDateInput
                   value={to}
                   onChange={(e) => {
                     setAllDates(false);
-                    setTo(e.target.value);
+                    setTo(e);
                     reset();
                   }}
                 />
@@ -1312,18 +1317,20 @@ export default function Transactions({
                     t.isTransfer ||
                     t.kind === "refund" ||
                     t.kind === "split_parent") && (
-                    <span className="review-status">To review</span>
+                    <StatusChip className="review-status" tone="warning">
+                      To review
+                    </StatusChip>
                   )}
                 {t.kind === "split_parent" && (
-                  <span className="transaction-status">
+                  <StatusChip className="transaction-status">
                     Split ·{" "}
                     {data?.items.filter((child) => child.parentId === t.id)
                       .length ?? 0}{" "}
                     lines
-                  </span>
+                  </StatusChip>
                 )}
                 {t.kind === "refund" && (
-                  <span className="transaction-status">
+                  <StatusChip className="transaction-status">
                     Refund
                     {t.refundAllocations?.length
                       ? ` · counted in ${
@@ -1337,10 +1344,19 @@ export default function Transactions({
                             .join(", ") || "original purchase month"
                         }`
                       : " · link a purchase"}
-                  </span>
+                  </StatusChip>
                 )}
                 {t.kind !== "split_parent" && t.kind !== "refund" && (
-                  <span
+                  <StatusChip
+                    tone={
+                      !(
+                        t.categoryId ||
+                        t.subcategoryId ||
+                        financialType(t) === "transfer"
+                      )
+                        ? "warning"
+                        : "neutral"
+                    }
                     className={`transaction-status ${t.isTransfer || t.type === "transfer" || t.transferPairId ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
                   >
                     <span
@@ -1362,7 +1378,7 @@ export default function Transactions({
                             (c) => c.id === (t.categoryId ?? t.subcategoryId),
                           )?.name ?? "Category unavailable")
                         : "Needs category"}
-                  </span>
+                  </StatusChip>
                 )}
                 {t.categorySource && (
                   <small className="transaction-origin">
@@ -1540,23 +1556,26 @@ export default function Transactions({
               )}
         </div>
       )}
-      {totalPages > 1 && (
+      {items.length > 0 && items.length < filtered.length && (
         <div className="pagination">
           <button
-            disabled={currentPage === 0}
-            onClick={() => setPage(currentPage - 1)}
+            onClick={() => {
+              const firstNew = items.length;
+              setPage(currentPage + 1);
+              requestAnimationFrame(() =>
+                document
+                  .querySelectorAll<HTMLElement>(
+                    ".transaction-list .transaction-row",
+                  )
+                  [firstNew]?.focus(),
+              );
+            }}
           >
-            Previous
+            Show more
           </button>
           <span>
-            Page {currentPage + 1} of {totalPages}
+            Showing {items.length} of {filtered.length}
           </span>
-          <button
-            disabled={currentPage + 1 >= totalPages}
-            onClick={() => setPage(currentPage + 1)}
-          >
-            Next
-          </button>
         </div>
       )}
       {railConflict && (

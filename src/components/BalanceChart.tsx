@@ -1,3 +1,4 @@
+import { useRootFontSize } from "./useRootFontSize";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -40,6 +41,7 @@ export function BalanceChart({
   transactions: Transaction[];
   showValues?: boolean;
 }) {
+  const chartRem = useRootFontSize();
   const hatchId = `balance-gap-${useId().replaceAll(":", "")}`;
   const [selectedGap, setSelectedGap] = useState<string>();
   const scoped = accounts.filter((a) => a.currency === currency);
@@ -155,6 +157,7 @@ export function BalanceChart({
               tick={{ fontSize: 13, fill: "var(--muted)" }}
             />
             <YAxis
+              width={Math.max(60, Math.round(chartRem * 3.75))}
               tickLine={false}
               tick={{ fontSize: 13, fill: "var(--muted)" }}
               tickFormatter={(v) =>

@@ -121,7 +121,7 @@ export function CsvMappingPanel({
                 });
             }}
           >
-            <option value="">Create an account from this export</option>
+            <option value="">New account</option>
             {accounts
               .filter((a) => a.tracking !== "manual")
               .map((a) => (
@@ -246,12 +246,8 @@ export function CsvMappingPanel({
                 })
               }
             >
-              <option value="financial">
-                Positive money held, negative money owed
-              </option>
-              <option value="debt-positive">
-                Positive card debt, negative credit balance
-              </option>
+              <option value="financial">Cash balance</option>
+              <option value="debt-positive">Card debt</option>
             </select>
           </label>
         )}
@@ -267,8 +263,12 @@ export function CsvMappingPanel({
               })
             }
           >
-            <option value="day-first">Day / month / year (UK)</option>
-            <option value="month-first">Month / day / year (US)</option>
+            <option value="day-first" aria-label="Day / month / year">
+              DD/MM/YYYY
+            </option>
+            <option value="month-first" aria-label="Month / day / year">
+              MM/DD/YYYY
+            </option>
           </select>
         </label>
         <label>
@@ -284,14 +284,28 @@ export function CsvMappingPanel({
               })
             }
           >
-            <option value="signed">Positive in, negative out</option>
-            <option value="purchases-positive">
-              Positive purchases, negative credits
-            </option>
+            <option value="signed">Cash flow</option>
+            <option value="purchases-positive">Card spending</option>
           </select>
         </label>
       </div>
-      <p className="muted">First row: {table.rows[0]?.join(" · ")}</p>
+      {mapping.balance !== undefined && (
+        <p className="muted">
+          Balance convention:{" "}
+          {csvBalanceConvention(mapping) === "debt-positive"
+            ? "Positive card debt, negative credit balance."
+            : "Positive money held, negative money owed."}
+        </p>
+      )}
+      <p className="muted">
+        Amount convention:{" "}
+        {mapping.amountDirection === "purchases-positive"
+          ? "Positive purchases, negative credits."
+          : "Positive in, negative out."}
+      </p>
+      <p className="muted" data-source-text>
+        First row: {table.rows[0]?.join(" · ")}
+      </p>
       {error && <p role="alert">{error}</p>}
       <button
         className="primary"

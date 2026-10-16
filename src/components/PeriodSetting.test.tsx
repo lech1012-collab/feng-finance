@@ -55,3 +55,21 @@ it("cancel leaves closed months and period unchanged; confirming and Undo restor
   expect(await db.monthCloses.toArray()).toEqual(before);
   expect(await db.settings.get("period:start")).toBeUndefined();
 });
+
+it("undoes the automatic month-close switch locally without changing closed snapshots", async () => {
+  const before = await db.monthCloses.toArray();
+  await db.settings.put({ key: "review:autoClose", value: "true" });
+  render(<PeriodSetting />);
+  const toggle = await screen.findByRole("switch", {
+    name: "Automatically close complete, reviewed months after 60 days",
+  });
+  await waitFor(() => expect(toggle).toBeChecked());
+  fireEvent.click(toggle);
+  await screen.findByText("Automatic month close preference saved.");
+  expect((await db.settings.get("review:autoClose"))?.value).toBe("false");
+  fireEvent.click(screen.getByRole("button", { name: "Undo" }));
+  await waitFor(async () =>
+    expect((await db.settings.get("review:autoClose"))?.value).toBe("true"),
+  );
+  expect(await db.monthCloses.toArray()).toEqual(before);
+});

@@ -1,0 +1,47 @@
+.uk-date-container {
+  display: block;
+  min-width: 0;
+  width: 100%;
+  container-type: inline-size;
+}
+.uk-date-field {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 44px;
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  min-width: 0;
+}
+.uk-date-field:has(> input[readonly]) {
+  grid-template-columns: minmax(0, 1fr);
+}
+.app .uk-date-field > .uk-date-text {
+  width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.app .uk-date-field > .uk-date-calendar {
+  width: 44px;
+  height: 48px;
+  min-width: 44px;
+  min-height: 44px;
+  margin: 0;
+}
+.app .uk-date-field > .sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+@container (max-width: 18rem) {
+  .uk-date-field {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .uk-date-calendar {
+    justify-self: end;
+  }
+}
