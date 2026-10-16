@@ -63,6 +63,49 @@ async function ledger(page: Page) {
 
 test.describe("UK date entry", () => {
   test.use({ locale: "en-US" });
+  test("rule conditions fit desktop sheets and both date boundaries use UK order", async ({
+    page,
+    baseURL,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await page.goto(`${baseURL}/#/settings?section=rules`);
+    await page
+      .getByRole("button", { name: "Create rule", exact: true })
+      .click();
+    const sheet = page.getByRole("dialog", {
+      name: "Create rule",
+      exact: true,
+    });
+    const field = sheet.getByRole("combobox", {
+      name: "Condition 1 field",
+      exact: true,
+    });
+    const comparison = sheet.getByRole("combobox", {
+      name: "Condition 1 comparison",
+      exact: true,
+    });
+    const value = sheet.getByRole("textbox", {
+      name: "Condition 1 value",
+      exact: true,
+    });
+    const fieldBox = await field.boundingBox(),
+      comparisonBox = await comparison.boundingBox();
+    expect(fieldBox!.width).toBeGreaterThan(300);
+    expect(comparisonBox!.y).toBeGreaterThan(fieldBox!.y + fieldBox!.height);
+    await field.selectOption("date");
+    await comparison.selectOption("between");
+    await value.fill("01092026");
+    const end = sheet.getByRole("textbox", {
+      name: "Condition 1 range end",
+      exact: true,
+    });
+    await end.fill("30092026");
+    await expect(value).toHaveValue("01/09/2026");
+    await expect(end).toHaveValue("30/09/2026");
+    await end.fill("31/04/2026");
+    await expect(end).toHaveAttribute("aria-invalid", "true");
+    expect((await ledger(page)).transactions).toEqual([]);
+  });
   test("uses UK day/month order in a US browser and never saves a stale date after invalid entry", async ({
     page,
     baseURL,

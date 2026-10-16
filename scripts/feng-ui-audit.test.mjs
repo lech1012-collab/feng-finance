@@ -249,6 +249,25 @@ test("UK date entry has room for its complete value at the rendered font size", 
   );
   assert.ok(!has(readable, "date-input-fit"));
 });
+test("Selected native and custom select labels must fit beside their arrow", async () => {
+  const body =
+    "<label>Field<select><option>Description</option></select></label>";
+  const clipped = await inspect(
+    body,
+    "select{font:16px Arial;width:105px;padding:12px}",
+  );
+  assert.ok(has(clipped, "select-label-fit"));
+  const readable = await inspect(
+    body,
+    "select{font:16px Arial;width:300px;padding:12px}",
+  );
+  assert.ok(!has(readable, "select-label-fit"));
+  const custom = await inspect(
+    body,
+    "select{appearance:none;font:16px Arial;width:160px;padding:12px 36px 12px 12px}",
+  );
+  assert.ok(!has(custom, "select-label-fit"));
+});
 test("A nested header action must leave space before the following input", async () => {
   const body =
     '<section><div class="header"><h2>Search</h2><button>Hide conditions</button></div><input aria-label="Query"></section>';

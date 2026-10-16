@@ -49,6 +49,10 @@ export const AUDIT_RULES = {
     "medium",
     "Text is never clipped or ellipsised without an intentional scroll container.",
   ],
+  "select-label-fit": [
+    "medium",
+    "The selected option fits the visible select without clipping its label.",
+  ],
   "divider-short": ["medium", "Dividers span the content width, within 1 px."],
   "divider-in-row": [
     "medium",
@@ -275,6 +279,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
     "date-wrap": ["medium"],
     "sibling-squeeze": ["medium"],
     "text-clipped": ["medium"],
+    "select-label-fit": ["medium"],
     "divider-short": ["medium"],
     "divider-in-row": ["medium"],
     "divider-at-edge": ["low"],
@@ -909,6 +914,28 @@ export function collectGeometry({ mobile, setupId, stateId }) {
             "Full day/month/year value fits without clipping",
           );
       }
+    }
+    if (e.matches("select:not([multiple])")) {
+      const selected = e.selectedOptions[0]?.textContent?.trim() || "";
+      const arrow = s.appearance === "none" ? 0 : 20;
+      const available =
+        e.clientWidth -
+        parseFloat(s.paddingLeft) -
+        parseFloat(s.paddingRight) -
+        arrow;
+      const needed = textMeasure(selected, e);
+      if (needed > available + tolerance)
+        add(
+          "select-label-fit",
+          e,
+          {
+            selected,
+            needed: round(needed),
+            available: round(available),
+            nativeArrow: arrow,
+          },
+          "The complete selected label fits beside the select arrow",
+        );
     }
     if (e.matches('input[type="file"]'))
       add(

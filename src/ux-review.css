@@ -23,6 +23,12 @@
   color: var(--ink);
   border-color: var(--line);
 }
+/* Conditions remain readable in narrow side panels and enlarged query filters. */
+.condition-editor .condition-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
 .app input:user-invalid,
 .ux-sheet input:user-invalid,
 input[aria-invalid="true"] {
@@ -778,8 +784,7 @@ input[aria-invalid="true"] {
     gap: 4px;
   }
   .ux-sheet .form-grid,
-  .ux-sheet .v2-inline-form,
-  .ux-sheet .condition-row {
+  .ux-sheet .v2-inline-form {
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
