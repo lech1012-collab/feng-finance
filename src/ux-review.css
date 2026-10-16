@@ -24,6 +24,8 @@
   border-color: var(--line);
 }
 /* Conditions remain readable in narrow side panels and enlarged query filters. */
+.ux-sheet .form-grid,
+.ux-sheet .v2-inline-form,
 .condition-editor .condition-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr);
@@ -782,12 +784,6 @@ input[aria-invalid="true"] {
 @media (max-width: 640px) {
   .app .search-line {
     gap: 4px;
-  }
-  .ux-sheet .form-grid,
-  .ux-sheet .v2-inline-form {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
   }
   .app .generic-mapping-columns {
     grid-template-columns: minmax(0, 1fr);

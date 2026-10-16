@@ -921,8 +921,7 @@ export function collectGeometry({ mobile, setupId, stateId }) {
       const available =
         e.clientWidth -
         parseFloat(s.paddingLeft) -
-        parseFloat(s.paddingRight) -
-        arrow;
+        Math.max(parseFloat(s.paddingRight), arrow);
       const needed = textMeasure(selected, e);
       if (needed > available + tolerance)
         add(
