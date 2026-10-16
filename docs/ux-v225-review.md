@@ -1,3 +1,5 @@
+> Historical v2.2.6 implementation inventory. The independent final-polish verification and current owner decisions supersede the claims below; use `FINAL-POLISH-REPORT.md` for release evidence.
+
 # UX review implementation — v2.2.5 findings
 
 Implemented in candidate v2.2.6, dated 14 October 2026. Review dated 13 October 2026. Track each finding against implementation and

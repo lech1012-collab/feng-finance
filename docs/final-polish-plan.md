@@ -20,17 +20,22 @@ All audit records and screenshots use fictitious data dated against 14 October 2
 
 ## Sources and decisions
 
-Read the Complete UX Review, v2 specification, v2.2 amendment, reference HTML and
-existing layout audit. The separately named Release Readiness Review and
-`feng-ui-audit.mjs` were not present in the supplied attachments or workspace.
-The owner has been asked whether to use the Complete UX Review's release gate and
-extend the available audit as substitutes. Do not invent the missing source.
+All six supplied sources were read: the Complete UX Review, v2 specification,
+v2.2 amendment, Release Readiness Review, original reference HTML and supplied
+Playwright audit. The Release Readiness Review actually places sizing in section
+4, Settings in section 5 and the release gate in section 7; its own headings are
+used in citations.
 
-Dark default and the Home category list have earlier explicit owner preferences
-that conflict with findings D13 and H4. The owner has been asked to resolve them.
-Category-parent editing also requires an explicit decision because it changes
-existing analysis groupings. Preserve these behaviours pending the answer.
+The owner approved the review's System default and top-five Home category list
+with All categories. Saved Light and Dark preferences remain honoured. Existing
+category parents remain unchanged by explicit owner decision. B24 now includes
+an explicit, reversible same-bill/separate-bills confirmation. Its decisions stay
+local, survive backup and do not change imported transactions or balances.
 
-No financial calculation changes are authorised outside B1, B11, B28, B32 and B33.
-No schema migration is planned. Real iPhone, VoiceOver and beta volunteer checks
-are manual release gates and must not be reported as automated passes.
+Financial calculation changes remain limited to B1, B11, B28, B32 and B33, plus
+the explicitly approved B24 recurrence identity flow. The ECB backup-cache repair
+changes schema validation of cached quote codes, not conversion arithmetic or
+supported ledger currencies. No destructive schema migration is introduced.
+Credential-changing Undo is a pending owner decision; credential material must
+not enter persistent change logs or backups. Real iPhone, VoiceOver and beta
+volunteer checks remain manual gates, never automatic passes.

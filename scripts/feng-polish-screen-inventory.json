@@ -784,19 +784,22 @@
       "id": "series-match-review",
       "group": "recurrence",
       "kind": "state",
-      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet"
+      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet",
+      "title": "Explicit recurring bill identity review; baseline silently combines similar names"
     },
     {
       "id": "series-match-undo",
       "group": "recurrence",
       "kind": "state",
-      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet"
+      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet",
+      "title": "Recurring bill match Undo; baseline has no confirmation to reverse"
     },
     {
       "id": "monthly-review-contribution",
       "group": "recurrence",
       "kind": "state",
-      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet"
+      "method": "Actual UI transition, fictitious demo; baseline lacks new confirmation/sheet",
+      "title": "Monthly review contribution form in a sheet"
     },
     {
       "id": "analyse-category",
