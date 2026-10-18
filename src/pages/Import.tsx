@@ -34,6 +34,14 @@ import type { LayoutMapping, RowReviewAction } from "../import/generic/types";
 import type { PdfImportSession } from "../import/pdf-session-types";
 import { FeedbackLink } from "../components/FeedbackPanel";
 import { RELEASE_CONFIGURATION } from "../beta/configuration";
+import {
+  appendBatchEntries,
+  batchPresentation,
+  expandBatchStatement,
+  nextAttentionStatement,
+  reviewedRowSelection,
+  statementPresentation,
+} from "../import/batch-presentation";
 
 export default function ImportPage({
   onImported,
@@ -59,6 +67,8 @@ export default function ImportPage({
   const initialTransferLinkIds = useRef(new Set<string>());
   const navigate = useNavigate();
   const localPicker = useRef<HTMLInputElement>(null);
+  const statementCards = useRef(new Map<string, HTMLDivElement>());
+  const reviewedInclusions = useRef(new Map<string, Set<string>>());
   const accounts = useLiveQuery(
     () => db.accounts.filter((a) => !a.isDemo).toArray(),
     [],
@@ -116,16 +126,31 @@ export default function ImportPage({
   }, []);
   const patchEntry = (entryId: string, patch: Partial<FileReview>) => {
     if (alive.current)
-      setEntries((current) =>
-        current.map((entry) =>
+      setEntries((current) => {
+        const updated = current.map((entry) =>
           entry.id === entryId ? { ...entry, ...patch } : entry,
-        ),
-      );
+        );
+        return patch.open === true
+          ? expandBatchStatement(updated, entryId)
+          : updated;
+      });
   };
   const patchReviewEntry = (entryId: string, patch: Partial<FileReview>) => {
     setEntries((current) => {
       const previous = current.find((entry) => entry.id === entryId);
       if (!previous) return current;
+      if (patch.draft && previous.draft) {
+        const choices =
+          reviewedInclusions.current.get(entryId) ?? new Set<string>();
+        for (const row of patch.draft.transactions) {
+          const prior = previous.draft.transactions.find(
+            (item) => item.id === row.id,
+          );
+          if (prior && row.include !== prior.include)
+            choices.add(row.transactionFingerprint);
+        }
+        reviewedInclusions.current.set(entryId, choices);
+      }
       if (patch.skip === true && !previous.skip) {
         releaseSession(previous.extracted?.pdfSession);
         patch = {
@@ -155,7 +180,7 @@ export default function ImportPage({
         (patch.draft &&
           previous.draft &&
           rowIdentity(patch.draft) !== rowIdentity(previous.draft));
-      return current.map((entry) => {
+      const updated = current.map((entry) => {
         if (entry.id === entryId) return { ...entry, ...patch };
         if (
           !changedSelection ||
@@ -178,9 +203,12 @@ export default function ImportPage({
           previous.draft.statement.statementPeriodEnd >=
             entry.draft.statement.statementPeriodStart;
         return sameAccount && overlap
-          ? { ...entry, requiresBatchRecheck: true, open: true }
+          ? { ...entry, requiresBatchRecheck: true }
           : entry;
       });
+      return patch.open === true
+        ? expandBatchStatement(updated, entryId)
+        : updated;
     });
   };
   const processEntry = async (
@@ -305,32 +333,22 @@ export default function ImportPage({
                   isReviewed: true,
                 }
               : {}),
-            ...(old.transactionFingerprint === row.transactionFingerprint
-              ? {
-                  include: old.include,
-                  acknowledged: old.acknowledged || row.acknowledged,
-                  replaceManual: old.replaceManual,
-                }
-              : {}),
+            ...reviewedRowSelection(
+              old,
+              row,
+              reviewedInclusions.current
+                .get(entry.id)
+                ?.has(old.transactionFingerprint) ?? false,
+            ),
           };
         });
       }
-      const needsReview =
-        !draft.exactDuplicate &&
-        (draftReconciliation(draft).status === "warning" ||
-          draft.warnings.length > 0 ||
-          (draft.parserReview && !draft.parserFallback
-            ? draft.parserReview.checks.needsReviewRows > 0 ||
-              !draft.parserReview.checks.reconciledExactly
-            : draft.transactions.some(
-                (t) => t.include && t.extractionConfidence < 0.8,
-              )));
       patchEntry(entry.id, {
         draft,
         extracted,
         state: "review",
         progress: "Ready to review",
-        open: entry.open || needsReview,
+        open: entry.open,
         override: false,
         optionsChanged: false,
         invalidAmounts: [],
@@ -354,7 +372,7 @@ export default function ImportPage({
           e instanceof Error
             ? e.message
             : "The statement could not be read. No financial data was saved.",
-        open: true,
+        open: entry.open,
         progress: "Couldn't read this statement",
         pdfReviewOptions,
         cancelled: !!extracted?.extraction?.cancelled,
@@ -366,7 +384,6 @@ export default function ImportPage({
     const token = ++operation.current;
     processing.current?.abort();
     processing.current = new AbortController();
-    releaseAllSessions();
     const selected: FileReview[] = files.map((file) => ({
       id: id(),
       file,
@@ -385,23 +402,29 @@ export default function ImportPage({
       showAll: false,
       invalidAmounts: [],
     }));
-    setEntries(selected);
-    setSelectedTransferIds([]);
-    setRejectedAutomaticIds([]);
+    setEntries((current) => appendBatchEntries(current, selected));
     setError("");
     setBusy(true);
     setPhase("check");
-    initialTransferLinkIds.current = new Set(
-      (await db.transferLinks.toArray()).map((link) => link.id),
-    );
-    const pendingDrafts: ImportDraft[] = [];
+    if (!entries.length)
+      initialTransferLinkIds.current = new Set(
+        (await db.transferLinks.toArray()).map((link) => link.id),
+      );
+    const pendingDrafts = entries
+      .filter(
+        (entry) =>
+          !entry.skip &&
+          entry.state !== "saved" &&
+          entry.draft &&
+          !entry.draft.exactDuplicate,
+      )
+      .map((entry) => entry.draft!);
     for (const entry of selected) {
       if (!alive.current || token !== operation.current) return;
       if (processing.current.signal.aborted) {
         patchEntry(entry.id, {
           state: "error",
           cancelled: true,
-          open: true,
           progress: "Not read",
           error:
             "Processing was cancelled before this file was read. Parse again to check it.",
@@ -418,6 +441,12 @@ export default function ImportPage({
       if (draft && !draft.exactDuplicate) pendingDrafts.push(draft);
     }
     if (alive.current && token === operation.current) {
+      setEntries((current) => {
+        const attention = batchPresentation(current).attention;
+        const target =
+          attention.find((item) => item.entry.open) ?? attention[0];
+        return expandBatchStatement(current, target?.entry.id);
+      });
       setBusy(false);
       setPhase("review");
     }
@@ -457,6 +486,11 @@ export default function ImportPage({
       setBusy(false);
       setPhase("review");
     }
+  };
+  const includeAndRecheck = (entry: FileReview) => {
+    const changed = { ...entry, skip: false, open: true };
+    patchReviewEntry(entry.id, { skip: false, open: true });
+    void reparse(changed, false, true);
   };
   const checkMappedCsv = (
     entry: FileReview,
@@ -607,11 +641,17 @@ export default function ImportPage({
       draftReconciliation(entry.draft).status === "reconciled",
   );
   const hasChanges = newCount > 0 || balanceStatements.length > 0;
-  const sorted = [...entries].sort(
-    (a, b) =>
-      Number(importBlockers(b).length > 0) -
-      Number(importBlockers(a).length > 0),
-  );
+  const batch = batchPresentation(entries);
+  const reviewNextStatement = () => {
+    const next = nextAttentionStatement(entries);
+    if (!next) return;
+    setEntries((current) => expandBatchStatement(current, next.id));
+    const summary = statementCards.current
+      .get(next.id)
+      ?.querySelector<HTMLElement>(".import-statement-heading");
+    summary?.focus();
+    summary?.scrollIntoView?.({ block: "start", behavior: "instant" });
+  };
   const save = async () => {
     if (busy || blocking.length || !hasChanges || !transferPreview) return;
     const confirmedTransferProposalIds = selectedTransferIds.filter(
@@ -808,7 +848,7 @@ export default function ImportPage({
           {entries.length > 0 && (
             <div className="import-change-files">
               <label className={`button file-button ${busy ? "disabled" : ""}`}>
-                Choose different statements
+                Add statements
                 <input
                   aria-label="Select statements"
                   type="file"
@@ -822,7 +862,11 @@ export default function ImportPage({
                   }}
                 />
               </label>
-              <span className="muted">Nothing is saved until you confirm.</span>
+              <span className="muted">
+                {batch.savedCount > 0
+                  ? "Saved statements stay saved. Confirm the remaining statements when ready."
+                  : "Nothing is saved until you confirm."}
+              </span>
             </div>
           )}
         </div>
@@ -897,6 +941,9 @@ export default function ImportPage({
           aria-label="Checking statements"
         >
           <h2>Checking your statements</h2>
+          <p role="status">
+            {batch.completedCount} of {entries.length} statements checked
+          </p>
           <button
             type="button"
             disabled={processing.current?.signal.aborted}
@@ -929,8 +976,8 @@ export default function ImportPage({
                 </span>
               </span>
               <p role={entry.state === "checking" ? "status" : undefined}>
-                {entry.draft
-                  ? `Detected ${entry.draft.statement.institution} ${entry.draft.account.maskedAccountIdentifier} · ready`
+                {entry.draft && entry.state !== "checking"
+                  ? `${entry.draft.statement.institution} ${entry.draft.account.maskedAccountIdentifier} · ${statementPresentation(entry).state === "attention" ? "needs attention" : statementPresentation(entry).state === "skipped" ? "skipped" : entry.state === "saved" ? "saved" : "ready"}`
                   : entry.progress}
               </p>
               {entry.detailedProgress && (
@@ -964,10 +1011,42 @@ export default function ImportPage({
         </p>
       )}
       {phase !== "check" && entries.length > 0 && (
+        <section
+          className="card import-batch-summary"
+          aria-label="Batch review"
+        >
+          <p role="status">
+            <strong>
+              {batch.readyCount} ready · {batch.attention.length} need
+              {batch.attention.length === 1 ? "s" : ""} attention ·{" "}
+              {batch.skippedCount} skipped
+              {batch.savedCount > 0 && ` · ${batch.savedCount} saved`}
+            </strong>
+          </p>
+          {batch.attention.length > 0 && (
+            <>
+              <p>
+                Resolve each statement below, or leave it out of this import.
+              </p>
+              <button disabled={busy} onClick={reviewNextStatement}>
+                Review next statement
+              </button>
+            </>
+          )}
+        </section>
+      )}
+      {phase !== "check" && entries.length > 0 && (
         <div className="import-review-list">
-          {sorted.map((entry) => (
-            <div key={entry.id}>
+          {batch.sorted.map((entry) => (
+            <div
+              key={entry.id}
+              ref={(element) => {
+                if (element) statementCards.current.set(entry.id, element);
+                else statementCards.current.delete(entry.id);
+              }}
+            >
               {entry.extracted?.csv &&
+                entry.open &&
                 (!entry.draft || entry.optionsChanged) && (
                   <CsvMappingPanel
                     table={entry.extracted.csv}
@@ -1014,6 +1093,7 @@ export default function ImportPage({
                 busy={busy}
                 patch={(patch) => patchReviewEntry(entry.id, patch)}
                 reparse={(ocr) => void reparse(entry, ocr)}
+                onInclude={() => includeAndRecheck(entry)}
                 onSourceAction={(rowId, action) =>
                   reviewSourceRow(entry, rowId, action)
                 }

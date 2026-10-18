@@ -46,6 +46,7 @@ export function ImportStatementReview({
   sourceReview,
   onSourceAction,
   onCreateAccount,
+  onInclude,
 }: {
   entry: FileReview;
   accounts: Account[];
@@ -57,6 +58,7 @@ export function ImportStatementReview({
   sourceReview?: ReactNode;
   onSourceAction?: (rowId: string, action: RowReviewAction) => void;
   onCreateAccount?: (account: Account) => void;
+  onInclude?: () => void;
 }) {
   const d = entry.draft;
   const validation = d && draftReconciliation(d);
@@ -122,7 +124,9 @@ export function ImportStatementReview({
       : entry.state === "saved"
         ? `${entry.imported ?? 0} imported`
         : entry.error
-          ? "Couldn't read PDF"
+          ? d
+            ? "Couldn't save statement"
+            : "Couldn't read statement"
           : blocking
             ? entry.requiresBatchRecheck
               ? "Recheck statement"
@@ -198,16 +202,54 @@ export function ImportStatementReview({
       </summary>
       <div className="import-statement-content">
         <p className="muted import-source-name">{entry.file.name}</p>
+        {entry.state !== "saved" && (
+          <div className="import-file-actions">
+            {entry.skip ? (
+              <>
+                <p>Left out. No records from this statement will be saved.</p>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    onInclude ? onInclude() : patch({ skip: false, open: true })
+                  }
+                >
+                  Include and recheck statement
+                </button>
+              </>
+            ) : (
+              <button disabled={busy} onClick={() => patch({ skip: true })}>
+                Leave out this statement
+              </button>
+            )}
+          </div>
+        )}
+        {blocking && d && (
+          <div className="notice import-blocking-warning">
+            <div>
+              <strong>Needs attention before import</strong>
+              <ul>
+                {blockers.map((reason) => (
+                  <li key={reason}>{reason}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        )}
         {entry.state === "checking" && <p role="status">{entry.progress}</p>}
         {entry.error && (
           <div className="notice import-blocking-warning" role="alert">
             <AlertTriangle size={18} />
             <div>
-              <strong>This statement couldn't be read</strong>
+              <strong>
+                {d
+                  ? "This statement couldn't be saved"
+                  : "This statement couldn't be read"}
+              </strong>
               <p>{entry.error}</p>
               <p>
-                Use a PDF, CSV, OFX, QFX or QIF statement, or select the bank
-                and account below.
+                {d
+                  ? "Review this statement and confirm again. Previously saved statements will not be imported twice."
+                  : "Use a PDF, CSV, OFX, QFX or QIF statement, or select the bank and account below."}
               </p>
             </div>
           </div>
@@ -1083,17 +1125,6 @@ export function ImportStatementReview({
             </form>
           )}
         </details>
-        {entry.state !== "saved" && (
-          <label className="check">
-            <input
-              type="checkbox"
-              disabled={busy}
-              checked={entry.skip}
-              onChange={(e) => patch({ skip: e.target.checked })}
-            />
-            Skip this file. No records from this statement will be saved.
-          </label>
-        )}
       </div>
     </details>
   );

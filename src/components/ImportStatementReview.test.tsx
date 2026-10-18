@@ -115,6 +115,25 @@ describe("import review corrections", () => {
     ).toHaveTextContent("✓ Reconciled");
   });
 
+  it("identifies a retryable save error without reporting a source reading failure", async () => {
+    const entry = await reviewEntry();
+    entry.error = "Fictitious storage failure after an earlier statement saved";
+    expect(importBlockers(entry)).toEqual([]);
+    const { container } = await showReview(entry);
+    expect(
+      container.querySelector("summary .ui-chip-visual"),
+    ).toHaveTextContent("Couldn't save statement");
+    expect(screen.getByText("This statement couldn't be saved")).toBeVisible();
+    expect(
+      screen.queryByText("This statement couldn't be read"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByText(
+        /Previously saved statements will not be imported twice/,
+      ),
+    ).toBeVisible();
+  });
+
   it("keeps an exact duplicate blocked when batch changes require rechecking", async () => {
     const entry = await reviewEntry();
     entry.draft!.exactDuplicate = true;
