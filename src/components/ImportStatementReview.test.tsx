@@ -1,10 +1,16 @@
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { ImportStatementReview } from "./ImportStatementReview";
 import { db, initializeDatabase } from "../storage/database";
 import { clearLocalData } from "../storage/backup";
-import { prepareDraft } from "../import/pipeline";
+import { prepareDraft, draftReconciliation } from "../import/pipeline";
 import { importBlockers, type FileReview } from "../import/review-model";
 import { bankRows } from "../tests/helpers";
 import { genericFixture } from "../import/generic/fixtures";
@@ -15,6 +21,18 @@ beforeEach(async () => {
   cleanup();
   await clearLocalData();
   await initializeDatabase();
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+    configurable: true,
+    value() {
+      this.open = true;
+    },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", {
+    configurable: true,
+    value() {
+      this.open = false;
+    },
+  });
 });
 afterAll(async () => {
   await db.delete();
@@ -46,7 +64,10 @@ describe("import review corrections", () => {
     showAll: false,
     invalidAmounts: [],
   });
-  const showReview = async (entry: FileReview) =>
+  const showReview = async (
+    entry: FileReview,
+    patch: (change: Partial<FileReview>) => void = () => undefined,
+  ) =>
     render(
       <MemoryRouter>
         <ImportStatementReview
@@ -55,11 +76,149 @@ describe("import review corrections", () => {
           categories={await db.categories.toArray()}
           history={[]}
           busy={false}
-          patch={() => undefined}
+          patch={patch}
           reparse={() => undefined}
         />
       </MemoryRouter>,
     );
+
+  it("keeps correct row editors on demand and provides no routine checkboxes", async () => {
+    const entry = await reviewEntry();
+    entry.showAll = true;
+    const { container } = await showReview(entry);
+    expect(container.querySelectorAll(".review-row input")).toHaveLength(0);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    fireEvent.click(container.querySelector(".review-compact")!);
+    expect(
+      screen.getByRole("button", { name: "Exclude transaction" }),
+    ).toBeVisible();
+    expect(
+      container.querySelectorAll(".review-row:not([open]) input"),
+    ).toHaveLength(0);
+    expect(
+      container.querySelectorAll(".review-row[open] input").length,
+    ).toBeGreaterThan(0);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+  });
+
+  it.each(["normal", "excluded", "uncertain", "duplicate"])(
+    "mutates only the intended %s row with a named action",
+    async (kind) => {
+      const entry = await reviewEntry();
+      entry.showAll = true;
+      const first = entry.draft!.transactions[0];
+      if (kind === "excluded" || kind === "duplicate") first.include = false;
+      if (kind === "uncertain") {
+        first.extractionConfidence = 0.6;
+        first.acknowledged = false;
+      }
+      if (kind === "duplicate") {
+        first.duplicate = "possible";
+        first.acknowledged = false;
+      }
+      const patch = vi.fn();
+      const { container } = await showReview(entry, patch);
+      const row = [
+        ...container.querySelectorAll<HTMLDetailsElement>(".review-row"),
+      ].find((item) => item.textContent?.includes("John Lewis"))!;
+      if (!row.open) fireEvent.click(row.querySelector("summary")!);
+      const label =
+        kind === "duplicate"
+          ? "Keep this checked transaction"
+          : kind === "uncertain"
+            ? "Amount is correct"
+            : kind === "excluded"
+              ? "Include transaction"
+              : "Exclude transaction";
+      fireEvent.click(within(row).getByRole("button", { name: label }));
+      const changed = patch.mock.calls.at(-1)![0].draft;
+      expect(changed.transactions.slice(1)).toEqual(
+        entry.draft!.transactions.slice(1),
+      );
+      expect(changed.transactions[0]).toMatchObject({
+        include: kind !== "normal",
+        ...(kind === "duplicate" || kind === "uncertain"
+          ? { acknowledged: true }
+          : {}),
+        amount: first.amount,
+        date: first.date,
+        sourcePage: first.sourcePage,
+      });
+    },
+  );
+
+  it.each([false, true])(
+    "accepts or undoes only the displayed statement warnings (accepted=%s)",
+    async (accepted) => {
+      const entry = await reviewEntry();
+      entry.draft!.warnings = [
+        "Fictitious statement warning to compare with the original",
+      ];
+      entry.draft!.reviewedWarnings = accepted;
+      const patch = vi.fn();
+      await showReview(entry, patch);
+      fireEvent.click(
+        screen.getByRole("button", {
+          name: accepted
+            ? "Undo warning acceptance"
+            : "Accept these statement warnings",
+        }),
+      );
+      expect(patch.mock.calls.at(-1)![0].draft).toEqual({
+        ...entry.draft,
+        reviewedWarnings: !accepted,
+      });
+    },
+  );
+
+  it("requires one explicit financial sheet, keeps cancellation inert and acceptance unverified", async () => {
+    const entry = await reviewEntry();
+    entry.draft!.transactions[0].amount -= 1;
+    const patch = vi.fn();
+    await showReview(entry, patch);
+    const trigger = screen.getByRole("button", { name: "Import anyway…" });
+    fireEvent.click(trigger);
+    let dialog = screen.getByRole("dialog");
+    expect(
+      within(dialog).getByText("Balance difference").nextElementSibling,
+    ).toHaveTextContent("+£0.01");
+    expect(
+      within(dialog).getByRole("button", {
+        name: "Accept unverified statement",
+      }),
+    ).toBeDisabled();
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Continue reviewing" }),
+    );
+    expect(patch).not.toHaveBeenCalled();
+    fireEvent.click(trigger);
+    dialog = screen.getByRole("dialog");
+    expect(within(dialog).getAllByRole("checkbox")).toHaveLength(1);
+    fireEvent.click(within(dialog).getByRole("checkbox"));
+    fireEvent.click(
+      within(dialog).getByRole("button", {
+        name: "Accept unverified statement",
+      }),
+    );
+    const accepted = { ...entry, ...patch.mock.calls.at(-1)![0] };
+    expect(accepted.override).toBe(true);
+    expect(draftReconciliation(accepted.draft!).status).toBe("warning");
+    expect(importBlockers(accepted)).toEqual([]);
+    expect(accepted.draft!.transactions).toEqual(entry.draft!.transactions);
+  });
+
+  it("prevents financial acceptance while a corrected amount is invalid", async () => {
+    const entry = await reviewEntry();
+    entry.draft!.transactions[0].amount -= 1;
+    entry.invalidAmounts = [entry.draft!.transactions[0].id];
+    const patch = vi.fn();
+    await showReview(entry, patch);
+    expect(
+      screen.getByRole("button", { name: "Import anyway…" }),
+    ).toBeDisabled();
+    expect(patch).not.toHaveBeenCalled();
+    expect(importBlockers(entry)).toContain("Correct the invalid amounts.");
+  });
 
   it.each([
     ["changed parser options", "Parse again"],
@@ -173,6 +332,7 @@ describe("import review corrections", () => {
     expect(
       screen.queryByText(/possible or confirmed duplicate transaction/),
     ).not.toBeInTheDocument();
+    fireEvent.click(container.querySelector(".review-compact")!);
     expect(container.querySelector(".review-compact strong")).toHaveTextContent(
       "Waitrose",
     );
@@ -301,6 +461,7 @@ describe("import review corrections", () => {
         />
       </MemoryRouter>,
     );
+    fireEvent.click(document.querySelector(".review-compact")!);
     const row = draft.transactions[0];
     const input = screen.getByLabelText(`Amount for ${row.description}`, {
       exact: true,

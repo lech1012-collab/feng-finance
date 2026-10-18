@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { money } from "../domain/money";
 import { formatUkDate } from "../domain/dates";
 import {
@@ -22,7 +21,6 @@ export function ImportTransferReview({
   onRejectedAutomaticChange: (ids: string[]) => void;
   busy: boolean;
 }) {
-  const [showAutomatic, setShowAutomatic] = useState(false);
   if (!preview.proposals.length) return null;
   const automaticIds = new Set(preview.automaticProposalIds);
   const automatic = preview.proposals.filter((proposal) =>
@@ -50,62 +48,55 @@ export function ImportTransferReview({
     preview.accounts.map((account) => [account.id, account]),
   );
   return (
-    <section className="card" aria-label="Confirm internal transfers">
-      <h2>Money between your accounts</h2>
-      {automatic.length > 0 && (
-        <div className="import-automatic-summary">
-          <p role="status">
-            <strong>
-              {automaticCount}{" "}
-              {automaticCount === 1 ? "pair will" : "pairs will"} link
-              automatically
-            </strong>
-            <span className="block muted">
-              After import · one match, same currency, within 2 days
-            </span>
+    <details className="card import-transfer-review">
+      <summary>
+        <strong>Optional transfer linking</strong>
+        <span>
+          {automaticCount} automatic · {selected.length} confirmed ·{" "}
+          {manual.length - selected.length} left for later
+        </span>
+      </summary>
+      <section aria-label="Confirm internal transfers">
+        <h2>Money between your accounts</h2>
+        {automatic.length > 0 && (
+          <div className="import-automatic-summary">
+            <p role="status">
+              <strong>
+                {automaticCount}{" "}
+                {automaticCount === 1 ? "pair will" : "pairs will"} link
+                automatically
+              </strong>
+              <span className="block muted">
+                After import · one match, same currency, within 2 days
+              </span>
+            </p>
+          </div>
+        )}
+        {manual.length > 0 && <h3>Transfers to confirm</h3>}
+        {manual.length > 0 && (
+          <p>
+            Confirm transfers between your own accounts and card repayments.
+            Confirmed pairs are excluded from income and spending. Other matches
+            stay unlinked until you confirm them.
           </p>
+        )}
+        {unique.length > 1 && (
           <button
             disabled={busy}
-            aria-expanded={showAutomatic}
-            onClick={() => setShowAutomatic((current) => !current)}
+            onClick={() =>
+              onChange([
+                ...new Set([
+                  ...selectedIds,
+                  ...unique.map((proposal) => proposal.id),
+                ]),
+              ])
+            }
           >
-            {showAutomatic ? "Hide review" : "Review"}
+            Confirm all clear matches
           </button>
-        </div>
-      )}
-      {manual.length > 0 && <h3>Transfers to confirm</h3>}
-      {manual.length > 0 && (
-        <p>
-          Confirm transfers between your own accounts and card repayments.
-          Confirmed pairs are excluded from income and spending. Other matches
-          stay unlinked until you confirm them.
-        </p>
-      )}
-      {showAutomatic && (
-        <p className="muted">
-          Leave a pair unchecked to keep it unlinked. This decision is
-          remembered for these two payments.
-        </p>
-      )}
-      {unique.length > 1 && (
-        <button
-          disabled={busy}
-          onClick={() =>
-            onChange([
-              ...new Set([
-                ...selectedIds,
-                ...unique.map((proposal) => proposal.id),
-              ]),
-            ])
-          }
-        >
-          Confirm all clear matches
-        </button>
-      )}
-      <div className="import-transfer-list">
-        {preview.proposals
-          .filter((proposal) => showAutomatic || !automaticIds.has(proposal.id))
-          .map((proposal) => {
+        )}
+        <div className="import-transfer-list">
+          {preview.proposals.map((proposal) => {
             const outgoing = transactions.get(proposal.debitTxId)!,
               incoming = transactions.get(proposal.creditTxId)!;
             const debitAccount = accounts.get(outgoing.accountId)!,
@@ -117,30 +108,7 @@ export function ImportTransferReview({
             const conflict =
               !checked && (used.has(outgoing.id) || used.has(incoming.id));
             return (
-              <label className="check card" key={proposal.id}>
-                <input
-                  type="checkbox"
-                  aria-label={`${isAutomatic ? "Link automatically" : "Confirm"} ${debitAccount.institution} to ${creditAccount.institution} ${money(Math.abs(outgoing.amount), outgoing.currency)}`}
-                  disabled={busy || conflict}
-                  checked={checked}
-                  onChange={(e) => {
-                    if (isAutomatic) {
-                      onRejectedAutomaticChange(
-                        e.target.checked
-                          ? rejectedAutomaticIds.filter(
-                              (id) => id !== proposal.id,
-                            )
-                          : [...rejectedAutomaticIds, proposal.id],
-                      );
-                    } else {
-                      onChange(
-                        e.target.checked
-                          ? [...selectedIds, proposal.id]
-                          : selectedIds.filter((id) => id !== proposal.id),
-                      );
-                    }
-                  }}
-                />
+              <article className="import-transfer-pair" key={proposal.id}>
                 <span>
                   <strong>
                     {proposal.pairKind === "card_repayment"
@@ -155,13 +123,23 @@ export function ImportTransferReview({
                   </strong>
                   <span className="block">
                     {debitAccount.institution} · {debitAccount.displayName} ·{" "}
-                    {money(outgoing.amount, outgoing.currency)} ·{" "}
-                    {formatUkDate(outgoing.date)}
+                    <span className="amount">
+                      {money(outgoing.amount, outgoing.currency)}
+                    </span>{" "}
+                    ·{" "}
+                    <time className="date-value" dateTime={outgoing.date}>
+                      {formatUkDate(outgoing.date)}
+                    </time>
                   </span>
                   <span className="block">
                     {creditAccount.institution} · {creditAccount.displayName} ·{" "}
-                    {money(incoming.amount, incoming.currency, true)} ·{" "}
-                    {formatUkDate(incoming.date)}
+                    <span className="amount">
+                      {money(incoming.amount, incoming.currency, true)}
+                    </span>{" "}
+                    ·{" "}
+                    <time className="date-value" dateTime={incoming.date}>
+                      {formatUkDate(incoming.date)}
+                    </time>
                   </span>
                   {conflict && (
                     <span className="block muted">
@@ -169,19 +147,42 @@ export function ImportTransferReview({
                     </span>
                   )}
                 </span>
-              </label>
+                <button
+                  disabled={busy || conflict}
+                  aria-label={`${checked ? "Leave unlinked" : "Link"} ${debitAccount.institution} to ${creditAccount.institution} ${money(Math.abs(outgoing.amount), outgoing.currency)}`}
+                  onClick={() => {
+                    if (isAutomatic)
+                      onRejectedAutomaticChange(
+                        checked
+                          ? [...rejectedAutomaticIds, proposal.id]
+                          : rejectedAutomaticIds.filter(
+                              (id) => id !== proposal.id,
+                            ),
+                      );
+                    else
+                      onChange(
+                        checked
+                          ? selectedIds.filter((id) => id !== proposal.id)
+                          : [...selectedIds, proposal.id],
+                      );
+                  }}
+                >
+                  {checked ? "Leave unlinked" : "Link these payments"}
+                </button>
+              </article>
             );
           })}
-      </div>
-      {manual.length > 0 && (
-        <p className="muted">
-          {selected.length} confirmed ·{" "}
-          {manual.length -
-            selected.filter((proposal) => !automaticIds.has(proposal.id))
-              .length}{" "}
-          left for later
-        </p>
-      )}
-    </section>
+        </div>
+        {manual.length > 0 && (
+          <p className="muted">
+            {selected.length} confirmed ·{" "}
+            {manual.length -
+              selected.filter((proposal) => !automaticIds.has(proposal.id))
+                .length}{" "}
+            left for later
+          </p>
+        )}
+      </section>
+    </details>
   );
 }

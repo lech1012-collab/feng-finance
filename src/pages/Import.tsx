@@ -34,6 +34,7 @@ import type { LayoutMapping, RowReviewAction } from "../import/generic/types";
 import type { PdfImportSession } from "../import/pdf-session-types";
 import { FeedbackLink } from "../components/FeedbackPanel";
 import { RELEASE_CONFIGURATION } from "../beta/configuration";
+import "./Import.css";
 import {
   appendBatchEntries,
   batchPresentation,
@@ -837,7 +838,17 @@ export default function ImportPage({
     }
   };
   return (
-    <>
+    <div
+      className="import-workspace"
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = busy ? "none" : "copy";
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        if (!busy) void selectFiles(Array.from(event.dataTransfer.files));
+      }}
+    >
       <div className="page-heading">
         <div>
           <h1>
@@ -894,20 +905,12 @@ export default function ImportPage({
               localPicker.current?.click();
             }
           }}
-          onDragOver={(e) => {
-            e.preventDefault();
-            e.dataTransfer.dropEffect = busy ? "none" : "copy";
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            if (!busy) void selectFiles(Array.from(e.dataTransfer.files));
-          }}
         >
           <Upload size={28} />
           <h2>Add your statements</h2>
           <p>
-            Select or drop PDF statements or CSV, OFX, QFX and QIF exports.
-            We’ll check the numbers and highlight anything that needs you.
+            Select or drop multiple PDF statements. We’ll check the numbers and
+            highlight anything that needs you.
           </p>
           <label
             className={`button primary file-button ${busy ? "disabled" : ""}`}
@@ -928,6 +931,13 @@ export default function ImportPage({
               }}
             />
           </label>
+          <details className="import-other-formats">
+            <summary>Other file formats</summary>
+            <p>
+              CSV, OFX, QFX and QIF exports are also supported. Choose them with
+              the same file picker.
+            </p>
+          </details>
           <p className="muted">
             Digital PDFs work best. Scanned pages are read on this device. Up to
             30 MB and 100 pages per PDF.
@@ -1035,166 +1045,175 @@ export default function ImportPage({
           )}
         </section>
       )}
-      {phase !== "check" && entries.length > 0 && (
-        <div className="import-review-list">
-          {batch.sorted.map((entry) => (
-            <div
-              key={entry.id}
-              ref={(element) => {
-                if (element) statementCards.current.set(entry.id, element);
-                else statementCards.current.delete(entry.id);
-              }}
-            >
-              {entry.extracted?.csv &&
-                entry.open &&
-                (!entry.draft || entry.optionsChanged) && (
-                  <CsvMappingPanel
-                    table={entry.extracted.csv}
-                    initial={
-                      entry.csvMapping ??
-                      entry.draft?.csvMapping ??
-                      entry.extracted.preset
-                    }
-                    initialAccountId={entry.draft?.account.id}
-                    accounts={[
-                      ...(accounts ?? []),
-                      ...(entry.draft &&
-                      !accounts?.some(
-                        (account) => account.id === entry.draft!.account.id,
-                      )
-                        ? [entry.draft.account]
-                        : []),
-                    ]}
-                    savedMappings={savedMappings}
-                    busy={busy}
-                    onCheck={(mapping, account) =>
-                      checkMappedCsv(entry, mapping, account)
-                    }
-                  />
-                )}
-              <ImportStatementReview
+      {entries.length > 0 && (
+        <div className="import-review-list" hidden={phase === "check"}>
+          {batch.sorted
+            .filter(
+              (entry) =>
+                entry.state !== "queued" &&
+                (entry.state !== "checking" || !!entry.draft),
+            )
+            .map((entry) => (
+              <div
                 key={entry.id}
-                entry={entry}
-                accounts={accounts ?? []}
-                categories={categories ?? []}
-                history={[
-                  ...(history ?? []),
-                  ...entries
-                    .filter(
-                      (other) =>
-                        other.id !== entry.id &&
-                        !other.skip &&
-                        other.draft &&
-                        !other.draft.exactDuplicate &&
-                        other.state !== "saved",
-                    )
-                    .map((other) => other.draft!.statement),
-                ]}
-                busy={busy}
-                patch={(patch) => patchReviewEntry(entry.id, patch)}
-                reparse={(ocr) => void reparse(entry, ocr)}
-                onInclude={() => includeAndRecheck(entry)}
-                onSourceAction={(rowId, action) =>
-                  reviewSourceRow(entry, rowId, action)
-                }
-                onCreateAccount={(account) => {
-                  const changed = {
-                    ...entry,
-                    accountOverride: account,
-                    accountId: account.id,
-                    bank: account.institution,
-                  };
-                  patchEntry(entry.id, {
-                    accountOverride: account,
-                    accountId: account.id,
-                    bank: account.institution,
-                  });
-                  void reparse(changed, false, true);
+                ref={(element) => {
+                  if (element) statementCards.current.set(entry.id, element);
+                  else statementCards.current.delete(entry.id);
                 }}
-                sourceReview={(() => {
-                  if (entry.skip || entry.state === "saved") return undefined;
-                  if (entry.draft?.bankSource) {
-                    return (
-                      <details className="generic-parser-details">
-                        <summary>Reading details</summary>
-                        <p>
-                          This statement uses its bank reader. If a date or
-                          amount looks wrong, review the PDF layout to correct
-                          the source reading and check the figures again.
-                        </p>
-                        <button
-                          type="button"
-                          disabled={busy}
-                          onClick={() => {
-                            const changed: FileReview = {
-                              ...entry,
-                              pdfReviewOptions: {
-                                ...entry.pdfReviewOptions,
-                                preferGeneric: true,
-                              },
-                            };
-                            patchEntry(entry.id, {
-                              pdfReviewOptions: changed.pdfReviewOptions,
-                            });
-                            void reparse(changed, false, true);
-                          }}
-                        >
-                          Review PDF layout
-                        </button>
-                      </details>
-                    );
-                  }
-                  const result = sourceReview(entry);
-                  if (!result) return undefined;
-                  const review = (
-                    <GenericImportReview
-                      result={result}
-                      session={entry.extracted?.pdfSession}
-                      currency={
-                        entry.draft?.statement.currency ??
-                        entry.accountOverride?.currency
+              >
+                {entry.extracted?.csv &&
+                  entry.open &&
+                  (!entry.draft || entry.optionsChanged) && (
+                    <CsvMappingPanel
+                      table={entry.extracted.csv}
+                      initial={
+                        entry.csvMapping ??
+                        entry.draft?.csvMapping ??
+                        entry.extracted.preset
                       }
-                      method={
-                        entry.draft?.statement.parserMethod ??
-                        entry.extracted?.extraction?.method
-                      }
+                      initialAccountId={entry.draft?.account.id}
+                      accounts={[
+                        ...(accounts ?? []),
+                        ...(entry.draft &&
+                        !accounts?.some(
+                          (account) => account.id === entry.draft!.account.id,
+                        )
+                          ? [entry.draft.account]
+                          : []),
+                      ]}
+                      savedMappings={savedMappings}
                       busy={busy}
-                      onAction={(rowId, action) =>
-                        reviewSourceRow(entry, rowId, action)
+                      onCheck={(mapping, account) =>
+                        checkMappedCsv(entry, mapping, account)
                       }
-                      onMapping={(mapping) => mapSourceColumns(entry, mapping)}
-                      onSaveTemplate={(name, mapping) =>
-                        void saveSourceLayout(entry, name, mapping)
-                      }
-                      canImportAnyway={!!entry.draft && !entry.optionsChanged}
-                      onImportAnyway={() => {
-                        if (!entry.draft) return;
-                        patchReviewEntry(entry.id, {
-                          override: true,
-                          draft: { ...entry.draft, reviewedWarnings: true },
-                        });
-                      }}
                     />
-                  );
-                  return entry.draft?.parserFallback ? (
-                    <details className="generic-parser-details">
-                      <summary>Alternative column reading</summary>
-                      <p>
-                        The bank-specific reader checked this recognised
-                        statement automatically. Column mapping and source-row
-                        corrections are available here if you need them.
-                        Changing the mapping or rows selects that reading for
-                        this import.
-                      </p>
-                      {review}
-                    </details>
-                  ) : (
-                    review
-                  );
-                })()}
-              />
-            </div>
-          ))}
+                  )}
+                <ImportStatementReview
+                  key={entry.id}
+                  entry={entry}
+                  accounts={accounts ?? []}
+                  categories={categories ?? []}
+                  history={[
+                    ...(history ?? []),
+                    ...entries
+                      .filter(
+                        (other) =>
+                          other.id !== entry.id &&
+                          !other.skip &&
+                          other.draft &&
+                          !other.draft.exactDuplicate &&
+                          other.state !== "saved",
+                      )
+                      .map((other) => other.draft!.statement),
+                  ]}
+                  busy={busy}
+                  patch={(patch) => patchReviewEntry(entry.id, patch)}
+                  reparse={(ocr) => void reparse(entry, ocr)}
+                  onInclude={() => includeAndRecheck(entry)}
+                  onSourceAction={(rowId, action) =>
+                    reviewSourceRow(entry, rowId, action)
+                  }
+                  onCreateAccount={(account) => {
+                    const changed = {
+                      ...entry,
+                      accountOverride: account,
+                      accountId: account.id,
+                      bank: account.institution,
+                    };
+                    patchEntry(entry.id, {
+                      accountOverride: account,
+                      accountId: account.id,
+                      bank: account.institution,
+                    });
+                    void reparse(changed, false, true);
+                  }}
+                  sourceReview={(() => {
+                    if (entry.skip || entry.state === "saved") return undefined;
+                    if (entry.draft?.bankSource) {
+                      return (
+                        <details className="generic-parser-details">
+                          <summary>Reading details</summary>
+                          <p>
+                            This statement uses its bank reader. If a date or
+                            amount looks wrong, review the PDF layout to correct
+                            the source reading and check the figures again.
+                          </p>
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => {
+                              const changed: FileReview = {
+                                ...entry,
+                                pdfReviewOptions: {
+                                  ...entry.pdfReviewOptions,
+                                  preferGeneric: true,
+                                },
+                              };
+                              patchEntry(entry.id, {
+                                pdfReviewOptions: changed.pdfReviewOptions,
+                              });
+                              void reparse(changed, false, true);
+                            }}
+                          >
+                            Review PDF layout
+                          </button>
+                        </details>
+                      );
+                    }
+                    const result = sourceReview(entry);
+                    if (!result) return undefined;
+                    const review = (
+                      <GenericImportReview
+                        result={result}
+                        session={entry.extracted?.pdfSession}
+                        currency={
+                          entry.draft?.statement.currency ??
+                          entry.accountOverride?.currency
+                        }
+                        method={
+                          entry.draft?.statement.parserMethod ??
+                          entry.extracted?.extraction?.method
+                        }
+                        busy={busy}
+                        onAction={(rowId, action) =>
+                          reviewSourceRow(entry, rowId, action)
+                        }
+                        onMapping={(mapping) =>
+                          mapSourceColumns(entry, mapping)
+                        }
+                        onSaveTemplate={(name, mapping) =>
+                          void saveSourceLayout(entry, name, mapping)
+                        }
+                        canImportAnyway={!!entry.draft && !entry.optionsChanged}
+                        showImportAnyway={false}
+                        onImportAnyway={() => {
+                          if (!entry.draft) return;
+                          patchReviewEntry(entry.id, {
+                            override: true,
+                            draft: entry.draft,
+                          });
+                        }}
+                      />
+                    );
+                    return entry.draft?.parserFallback ? (
+                      <details className="generic-parser-details">
+                        <summary>Alternative column reading</summary>
+                        <p>
+                          The bank-specific reader checked this recognised
+                          statement automatically. Column mapping and source-row
+                          corrections are available here if you need them.
+                          Changing the mapping or rows selects that reading for
+                          this import.
+                        </p>
+                        {review}
+                      </details>
+                    ) : (
+                      review
+                    );
+                  })()}
+                />
+              </div>
+            ))}
         </div>
       )}
       {phase === "review" &&
@@ -1233,23 +1252,26 @@ export default function ImportPage({
         <div className="import-footer import-outcome-footer">
           <div aria-live="polite">
             <strong>
-              {newCount} new · {duplicateCount} duplicate
-              {duplicateCount === 1 ? "" : "s"} skipped
+              {newCount} new
+              {duplicateCount > 0 &&
+                ` · ${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"} skipped`}
               {balanceStatements.length > 0 &&
                 ` · ${balanceStatements.length} balance update${balanceStatements.length === 1 ? "" : "s"}`}
               {excludedCount > 0 && ` · ${excludedCount} excluded`}
               {skippedFileCount > 0 &&
                 ` · ${skippedFileCount} file${skippedFileCount === 1 ? "" : "s"} skipped`}
             </strong>
-            <span>
-              {busy && phase === "review" && !commitStatus
-                ? "Rechecking source rows…"
-                : phase === "check"
-                  ? "Checking every selected file before review"
-                  : blocking.length
-                    ? `${blocking.length} statement${blocking.length === 1 ? "" : "s"} need${blocking.length === 1 ? "s" : ""} attention`
-                    : "Ready to import selected rows"}
-            </span>
+            {(busy || phase === "check" || blocking.length > 0) && (
+              <span>
+                {busy && phase === "review" && !commitStatus
+                  ? "Rechecking source rows…"
+                  : phase === "check"
+                    ? "Checking every selected file before review"
+                    : blocking.length
+                      ? `${blocking.length} statement${blocking.length === 1 ? "" : "s"} need${blocking.length === 1 ? "s" : ""} attention`
+                      : ""}
+              </span>
+            )}
             {commitStatus && <span role="status">{commitStatus}</span>}
           </div>
           {!hasChanges && !blocking.length && phase === "review" ? (
@@ -1272,6 +1294,6 @@ export default function ImportPage({
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }

@@ -441,6 +441,12 @@ async function closeSheet(page) {
   await page.waitForTimeout(100);
 }
 async function select(page, names) {
+  // Each captured scene starts a new review; adding in the UI now preserves a batch.
+  const close = page.getByRole("link", {
+    name: "Close import review",
+    exact: true,
+  });
+  if (await close.isVisible()) await close.click();
   await go(page, "/import");
   await page
     .getByLabel("Select statements", { exact: true })
@@ -461,6 +467,9 @@ async function card(page, name) {
   await expect(c).toHaveCount(1);
   if (!(await c.evaluate((e) => e.open)))
     await c.locator(":scope > summary").click();
+  const figures = c.locator(".import-statement-figures");
+  if ((await figures.count()) && !(await figures.evaluate((node) => node.open)))
+    await figures.locator(":scope > summary").click();
   return c;
 }
 async function baseStates(setup) {
@@ -1294,7 +1303,7 @@ async function importStates(setup) {
     );
     const cancel = wrong.getByRole("button", { name: "Cancel", exact: true });
     if (await cancel.count()) await cancel.click();
-    const anyway = proof.getByRole("button", {
+    const anyway = bad.getByRole("button", {
       name: "Import anyway…",
       exact: true,
     });

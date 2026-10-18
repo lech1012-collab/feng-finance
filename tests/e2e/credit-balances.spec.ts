@@ -1,4 +1,8 @@
 import { saveReadableBackup, settingsSection, loadDemoUi } from "./flows";
+import {
+  acceptStatementWarnings,
+  acceptUnverifiedStatement,
+} from "./import-actions";
 import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
 import { readFile } from "node:fs/promises";
@@ -33,9 +37,10 @@ async function importStatement(page: Page, name: string) {
     name: "Confirm import",
     exact: true,
   });
-  const acknowledgement = card.getByLabel(
-    /I compared the extracted rows with the source file/,
-  );
+  const acknowledgement = card.getByRole("button", {
+    name: "Accept these statement warnings",
+    exact: true,
+  });
   if (name === "barclaycard" || name === "amex-uk-layout")
     await expect(acknowledgement).toBeVisible();
   if (name === "amex-uk-layout")
@@ -47,16 +52,16 @@ async function importStatement(page: Page, name: string) {
   if (name === "amex-uk-layout") {
     await expect(confirm).toBeDisabled();
     await expect(card.locator(".generic-import-review")).toHaveCount(0);
-    await card
-      .getByLabel(
-        "I reviewed the source PDF and explicitly accept this unverified statement.",
-        { exact: true },
-      )
-      .check();
-    await acknowledgement.check();
+    await acceptUnverifiedStatement(page, card);
+    await expect(
+      card.getByRole("button", {
+        name: "Undo warning acceptance",
+        exact: true,
+      }),
+    ).toBeVisible();
   } else if (await acknowledgement.count()) {
     await expect(confirm).toBeDisabled();
-    await acknowledgement.check();
+    await acceptStatementWarnings(card);
   }
   await confirm.click();
   await expect(

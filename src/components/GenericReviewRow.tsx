@@ -75,6 +75,16 @@ function ReadingValues({
   reading: RowReading;
   currency?: string;
 }) {
+  const raw = (label: string, value?: string) => (
+    <span
+      className="import-raw-reference"
+      role="region"
+      aria-label={`Original ${label}`}
+      tabIndex={0}
+    >
+      {value || "Not read"}
+    </span>
+  );
   return (
     <dl className="generic-reading-values">
       <div>
@@ -85,7 +95,7 @@ function ReadingValues({
               {displayDate(reading.date)}
             </time>
           ) : (
-            (reading.rawDate ?? "Not read")
+            raw("date", reading.rawDate)
           )}
         </dd>
       </div>
@@ -107,7 +117,7 @@ function ReadingValues({
         <dt>Amount</dt>
         <dd>
           {reading.amount === undefined
-            ? reading.rawAmount || "Not read"
+            ? raw("amount", reading.rawAmount)
             : displayMoney(reading.amount, currency, true)}
         </dd>
       </div>
@@ -117,7 +127,7 @@ function ReadingValues({
           <dt>Balance</dt>
           <dd>
             {reading.balanceAfterTransaction === undefined
-              ? reading.rawBalance
+              ? raw("balance", reading.rawBalance)
               : displayMoney(reading.balanceAfterTransaction, currency)}
           </dd>
         </div>
@@ -140,6 +150,11 @@ export function GenericReviewRow({
   onAction: GenericImportReviewProps["onAction"];
 }) {
   const reading = selectedReading(row);
+  const merchant = displayMerchant({
+    merchant: "",
+    description: reading?.description || "Unread transaction",
+  });
+  const rawName = /\S{30,}/.test(merchant);
   const [correcting, setCorrecting] = useState(false);
   const [open, setOpen] = useState(!row.resolved);
   useEffect(() => {
@@ -194,11 +209,13 @@ export function GenericReviewRow({
     >
       <summary>
         <span>
-          <strong>
-            {displayMerchant({
-              merchant: "",
-              description: reading?.description || "Unread transaction",
-            })}
+          <strong
+            className={rawName ? "import-raw-reference" : undefined}
+            role={rawName ? "region" : undefined}
+            aria-label={rawName ? "Transaction name" : undefined}
+            tabIndex={rawName ? 0 : undefined}
+          >
+            {merchant}
           </strong>
           <small>
             Page {row.rect.page} · {state}

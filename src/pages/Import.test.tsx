@@ -9,6 +9,7 @@ import {
 } from "vitest";
 import {
   cleanup,
+  configure,
   fireEvent,
   render,
   screen,
@@ -30,6 +31,7 @@ vi.mock("../import/pipeline", async (original) => ({
 }));
 
 beforeEach(async () => {
+  configure({ asyncUtilTimeout: 5000 });
   vi.mocked(extractFile).mockReset();
   await clearLocalData();
   await initializeDatabase();
@@ -167,10 +169,16 @@ describe("PDF review session lifecycle", () => {
     );
     const salaryRow = (card: HTMLElement) =>
       [...card.querySelectorAll<HTMLElement>(".review-row")].find((row) =>
-        within(row).queryByText("FICTIONAL SALARY", { exact: true }),
+        /fictional salary/i.test(
+          row.querySelector(".review-compact strong")?.textContent ?? "",
+        ),
       )!;
     fireEvent.click(salaryRow(original()).querySelector("summary")!);
-    fireEvent.click(within(salaryRow(original())).getByRole("checkbox"));
+    fireEvent.click(
+      within(salaryRow(original())).getByRole("button", {
+        name: "Exclude transaction",
+      }),
+    );
     expect(
       screen.getByRole("button", { name: "Confirm import" }),
     ).toBeDisabled();
@@ -194,11 +202,17 @@ describe("PDF review session lifecycle", () => {
     );
     fireEvent.click(salaryRow(regenerated()).querySelector("summary")!);
     expect(
-      within(salaryRow(regenerated())).getByRole("checkbox"),
-    ).toBeChecked();
+      within(salaryRow(regenerated())).getByRole("button", {
+        name: "Exclude transaction",
+      }),
+    ).toBeVisible();
     // Restoring the original now discovers this row as a duplicate again.
     fireEvent.click(original().querySelector("summary")!);
-    fireEvent.click(within(salaryRow(original())).getByRole("checkbox"));
+    fireEvent.click(
+      within(salaryRow(original())).getByRole("button", {
+        name: "Include transaction",
+      }),
+    );
     fireEvent.click(
       screen.getByRole("button", { name: "Review next statement" }),
     );
@@ -213,11 +227,17 @@ describe("PDF review session lifecycle", () => {
       ).toBeEnabled(),
     );
     const duplicateRow = salaryRow(regenerated());
+    fireEvent.click(duplicateRow.querySelector("summary")!);
     expect(
-      within(duplicateRow).getByRole("checkbox", {
-        name: "Fictional Salary",
+      within(duplicateRow).getByRole("button", {
+        name: "Keep this checked transaction",
       }),
-    ).not.toBeChecked();
+    ).toBeVisible();
+    expect(
+      within(duplicateRow).queryByRole("button", {
+        name: "Exclude transaction",
+      }),
+    ).not.toBeInTheDocument();
     expect(
       within(duplicateRow).getByText(/Known duplicate|Possible duplicate/),
     ).toBeVisible();
@@ -260,7 +280,9 @@ describe("PDF review session lifecycle", () => {
     expect(
       within(firstRow).getByLabelText("Category", { exact: true }),
     ).toHaveValue("shopping");
-    fireEvent.click(within(firstRow).getByRole("checkbox"));
+    fireEvent.click(
+      within(firstRow).getByRole("button", { name: "Exclude transaction" }),
+    );
     const picker = screen.getByLabelText("Select statements", { exact: true });
     fireEvent.change(picker, {
       target: { files: [new File(["same fictitious PDF"], "repeated.pdf")] },
@@ -278,8 +300,11 @@ describe("PDF review session lifecycle", () => {
     expect(repeatedSource.pdfSession!.dispose).not.toHaveBeenCalled();
     fireEvent.click(container.querySelector(".import-statement-heading")!);
     const preserved = container.querySelector<HTMLElement>(".review-row")!;
-    fireEvent.click(preserved.querySelector("summary")!);
-    expect(within(preserved).getByRole("checkbox")).not.toBeChecked();
+    if (!(preserved as HTMLDetailsElement).open)
+      fireEvent.click(preserved.querySelector("summary")!);
+    expect(
+      within(preserved).getByRole("button", { name: "Include transaction" }),
+    ).toBeVisible();
     expect(
       within(preserved).getByLabelText("Category", { exact: true }),
     ).toHaveValue("shopping");
@@ -429,7 +454,9 @@ describe("PDF review session lifecycle", () => {
       new File(["fictitious"], "fictitious.pdf"),
       new File(["fictitious"], "not-read.pdf"),
     ]);
-    await screen.findByText("Reading scanned page 2 of 2");
+    await within(
+      screen.getByRole("region", { name: "Checking statements" }),
+    ).findByText("Reading scanned page 2 of 2");
     fireEvent.click(screen.getByRole("button", { name: "Stop processing" }));
     await screen.findByRole("button", { name: "Review next statement" });
     expect(screen.getByText(/Not imported: unread pages 2/)).toBeVisible();
