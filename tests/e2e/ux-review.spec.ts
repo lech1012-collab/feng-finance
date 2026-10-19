@@ -421,7 +421,7 @@ test("UX mobile: import close and post-import shortcuts remain easy to tap", asy
   });
   await expect(confirm).toBeEnabled();
   const close = (await page
-    .getByRole("link", { name: "Close import review" })
+    .getByRole("link", { name: "Leave review" })
     .boundingBox())!;
   expect(close.width).toBeGreaterThanOrEqual(44);
   expect(close.height).toBeGreaterThanOrEqual(44);

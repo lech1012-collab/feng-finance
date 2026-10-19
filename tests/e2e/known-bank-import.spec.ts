@@ -332,21 +332,23 @@ test("a bank-reader source correction opens generic review only on request and r
     .locator(".review-row")
     .filter({ hasText: "FICTIONAL GROCER" });
   await nativeRow.locator(":scope > summary").click();
-  await expect(nativeRow.getByLabel("Date", { exact: true })).toHaveAttribute(
-    "readonly",
-  );
   await expect(
     nativeRow.getByRole("textbox", { name: /Amount for/ }),
-  ).toHaveAttribute("readonly");
+  ).toHaveCount(0);
+  await expect(nativeRow.locator("time").first()).toHaveAttribute(
+    "datetime",
+    "2026-09-02",
+  );
+  expect((await records(page)).transactions).toHaveLength(0);
   await nativeRow
     .getByLabel("Category", { exact: true })
     .selectOption("shopping");
   await nativeRow
-    .getByRole("button", { name: "Correct amount", exact: true })
+    .getByRole("button", { name: /Correct amount for .*grocer/i })
     .click();
   await expect(
     page.getByRole("dialog", {
-      name: "Correct transaction amount",
+      name: "Correct amount",
       exact: true,
     }),
   ).toBeVisible();
@@ -357,11 +359,18 @@ test("a bank-reader source correction opens generic review only on request and r
   const row = proof.locator(".generic-review-row").filter({
     has: page.locator("summary strong", { hasText: "FICTIONAL GROCER" }),
   });
+  await expect(row).toHaveCount(1);
+  const editor = page.getByRole("dialog", {
+    name: "Correct amount",
+    exact: true,
+  });
   await expect(
-    row.getByRole("button", { name: "Money out", exact: true }),
+    editor.getByRole("button", { name: "Money out", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await row.getByLabel("Amount (GBP)", { exact: true }).fill("80.00");
-  await row.getByRole("button", { name: "Save row", exact: true }).click();
+  await editor.getByLabel("Amount (GBP)", { exact: true }).fill("80.00");
+  await editor
+    .getByRole("button", { name: "Save amount", exact: true })
+    .click();
   await expect(proof).toContainText("Statement figures match exactly");
   const confirm = page.getByRole("button", {
     name: "Confirm import",

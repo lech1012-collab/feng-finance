@@ -97,7 +97,30 @@ function Shell() {
   const fileInput = useRef<HTMLInputElement>(null);
   const mobileNavigation = useRef<HTMLElement>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [importMounted, setImportMounted] = useState(false);
+  const [pendingImportCount, setPendingImportCount] = useState(0);
+  const hasPendingImport = useRef(false);
+  hasPendingImport.current = !!selectedFiles.length || !!pendingImportCount;
+  const importActive = location.pathname === "/import";
   const openImportPicker = () => fileInput.current?.click();
+  const openImport = () => {
+    if (pendingImportCount || selectedFiles.length) {
+      setImportMounted(true);
+      navigate("/import");
+    } else openImportPicker();
+  };
+  useEffect(() => {
+    if (importActive) setImportMounted(true);
+  }, [importActive]);
+  useEffect(() => {
+    if (!pendingImportCount && !selectedFiles.length) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [pendingImportCount, selectedFiles.length]);
   const [month, setMonth] = useState(localToday().slice(0, 7));
   const [monthChosen, setMonthChosen] = useState(false);
   const latestDate = useLiveQuery(async () => {
@@ -165,7 +188,10 @@ function Shell() {
   );
   const safeUpdate = useSafeUpdateVisibility(
     location.pathname,
-    betaBusy || !!selectedFiles.length || pendingFinancialWrite,
+    betaBusy ||
+      !!selectedFiles.length ||
+      !!pendingImportCount ||
+      pendingFinancialWrite,
   );
   const saveBetaSettings = async (settings: Setting[]) => {
     await db.transaction("rw", db.settings, () =>
@@ -350,7 +376,7 @@ function Shell() {
     };
   }, []);
   useEffect(() => {
-    window.scrollTo(0, 0);
+    if (!importActive) window.scrollTo(0, 0);
     const targetId = decodeURIComponent(location.hash.slice(1));
     if (!targetId) return;
     const reveal = () => {
@@ -379,7 +405,7 @@ function Shell() {
       ["", "#", "#/"].includes(window.location.hash.split("?")[0]) &&
       location.pathname === "/" &&
       !betaBusy &&
-      !selectedFiles.length &&
+      !hasPendingImport.current &&
       !hasPendingFinancialWrites() &&
       !document.querySelector("dialog[open], [aria-modal='true']");
     if (!permitted()) return;
@@ -402,7 +428,7 @@ function Shell() {
     }
   };
   return (
-    <ImportPickerContext.Provider value={openImportPicker}>
+    <ImportPickerContext.Provider value={openImport}>
       <div className="app" data-page={sectionForPath(location.pathname)}>
         <input
           ref={fileInput}
@@ -416,6 +442,7 @@ function Shell() {
             const files = Array.from(e.target.files ?? []);
             e.target.value = "";
             if (files.length) {
+              setImportMounted(true);
               setSelectedFiles(files);
               navigate("/import");
             }
@@ -446,7 +473,7 @@ function Shell() {
           )}
           <button
             className="primary sidebar-import"
-            onClick={openImportPicker}
+            onClick={openImport}
             aria-current={
               sectionForPath(location.pathname) === "import"
                 ? "page"
@@ -454,7 +481,9 @@ function Shell() {
             }
           >
             <Plus size={20} />
-            Import statement
+            {pendingImportCount
+              ? `Resume import (${pendingImportCount})`
+              : "Import statement"}
           </button>
           <nav aria-label="Main navigation">
             {[
@@ -478,7 +507,7 @@ function Shell() {
                           if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
                             return;
                           e.preventDefault();
-                          openImportPicker();
+                          openImport();
                         }
                       : undefined
                   }
@@ -529,14 +558,18 @@ function Shell() {
                         )
                           return;
                         event.preventDefault();
-                        openImportPicker();
+                        openImport();
                       }
                     : undefined
                 }
               >
                 <I size={21} />
                 <span>
-                  {label === "Transactions" ? "Activity" : String(label)}
+                  {label === "Transactions"
+                    ? "Activity"
+                    : label === "Import" && pendingImportCount
+                      ? `Import (${pendingImportCount})`
+                      : String(label)}
                 </span>
               </Link>
             );
@@ -668,109 +701,135 @@ function Shell() {
                 }
               />
             ) : (
-              <Suspense fallback={<p role="status">Loading…</p>}>
-                <Routes>
-                  <Route path="/accounts" element={<Accounts />} />
-                  <Route
-                    path="/"
-                    element={
-                      <Home
-                        month={month}
-                        setMonth={chooseMonth}
-                        currency={currency}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/import"
-                    element={
+              <>
+                {!!pendingImportCount && !importActive && (
+                  <div className="notice" role="status">
+                    <span>
+                      {pendingImportCount} statement
+                      {pendingImportCount === 1 ? "" : "s"} in your pending
+                      review.
+                    </span>
+                    <button type="button" onClick={openImport}>
+                      Resume import
+                    </button>
+                  </div>
+                )}
+                <Suspense fallback={<p role="status">Loading…</p>}>
+                  <Routes>
+                    <Route path="/accounts" element={<Accounts />} />
+                    <Route
+                      path="/"
+                      element={
+                        <Home
+                          month={month}
+                          setMonth={chooseMonth}
+                          currency={currency}
+                        />
+                      }
+                    />
+                    <Route path="/import" element={null} />
+                    <Route
+                      path="/transactions"
+                      element={
+                        <Transactions
+                          key={location.search + currency}
+                          month={month}
+                          currency={currency}
+                        />
+                      }
+                    />
+                    <Route path="/transactions/:id" element={<Detail />} />
+                    <Route
+                      path="/analysis"
+                      element={
+                        <Analysis
+                          month={month}
+                          setMonth={chooseMonth}
+                          currency={currency}
+                        />
+                      }
+                    />
+                    <Route
+                      path="/property"
+                      element={
+                        <Analysis
+                          key="property"
+                          month={month}
+                          setMonth={chooseMonth}
+                          currency={currency}
+                          property
+                        />
+                      }
+                    />
+                    <Route
+                      path="/subscriptions"
+                      element={<Subscriptions currency={currency} />}
+                    />
+                    <Route
+                      path="/categories/:id"
+                      element={
+                        <Category
+                          key={location.pathname + currency}
+                          month={month}
+                          currency={currency}
+                          setMonth={chooseMonth}
+                        />
+                      }
+                    />
+                    <Route
+                      path="/settings"
+                      element={
+                        <Settings
+                          beta={{
+                            mode: runtimeMode,
+                            storagePersisted:
+                              actualStoragePersisted ??
+                              betaData.prefs.storagePersisted,
+                            desktopInstall,
+                            onRequestStorage: requestBetaStorage,
+                          }}
+                        />
+                      }
+                    />
+                    <Route
+                      path="/review"
+                      element={
+                        <ReviewRoute month={month} currency={currency} />
+                      }
+                    />
+                    <Route
+                      path="/planning"
+                      element={
+                        <Planning
+                          month={month}
+                          setMonth={chooseMonth}
+                          currency={currency}
+                        />
+                      }
+                    />
+                    <Route path="*" element={<Navigate to="/" replace />} />
+                  </Routes>
+                </Suspense>
+                {(importMounted || importActive) && (
+                  <div hidden={!importActive} inert={!importActive}>
+                    <Suspense
+                      fallback={
+                        importActive ? (
+                          <p role="status">Opening your import review…</p>
+                        ) : null
+                      }
+                    >
                       <Import
+                        active={importActive}
                         selectedFiles={selectedFiles}
                         onFilesStarted={() => setSelectedFiles([])}
+                        onPendingChange={setPendingImportCount}
                         onImported={(latest) => chooseMonth(latest)}
                       />
-                    }
-                  />
-                  <Route
-                    path="/transactions"
-                    element={
-                      <Transactions
-                        key={location.search + currency}
-                        month={month}
-                        currency={currency}
-                      />
-                    }
-                  />
-                  <Route path="/transactions/:id" element={<Detail />} />
-                  <Route
-                    path="/analysis"
-                    element={
-                      <Analysis
-                        month={month}
-                        setMonth={chooseMonth}
-                        currency={currency}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/property"
-                    element={
-                      <Analysis
-                        key="property"
-                        month={month}
-                        setMonth={chooseMonth}
-                        currency={currency}
-                        property
-                      />
-                    }
-                  />
-                  <Route
-                    path="/subscriptions"
-                    element={<Subscriptions currency={currency} />}
-                  />
-                  <Route
-                    path="/categories/:id"
-                    element={
-                      <Category
-                        key={location.pathname + currency}
-                        month={month}
-                        currency={currency}
-                        setMonth={chooseMonth}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <Settings
-                        beta={{
-                          mode: runtimeMode,
-                          storagePersisted:
-                            actualStoragePersisted ??
-                            betaData.prefs.storagePersisted,
-                          desktopInstall,
-                          onRequestStorage: requestBetaStorage,
-                        }}
-                      />
-                    }
-                  />
-                  <Route
-                    path="/review"
-                    element={<ReviewRoute month={month} currency={currency} />}
-                  />
-                  <Route
-                    path="/planning"
-                    element={
-                      <Planning
-                        month={month}
-                        setMonth={chooseMonth}
-                        currency={currency}
-                      />
-                    }
-                  />
-                  <Route path="*" element={<Navigate to="/" replace />} />
-                </Routes>
-              </Suspense>
+                    </Suspense>
+                  </div>
+                )}
+              </>
             )}
           </main>
           <footer className="desktop-footer">

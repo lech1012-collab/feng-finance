@@ -16,7 +16,14 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { MemoryRouter, Route, Routes } from "react-router-dom";
+import {
+  Link,
+  MemoryRouter,
+  Route,
+  Routes,
+  useLocation,
+} from "react-router-dom";
+import { useState } from "react";
 import ImportPage from "./Import";
 import { db, initializeDatabase } from "../storage/database";
 import { clearLocalData } from "../storage/backup";
@@ -90,7 +97,156 @@ function show(files = [new File(["fictitious"], "fictitious.pdf")]) {
   );
 }
 
+function RetainedReview({
+  files,
+  pending,
+}: {
+  files: File[];
+  pending: (count: number) => void;
+}) {
+  const location = useLocation();
+  const [selected, setSelected] = useState(files);
+  const visible = location.pathname === "/import";
+  return (
+    <>
+      <Link to="/transactions">Transactions</Link>
+      <Link to="/import">Resume import</Link>
+      <div hidden={!visible} inert={!visible}>
+        <ImportPage
+          active={visible}
+          selectedFiles={selected}
+          onFilesStarted={() => setSelected([])}
+          onPendingChange={pending}
+          onImported={vi.fn()}
+        />
+      </div>
+      <Routes>
+        <Route path="/transactions" element={<h1>Transactions</h1>} />
+        <Route path="/" element={<h1>Home</h1>} />
+        <Route path="/import" element={null} />
+      </Routes>
+    </>
+  );
+}
 describe("PDF review session lifecycle", () => {
+  it("keeps extraction and its source alive across navigation, then resumes without reading files again", async () => {
+    const source = extracted();
+    let finish!: (value: ExtractedFile) => void;
+    vi.mocked(extractFile).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/import"]}>
+        <RetainedReview
+          files={[new File([], "fictitious.pdf")]}
+          pending={pending}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() => expect(extractFile).toHaveBeenCalledOnce());
+    expect(pending).toHaveBeenLastCalledWith(1);
+    fireEvent.click(screen.getByRole("link", { name: "Transactions" }));
+    expect(screen.getByRole("heading", { name: "Transactions" })).toBeVisible();
+    expect(
+      screen.queryByRole("heading", { name: "Review 1 statement" }),
+    ).not.toBeInTheDocument();
+    finish(source);
+    await waitFor(() =>
+      expect(document.querySelector(".import-batch-summary")).toHaveTextContent(
+        "1 ready",
+      ),
+    );
+    expect(source.pdfSession!.dispose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("link", { name: "Resume import" }));
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Confirm import" }),
+      ).toBeEnabled(),
+    );
+    expect(extractFile).toHaveBeenCalledOnce();
+    expect(await db.transactions.count()).toBe(0);
+    fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+    await screen.findByRole("heading", { name: "Home" });
+    expect(pending).toHaveBeenLastCalledWith(0);
+    expect(source.pdfSession!.dispose).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole("link", { name: "Resume import" }));
+    expect(
+      screen.getByRole("heading", { name: "Import statements" }),
+    ).toBeVisible();
+    expect(extractFile).toHaveBeenCalledOnce();
+  });
+  it("suspends a correction while navigating and retains the exact unfinished decimal on return", async () => {
+    const source = extracted();
+    vi.mocked(extractFile).mockResolvedValue(source);
+    const view = render(
+      <MemoryRouter initialEntries={["/import"]}>
+        <RetainedReview
+          files={[new File([], "fictitious.pdf")]}
+          pending={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Confirm import" }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(document.querySelector(".import-statement-heading")!);
+    fireEvent.click(
+      screen.getByRole("button", { name: "All transactions (3)" }),
+    );
+    fireEvent.click(
+      screen.getAllByRole("button", { name: /^Correct amount for / })[0],
+    );
+    const input = await screen.findByLabelText("Amount (GBP)");
+    fireEvent.change(input, { target: { value: "12." } });
+    fireEvent.click(screen.getByRole("link", { name: "Transactions" }));
+    expect(
+      screen.queryByRole("dialog", { name: "Correct amount" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("link", { name: "Resume import" }));
+    expect(screen.getByLabelText("Amount (GBP)")).toHaveValue("12.");
+    expect(extractFile).toHaveBeenCalledOnce();
+    expect(await db.transactions.count()).toBe(0);
+    view.unmount();
+  });
+  it("discards only an explicitly confirmed pending review and releases its source", async () => {
+    const source = extracted();
+    vi.mocked(extractFile).mockResolvedValue(source);
+    const pending = vi.fn();
+    render(
+      <MemoryRouter initialEntries={["/import"]}>
+        <RetainedReview
+          files={[new File([], "fictitious.pdf")]}
+          pending={pending}
+        />
+      </MemoryRouter>,
+    );
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Confirm import" }),
+      ).toBeEnabled(),
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Discard review" }));
+    fireEvent.click(screen.getByRole("button", { name: "Keep review" }));
+    expect(source.pdfSession!.dispose).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Discard review" }));
+    fireEvent.click(
+      within(
+        screen.getByRole("dialog", { name: "Discard this review?" }),
+      ).getByRole("button", { name: "Discard review" }),
+    );
+    expect(
+      screen.getByRole("heading", { name: "Import statements" }),
+    ).toBeVisible();
+    expect(pending).toHaveBeenLastCalledWith(0);
+    expect(source.pdfSession!.dispose).toHaveBeenCalledOnce();
+    expect(await db.transactions.count()).toBe(0);
+  });
   it("rechecks a repeated PDF after the earlier copy is left out, restoring its automatic row defaults", async () => {
     const earlier = extracted();
     const repeated = extracted();
@@ -387,7 +543,7 @@ describe("PDF review session lifecycle", () => {
     expect(await db.statements.count()).toBe(1);
   });
 
-  it("disposes the source on close without saving any records", async () => {
+  it("releases the source when the entire host unmounts without saving any records", async () => {
     const source = extracted();
     vi.mocked(extractFile).mockResolvedValue(source);
     show();
@@ -398,7 +554,7 @@ describe("PDF review session lifecycle", () => {
         ).toBeEnabled(),
       { timeout: 5000 },
     );
-    fireEvent.click(screen.getByRole("link", { name: "Close import review" }));
+    fireEvent.click(screen.getByRole("link", { name: "Leave review" }));
     expect(
       await screen.findByRole("heading", { name: "Home" }, { timeout: 5000 }),
     ).toBeVisible();
@@ -481,6 +637,95 @@ describe("PDF review session lifecycle", () => {
     expect(vi.mocked(extractFile)).toHaveBeenCalledTimes(1);
     expect(source.pdfSession!.dispose).not.toHaveBeenCalled();
     expect(await db.transactions.count()).toBe(0);
+  });
+  it("opens manual native amount correction without waiting for numeric OCR and still blocks a wrong correction", async () => {
+    const source = extracted();
+    source.extraction!.items[0].text = "Barclays";
+    source.extraction!.items.find(
+      (item) => item.text === "100.00" && item.y === 240,
+    )!.text = "101.00";
+    source.rows = reconstructRows(
+      source.extraction!.items.map((item) => ({
+        ...item,
+        y: item.y + item.height,
+      })),
+    );
+    // This would never finish if the manual editor accidentally awaited OCR.
+    vi.mocked(source.pdfSession!.readCells).mockImplementation(
+      () => new Promise(() => undefined),
+    );
+    vi.mocked(extractFile).mockResolvedValue(source);
+    show();
+    fireEvent.click(
+      await screen.findByRole("button", { name: "All transactions (3)" }),
+    );
+    expect(
+      screen.getByText(/Dates and amounts come from the bank reader/),
+    ).toBeVisible();
+    fireEvent.click(
+      screen.getByRole("button", { name: /Correct amount for .*shop/i }),
+    );
+    const editor = await screen.findByRole("dialog", {
+      name: "Correct amount",
+    });
+    expect(within(editor).getByLabelText("Amount (GBP)")).toHaveValue("101.00");
+    expect(source.pdfSession!.readCells).not.toHaveBeenCalled();
+    fireEvent.change(within(editor).getByLabelText("Amount (GBP)"), {
+      target: { value: "102.00" },
+    });
+    fireEvent.click(
+      within(editor).getByRole("button", { name: "Save amount" }),
+    );
+    await waitFor(() =>
+      expect(
+        screen.queryByText("Rechecking source rows…"),
+      ).not.toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Confirm import" }),
+    ).toBeDisabled();
+    expect(source.pdfSession!.readCells).not.toHaveBeenCalled();
+    expect(await db.transactions.count()).toBe(0);
+    expect(
+      source.extraction!.items.some((item) => item.text === "101.00"),
+    ).toBe(true);
+  });
+  it("prevents discard throughout asynchronous confirm preflight before any financial write", async () => {
+    const source = extracted();
+    vi.mocked(extractFile).mockResolvedValue(source);
+    show();
+    await waitFor(() =>
+      expect(
+        screen.getByRole("button", { name: "Confirm import" }),
+      ).toBeEnabled(),
+    );
+    let finish!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      finish = resolve;
+    });
+    const deferred = db.transactions.bulkGet([]).then(async (rows) => {
+      await gate;
+      return rows;
+    });
+    const spy = vi
+      .spyOn(db.transactions, "bulkGet")
+      .mockReturnValueOnce(deferred);
+    try {
+      fireEvent.click(screen.getByRole("button", { name: "Confirm import" }));
+      expect(
+        screen.getByRole("button", { name: "Discard review" }),
+      ).toBeDisabled();
+      expect(
+        screen.getByText("Checking statements before saving…"),
+      ).toBeVisible();
+      expect(await db.transactions.count()).toBe(0);
+      finish();
+      await screen.findByRole("heading", { name: "Home" });
+      expect(await db.transactions.count()).toBe(3);
+    } finally {
+      finish();
+      spy.mockRestore();
+    }
   });
   it("confirms reconciled rows atomically and returns home with the source released", async () => {
     const source = extracted();

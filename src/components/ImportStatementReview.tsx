@@ -96,20 +96,37 @@ export function ImportStatementReview({
     });
   const correctSource = (
     row: ImportDraft["transactions"][number],
-    correction: { date?: string; amount?: number },
+    correction: Partial<
+      Pick<
+        ImportDraft["transactions"][number],
+        | "date"
+        | "bookingDate"
+        | "description"
+        | "amount"
+        | "balanceAfterTransaction"
+      >
+    >,
   ) => {
     if (d?.bankSource) return;
     if (row.parseRowId && d?.parserReview && onSourceAction) {
       onSourceAction(row.parseRowId, {
         kind: "correct",
         date: correction.date ?? row.date,
-        ...(row.bookingDate ? { bookingDate: row.bookingDate } : {}),
-        description: row.description,
+        ...((correction.bookingDate ?? row.bookingDate)
+          ? { bookingDate: correction.bookingDate ?? row.bookingDate }
+          : {}),
+        description: correction.description ?? row.description,
         amount: correction.amount ?? row.amount,
-        balanceAfterTransaction: row.balanceAfterTransaction,
+        balanceAfterTransaction:
+          correction.balanceAfterTransaction ?? row.balanceAfterTransaction,
       });
     } else {
-      updateRow(row.id, { ...correction, acknowledged: true });
+      const amount = correction.amount ?? row.amount;
+      updateRow(row.id, {
+        ...correction,
+        type: row.isTransfer ? "transfer" : amount >= 0 ? "income" : "expense",
+        acknowledged: true,
+      });
     }
   };
   const blockers = importBlockers(entry);
@@ -694,9 +711,8 @@ export function ImportStatementReview({
                     )}
                     {entry.showAll && d.bankSource && (
                       <p className="hint">
-                        Dates and amounts come from the bank reader. Open a
-                        transaction and choose Correct amount to check its
-                        source values.
+                        Dates and amounts come from the bank reader. Tap an
+                        amount to correct its source value.
                       </p>
                     )}
                     {(entry.showAll ? [...d.transactions] : [...checks])

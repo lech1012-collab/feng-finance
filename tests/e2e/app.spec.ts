@@ -641,8 +641,14 @@ async function openImport(page: Page) {
 async function selectStatement(page: Page, name: string) {
   // This helper starts a distinct review; adding to a batch is tested separately.
   if (await page.locator(".import-statement-card").count()) {
-    await gotoRoute(page, "/");
-    await openImport(page);
+    await page
+      .getByRole("button", { name: "Discard review", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Discard this review?", exact: true })
+      .getByRole("button", { name: "Discard review", exact: true })
+      .click();
+    await expect(page.locator(".import-statement-card")).toHaveCount(0);
   }
   await page.getByLabel("Select statements").setInputFiles(fixture(name));
   await expect(page.locator(".import-review-list")).toBeVisible({

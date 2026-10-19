@@ -1,8 +1,23 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { SourceRowCorrection } from "./SourceRowCorrection";
+import { SheetVisibilityContext } from "./Sheet";
 import type { RowReading } from "../import/generic/types";
 afterEach(cleanup);
+beforeEach(() => {
+  Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+    configurable: true,
+    value() {
+      this.open = true;
+    },
+  });
+  Object.defineProperty(HTMLDialogElement.prototype, "close", {
+    configurable: true,
+    value() {
+      this.open = false;
+    },
+  });
+});
 const reading: RowReading = {
   id: "source",
   date: "2026-09-05",
@@ -31,6 +46,67 @@ function show(
   return { onSave, onCancel, ...view };
 }
 describe("source amount correction", () => {
+  it("portals outside statement containers and preserves typed values while the import route is hidden", () => {
+    const onSave = vi.fn();
+    const editor = (active: boolean) => (
+      <SheetVisibilityContext.Provider value={active}>
+        <div data-testid="source-card">
+          <SourceRowCorrection
+            reading={reading}
+            currency="GBP"
+            busy={false}
+            source={<p>Original PDF</p>}
+            onSave={onSave}
+            onCancel={vi.fn()}
+          />
+        </div>
+      </SheetVisibilityContext.Provider>
+    );
+    const view = render(editor(true));
+    const dialog = screen.getByRole("dialog", {
+      name: "Correct amount",
+    });
+    expect(screen.getByTestId("source-card").contains(dialog)).toBe(false);
+    expect(dialog.closest(".import-correction-overlay")).toHaveAttribute(
+      "data-page",
+      "import",
+    );
+    fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
+      target: { value: "12." },
+    });
+    view.rerender(editor(false));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(document.body.style.overflow).not.toBe("hidden");
+    view.rerender(editor(true));
+    expect(screen.getByLabelText("Amount (GBP)")).toHaveValue("12.");
+    expect(screen.getByRole("dialog")).toBeVisible();
+    view.unmount();
+    expect(
+      document.querySelector(".import-correction-overlay"),
+    ).not.toBeInTheDocument();
+    expect(onSave).not.toHaveBeenCalled();
+  });
+  it("keeps the amount field editable when currency is missing and blocks an unsafe save", () => {
+    const onSave = vi.fn();
+    render(
+      <SourceRowCorrection
+        reading={reading}
+        busy={false}
+        source={null}
+        onSave={onSave}
+        onCancel={vi.fn()}
+      />,
+    );
+    const input = screen.getByLabelText("Amount", { exact: true });
+    expect(input).toBeEnabled();
+    fireEvent.change(input, { target: { value: "80.00" } });
+    expect(input).toHaveValue("80.00");
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
+    expect(screen.getAllByRole("alert")[0]).toHaveTextContent(
+      "Choose the statement currency",
+    );
+    expect(onSave).not.toHaveBeenCalled();
+  });
   it("accepts an outgoing amount without a minus key and preserves unrelated source facts", () => {
     const { onSave } = show();
     expect(screen.getByLabelText("Amount (GBP)")).toHaveValue("81.00");
@@ -41,7 +117,7 @@ describe("source amount correction", () => {
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "80.00" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(onSave).toHaveBeenCalledExactlyOnceWith({
       kind: "correct",
       date: "2026-09-05",
@@ -57,10 +133,10 @@ describe("source amount correction", () => {
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "80.00" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(onSave.mock.calls[0][0].amount).toBe(8000);
     fireEvent.click(screen.getByRole("button", { name: "Money out" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(onSave.mock.calls[1][0].amount).toBe(-8000);
   });
   it("accepts signed paste and keeps the value consistent after a direction change", () => {
@@ -70,7 +146,7 @@ describe("source amount correction", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Money in" }));
     expect(screen.getByLabelText("Amount (GBP)")).toHaveValue("80.00");
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(onSave.mock.calls[0][0].amount).toBe(8000);
   });
   it("requires an explicit direction when the source amount could not be read", () => {
@@ -78,13 +154,13 @@ describe("source amount correction", () => {
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "80.00" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Choose Money in or Money out",
     );
     expect(onSave).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "Money out" }));
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(onSave.mock.calls[0][0].amount).toBe(-8000);
   });
   it.each([
@@ -100,7 +176,7 @@ describe("source amount correction", () => {
       fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
         target: { value },
       });
-      fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+      fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
       expect(onSave.mock.calls[0][0].amount).toBe(expected);
     },
   );
@@ -109,7 +185,7 @@ describe("source amount correction", () => {
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "80.001" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(screen.getByRole("alert")).toHaveTextContent(
       "correct decimal places",
     );

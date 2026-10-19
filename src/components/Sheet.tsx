@@ -10,6 +10,7 @@ import {
 import { createPortal } from "react-dom";
 import { StickyFooter } from "./UIPrimitives";
 import "./ux-controls.css";
+export const SheetVisibilityContext = createContext(true);
 const FooterContext = createContext<HTMLElement | null>(null);
 export function SheetFooter({ children }: { children: ReactNode }) {
   const host = useContext(FooterContext);
@@ -26,14 +27,18 @@ export function Sheet({
   children,
   footer,
   onClose,
+  closeLabel,
   open = true,
 }: {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
+  closeLabel?: string;
   open?: boolean;
 }) {
+  const visible = useContext(SheetVisibilityContext);
+  open = open && visible;
   const ref = useRef<HTMLDialogElement>(null);
   const [footerHost, setFooterHost] = useState<HTMLElement | null>(null);
   const titleId = useId();
@@ -74,9 +79,11 @@ export function Sheet({
     return () => {
       window.visualViewport?.removeEventListener("resize", resize);
       window.visualViewport?.removeEventListener("scroll", resize);
-      dialog.close?.();
+      if (dialog.close) dialog.close();
+      else dialog.removeAttribute("open");
       document.body.style.overflow = overflow;
-      if (previous?.isConnected) previous.focus();
+      if (previous?.isConnected && !previous.closest("[hidden], [inert]"))
+        previous.focus({ preventScroll: true });
       else document.getElementById("main")?.focus();
     };
   }, [open]);
@@ -97,7 +104,7 @@ export function Sheet({
         <button
           type="button"
           className="icon-button"
-          aria-label={`Close ${title}`}
+          aria-label={closeLabel ?? `Close ${title}`}
           onClick={onClose}
         >
           ×

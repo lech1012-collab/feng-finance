@@ -493,3 +493,24 @@ Money in / Money out controls and strict precision checks. Bank-reader transacti
 can open source correction directly. Saving a correction rechecks the statement;
 financial records are written only after Confirm import. See the
 [workflow, safety rules and mobile verification](docs/import-amount-correction.md).
+
+## v2.2.10 Import correction and resume
+
+Tap the displayed transaction amount itself to open the same correction panel
+for native-bank and generic source review. The Amount field accepts ordinary
+keystrokes, including incomplete decimals while typing; Save amount validates
+precision and rechecks the statement. Source proof and financial import guards
+remain unchanged.
+
+A selected batch stays in memory while navigating between tabs, including
+corrections, category choices and expanded statements. Import resumes pending
+work; Add statements appends PDFs. Discard review explicitly clears only the
+unsaved review. Final confirmation returns Home and releases source resources.
+Pending imports prevent update reloads. Reloading, closing Feng or an app-lock
+remount clears unconfirmed memory-only PDFs; no original statements are persisted.
+
+The [designer-to-developer handoff](docs/import-session-ux-handoff.md) records
+the diagnosis, intended journey, interaction sizes and verification contract.
+Browser regressions use actual taps and sequential keystrokes, not only value
+replacement, and inspect inner text scrolling as well as page width. Physical
+iPhone keyboard, Safari/PWA touch and VoiceOver checks remain manual beta gates.

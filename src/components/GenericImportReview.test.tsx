@@ -219,10 +219,10 @@ describe("generic PDF evidence review", () => {
       screen.getByText(/fictional store/i, { selector: "summary strong" }),
     );
     fireEvent.click(
-      await screen.findByRole("button", { name: "Correct amount" }),
+      await screen.findByRole("button", { name: /^Correct amount for / }),
     );
     expect(
-      screen.getByRole("dialog", { name: "Correct transaction amount" }),
+      screen.getByRole("dialog", { name: "Correct amount" }),
     ).toBeVisible();
     expect(onAction).not.toHaveBeenCalled();
   });
@@ -241,11 +241,14 @@ describe("generic PDF evidence review", () => {
       correctionRequest: { id: "direct-request", rowId: "row-11" },
     });
     expect(
-      screen.getByRole("dialog", { name: "Correct transaction amount" }),
+      screen.getByRole("dialog", { name: "Correct amount" }),
     ).toBeVisible();
     expect(screen.getByLabelText("Amount (GBP)")).toHaveValue("24.99");
     fireEvent.click(screen.getByRole("button", { name: "Cancel correction" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /^Correct amount for / }),
+    ).toHaveFocus();
     expect(onAction).not.toHaveBeenCalled();
   });
   it("shows a one-penny difference and requires explicit confirmation before import anyway", () => {
@@ -301,7 +304,7 @@ describe("generic PDF evidence review", () => {
       screen.getByRole("button", { name: "Import anyway…" }),
     ).toBeDisabled();
     expect(
-      screen.getByRole("button", { name: "Correct amount" }),
+      screen.getByRole("button", { name: /^Correct amount for / }),
     ).toBeEnabled();
   });
 
@@ -313,14 +316,16 @@ describe("generic PDF evidence review", () => {
       kind: "accept",
       readingId: "reading-ocr",
     });
-    fireEvent.click(screen.getByRole("button", { name: "Correct amount" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Correct amount for / }),
+    );
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "-25.00" },
     });
     fireEvent.change(screen.getByLabelText("Description", { exact: true }), {
       target: { value: "Corrected fictional store" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(onAction).toHaveBeenLastCalledWith("row-1", {
       kind: "correct",
       date: "2026-09-05",
@@ -337,11 +342,13 @@ describe("generic PDF evidence review", () => {
 
   it("rejects ambiguous or excess-precision corrections without emitting a mutation", () => {
     const { onAction } = show();
-    fireEvent.click(screen.getByRole("button", { name: "Correct amount" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /^Correct amount for / }),
+    );
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "25.001" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Save row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save amount" }));
     expect(screen.getByRole("alert")).toHaveTextContent("Enter a valid date");
     expect(onAction).not.toHaveBeenCalled();
   });
@@ -537,7 +544,7 @@ describe("generic PDF evidence review", () => {
       ),
     ).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Correct amount" }),
+      screen.getByRole("button", { name: /^Correct amount for / }),
     ).toBeEnabled();
     expect(screen.getByRole("button", { name: "Use reading 2" })).toBeEnabled();
   });

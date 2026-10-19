@@ -443,7 +443,7 @@ async function closeSheet(page) {
 async function select(page, names) {
   // Each captured scene starts a new review; adding in the UI now preserves a batch.
   const close = page.getByRole("link", {
-    name: "Close import review",
+    name: "Leave review",
     exact: true,
   });
   if (await close.isVisible()) await close.click();
