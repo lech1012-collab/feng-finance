@@ -345,3 +345,50 @@
     width: 100%;
   }
 }
+
+/* Editing amounts must not reflow or horizontally pan the statement objects. */
+.import-workspace
+  :is(
+    .generic-review-row,
+    .generic-row-content,
+    .generic-readings,
+    .generic-reading,
+    .import-correction,
+    .generic-correction
+  ) {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+.import-workspace .import-correction > p {
+  margin-block: 0 12px;
+  overflow-wrap: anywhere;
+}
+.import-workspace .import-correction .generic-correction {
+  grid-template-columns: minmax(0, 1fr);
+  margin-top: 16px;
+}
+.import-workspace .import-money-direction {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.import-workspace
+  :is(.import-correction-details, .generic-reading-comparison)
+  > summary {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  min-height: 44px;
+}
+.import-workspace .import-correction-details label {
+  margin-block: 12px;
+}
+.import-workspace .import-correction input,
+.import-workspace .import-correction textarea {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.import-workspace .import-correction .generic-source-crop {
+  margin-block: 12px;
+}

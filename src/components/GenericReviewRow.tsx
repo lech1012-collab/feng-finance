@@ -1,7 +1,5 @@
-import { UKDateInput } from "./UKDateInput";
-import { useEffect, useId, useState } from "react";
-import { decimalMoney, parseMoney } from "../domain/money";
-import { parseDate } from "../domain/dates";
+import { SourceRowCorrection } from "./SourceRowCorrection";
+import { useEffect, useState } from "react";
 import { displayDate, displayMerchant } from "../domain/presentation";
 import type { RowCheck, RowReading, SourceRect } from "../import/generic/types";
 import {
@@ -55,6 +53,7 @@ function SourceCrop({
         <img
           src={preview.url}
           alt={`Original statement row on page ${rect.page}`}
+          draggable={false}
         />
       ) : (
         <p className="muted">
@@ -142,12 +141,14 @@ export function GenericReviewRow({
   currency,
   busy,
   onAction,
+  correctionRequest,
 }: {
   row: RowCheck;
   session?: CropSession;
   currency?: string;
   busy: boolean;
   onAction: GenericImportReviewProps["onAction"];
+  correctionRequest?: string;
 }) {
   const reading = selectedReading(row);
   const merchant = displayMerchant({
@@ -160,20 +161,12 @@ export function GenericReviewRow({
   useEffect(() => {
     setOpen(!row.resolved);
   }, [row.resolved]);
-  const [date, setDate] = useState(reading?.date ?? "");
-  const [description, setDescription] = useState(reading?.description ?? "");
-  const [amount, setAmount] = useState(
-    reading?.amount !== undefined && currency
-      ? decimalMoney(reading.amount, currency)
-      : "",
-  );
-  const [balance, setBalance] = useState(
-    reading?.balanceAfterTransaction !== undefined && currency
-      ? decimalMoney(reading.balanceAfterTransaction, currency)
-      : "",
-  );
-  const [error, setError] = useState("");
-  const amountId = useId();
+  useEffect(() => {
+    if (correctionRequest) {
+      setOpen(true);
+      setCorrecting(true);
+    }
+  }, [correctionRequest]);
   const excluded = row.reviewAction?.kind === "exclude";
   const state = excluded
     ? "Excluded from import"
@@ -182,22 +175,6 @@ export function GenericReviewRow({
         ? "Reviewed · not verified"
         : "Reviewed"
       : "Needs review";
-  const startCorrection = () => {
-    setDate(reading?.date ?? "");
-    setDescription(reading?.description ?? "");
-    setAmount(
-      reading?.amount !== undefined && currency
-        ? decimalMoney(reading.amount, currency)
-        : "",
-    );
-    setBalance(
-      reading?.balanceAfterTransaction !== undefined && currency
-        ? decimalMoney(reading.balanceAfterTransaction, currency)
-        : "",
-    );
-    setError("");
-    setCorrecting(true);
-  };
   return (
     <details
       className={`generic-review-row${excluded ? " generic-row-excluded" : ""}`}
@@ -255,150 +232,78 @@ export function GenericReviewRow({
               )}
             </dl>
           )}
-          <div className="generic-readings">
-            {row.readings.map((option, index) => (
-              <section
-                className="generic-reading"
-                key={option.id}
-                aria-label={`${index === 0 ? "Extracted" : "Alternative"} reading ${index + 1}`}
-              >
-                <h4>
-                  {index === 0 ? "Extracted values" : `Alternative ${index}`}
-                  {option.parseSource === "ocr" && (
-                    <span className="small-chip">Read from image</span>
-                  )}
-                </h4>
-                <ReadingValues reading={option} currency={currency} />
-                <button
-                  type="button"
-                  disabled={busy || !validReading(option)}
-                  onClick={() =>
-                    onAction(row.rowId, {
-                      kind: "accept",
-                      readingId: option.id,
-                    })
-                  }
-                >
-                  Use reading {index + 1}
-                </button>
-                {!validReading(option) && (
-                  <p className="muted">
-                    Correct the missing or invalid date, description or amount
-                    before accepting.
-                  </p>
-                )}
-              </section>
-            ))}
-          </div>
-          {correcting ? (
-            <form
-              className="generic-correction"
-              onSubmit={(event) => {
-                event.preventDefault();
-                if (!currency) {
-                  setError(
-                    "Choose the statement currency before correcting an amount.",
-                  );
-                  return;
-                }
-                try {
-                  const validDate = parseDate(date);
-                  if (validDate !== date || !description.trim())
-                    throw new Error("Invalid row");
-                  const minorAmount = parseMoney(amount, currency);
-                  const minorBalance = balance.trim()
-                    ? parseMoney(balance, currency)
-                    : undefined;
-                  onAction(row.rowId, {
-                    kind: "correct",
-                    date: validDate,
-                    description: description.trim(),
-                    amount: minorAmount,
-                    ...(minorBalance === undefined
-                      ? {}
-                      : { balanceAfterTransaction: minorBalance }),
-                  });
-                  setError("");
-                  setCorrecting(false);
-                } catch {
-                  setError(
-                    "Enter a valid date, description and amount. Use a minus sign for money out.",
-                  );
-                }
+          <div className="generic-action-row">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                setCorrecting(true);
               }}
             >
-              <label>
-                Date
-                <UKDateInput
-                  required
-                  disabled={busy}
-                  value={date}
-                  onChange={(event) => setDate(event)}
-                />
-              </label>
-              <label>
-                Description
-                <textarea
-                  required
-                  disabled={busy}
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-              </label>
-              <label htmlFor={amountId}>
-                Amount{currency ? ` (${currency})` : ""}
-                <input
-                  id={amountId}
-                  type="text"
-                  inputMode="decimal"
-                  required
-                  disabled={busy || !currency}
-                  value={amount}
-                  onChange={(event) => setAmount(event.target.value)}
-                />
-              </label>
-              <label>
-                Running balance (optional)
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  disabled={busy || !currency}
-                  value={balance}
-                  onChange={(event) => setBalance(event.target.value)}
-                />
-              </label>
-              <p className="muted">
-                Positive means money in. Negative means money out. Saving checks
-                the statement again.
-              </p>
-              {error && <p role="alert">{error}</p>}
-              <div className="generic-action-row">
-                <button type="submit" disabled={busy || !currency}>
-                  Save row
-                </button>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => setCorrecting(false)}
-                >
-                  Cancel correction
-                </button>
-              </div>
-            </form>
-          ) : (
-            <div className="generic-action-row">
-              <button type="button" disabled={busy} onClick={startCorrection}>
-                Correct row
-              </button>
-              <button
-                type="button"
-                disabled={busy || excluded}
-                onClick={() => onAction(row.rowId, { kind: "exclude" })}
-              >
-                Exclude row
-              </button>
-            </div>
+              Correct amount
+            </button>
+            <button
+              type="button"
+              disabled={busy || excluded}
+              onClick={() => onAction(row.rowId, { kind: "exclude" })}
+            >
+              Exclude row
+            </button>
+          </div>
+          {correcting && (
+            <SourceRowCorrection
+              reading={reading}
+              currency={currency}
+              busy={busy}
+              source={<SourceCrop session={session} rect={row.rect} />}
+              onSave={(action) => {
+                onAction(row.rowId, action);
+                setCorrecting(false);
+              }}
+              onCancel={() => setCorrecting(false)}
+            />
           )}
+          <details className="generic-reading-comparison">
+            <summary>
+              Compare extracted readings ({row.readings.length})
+            </summary>
+            <div className="generic-readings">
+              {row.readings.map((option, index) => (
+                <section
+                  className="generic-reading"
+                  key={option.id}
+                  aria-label={`${index === 0 ? "Extracted" : "Alternative"} reading ${index + 1}`}
+                >
+                  <h4>
+                    {index === 0 ? "Extracted values" : `Alternative ${index}`}
+                    {option.parseSource === "ocr" && (
+                      <span className="small-chip">Read from image</span>
+                    )}
+                  </h4>
+                  <ReadingValues reading={option} currency={currency} />
+                  <button
+                    type="button"
+                    disabled={busy || !validReading(option)}
+                    onClick={() =>
+                      onAction(row.rowId, {
+                        kind: "accept",
+                        readingId: option.id,
+                      })
+                    }
+                  >
+                    Use reading {index + 1}
+                  </button>
+                  {!validReading(option) && (
+                    <p className="muted">
+                      Correct the missing or invalid date, description or amount
+                      before accepting.
+                    </p>
+                  )}
+                </section>
+              ))}
+            </div>
+          </details>
           <p className="muted">
             Excluding a source row changes the statement check. Duplicate rows
             are handled separately.

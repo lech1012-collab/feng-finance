@@ -14,13 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-19",
   points: [
-    "Select several statements and add more without losing your review choices.",
-    "Review one exception at a time, then confirm the whole batch.",
-    "Clearer mobile statement details, with financial checks kept in place.",
+    "Correct uncertain transaction amounts in a fixed editing panel.",
+    "Choose Money in or Money out without typing a minus sign.",
+    "Reach source correction directly from a bank-reader transaction.",
   ],
   pleaseTest: [
-    "Import several PDFs, add another selection and review any flagged statements.",
-    "Try small screens, larger text and offline importing.",
+    "Correct an uncertain amount, save it and check the statement balance.",
+    "Try the editor on your phone with the keyboard open and larger text.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +28,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.8",
+    date: "2026-10-19",
+    points: [
+      "Select several statements and add more without losing your review choices.",
+      "Review one exception at a time, then confirm the whole batch.",
+      "Clearer mobile statement details, with financial checks kept in place.",
+    ],
+    pleaseTest: [
+      "Import several PDFs, add another selection and review any flagged statements.",
+      "Try small screens, larger text and offline importing.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.7",
     date: "2026-10-15",

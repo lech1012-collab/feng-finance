@@ -203,6 +203,28 @@ afterEach(() => {
 });
 
 describe("generic PDF evidence review", () => {
+  it("opens the specifically requested verified row even beyond the first ten rows, without saving it", () => {
+    const result = resultFixture();
+    result.status = "parsed";
+    result.checks.needsReviewRows = 0;
+    result.rowChecks = Array.from({ length: 12 }, (_, index) => ({
+      ...flaggedRow(),
+      rowId: `row-${index}`,
+      checkLevel: "balance",
+      resolved: true,
+      issues: [],
+    }));
+    const { onAction } = show(result, {
+      correctionRequest: { id: "direct-request", rowId: "row-11" },
+    });
+    expect(
+      screen.getByRole("dialog", { name: "Correct transaction amount" }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Amount (GBP)")).toHaveValue("24.99");
+    fireEvent.click(screen.getByRole("button", { name: "Cancel correction" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onAction).not.toHaveBeenCalled();
+  });
   it("shows a one-penny difference and requires explicit confirmation before import anyway", () => {
     const { onImportAnyway } = show();
     expect(screen.getByText(/^Balance difference:/)).toHaveTextContent(
@@ -255,17 +277,20 @@ describe("generic PDF evidence review", () => {
     expect(
       screen.getByRole("button", { name: "Import anyway…" }),
     ).toBeDisabled();
-    expect(screen.getByRole("button", { name: "Correct row" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Correct amount" }),
+    ).toBeEnabled();
   });
 
   it("emits the chosen alternative, exact signed correction and source-row exclusion", () => {
     const { onAction } = show();
+    fireEvent.click(screen.getByText(/Compare extracted readings/));
     fireEvent.click(screen.getByRole("button", { name: "Use reading 2" }));
     expect(onAction).toHaveBeenLastCalledWith("row-1", {
       kind: "accept",
       readingId: "reading-ocr",
     });
-    fireEvent.click(screen.getByRole("button", { name: "Correct row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Correct amount" }));
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "-25.00" },
     });
@@ -289,7 +314,7 @@ describe("generic PDF evidence review", () => {
 
   it("rejects ambiguous or excess-precision corrections without emitting a mutation", () => {
     const { onAction } = show();
-    fireEvent.click(screen.getByRole("button", { name: "Correct row" }));
+    fireEvent.click(screen.getByRole("button", { name: "Correct amount" }));
     fireEvent.change(screen.getByLabelText("Amount (GBP)"), {
       target: { value: "25.001" },
     });
@@ -488,7 +513,9 @@ describe("generic PDF evidence review", () => {
         /Preview unavailable. Compare this row with the original PDF/,
       ),
     ).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Correct row" })).toBeEnabled();
+    expect(
+      screen.getByRole("button", { name: "Correct amount" }),
+    ).toBeEnabled();
     expect(screen.getByRole("button", { name: "Use reading 2" })).toBeEnabled();
   });
 });

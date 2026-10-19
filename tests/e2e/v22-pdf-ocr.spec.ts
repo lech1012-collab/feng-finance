@@ -362,7 +362,9 @@ test("a one-penny digital discrepancy stays unverified until the source amount i
         node.naturalHeight > 0,
     ),
   ).toBe(true);
-  await row.getByRole("button", { name: "Correct row", exact: true }).click();
+  await row
+    .getByRole("button", { name: "Correct amount", exact: true })
+    .click();
   await row.getByLabel("Amount (GBP)", { exact: true }).fill("-78.43");
   await row.getByRole("button", { name: "Save row", exact: true }).click();
   await expect(proof).toContainText("Statement figures match exactly");

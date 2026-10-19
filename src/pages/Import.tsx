@@ -1,3 +1,7 @@
+import {
+  sourceCorrectionRow,
+  type SourceCorrectionTarget,
+} from "../import/source-correction-target";
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -55,6 +59,11 @@ export default function ImportPage({
 }) {
   const [entries, setEntries] = useState<FileReview[]>([]);
   const [busy, setBusy] = useState(false);
+  const [sourceCorrection, setSourceCorrection] = useState<{
+    id: string;
+    entryId: string;
+    target: SourceCorrectionTarget;
+  }>();
   const [phase, setPhase] = useState<"pick" | "check" | "review" | "done">(
     "pick",
   );
@@ -508,11 +517,24 @@ export default function ImportPage({
     patchEntry(entry.id, changed);
     void reparse(changed, false);
   };
+  const reviewNativeSource = (
+    entry: FileReview,
+    target: SourceCorrectionTarget,
+  ) => {
+    setSourceCorrection({ id: id(), entryId: entry.id, target });
+    const changed = {
+      ...entry,
+      pdfReviewOptions: { ...entry.pdfReviewOptions, preferGeneric: true },
+    };
+    patchEntry(entry.id, { pdfReviewOptions: changed.pdfReviewOptions });
+    void reparse(changed, false, true);
+  };
   const reviewSourceRow = (
     entry: FileReview,
     rowId: string,
     action: RowReviewAction,
   ) => {
+    setSourceCorrection(undefined);
     const changed: FileReview = {
       ...entry,
       pdfReviewOptions: {
@@ -1110,6 +1132,7 @@ export default function ImportPage({
                   patch={(patch) => patchReviewEntry(entry.id, patch)}
                   reparse={(ocr) => void reparse(entry, ocr)}
                   onInclude={() => includeAndRecheck(entry)}
+                  onReviewSource={(row) => reviewNativeSource(entry, row)}
                   onSourceAction={(rowId, action) =>
                     reviewSourceRow(entry, rowId, action)
                   }
@@ -1165,6 +1188,17 @@ export default function ImportPage({
                     const review = (
                       <GenericImportReview
                         result={result}
+                        correctionRequest={
+                          sourceCorrection?.entryId === entry.id
+                            ? {
+                                id: sourceCorrection.id,
+                                rowId: sourceCorrectionRow(
+                                  result,
+                                  sourceCorrection.target,
+                                ),
+                              }
+                            : undefined
+                        }
                         session={entry.extracted?.pdfSession}
                         currency={
                           entry.draft?.statement.currency ??

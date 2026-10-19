@@ -341,21 +341,26 @@ test("a bank-reader source correction opens generic review only on request and r
   await nativeRow
     .getByLabel("Category", { exact: true })
     .selectOption("shopping");
-  const options = card.locator(readingOptionsSelector);
-  await options.locator(":scope > summary").click();
-  await options
-    .getByRole("button", { name: "Review PDF layout", exact: true })
+  await nativeRow
+    .getByRole("button", { name: "Correct amount", exact: true })
     .click();
+  await expect(
+    page.getByRole("dialog", {
+      name: "Correct transaction amount",
+      exact: true,
+    }),
+  ).toBeVisible();
   const proof = card.getByRole("region", {
     name: "Statement reading and checks",
   });
-  await expect(proof).toBeVisible();
   await expect(proof).toContainText("This statement is not verified yet");
   const row = proof.locator(".generic-review-row").filter({
     has: page.locator("summary strong", { hasText: "FICTIONAL GROCER" }),
   });
-  await row.getByRole("button", { name: "Correct row", exact: true }).click();
-  await row.getByLabel("Amount (GBP)", { exact: true }).fill("-80.00");
+  await expect(
+    row.getByRole("button", { name: "Money out", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await row.getByLabel("Amount (GBP)", { exact: true }).fill("80.00");
   await row.getByRole("button", { name: "Save row", exact: true }).click();
   await expect(proof).toContainText("Statement figures match exactly");
   const confirm = page.getByRole("button", {
