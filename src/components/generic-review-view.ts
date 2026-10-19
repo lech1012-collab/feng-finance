@@ -26,6 +26,8 @@ export interface GenericImportReviewProps {
   /** Called only after the explicit unverified-import confirmation. */
   onImportAnyway: () => void;
   canImportAnyway?: boolean;
+  /** The containing statement owns the shared acceptance sheet when false. */
+  showImportAnyway?: boolean;
 }
 export const roles: { value: ColumnRole; label: string }[] = [
   { value: "date", label: "Date" },

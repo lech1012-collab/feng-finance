@@ -100,17 +100,22 @@ before disconnecting. Physical iPhone checks are documented separately in the
 
 ## Everyday workflow
 
-1. On Home or the Import tab, select one or several PDF, CSV, OFX/QFX or QIF files.
-   The file picker opens directly. Desktop also supports dropping files.
-2. Feng parses files locally and prepares one combined review. It shows the
-   detected account and period, gross **Money in/Money out**, balances,
-   reconciliation, possible duplicates and any uncertain extracted rows.
-3. Resolve highlighted issues. Confirm proposed transfers or card repayments.
-   Failed reconciliation, partial extraction and unresolved OCR require explicit
-   review. Fully resolved image readings with exact checks can be confirmed;
-   choosing a category cannot make an invalid statement reconciled.
-4. Confirm import. Feng returns Home. **To review** includes both uncategorized
-   and categorized-but-unreviewed transactions.
+1. On Home, Import opens the file picker directly. Select several PDFs together,
+   or use **Select statements** on Import. Desktop also accepts dropped files.
+2. Feng checks files locally and presents one batch: ready, needing attention
+   and skipped. Reconciled statements stay closed. **Add statements** appends
+   more files without clearing corrections; cancelling keeps the batch.
+3. Review exceptions one statement at a time. **Review next statement** focuses
+   the next unresolved file. Statement figures, all transactions and reading
+   settings open on demand. A file can be left out and included/rechecked later.
+   Possible duplicates stay excluded by default. Uncertain amounts require their
+   own correction or confirmation; categorisation can wait. Optional transfer
+   linking stays available without becoming another mandatory review step.
+4. **Confirm import** saves the batch once and returns Home. Failed balances,
+   incomplete pages and invalid source values retain their original gates.
+   Importing unverified figures requires a separate explicit confirmation;
+   acceptance never makes those figures reconciled. **To review** includes both
+   uncategorised and categorised-but-unreviewed transactions.
 5. Sort the remaining records, then use the four-step monthly review to inspect
    changes, confirm pot contributions, review rules/backups and close the month.
 
@@ -444,6 +449,15 @@ are ignored and blocked.
 - No Open Banking, cloud sync, household sharing, AI assistant or automatic
   movement/cancellation of money. Property reporting is cash flow, not accrual,
   depreciation or a guaranteed tax treatment. Plans depend on imported evidence.
+
+## v2.2.8 Import workflow
+
+This update is limited to Import: preserved multi-file batches, exception-first
+review, fewer repetitive decisions and bounded mobile text. Bank readers,
+financial calculations, reconciliation policy and database schema are unchanged.
+The [design handoff](docs/import-ux-redesign.md) explains the incumbent patterns
+and acceptance criteria. The [implementation review](docs/import-ux-implementation-review.md)
+records reviewer corrections, screen evidence and verification limits.
 
 ## v2.2.7 verified UX beta
 

@@ -1,0 +1,34 @@
+[
+  {
+    "setup": "390-dark",
+    "scenario": "expanded-long-filename",
+    "width": 390,
+    "documentWidth": 1283,
+    "visibleCheckboxes": 2,
+    "overflow": []
+  },
+  {
+    "setup": "320-dark",
+    "scenario": "expanded-long-filename",
+    "width": 320,
+    "documentWidth": 1283,
+    "visibleCheckboxes": 2,
+    "overflow": []
+  },
+  {
+    "setup": "390-text200",
+    "scenario": "expanded-long-filename",
+    "width": 390,
+    "documentWidth": 2520,
+    "visibleCheckboxes": 2,
+    "overflow": []
+  },
+  {
+    "setup": "390-light",
+    "scenario": "expanded-long-filename",
+    "width": 390,
+    "documentWidth": 1283,
+    "visibleCheckboxes": 2,
+    "overflow": []
+  }
+]

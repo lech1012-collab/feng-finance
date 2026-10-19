@@ -1,5 +1,4 @@
 import { useRef, useState } from "react";
-import type { GenericParseResult } from "../import/generic/types";
 import {
   displayMoney,
   validReading,
@@ -10,69 +9,9 @@ import {
 import { GenericReviewRow } from "./GenericReviewRow";
 import { GenericColumnMapping } from "./GenericColumnMapping";
 import { Sheet } from "./Sheet";
-import { CheckboxRow, WarningBox } from "./UIPrimitives";
+import { ImportRiskConfirmation } from "./ImportRiskConfirmation";
 import "./GenericImportReview.css";
 export type { GenericImportReviewProps } from "./generic-review-view";
-function UnverifiedImport({
-  result,
-  busy,
-  onConfirm,
-  onCancel,
-}: {
-  result: GenericParseResult;
-  busy: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
-}) {
-  const [accepted, setAccepted] = useState(false);
-  return (
-    <Sheet
-      title="Import an unverified statement?"
-      onClose={onCancel}
-      footer={
-        <>
-          <button type="button" disabled={busy} onClick={onCancel} autoFocus>
-            Continue reviewing
-          </button>
-          <button
-            type="button"
-            disabled={busy || !accepted}
-            onClick={onConfirm}
-          >
-            Import unverified statement
-          </button>
-        </>
-      }
-    >
-      <WarningBox
-        title="Some statement figures are unverified"
-        severity="error"
-      >
-        <p>
-          Some rows or pages have not been verified against the statement. This
-          account and statement will be marked <strong>Unverified</strong>.
-        </p>
-        {!!result.checks.unreadPages.length && (
-          <p>
-            Pages {result.checks.unreadPages.join(", ")} have not been read.
-            Their transactions will not be imported.
-          </p>
-        )}
-        <p>
-          Only the selected, valid transactions will be added. Check the
-          original PDF before relying on these figures.
-        </p>
-      </WarningBox>
-      <CheckboxRow
-        checked={accepted}
-        onChange={setAccepted}
-        disabled={busy}
-        label="I checked the original statement and accept importing these unverified figures."
-      />
-    </Sheet>
-  );
-}
-
 export function GenericImportReview({
   result,
   session,
@@ -84,6 +23,7 @@ export function GenericImportReview({
   onSaveTemplate,
   onImportAnyway,
   canImportAnyway = !!result.parsed,
+  showImportAnyway = true,
 }: GenericImportReviewProps) {
   const [showMapping, setShowMapping] = useState(false);
   const [showOverride, setShowOverride] = useState(false);
@@ -304,7 +244,7 @@ export function GenericImportReview({
           </Sheet>
         )}
       </details>
-      {needsOverride && (
+      {needsOverride && showImportAnyway && (
         <div className="generic-override">
           <p>
             Resolve the rows and make the figures match, or explicitly import an
@@ -330,7 +270,8 @@ export function GenericImportReview({
         </div>
       )}
       {showOverride && (
-        <UnverifiedImport
+        <ImportRiskConfirmation
+          currency={currency}
           result={result}
           busy={busy}
           onCancel={() => setShowOverride(false)}

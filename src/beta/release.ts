@@ -12,15 +12,15 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-15",
+  date: "2026-10-19",
   points: [
-    "Clearer screens and consistent controls at small sizes and large text.",
-    "Confirm similar recurring bills, with Undo and local saved decisions.",
-    "Review PDF figures before opening column mapping.",
+    "Select several statements and add more without losing your review choices.",
+    "Review one exception at a time, then confirm the whole batch.",
+    "Clearer mobile statement details, with financial checks kept in place.",
   ],
   pleaseTest: [
-    "Import, sort transactions and save a protected backup.",
-    "Review small screens, large text and keyboard navigation.",
+    "Import several PDFs, add another selection and review any flagged statements.",
+    "Try small screens, larger text and offline importing.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +28,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.7",
+    date: "2026-10-15",
+    points: [
+      "Clearer screens and consistent controls at small sizes and large text.",
+      "Confirm similar recurring bills, with Undo and local saved decisions.",
+      "Review PDF figures before opening column mapping.",
+    ],
+    pleaseTest: [
+      "Import, sort transactions and save a protected backup.",
+      "Review small screens, large text and keyboard navigation.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.6",
     date: "2026-10-14",

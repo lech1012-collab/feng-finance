@@ -219,14 +219,14 @@ describe("generic PDF evidence review", () => {
     const dialog = screen.getByRole("dialog");
     expect(
       within(dialog).getByRole("button", {
-        name: "Import unverified statement",
+        name: "Accept unverified statement",
       }),
     ).toBeDisabled();
     expect(onImportAnyway).not.toHaveBeenCalled();
     fireEvent.click(within(dialog).getByRole("checkbox"));
     fireEvent.click(
       within(dialog).getByRole("button", {
-        name: "Import unverified statement",
+        name: "Accept unverified statement",
       }),
     );
     expect(onImportAnyway).toHaveBeenCalledExactlyOnceWith();

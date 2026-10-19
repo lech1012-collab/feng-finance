@@ -153,7 +153,7 @@ test("recognised digital Barclays, Barclaycard, Amex and Revolut import together
     const card = await openCard(page, statement.name);
     await expect(
       card.getByRole("heading", {
-        name: `${statement.institution} detected`,
+        name: statement.institution,
         exact: true,
       }),
     ).toBeVisible();
@@ -167,7 +167,10 @@ test("recognised digital Barclays, Barclaycard, Amex and Revolut import together
       card.getByRole("region", { name: "Statement reading and checks" }),
     ).toHaveCount(0);
     await expect(
-      card.getByLabel(/I compared the extracted rows with the source file/),
+      card.getByRole("button", {
+        name: "Accept these statement warnings",
+        exact: true,
+      }),
     ).toHaveCount(0);
     await expect(
       card.getByRole("button", { name: "Use reading 1" }),
@@ -262,7 +265,7 @@ test("an unknown HSBC statement retains the generic source-reading workflow", as
   await select(page, ["hsbc"]);
   const card = await openCard(page, "hsbc");
   await expect(
-    card.getByRole("heading", { name: "Other detected", exact: true }),
+    card.getByRole("heading", { name: "Other", exact: true }),
   ).toBeVisible();
   await expect(card.locator(readingOptionsSelector)).toHaveCount(1);
   const proof = card.getByRole("region", {
@@ -302,7 +305,7 @@ test("a known-bank transaction that contradicts printed balances still requires 
   await select(page, ["barclays-malformed"]);
   const card = await openCard(page, "barclays-malformed");
   await expect(
-    card.getByRole("heading", { name: "Barclays detected", exact: true }),
+    card.getByRole("heading", { name: "Barclays", exact: true }),
   ).toBeVisible();
   await expect(card.locator(readingOptionsSelector)).not.toHaveAttribute(
     "open",

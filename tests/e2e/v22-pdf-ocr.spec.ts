@@ -276,7 +276,7 @@ test("stopping scanned-page reading retains completed rows and requires explicit
   await expect(warning).toContainText("Pages 2 have not been read");
   await expect(
     warning.getByRole("button", {
-      name: "Import unverified statement",
+      name: "Accept unverified statement",
       exact: true,
     }),
   ).toBeDisabled();
@@ -286,7 +286,7 @@ test("stopping scanned-page reading retains completed rows and requires explicit
     )
     .check();
   await warning
-    .getByRole("button", { name: "Import unverified statement", exact: true })
+    .getByRole("button", { name: "Accept unverified statement", exact: true })
     .click();
   await expect(warning).toHaveCount(0);
   await expect(

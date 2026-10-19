@@ -1,3 +1,4 @@
+import { showTransferChoices } from "./import-actions";
 import { settingsSection } from "./flows";
 import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
@@ -226,16 +227,19 @@ test("a card repayment is confirmed in import review and linked atomically with 
       buffer: Buffer.from(card),
     },
   ]);
-  const review = page.getByRole("region", {
-    name: "Confirm internal transfers",
-  });
+  const review = await showTransferChoices(page);
   await expect(review).toBeVisible();
-  const confirmation = review.getByRole("checkbox", {
-    name: /Confirm Barclays to American Express/,
+  const confirmation = review.getByRole("button", {
+    name: /Link Barclays to American Express/,
   });
-  await expect(confirmation).not.toBeChecked();
+  await expect(confirmation).toBeVisible();
+  await expect(
+    review.getByRole("button", {
+      name: /Leave unlinked Barclays to American Express/,
+    }),
+  ).toHaveCount(0);
   expect(await records(page, "transactions")).toHaveLength(0);
-  await confirmation.check();
+  await confirmation.click();
   await confirm(page);
   const imported = await records(page, "transactions");
   expect(imported).toHaveLength(2);
@@ -287,19 +291,16 @@ for (const leaveUnlinked of [false, true]) {
         buffer: Buffer.from(card),
       },
     ]);
-    const review = page.getByRole("region", {
-      name: "Confirm internal transfers",
-    });
+    const review = await showTransferChoices(page);
     await expect(review).toContainText("1 pair will link automatically");
     expect(await records(page, "transferLinks")).toHaveLength(0);
-    await review.getByRole("button", { name: "Review", exact: true }).click();
-    const link = review.getByRole("checkbox", {
-      name: /Link automatically Barclays to American Express/,
+    const link = review.getByRole("button", {
+      name: /Leave unlinked Barclays to American Express/,
     });
-    await expect(link).toBeChecked();
+    await expect(link).toBeVisible();
     await expect(review).toContainText("£950.00");
     if (leaveUnlinked) {
-      await link.uncheck();
+      await link.click();
       await expect(review).toContainText("0 pairs will link automatically");
       await expect(review).toContainText("left unlinked");
     }

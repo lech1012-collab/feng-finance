@@ -1,4 +1,9 @@
 import {
+  showTransferChoices,
+  acceptUnverifiedStatement,
+  acceptStatementWarnings,
+} from "./import-actions";
+import {
   selectPeriod,
   saveReadableBackup,
   settingsSection,
@@ -96,10 +101,17 @@ async function openStatementCard(page: Page, bank: string) {
     timeout: 90000,
   });
   const card = page.locator(".import-statement-card").filter({
-    has: page.getByRole("heading", { name: `${bank} detected`, exact: true }),
+    has: page.getByRole("heading", { name: bank, exact: true }),
   });
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
+  // Legacy financial-detail journeys deliberately inspect the disclosed figures.
+  const figures = card.locator(".import-statement-figures");
+  if (
+    (await figures.count()) &&
+    !(await figures.evaluate((element) => (element as HTMLDetailsElement).open))
+  )
+    await figures.locator(":scope > summary").click();
   return card;
 }
 test("manual category memory survives deleting imports and reimporting the same PDF", async ({
@@ -627,6 +639,11 @@ async function openImport(page: Page) {
   ).toBeVisible();
 }
 async function selectStatement(page: Page, name: string) {
+  // This helper starts a distinct review; adding to a batch is tested separately.
+  if (await page.locator(".import-statement-card").count()) {
+    await gotoRoute(page, "/");
+    await openImport(page);
+  }
   await page.getByLabel("Select statements").setInputFiles(fixture(name));
   await expect(page.locator(".import-review-list")).toBeVisible({
     timeout: 90000,
@@ -634,6 +651,12 @@ async function selectStatement(page: Page, name: string) {
   const card = page.locator(".import-statement-card").first();
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
+  const figures = card.locator(".import-statement-figures");
+  if (
+    (await figures.count()) &&
+    !(await figures.evaluate((element) => (element as HTMLDetailsElement).open))
+  )
+    await figures.locator(":scope > summary").click();
 }
 async function confirmImport(page: Page) {
   await page
@@ -667,7 +690,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await openImport(page);
   await selectStatement(page, "barclays");
   await expect(
-    page.getByRole("heading", { name: "Barclays detected" }),
+    page.getByRole("heading", { name: "Barclays", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("✓ Statement reconciled", { exact: true }),
@@ -726,7 +749,7 @@ test("PDF import, drill-down, correction, learned rule and duplicate protection"
   await openImport(page);
   await selectStatement(page, "barclays-october");
   await expect(
-    page.getByRole("heading", { name: "Barclays detected" }),
+    page.getByRole("heading", { name: "Barclays", exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: /All transactions/ }).click();
   await page.locator(".review-row > summary").click();
@@ -842,19 +865,20 @@ test("multiple banks, transfer exclusion and currency isolation", async ({
       card.getByText("✓ Statement reconciled", { exact: true }),
     ).toBeVisible();
   }
-  const transfers = page.getByRole("region", {
-    name: "Confirm internal transfers",
-    exact: true,
-  });
+  const transfers = await showTransferChoices(page);
   await expect(transfers).toContainText("0 confirmed · 2 left for later");
   await transfers
-    .getByLabel("Confirm Barclays to Revolut £2,000.00", { exact: true })
-    .check();
-  await transfers
-    .getByLabel("Confirm Barclays to American Express £1,000.00", {
+    .getByRole("button", {
+      name: "Link Barclays to Revolut £2,000.00",
       exact: true,
     })
-    .check();
+    .click();
+  await transfers
+    .getByRole("button", {
+      name: "Link Barclays to American Express £1,000.00",
+      exact: true,
+    })
+    .click();
   await expect(transfers).toContainText("2 confirmed · 0 left for later");
   await expectTransactionCount(page, 0); // Reviewing pairs must not commit the drafts.
   await confirmImport(page);
@@ -977,33 +1001,31 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await openImport(page);
   await selectStatement(page, "barclaycard");
   await expect(
-    page.getByRole("heading", { name: "Barclays detected" }),
+    page.getByRole("heading", { name: "Barclays", exact: true }),
   ).toBeVisible();
   await expect(
     page.getByText("✓ Statement reconciled", { exact: true }),
   ).toBeVisible();
   await expect(
-    page.getByText("2 Sep to 4 Oct 2026 · transaction coverage", {
+    page.getByText("2 Sep 2026 to 4 Oct 2026 · transaction coverage", {
       exact: true,
     }),
   ).toBeVisible();
   await expect(
     page.getByText("Statement issued 4 Oct", { exact: true }),
   ).toBeVisible();
-  const transfers = page.getByRole("region", {
-    name: "Confirm internal transfers",
-    exact: true,
-  });
+  const transfers = await showTransferChoices(page);
   await transfers
-    .getByLabel("Confirm Barclays to Barclays £900.00", { exact: true })
-    .check();
+    .getByRole("button", {
+      name: "Link Barclays to Barclays £900.00",
+      exact: true,
+    })
+    .click();
   await expect(transfers).toContainText("1 confirmed · 0 left for later");
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await page
-    .getByLabel(/I compared the extracted rows with the source file/)
-    .check();
+  await acceptStatementWarnings(page.locator(".import-statement-card[open]"));
   await confirmImport(page);
   await page.locator('input[type="month"]').fill("2026-09");
   // An unlinked merchant refund awaits its original purchase; it is not income.
@@ -1032,7 +1054,7 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await expect(
     page
       .locator(".import-statement-card > summary")
-      .getByText("1 to 30 Sep 2026", { exact: true }),
+      .getByText("1 Sep 2026 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   const statement = page.locator(".import-statement-card");
   await statement
@@ -1057,7 +1079,12 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await expect(page.getByRole("alert")).toContainText(
     "Enter the dates printed on the PDF",
   );
-  await page.getByLabel("Enter statement dates from the source file").check();
+  await page
+    .getByRole("button", {
+      name: "Enter statement dates from the source file",
+      exact: true,
+    })
+    .click();
   await page
     .getByRole("textbox", { name: "Statement start date", exact: true })
     .fill("01/09/2026");
@@ -1071,20 +1098,23 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
-  await page
-    .getByLabel(/I compared the extracted rows with the source file/)
-    .check();
+  await acceptStatementWarnings(page.locator(".import-statement-card[open]"));
   await confirmImport(page);
   await openImport(page);
   await selectStatement(page, "barclays-october");
   await expect(
     page
       .locator(".import-statement-card > summary")
-      .getByText("1 to 31 Oct 2026", { exact: true }),
+      .getByText("1 Oct 2026 to 31 Oct 2026", { exact: true }),
   ).toBeVisible();
+  // Successful native statements keep technical date controls on demand.
+  await statement.locator(".parse-options > summary").click();
   await expect(
-    page.getByLabel("Enter statement dates from the source file"),
-  ).not.toBeChecked();
+    page.getByRole("button", {
+      name: "Enter statement dates from the source file",
+      exact: true,
+    }),
+  ).toBeVisible();
 });
 test("reconciliation warning cannot be silently committed", async ({
   page,
@@ -1100,16 +1130,24 @@ test("reconciliation warning cannot be silently committed", async ({
     page.getByRole("button", { name: "Confirm import" }),
   ).toBeDisabled();
   await expect(
-    page.getByLabel(/I reviewed the source PDF and explicitly accept/),
-  ).toHaveCount(1);
+    page.getByRole("button", { name: "Import anyway…", exact: true }),
+  ).toBeVisible();
   await expect(page.locator(".generic-import-review")).toHaveCount(0);
+  // Cancelling the explicit risk sheet never accepts the balance difference.
   await page
-    .getByLabel(/I reviewed the source PDF and explicitly accept/)
-    .check();
-  const extractionWarning = page.getByLabel(
-    /I compared the extracted rows with the source file/,
-  );
-  if (await extractionWarning.count()) await extractionWarning.check();
+    .getByRole("button", { name: "Import anyway…", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", {
+      name: "Import an unverified statement?",
+      exact: true,
+    })
+    .getByRole("button", { name: "Continue reviewing", exact: true })
+    .click();
+  await expect(
+    page.getByRole("button", { name: "Confirm import", exact: true }),
+  ).toBeDisabled();
+  await acceptUnverifiedStatement(page);
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeEnabled();
@@ -1282,7 +1320,7 @@ test("scanned PDF uses bundled OCR and exact source checks offline", async ({
   await openImport(page);
   await selectStatement(page, "barclays-scanned");
   await expect(
-    page.getByRole("heading", { name: "Barclays detected" }),
+    page.getByRole("heading", { name: "Barclays", exact: true }),
   ).toBeVisible({ timeout: 90000 });
   await expect(page.getByText(/Read from images/).first()).toBeVisible();
   const proof = page.getByRole("region", {
@@ -1477,9 +1515,11 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
     .setInputFiles([fixture("amex-uk-layout"), fixture("revolut-uk-layout")]);
   await expect(page.locator(".import-statement-card")).toHaveCount(2);
   const amex = await openStatementCard(page, "American Express");
-  const revolut = await openStatementCard(page, "Revolut");
+  const revolut = page.locator(".import-statement-card").filter({
+    has: page.getByRole("heading", { name: "Revolut", exact: true }),
+  });
   await expect(
-    page.getByRole("heading", { name: "American Express detected" }),
+    page.getByRole("heading", { name: "American Express", exact: true }),
   ).toBeVisible();
   await expect(
     amex.locator(".validation").getByText("Statement needs review", {
@@ -1489,7 +1529,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     amex
       .locator(":scope > summary")
-      .getByText("6 Sep to 5 Oct 2026", { exact: true }),
+      .getByText("6 Sep 2026 to 5 Oct 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     amex.getByText(
@@ -1502,17 +1542,10 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   // Out-of-period dates remain an explicit native warning; they do not require
   // reviewing every amount through the generic parser.
   await expect(amex.locator(".generic-import-review")).toHaveCount(0);
-  await amex
-    .getByLabel(
-      "I reviewed the source PDF and explicitly accept this unverified statement.",
-      { exact: true },
-    )
-    .check();
-  await amex
-    .getByLabel(/I compared the extracted rows with the source file/)
-    .check();
+  await acceptUnverifiedStatement(page, amex);
+  await openStatementCard(page, "Revolut");
   await expect(
-    page.getByRole("heading", { name: "Revolut detected" }),
+    page.getByRole("heading", { name: "Revolut", exact: true }),
   ).toBeVisible();
   await expect(
     revolut.getByText("✓ Statement reconciled", { exact: true }),
@@ -1520,7 +1553,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await expect(
     revolut
       .locator(":scope > summary")
-      .getByText("1 to 30 Sep 2026", { exact: true }),
+      .getByText("1 Sep 2026 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   await expect(
     revolut.locator(
@@ -1544,6 +1577,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   ).toContainText("£510.00");
   // These fictional statements contain different repayment amounts, so there
   // is no pair to infer. Explicitly mark the known own-card movements instead.
+  await openStatementCard(page, "American Express");
   await amex.getByRole("button", { name: /All transactions/ }).click();
   const amexPayment = amex
     .locator(".review-row")
@@ -1557,6 +1591,7 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
   await amexPayment
     .getByRole("combobox", { name: "Type", exact: true })
     .selectOption("transfer");
+  await openStatementCard(page, "Revolut");
   await revolut.getByRole("button", { name: /All transactions/ }).click();
   const revolutPayment = revolut
     .locator(".review-row")
@@ -2315,7 +2350,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
     .click();
   await (await choose).setFiles(fixture("barclays-sort"));
   await expect(
-    page.getByRole("heading", { name: "Barclays detected" }),
+    page.getByRole("heading", { name: "Barclays", exact: true }),
   ).toBeVisible();
   await confirmImport(page);
   await expect(
