@@ -45,6 +45,7 @@ export function ImportStatementReview({
   onSourceAction,
   onCreateAccount,
   onInclude,
+  onReviewSource,
 }: {
   entry: FileReview;
   accounts: Account[];
@@ -57,6 +58,7 @@ export function ImportStatementReview({
   onSourceAction?: (rowId: string, action: RowReviewAction) => void;
   onCreateAccount?: (account: Account) => void;
   onInclude?: () => void;
+  onReviewSource?: (row: ImportDraft["transactions"][number]) => void;
 }) {
   const d = entry.draft;
   const [showRisk, setShowRisk] = useState(false);
@@ -692,8 +694,9 @@ export function ImportStatementReview({
                     )}
                     {entry.showAll && d.bankSource && (
                       <p className="hint">
-                        Dates and amounts come from the bank reader. To correct
-                        them, open Reading details and choose Review PDF layout.
+                        Dates and amounts come from the bank reader. Open a
+                        transaction and choose Correct amount to check its
+                        source values.
                       </p>
                     )}
                     {(entry.showAll ? [...d.transactions] : [...checks])
@@ -713,6 +716,9 @@ export function ImportStatementReview({
                           busy={busy}
                           updateRow={updateRow}
                           correctSource={correctSource}
+                          onReviewSource={
+                            onReviewSource ? () => onReviewSource(t) : undefined
+                          }
                           invalidAmounts={entry.invalidAmounts}
                           patch={patch}
                           isExport={!!entry.extracted?.format}

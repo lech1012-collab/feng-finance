@@ -15,6 +15,7 @@ export type { GenericImportReviewProps } from "./generic-review-view";
 export function GenericImportReview({
   result,
   session,
+  correctionRequest,
   currency = result.parsed?.currency,
   method,
   busy,
@@ -31,6 +32,8 @@ export function GenericImportReview({
   const [visibleRows, setVisibleRows] = useState(10);
   const reviewedRows = result.rowChecks.filter(
     (row) =>
+      (!!correctionRequest && !correctionRequest.rowId) ||
+      row.rowId === correctionRequest?.rowId ||
       row.checkLevel === "review" ||
       row.checkLevel === "manual_override" ||
       row.issues.length > 0 ||
@@ -130,26 +133,52 @@ export function GenericImportReview({
           reconstructed rows remain available below.
         </p>
       )}
+      {correctionRequest && !correctionRequest.rowId && (
+        <p role="status">
+          Source review is open. Choose the matching transaction and select
+          Correct amount.
+        </p>
+      )}
       {!!reviewedRows.length && (
         <details
           className="generic-review-list"
-          open={result.checks.needsReviewRows > 0}
+          open={result.checks.needsReviewRows > 0 || !!correctionRequest}
         >
-          <summary>Needs review ({result.checks.needsReviewRows})</summary>
+          <summary>
+            {result.checks.needsReviewRows
+              ? `Needs review (${result.checks.needsReviewRows})`
+              : correctionRequest
+                ? correctionRequest.rowId
+                  ? "Selected transaction"
+                  : "Choose a transaction"
+                : "Reviewed transactions"}
+          </summary>
           <p>
             Compare each row with the original. Corrections recheck the
             statement immediately.
           </p>
-          {reviewedRows.slice(0, visibleRows).map((row) => (
-            <GenericReviewRow
-              key={row.rowId}
-              row={row}
-              session={session}
-              currency={currency}
-              busy={busy}
-              onAction={onAction}
-            />
-          ))}
+          {[...reviewedRows]
+            .sort(
+              (a, b) =>
+                Number(b.rowId === correctionRequest?.rowId) -
+                Number(a.rowId === correctionRequest?.rowId),
+            )
+            .slice(0, visibleRows)
+            .map((row) => (
+              <GenericReviewRow
+                key={row.rowId}
+                row={row}
+                session={session}
+                currency={currency}
+                busy={busy}
+                onAction={onAction}
+                correctionRequest={
+                  correctionRequest?.rowId === row.rowId
+                    ? correctionRequest.id
+                    : undefined
+                }
+              />
+            ))}
           {reviewedRows.length > visibleRows && (
             <button
               type="button"

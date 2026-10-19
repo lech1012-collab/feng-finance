@@ -43,3 +43,28 @@ for (const layout of [
   );
 }
 console.log("Generated six fictional known-bank and fallback PDFs.");
+
+// An unread amount remains correctable before any financial records are saved.
+{
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const page = document.addPage([595, 842]);
+  for (const item of knownBankItems("hsbc")) {
+    const text =
+      item.text === "FICTIONAL GROCER"
+        ? "BEAUTY CODE"
+        : item.y === 260 && item.x === 320
+          ? "UNREAD"
+          : item.text;
+    page.drawText(text, {
+      x: item.x,
+      y: 842 - item.y,
+      size: item.fontSize ?? item.height,
+      font,
+    });
+  }
+  await writeFile(
+    "tests/fixtures/beauty-code-correction.pdf",
+    await document.save(),
+  );
+}

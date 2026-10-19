@@ -489,6 +489,7 @@ describe("import review corrections", () => {
     const entry = { ...(await reviewEntry()), draft, showAll: true };
     const patch = vi.fn();
     const onSourceAction = vi.fn();
+    const onReviewSource = vi.fn();
     render(
       <MemoryRouter>
         <ImportStatementReview
@@ -500,6 +501,7 @@ describe("import review corrections", () => {
           patch={patch}
           reparse={() => undefined}
           onSourceAction={onSourceAction}
+          onReviewSource={onReviewSource}
         />
       </MemoryRouter>,
     );
@@ -512,7 +514,7 @@ describe("import review corrections", () => {
     const date = screen.getAllByLabelText("Date", { exact: true })[0];
     expect(date).toHaveAttribute("readonly");
     expect(
-      screen.getByText(/To correct them, open Reading details/),
+      screen.getByText(/Open a transaction and choose Correct amount/),
     ).toBeInTheDocument();
     fireEvent.blur(input, {
       target: { value: decimalMoney(row.amount, row.currency) },
@@ -526,6 +528,11 @@ describe("import review corrections", () => {
     });
     expect(onSourceAction).not.toHaveBeenCalled();
     expect(patch.mock.calls.some(([change]) => change.draft)).toBe(false);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Correct amount" })[0],
+    );
+    expect(onReviewSource).toHaveBeenCalledWith(row);
+    expect(onSourceAction).not.toHaveBeenCalled();
     fireEvent.change(screen.getAllByLabelText("Category", { exact: true })[0], {
       target: { value: "salary" },
     });

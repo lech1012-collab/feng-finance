@@ -16,6 +16,7 @@ export interface CropSession {
 }
 export interface GenericImportReviewProps {
   result: GenericParseResult;
+  correctionRequest?: { id: string; rowId?: string };
   session?: CropSession;
   currency?: string;
   method?: ParserMethod;

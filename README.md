@@ -485,3 +485,11 @@ and 205 screen findings to shared controls, financial safeguards and verificatio
 Dark remains the owner-selected default. Native Barclays, Barclaycard, Amex and
 Revolut parsing remains ahead of generic source review. Database schema 4,
 parser version 2.2.3 and portable backup version 1 remain unchanged.
+
+## v2.2.9 Amount correction
+
+Uncertain import amounts open a fixed editing sheet with the original PDF row,
+Money in / Money out controls and strict precision checks. Bank-reader transactions
+can open source correction directly. Saving a correction rechecks the statement;
+financial records are written only after Confirm import. See the
+[workflow, safety rules and mobile verification](docs/import-amount-correction.md).

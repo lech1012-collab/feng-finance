@@ -14,6 +14,7 @@ export function ImportTransactionReview({
   busy,
   updateRow,
   correctSource,
+  onReviewSource,
   invalidAmounts,
   patch,
   isExport,
@@ -31,6 +32,7 @@ export function ImportTransactionReview({
     row: ImportDraft["transactions"][number],
     correction: { date?: string; amount?: number },
   ) => void;
+  onReviewSource?: () => void;
   invalidAmounts: string[];
   patch: (update: Partial<FileReview>) => void;
 }) {
@@ -213,6 +215,11 @@ export function ImportTransactionReview({
                 }}
               />
             </label>
+            {d.bankSource && onReviewSource && (
+              <button type="button" disabled={busy} onClick={onReviewSource}>
+                Correct amount
+              </button>
+            )}
             <label>
               Category
               <select
