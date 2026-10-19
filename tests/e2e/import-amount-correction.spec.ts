@@ -51,6 +51,7 @@ for (const setup of [
 ]) {
   test(`unread Beauty Code amount is editable without moving mobile cards at ${setup.id}`, async ({
     page,
+    browserName,
   }, testInfo) => {
     await page.setViewportSize({ width: setup.width, height: setup.height });
     await page.emulateMedia({ reducedMotion: "reduce" });
@@ -103,6 +104,9 @@ for (const setup of [
     await expect(
       editor.getByRole("img", { name: /Original statement row/ }),
     ).toBeVisible();
+    await expect(
+      editor.getByRole("img", { name: /Original statement row/ }),
+    ).toHaveAttribute("draggable", "false");
     await amount.fill("80.00");
     await editor.getByRole("button", { name: "Save row", exact: true }).click();
     await expect(editor.getByRole("alert")).toContainText(
@@ -134,7 +138,17 @@ for (const setup of [
     expect(await page.evaluate(() => document.body.style.overflow)).toBe(
       "hidden",
     );
-    await page.mouse.wheel(240, 0);
+    if (browserName === "chromium") await page.mouse.wheel(240, 0);
+    else {
+      // Mobile WebKit's driver does not implement mouse.wheel. Exercise a
+      // horizontal pointer drag instead; real iPhone touch panning is manual.
+      const bounds = await editor.boundingBox();
+      if (!bounds) throw new Error("Correction editor is not laid out");
+      await page.mouse.move(40, bounds.y + 20);
+      await page.mouse.down();
+      await page.mouse.move(setup.width - 40, bounds.y + 20, { steps: 8 });
+      await page.mouse.up();
+    }
     expect(await page.evaluate(() => window.scrollX)).toBe(0);
     expect(
       await row.evaluate((node) => node.getBoundingClientRect().left),
