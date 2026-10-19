@@ -12,7 +12,7 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-18",
+  date: "2026-10-19",
   points: [
     "Select several statements and add more without losing your review choices.",
     "Review one exception at a time, then confirm the whole batch.",

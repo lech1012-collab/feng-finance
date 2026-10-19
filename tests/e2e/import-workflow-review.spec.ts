@@ -1,7 +1,14 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import AxeBuilder from "@axe-core/playwright";
-import { test, expect, type Page, type Locator } from "./fixtures";
+import {
+  test,
+  expect,
+  acknowledgeBeta,
+  type Page,
+  type Locator,
+} from "./fixtures";
+import { startStaticHost } from "./static-host";
 
 const fixture = (name: string) =>
   resolve(`tests/fixtures/known-bank-${name}.pdf`);
@@ -262,41 +269,62 @@ test("four native PDFs import offline without financial requests", async ({
   page,
 }) => {
   test.setTimeout(120000);
-  const requests: Array<{ host: string; method: string; body: string | null }> =
-    [];
-  page.on("request", (request) => {
-    if (request.url().startsWith("http"))
-      requests.push({
-        host: new URL(request.url()).host,
-        method: request.method(),
-        body: request.postData(),
-      });
-  });
-  await page.context().setOffline(true);
-  await openImport(page);
-  const cold = await page.reload();
-  expect(cold?.fromServiceWorker()).toBe(true);
-  await page
-    .getByLabel("Select statements", { exact: true })
-    .setInputFiles(banks.map(fixture));
-  const confirm = page.getByRole("button", {
-    name: "Confirm import",
-    exact: true,
-  });
-  await expect(confirm).toBeEnabled({ timeout: 90000 });
-  await confirm.click();
-  await expect(
-    page.getByRole("heading", { name: "Home", exact: true }),
-  ).toBeVisible();
-  await expectNativeLedger(page);
-  expect(
-    requests.filter(
-      (row) =>
-        row.host !== new URL(page.url()).host ||
-        row.method !== "GET" ||
-        row.body !== null,
-    ),
-  ).toEqual([]);
+  const host = await startStaticHost();
+  try {
+    await page.goto(`${host.origin}/#/`);
+    await acknowledgeBeta(page);
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await expect
+      .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
+      .toBe(true);
+    const requests: Array<{
+      host: string;
+      method: string;
+      body: string | null;
+    }> = [];
+    page.on("request", (request) => {
+      if (request.url().startsWith("http"))
+        requests.push({
+          host: new URL(request.url()).host,
+          method: request.method(),
+          body: request.postData(),
+        });
+    });
+    // A stopped origin proves real offline operation. WebKit's setOffline
+    // interception bypasses its service worker, including cached lazy modules.
+    await host.stop();
+    const cold = await page.reload();
+    expect(cold?.fromServiceWorker()).toBe(true);
+    await page.goto(`${host.origin}/#/import`);
+    await expect(
+      page.getByRole("heading", { name: "Import statements", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByLabel("Select statements", { exact: true })
+      .setInputFiles(banks.map(fixture));
+    const confirm = page.getByRole("button", {
+      name: "Confirm import",
+      exact: true,
+    });
+    await expect(confirm).toBeEnabled({ timeout: 90000 });
+    await confirm.click();
+    await expect(
+      page.getByRole("heading", { name: "Home", exact: true }),
+    ).toBeVisible();
+    await expectNativeLedger(page);
+    expect(
+      requests.filter(
+        (row) =>
+          row.host !== new URL(page.url()).host ||
+          row.method !== "GET" ||
+          row.body !== null,
+      ),
+    ).toEqual([]);
+  } finally {
+    await host.stop();
+  }
 });
 
 for (const setup of [

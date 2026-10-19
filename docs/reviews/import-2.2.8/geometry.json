@@ -1,0 +1,202 @@
+[
+  {
+    "setup": "320-dark",
+    "engine": "chromium",
+    "errors": [],
+    "requests": [],
+    "scenes": [
+      {
+        "name": "empty",
+        "width": 320,
+        "scrollWidth": 320,
+        "overflow": []
+      },
+      {
+        "name": "four-ready",
+        "width": 320,
+        "scrollWidth": 320,
+        "overflow": []
+      },
+      {
+        "name": "figures-long-filename",
+        "width": 320,
+        "scrollWidth": 320,
+        "overflow": []
+      },
+      {
+        "name": "transaction-edit",
+        "width": 320,
+        "scrollWidth": 320,
+        "overflow": []
+      },
+      {
+        "name": "failed-balance",
+        "width": 320,
+        "scrollWidth": 320,
+        "overflow": []
+      },
+      {
+        "name": "unverified-sheet",
+        "width": 320,
+        "scrollWidth": 320,
+        "overflow": []
+      },
+      {
+        "name": "generic-mapping",
+        "width": 320,
+        "scrollWidth": 320,
+        "overflow": []
+      }
+    ]
+  },
+  {
+    "setup": "390-dark",
+    "engine": "chromium",
+    "errors": [],
+    "requests": [],
+    "scenes": [
+      {
+        "name": "empty",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "four-ready",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "figures-long-filename",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "transaction-edit",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "failed-balance",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "unverified-sheet",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "generic-mapping",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      }
+    ]
+  },
+  {
+    "setup": "390-light",
+    "engine": "chromium",
+    "errors": [],
+    "requests": [],
+    "scenes": [
+      {
+        "name": "empty",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "four-ready",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "figures-long-filename",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "transaction-edit",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "failed-balance",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "unverified-sheet",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "generic-mapping",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      }
+    ]
+  },
+  {
+    "setup": "390-text200",
+    "engine": "chromium",
+    "errors": [],
+    "requests": [],
+    "scenes": [
+      {
+        "name": "empty",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "four-ready",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "figures-long-filename",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "transaction-edit",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "failed-balance",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "unverified-sheet",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      },
+      {
+        "name": "generic-mapping",
+        "width": 390,
+        "scrollWidth": 390,
+        "overflow": []
+      }
+    ]
+  }
+]

@@ -726,7 +726,9 @@ export function ImportStatementReview({
             <details
               className="parse-options"
               open={
-                !d && entry.extracted?.generic?.status === "identity-required"
+                !d &&
+                (entry.extracted?.format === "qif" ||
+                  entry.extracted?.generic?.status === "identity-required")
               }
             >
               <summary>

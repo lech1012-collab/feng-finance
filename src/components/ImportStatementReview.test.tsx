@@ -82,6 +82,48 @@ describe("import review corrections", () => {
       </MemoryRouter>,
     );
 
+  it.each([false, true])(
+    "discloses required QIF identity controls only before a draft is prepared (prepared=%s)",
+    async (prepared) => {
+      const entry = await reviewEntry();
+      entry.file = new File([], "fictional.qif");
+      entry.extracted = {
+        rows: [],
+        hash: "fictional-qif-identity",
+        filename: "fictional.qif",
+        method: "QIF",
+        format: "qif",
+        text: "!Type:Bank\nD09/10/2026\nT-15.00\nPFICTITIOUS QIF PURCHASE\n^\n",
+        warnings: [],
+      };
+      if (!prepared) {
+        entry.draft = undefined;
+        entry.state = "error";
+        entry.error = "Choose the bank and account for this QIF export.";
+      }
+      const { container } = await showReview(entry);
+      const options = container.querySelector(".parse-options");
+      if (prepared) {
+        expect(options).not.toHaveAttribute("open");
+        expect(
+          within(options as HTMLElement).getByLabelText("Bank", {
+            exact: true,
+          }),
+        ).not.toBeVisible();
+        expect(importBlockers(entry)).toEqual([]);
+      } else {
+        expect(options).toHaveAttribute("open");
+        expect(screen.getByRole("combobox", { name: "Bank" })).toBeVisible();
+        expect(screen.getByRole("combobox", { name: "Account" })).toBeVisible();
+        expect(
+          screen.getByRole("combobox", { name: "QIF date format" }),
+        ).toBeVisible();
+        expect(importBlockers(entry)).toEqual([entry.error]);
+      }
+      expect(await db.transactions.count()).toBe(0);
+    },
+  );
+
   it("keeps correct row editors on demand and provides no routine checkboxes", async () => {
     const entry = await reviewEntry();
     entry.showAll = true;

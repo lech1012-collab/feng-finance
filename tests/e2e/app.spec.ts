@@ -1107,6 +1107,8 @@ test("Barclays header date ranges and manual statement-date fallback", async ({
       .locator(".import-statement-card > summary")
       .getByText("1 Oct 2026 to 31 Oct 2026", { exact: true }),
   ).toBeVisible();
+  // Successful native statements keep technical date controls on demand.
+  await statement.locator(".parse-options > summary").click();
   await expect(
     page.getByRole("button", {
       name: "Enter statement dates from the source file",
