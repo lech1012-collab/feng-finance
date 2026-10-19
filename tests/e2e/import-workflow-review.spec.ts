@@ -465,8 +465,14 @@ for (const setup of [
     expect(await records(page, "transactions")).toHaveLength(0);
     // An unfamiliar bank keeps the generic route available without putting
     // this technical mapping sheet in the native-bank happy path.
-    await page.goto("/#/");
-    await openImport(page);
+    await page
+      .getByRole("button", { name: "Discard review", exact: true })
+      .click();
+    await page
+      .getByRole("dialog", { name: "Discard this review?", exact: true })
+      .getByRole("button", { name: "Discard review", exact: true })
+      .click();
+    await expect(page.locator(".import-statement-card")).toHaveCount(0);
     await page
       .getByLabel("Select statements", { exact: true })
       .setInputFiles(fixture("hsbc"));

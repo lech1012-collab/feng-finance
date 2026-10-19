@@ -2,7 +2,7 @@ import {
   sourceCorrectionRow,
   type SourceCorrectionTarget,
 } from "../import/source-correction-target";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { AlertTriangle, CheckCircle2, Upload, X } from "lucide-react";
@@ -38,6 +38,7 @@ import type { LayoutMapping, RowReviewAction } from "../import/generic/types";
 import type { PdfImportSession } from "../import/pdf-session-types";
 import { FeedbackLink } from "../components/FeedbackPanel";
 import { RELEASE_CONFIGURATION } from "../beta/configuration";
+import { Sheet, SheetVisibilityContext } from "../components/Sheet";
 import "./Import.css";
 import {
   appendBatchEntries,
@@ -52,12 +53,30 @@ export default function ImportPage({
   onImported,
   selectedFiles,
   onFilesStarted,
+  active: visible = true,
+  onPendingChange,
 }: {
+  active?: boolean;
+  onPendingChange?: (count: number) => void;
   selectedFiles?: File[];
   onFilesStarted?: () => void;
   onImported: (month: string, currency: string) => void;
 }) {
   const [entries, setEntries] = useState<FileReview[]>([]);
+  const [discarding, setDiscarding] = useState(false);
+  const scrollPosition = useRef(0);
+  useLayoutEffect(() => {
+    if (!visible) return;
+    window.scrollTo?.({ top: scrollPosition.current, left: 0 });
+    const remember = () => {
+      scrollPosition.current = window.scrollY;
+    };
+    window.addEventListener("scroll", remember, { passive: true });
+    return () => window.removeEventListener("scroll", remember);
+  }, [visible]);
+  useEffect(() => {
+    onPendingChange?.(entries.length);
+  }, [entries.length, onPendingChange]);
   const [busy, setBusy] = useState(false);
   const [sourceCorrection, setSourceCorrection] = useState<{
     id: string;
@@ -134,6 +153,24 @@ export default function ImportPage({
       releaseAllSessions();
     };
   }, []);
+  const discardReview = () => {
+    if (commitStatus) return;
+    operation.current++;
+    processing.current?.abort();
+    releaseAllSessions();
+    reviewedInclusions.current.clear();
+    initialTransferLinkIds.current.clear();
+    setEntries([]);
+    setSourceCorrection(undefined);
+    setSelectedTransferIds([]);
+    setRejectedAutomaticIds([]);
+    setError("");
+    setNotice("");
+    setBusy(false);
+    setPhase("pick");
+    setDiscarding(false);
+    onPendingChange?.(0);
+  };
   const patchEntry = (entryId: string, patch: Partial<FileReview>) => {
     if (alive.current)
       setEntries((current) => {
@@ -522,9 +559,22 @@ export default function ImportPage({
     target: SourceCorrectionTarget,
   ) => {
     setSourceCorrection({ id: id(), entryId: entry.id, target });
+    patchEntry(entry.id, { showAll: false });
+    if (
+      !entry.draft?.bankSource &&
+      sourceReview(entry) &&
+      !entry.draft?.parserFallback
+    )
+      return;
     const changed = {
       ...entry,
-      pdfReviewOptions: { ...entry.pdfReviewOptions, preferGeneric: true },
+      showAll: false,
+      pdfReviewOptions: {
+        ...entry.pdfReviewOptions,
+        preferGeneric: true,
+        // The user chose manual correction: do not delay the editor for OCR.
+        skipCellOcr: true,
+      },
     };
     patchEntry(entry.id, { pdfReviewOptions: changed.pdfReviewOptions });
     void reparse(changed, false, true);
@@ -698,39 +748,40 @@ export default function ImportPage({
         },
         overrideValidation: entry.override,
       }));
-    const selectedRows = selected.flatMap((item) =>
-      item.draft.transactions.filter((row) => row.include),
-    );
-    const manualRows = (
-      await db.transactions.bulkGet(
-        selectedRows
-          .filter((row) => row.replaceManual && row.manualReplacementId)
-          .map((row) => row.manualReplacementId!),
-      )
-    ).filter((row) => !!row);
-    const pairedIds = new Set(
-      transferPreview.proposals
-        .filter((proposal) =>
-          confirmedTransferProposalIds.includes(proposal.id),
-        )
-        .flatMap((proposal) => [proposal.debitTxId, proposal.creditTxId]),
-    );
-    const pairedRows = transferPreview.transactions.filter((transaction) =>
-      pairedIds.has(transaction.id),
-    );
-    if (
-      !(await authorizeMonthEdit([
-        ...(await importMonthGuardDates(selected.map((item) => item.draft))),
-        ...manualRows,
-        ...pairedRows,
-      ]))
-    )
-      return;
     setBusy(true);
+    setCommitStatus("Checking statements before saving…");
     setError("");
     let pendingId = "";
     const outcomes: BatchOutcome[] = [];
     try {
+      const selectedRows = selected.flatMap((item) =>
+        item.draft.transactions.filter((row) => row.include),
+      );
+      const manualRows = (
+        await db.transactions.bulkGet(
+          selectedRows
+            .filter((row) => row.replaceManual && row.manualReplacementId)
+            .map((row) => row.manualReplacementId!),
+        )
+      ).filter((row) => !!row);
+      const pairedIds = new Set(
+        transferPreview.proposals
+          .filter((proposal) =>
+            confirmedTransferProposalIds.includes(proposal.id),
+          )
+          .flatMap((proposal) => [proposal.debitTxId, proposal.creditTxId]),
+      );
+      const pairedRows = transferPreview.transactions.filter((transaction) =>
+        pairedIds.has(transaction.id),
+      );
+      if (
+        !(await authorizeMonthEdit([
+          ...(await importMonthGuardDates(selected.map((item) => item.draft))),
+          ...manualRows,
+          ...pairedRows,
+        ]))
+      )
+        return;
       await commitReviewedBatch(
         selected,
         (outcome) => {
@@ -825,7 +876,14 @@ export default function ImportPage({
             link.transactionIds.some((id) => importedIds.has(id)),
         )
         .count();
-      setPhase("done");
+      releaseAllSessions();
+      setEntries([]);
+      reviewedInclusions.current.clear();
+      setSelectedTransferIds([]);
+      setRejectedAutomaticIds([]);
+      setSourceCorrection(undefined);
+      onPendingChange?.(0);
+      setPhase("pick");
       navigate("/", {
         replace: true,
         state: {
@@ -860,474 +918,528 @@ export default function ImportPage({
     }
   };
   return (
-    <div
-      className="import-workspace"
-      onDragOver={(event) => {
-        event.preventDefault();
-        event.dataTransfer.dropEffect = busy ? "none" : "copy";
-      }}
-      onDrop={(event) => {
-        event.preventDefault();
-        if (!busy) void selectFiles(Array.from(event.dataTransfer.files));
-      }}
-    >
-      <div className="page-heading">
-        <div>
-          <h1>
-            {entries.length
-              ? `Review ${entries.length} statement${entries.length === 1 ? "" : "s"}`
-              : "Import statements"}
-          </h1>
+    <SheetVisibilityContext.Provider value={visible}>
+      <div
+        className="import-workspace"
+        onDragOver={(event) => {
+          event.preventDefault();
+          event.dataTransfer.dropEffect = busy ? "none" : "copy";
+        }}
+        onDrop={(event) => {
+          event.preventDefault();
+          if (!busy) void selectFiles(Array.from(event.dataTransfer.files));
+        }}
+      >
+        <div className="page-heading">
+          <div>
+            <h1>
+              {entries.length
+                ? `Review ${entries.length} statement${entries.length === 1 ? "" : "s"}`
+                : "Import statements"}
+            </h1>
+            {entries.length > 0 && (
+              <div className="import-change-files">
+                <label
+                  className={`button file-button ${busy ? "disabled" : ""}`}
+                >
+                  Add statements
+                  <input
+                    aria-label="Select statements"
+                    type="file"
+                    accept={STATEMENT_FILE_ACCEPT}
+                    multiple
+                    disabled={busy}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? []);
+                      e.target.value = "";
+                      void selectFiles(files);
+                    }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  disabled={!!commitStatus}
+                  onClick={() => setDiscarding(true)}
+                >
+                  Discard review
+                </button>
+                <span className="muted">
+                  You can change tabs and return to this review.
+                </span>
+                <span className="muted">
+                  {batch.savedCount > 0
+                    ? "Saved statements stay saved. Confirm the remaining statements when ready."
+                    : "Nothing is saved until you confirm."}
+                </span>
+              </div>
+            )}
+          </div>
           {entries.length > 0 && (
-            <div className="import-change-files">
-              <label className={`button file-button ${busy ? "disabled" : ""}`}>
-                Add statements
-                <input
-                  aria-label="Select statements"
-                  type="file"
-                  accept={STATEMENT_FILE_ACCEPT}
-                  multiple
-                  disabled={busy}
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files ?? []);
-                    e.target.value = "";
-                    void selectFiles(files);
-                  }}
-                />
-              </label>
-              <span className="muted">
-                {batch.savedCount > 0
-                  ? "Saved statements stay saved. Confirm the remaining statements when ready."
-                  : "Nothing is saved until you confirm."}
-              </span>
-            </div>
+            <Link className="icon-button" to="/" aria-label="Leave review">
+              <X size={20} />
+            </Link>
           )}
         </div>
-        {entries.length > 0 && (
-          <Link className="icon-button" to="/" aria-label="Close import review">
-            <X size={20} />
-          </Link>
-        )}
-      </div>
-      <Stepper
-        label="Import progress"
-        steps={["Pick", "Check", "Review", "Done"]}
-        current={["pick", "check", "review", "done"].indexOf(phase)}
-      />
-      {entries.length === 0 && (
-        <section
-          className="card upload-card"
-          onClick={(event) => {
-            const target = event.target;
-            if (
-              !busy &&
-              target instanceof Element &&
-              !target.closest("input, label, button, a")
-            ) {
-              localPicker.current?.click();
+        {discarding && (
+          <Sheet
+            title="Discard this review?"
+            onClose={() => setDiscarding(false)}
+            footer={
+              <>
+                <button
+                  type="button"
+                  autoFocus
+                  onClick={() => setDiscarding(false)}
+                >
+                  Keep review
+                </button>
+                <button
+                  type="button"
+                  disabled={!!commitStatus}
+                  onClick={discardReview}
+                >
+                  Discard review
+                </button>
+              </>
             }
-          }}
-        >
-          <Upload size={28} />
-          <h2>Add your statements</h2>
-          <p>
-            Select or drop multiple PDF statements. We’ll check the numbers and
-            highlight anything that needs you.
-          </p>
-          <label
-            className={`button primary file-button ${busy ? "disabled" : ""}`}
           >
-            <Upload size={18} />
-            Select statements
-            <input
-              ref={localPicker}
-              aria-label="Select statements"
-              type="file"
-              accept={STATEMENT_FILE_ACCEPT}
-              multiple
-              disabled={busy}
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? []);
-                e.target.value = "";
-                void selectFiles(files);
-              }}
-            />
-          </label>
-          <details className="import-other-formats">
-            <summary>Other file formats</summary>
             <p>
-              CSV, OFX, QFX and QIF exports are also supported. Choose them with
-              the same file picker.
+              Your unsaved corrections and {entries.length} selected file
+              {entries.length === 1 ? "" : "s"} will be removed. Imported
+              transactions will stay.
             </p>
-          </details>
-          <p className="muted">
-            Digital PDFs work best. Scanned pages are read on this device. Up to
-            30 MB and 100 pages per PDF.
-          </p>
-        </section>
-      )}
-
-      {phase === "check" && (
-        <section
-          className="card import-processing-list"
-          aria-label="Checking statements"
-        >
-          <h2>Checking your statements</h2>
-          <p role="status">
-            {batch.completedCount} of {entries.length} statements checked
-          </p>
-          <button
-            type="button"
-            disabled={processing.current?.signal.aborted}
-            onClick={() => {
-              processing.current?.abort();
-              setError(
-                "Processing stopped. Completed pages remain available to review; unread pages and files will not be imported.",
-              );
+          </Sheet>
+        )}
+        <Stepper
+          label="Import progress"
+          steps={["Pick", "Check", "Review", "Done"]}
+          current={["pick", "check", "review", "done"].indexOf(phase)}
+        />
+        {entries.length === 0 && (
+          <section
+            className="card upload-card"
+            onClick={(event) => {
+              const target = event.target;
+              if (
+                !busy &&
+                target instanceof Element &&
+                !target.closest("input, label, button, a")
+              ) {
+                localPicker.current?.click();
+              }
             }}
           >
-            Stop processing
-          </button>
-          {entries.map((entry) => (
-            <div key={entry.id} className="import-processing-file">
-              <span>
-                {entry.state === "checking" ? (
-                  <span className="spinner" />
-                ) : entry.state === "review" ? (
-                  <CheckCircle2 size={18} />
-                ) : entry.state === "error" ? (
-                  <AlertTriangle size={18} />
-                ) : null}
-                <span
-                  className="source-filename"
-                  role="region"
-                  aria-label="Source filename"
-                  tabIndex={0}
-                >
-                  <strong>{entry.file.name}</strong>
-                </span>
-              </span>
-              <p role={entry.state === "checking" ? "status" : undefined}>
-                {entry.draft && entry.state !== "checking"
-                  ? `${entry.draft.statement.institution} ${entry.draft.account.maskedAccountIdentifier} · ${statementPresentation(entry).state === "attention" ? "needs attention" : statementPresentation(entry).state === "skipped" ? "skipped" : entry.state === "saved" ? "saved" : "ready"}`
-                  : entry.progress}
-              </p>
-              {entry.detailedProgress && (
-                <div>
-                  {entry.detailedProgress.fraction !== undefined && (
-                    <progress
-                      aria-label={`Reading ${entry.file.name}`}
-                      max={1}
-                      value={entry.detailedProgress.fraction}
-                    />
-                  )}
-                  {entry.detailedProgress.completed &&
-                    entry.detailedProgress.page && (
-                      <small>Page {entry.detailedProgress.page} read</small>
-                    )}
-                </div>
-              )}
-            </div>
-          ))}
-        </section>
-      )}
-      {error && (
-        <div className="notice import-blocking-warning" role="alert">
-          <AlertTriangle size={18} />
-          <span>{error}</span>
-        </div>
-      )}
-      {notice && (
-        <p className="notice" role="status">
-          {notice}
-        </p>
-      )}
-      {phase !== "check" && entries.length > 0 && (
-        <section
-          className="card import-batch-summary"
-          aria-label="Batch review"
-        >
-          <p role="status">
-            <strong>
-              {batch.readyCount} ready · {batch.attention.length} need
-              {batch.attention.length === 1 ? "s" : ""} attention ·{" "}
-              {batch.skippedCount} skipped
-              {batch.savedCount > 0 && ` · ${batch.savedCount} saved`}
-            </strong>
-          </p>
-          {batch.attention.length > 0 && (
-            <>
-              <p>
-                Resolve each statement below, or leave it out of this import.
-              </p>
-              <button disabled={busy} onClick={reviewNextStatement}>
-                Review next statement
-              </button>
-            </>
-          )}
-        </section>
-      )}
-      {entries.length > 0 && (
-        <div className="import-review-list" hidden={phase === "check"}>
-          {batch.sorted
-            .filter(
-              (entry) =>
-                entry.state !== "queued" &&
-                (entry.state !== "checking" || !!entry.draft),
-            )
-            .map((entry) => (
-              <div
-                key={entry.id}
-                ref={(element) => {
-                  if (element) statementCards.current.set(entry.id, element);
-                  else statementCards.current.delete(entry.id);
-                }}
-              >
-                {entry.extracted?.csv &&
-                  entry.open &&
-                  (!entry.draft || entry.optionsChanged) && (
-                    <CsvMappingPanel
-                      table={entry.extracted.csv}
-                      initial={
-                        entry.csvMapping ??
-                        entry.draft?.csvMapping ??
-                        entry.extracted.preset
-                      }
-                      initialAccountId={entry.draft?.account.id}
-                      accounts={[
-                        ...(accounts ?? []),
-                        ...(entry.draft &&
-                        !accounts?.some(
-                          (account) => account.id === entry.draft!.account.id,
-                        )
-                          ? [entry.draft.account]
-                          : []),
-                      ]}
-                      savedMappings={savedMappings}
-                      busy={busy}
-                      onCheck={(mapping, account) =>
-                        checkMappedCsv(entry, mapping, account)
-                      }
-                    />
-                  )}
-                <ImportStatementReview
-                  key={entry.id}
-                  entry={entry}
-                  accounts={accounts ?? []}
-                  categories={categories ?? []}
-                  history={[
-                    ...(history ?? []),
-                    ...entries
-                      .filter(
-                        (other) =>
-                          other.id !== entry.id &&
-                          !other.skip &&
-                          other.draft &&
-                          !other.draft.exactDuplicate &&
-                          other.state !== "saved",
-                      )
-                      .map((other) => other.draft!.statement),
-                  ]}
-                  busy={busy}
-                  patch={(patch) => patchReviewEntry(entry.id, patch)}
-                  reparse={(ocr) => void reparse(entry, ocr)}
-                  onInclude={() => includeAndRecheck(entry)}
-                  onReviewSource={(row) => reviewNativeSource(entry, row)}
-                  onSourceAction={(rowId, action) =>
-                    reviewSourceRow(entry, rowId, action)
-                  }
-                  onCreateAccount={(account) => {
-                    const changed = {
-                      ...entry,
-                      accountOverride: account,
-                      accountId: account.id,
-                      bank: account.institution,
-                    };
-                    patchEntry(entry.id, {
-                      accountOverride: account,
-                      accountId: account.id,
-                      bank: account.institution,
-                    });
-                    void reparse(changed, false, true);
-                  }}
-                  sourceReview={(() => {
-                    if (entry.skip || entry.state === "saved") return undefined;
-                    if (entry.draft?.bankSource) {
-                      return (
-                        <details className="generic-parser-details">
-                          <summary>Reading details</summary>
-                          <p>
-                            This statement uses its bank reader. If a date or
-                            amount looks wrong, review the PDF layout to correct
-                            the source reading and check the figures again.
-                          </p>
-                          <button
-                            type="button"
-                            disabled={busy}
-                            onClick={() => {
-                              const changed: FileReview = {
-                                ...entry,
-                                pdfReviewOptions: {
-                                  ...entry.pdfReviewOptions,
-                                  preferGeneric: true,
-                                },
-                              };
-                              patchEntry(entry.id, {
-                                pdfReviewOptions: changed.pdfReviewOptions,
-                              });
-                              void reparse(changed, false, true);
-                            }}
-                          >
-                            Review PDF layout
-                          </button>
-                        </details>
-                      );
-                    }
-                    const result = sourceReview(entry);
-                    if (!result) return undefined;
-                    const review = (
-                      <GenericImportReview
-                        result={result}
-                        correctionRequest={
-                          sourceCorrection?.entryId === entry.id
-                            ? {
-                                id: sourceCorrection.id,
-                                rowId: sourceCorrectionRow(
-                                  result,
-                                  sourceCorrection.target,
-                                ),
-                              }
-                            : undefined
-                        }
-                        session={entry.extracted?.pdfSession}
-                        currency={
-                          entry.draft?.statement.currency ??
-                          entry.accountOverride?.currency
-                        }
-                        method={
-                          entry.draft?.statement.parserMethod ??
-                          entry.extracted?.extraction?.method
-                        }
-                        busy={busy}
-                        onAction={(rowId, action) =>
-                          reviewSourceRow(entry, rowId, action)
-                        }
-                        onMapping={(mapping) =>
-                          mapSourceColumns(entry, mapping)
-                        }
-                        onSaveTemplate={(name, mapping) =>
-                          void saveSourceLayout(entry, name, mapping)
-                        }
-                        canImportAnyway={!!entry.draft && !entry.optionsChanged}
-                        showImportAnyway={false}
-                        onImportAnyway={() => {
-                          if (!entry.draft) return;
-                          patchReviewEntry(entry.id, {
-                            override: true,
-                            draft: entry.draft,
-                          });
-                        }}
-                      />
-                    );
-                    return entry.draft?.parserFallback ? (
-                      <details className="generic-parser-details">
-                        <summary>Alternative column reading</summary>
-                        <p>
-                          The bank-specific reader checked this recognised
-                          statement automatically. Column mapping and source-row
-                          corrections are available here if you need them.
-                          Changing the mapping or rows selects that reading for
-                          this import.
-                        </p>
-                        {review}
-                      </details>
-                    ) : (
-                      review
-                    );
-                  })()}
-                />
-              </div>
-            ))}
-        </div>
-      )}
-      {phase === "review" &&
-        entries.some(
-          (entry) =>
-            !entry.skip &&
-            (entry.error ||
-              (!entry.draft?.parserFallback &&
-                sourceReview(entry) &&
-                !sourceReview(entry)?.checks.reconciledExactly)),
-        ) && (
-          <section className="card" aria-label="Help with a failed import">
+            <Upload size={28} />
+            <h2>Add your statements</h2>
             <p>
-              Having trouble reading a statement? You can share technical
-              details without sharing your figures or PDF.
+              Select or drop multiple PDF statements. We’ll check the numbers
+              and highlight anything that needs you.
             </p>
-            <FeedbackLink
-              configuration={RELEASE_CONFIGURATION}
-              diagnostics={diagnostics}
+            <label
+              className={`button primary file-button ${busy ? "disabled" : ""}`}
             >
-              Report an import problem
-            </FeedbackLink>
+              <Upload size={18} />
+              Select statements
+              <input
+                ref={localPicker}
+                aria-label="Select statements"
+                type="file"
+                accept={STATEMENT_FILE_ACCEPT}
+                multiple
+                disabled={busy}
+                onChange={(e) => {
+                  const files = Array.from(e.target.files ?? []);
+                  e.target.value = "";
+                  void selectFiles(files);
+                }}
+              />
+            </label>
+            <details className="import-other-formats">
+              <summary>Other file formats</summary>
+              <p>
+                CSV, OFX, QFX and QIF exports are also supported. Choose them
+                with the same file picker.
+              </p>
+            </details>
+            <p className="muted">
+              Digital PDFs work best. Scanned pages are read on this device. Up
+              to 30 MB and 100 pages per PDF.
+            </p>
           </section>
         )}
-      {phase === "review" && transferPreview && (
-        <ImportTransferReview
-          preview={transferPreview}
-          selectedIds={selectedTransferIds}
-          onChange={setSelectedTransferIds}
-          rejectedAutomaticIds={rejectedAutomaticIds}
-          onRejectedAutomaticChange={setRejectedAutomaticIds}
-          busy={busy}
-        />
-      )}
-      {entries.length > 0 && (
-        <div className="import-footer import-outcome-footer">
-          <div aria-live="polite">
-            <strong>
-              {newCount} new
-              {duplicateCount > 0 &&
-                ` · ${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"} skipped`}
-              {balanceStatements.length > 0 &&
-                ` · ${balanceStatements.length} balance update${balanceStatements.length === 1 ? "" : "s"}`}
-              {excludedCount > 0 && ` · ${excludedCount} excluded`}
-              {skippedFileCount > 0 &&
-                ` · ${skippedFileCount} file${skippedFileCount === 1 ? "" : "s"} skipped`}
-            </strong>
-            {(busy || phase === "check" || blocking.length > 0) && (
-              <span>
-                {busy && phase === "review" && !commitStatus
-                  ? "Rechecking source rows…"
-                  : phase === "check"
-                    ? "Checking every selected file before review"
-                    : blocking.length
-                      ? `${blocking.length} statement${blocking.length === 1 ? "" : "s"} need${blocking.length === 1 ? "s" : ""} attention`
-                      : ""}
-              </span>
-            )}
-            {commitStatus && <span role="status">{commitStatus}</span>}
+
+        {phase === "check" && (
+          <section
+            className="card import-processing-list"
+            aria-label="Checking statements"
+          >
+            <h2>Checking your statements</h2>
+            <p role="status">
+              {batch.completedCount} of {entries.length} statements checked
+            </p>
+            <button
+              type="button"
+              disabled={processing.current?.signal.aborted}
+              onClick={() => {
+                processing.current?.abort();
+                setError(
+                  "Processing stopped. Completed pages remain available to review; unread pages and files will not be imported.",
+                );
+              }}
+            >
+              Stop processing
+            </button>
+            {entries.map((entry) => (
+              <div key={entry.id} className="import-processing-file">
+                <span>
+                  {entry.state === "checking" ? (
+                    <span className="spinner" />
+                  ) : entry.state === "review" ? (
+                    <CheckCircle2 size={18} />
+                  ) : entry.state === "error" ? (
+                    <AlertTriangle size={18} />
+                  ) : null}
+                  <span
+                    className="source-filename"
+                    role="region"
+                    aria-label="Source filename"
+                    tabIndex={0}
+                  >
+                    <strong>{entry.file.name}</strong>
+                  </span>
+                </span>
+                <p role={entry.state === "checking" ? "status" : undefined}>
+                  {entry.draft && entry.state !== "checking"
+                    ? `${entry.draft.statement.institution} ${entry.draft.account.maskedAccountIdentifier} · ${statementPresentation(entry).state === "attention" ? "needs attention" : statementPresentation(entry).state === "skipped" ? "skipped" : entry.state === "saved" ? "saved" : "ready"}`
+                    : entry.progress}
+                </p>
+                {entry.detailedProgress && (
+                  <div>
+                    {entry.detailedProgress.fraction !== undefined && (
+                      <progress
+                        aria-label={`Reading ${entry.file.name}`}
+                        max={1}
+                        value={entry.detailedProgress.fraction}
+                      />
+                    )}
+                    {entry.detailedProgress.completed &&
+                      entry.detailedProgress.page && (
+                        <small>Page {entry.detailedProgress.page} read</small>
+                      )}
+                  </div>
+                )}
+              </div>
+            ))}
+          </section>
+        )}
+        {error && (
+          <div className="notice import-blocking-warning" role="alert">
+            <AlertTriangle size={18} />
+            <span>{error}</span>
           </div>
-          {!hasChanges && !blocking.length && phase === "review" ? (
-            <button
-              disabled={busy}
-              onClick={() => navigate("/", { replace: true })}
-            >
-              Back to Home
-            </button>
-          ) : (
-            <button
-              className="primary"
-              disabled={
-                busy || !!blocking.length || !hasChanges || !transferPreview
-              }
-              onClick={() => void save()}
-            >
-              Confirm import
-            </button>
+        )}
+        {notice && (
+          <p className="notice" role="status">
+            {notice}
+          </p>
+        )}
+        {phase !== "check" && entries.length > 0 && (
+          <section
+            className="card import-batch-summary"
+            aria-label="Batch review"
+          >
+            <p role="status">
+              <strong>
+                {batch.readyCount} ready · {batch.attention.length} need
+                {batch.attention.length === 1 ? "s" : ""} attention ·{" "}
+                {batch.skippedCount} skipped
+                {batch.savedCount > 0 && ` · ${batch.savedCount} saved`}
+              </strong>
+            </p>
+            {batch.attention.length > 0 && (
+              <>
+                <p>
+                  Resolve each statement below, or leave it out of this import.
+                </p>
+                <button disabled={busy} onClick={reviewNextStatement}>
+                  Review next statement
+                </button>
+              </>
+            )}
+          </section>
+        )}
+        {entries.length > 0 && (
+          <div className="import-review-list" hidden={phase === "check"}>
+            {batch.sorted
+              .filter(
+                (entry) =>
+                  entry.state !== "queued" &&
+                  (entry.state !== "checking" || !!entry.draft),
+              )
+              .map((entry) => (
+                <div
+                  key={entry.id}
+                  ref={(element) => {
+                    if (element) statementCards.current.set(entry.id, element);
+                    else statementCards.current.delete(entry.id);
+                  }}
+                >
+                  {entry.extracted?.csv &&
+                    entry.open &&
+                    (!entry.draft || entry.optionsChanged) && (
+                      <CsvMappingPanel
+                        table={entry.extracted.csv}
+                        initial={
+                          entry.csvMapping ??
+                          entry.draft?.csvMapping ??
+                          entry.extracted.preset
+                        }
+                        initialAccountId={entry.draft?.account.id}
+                        accounts={[
+                          ...(accounts ?? []),
+                          ...(entry.draft &&
+                          !accounts?.some(
+                            (account) => account.id === entry.draft!.account.id,
+                          )
+                            ? [entry.draft.account]
+                            : []),
+                        ]}
+                        savedMappings={savedMappings}
+                        busy={busy}
+                        onCheck={(mapping, account) =>
+                          checkMappedCsv(entry, mapping, account)
+                        }
+                      />
+                    )}
+                  <ImportStatementReview
+                    key={entry.id}
+                    entry={entry}
+                    accounts={accounts ?? []}
+                    categories={categories ?? []}
+                    history={[
+                      ...(history ?? []),
+                      ...entries
+                        .filter(
+                          (other) =>
+                            other.id !== entry.id &&
+                            !other.skip &&
+                            other.draft &&
+                            !other.draft.exactDuplicate &&
+                            other.state !== "saved",
+                        )
+                        .map((other) => other.draft!.statement),
+                    ]}
+                    busy={busy}
+                    patch={(patch) => patchReviewEntry(entry.id, patch)}
+                    reparse={(ocr) => void reparse(entry, ocr)}
+                    onInclude={() => includeAndRecheck(entry)}
+                    onReviewSource={
+                      entry.extracted?.pdfSession ||
+                      sourceReview(entry) ||
+                      entry.draft?.bankSource
+                        ? (row) => reviewNativeSource(entry, row)
+                        : undefined
+                    }
+                    onSourceAction={(rowId, action) =>
+                      reviewSourceRow(entry, rowId, action)
+                    }
+                    onCreateAccount={(account) => {
+                      const changed = {
+                        ...entry,
+                        accountOverride: account,
+                        accountId: account.id,
+                        bank: account.institution,
+                      };
+                      patchEntry(entry.id, {
+                        accountOverride: account,
+                        accountId: account.id,
+                        bank: account.institution,
+                      });
+                      void reparse(changed, false, true);
+                    }}
+                    sourceReview={(() => {
+                      if (entry.skip || entry.state === "saved")
+                        return undefined;
+                      if (entry.draft?.bankSource) {
+                        return (
+                          <details className="generic-parser-details">
+                            <summary>Reading details</summary>
+                            <p>
+                              This statement uses its bank reader. If a date or
+                              amount looks wrong, review the PDF layout to
+                              correct the source reading and check the figures
+                              again.
+                            </p>
+                            <button
+                              type="button"
+                              disabled={busy}
+                              onClick={() => {
+                                const changed: FileReview = {
+                                  ...entry,
+                                  pdfReviewOptions: {
+                                    ...entry.pdfReviewOptions,
+                                    preferGeneric: true,
+                                  },
+                                };
+                                patchEntry(entry.id, {
+                                  pdfReviewOptions: changed.pdfReviewOptions,
+                                });
+                                void reparse(changed, false, true);
+                              }}
+                            >
+                              Review PDF layout
+                            </button>
+                          </details>
+                        );
+                      }
+                      const result = sourceReview(entry);
+                      if (!result) return undefined;
+                      const review = (
+                        <GenericImportReview
+                          result={result}
+                          correctionRequest={
+                            sourceCorrection?.entryId === entry.id
+                              ? {
+                                  id: sourceCorrection.id,
+                                  rowId: sourceCorrectionRow(
+                                    result,
+                                    sourceCorrection.target,
+                                  ),
+                                }
+                              : undefined
+                          }
+                          session={entry.extracted?.pdfSession}
+                          currency={
+                            entry.draft?.statement.currency ??
+                            entry.accountOverride?.currency
+                          }
+                          method={
+                            entry.draft?.statement.parserMethod ??
+                            entry.extracted?.extraction?.method
+                          }
+                          busy={busy}
+                          onAction={(rowId, action) =>
+                            reviewSourceRow(entry, rowId, action)
+                          }
+                          onMapping={(mapping) =>
+                            mapSourceColumns(entry, mapping)
+                          }
+                          onSaveTemplate={(name, mapping) =>
+                            void saveSourceLayout(entry, name, mapping)
+                          }
+                          canImportAnyway={
+                            !!entry.draft && !entry.optionsChanged
+                          }
+                          showImportAnyway={false}
+                          onImportAnyway={() => {
+                            if (!entry.draft) return;
+                            patchReviewEntry(entry.id, {
+                              override: true,
+                              draft: entry.draft,
+                            });
+                          }}
+                        />
+                      );
+                      return entry.draft?.parserFallback ? (
+                        <details className="generic-parser-details">
+                          <summary>Alternative column reading</summary>
+                          <p>
+                            The bank-specific reader checked this recognised
+                            statement automatically. Column mapping and
+                            source-row corrections are available here if you
+                            need them. Changing the mapping or rows selects that
+                            reading for this import.
+                          </p>
+                          {review}
+                        </details>
+                      ) : (
+                        review
+                      );
+                    })()}
+                  />
+                </div>
+              ))}
+          </div>
+        )}
+        {phase === "review" &&
+          entries.some(
+            (entry) =>
+              !entry.skip &&
+              (entry.error ||
+                (!entry.draft?.parserFallback &&
+                  sourceReview(entry) &&
+                  !sourceReview(entry)?.checks.reconciledExactly)),
+          ) && (
+            <section className="card" aria-label="Help with a failed import">
+              <p>
+                Having trouble reading a statement? You can share technical
+                details without sharing your figures or PDF.
+              </p>
+              <FeedbackLink
+                configuration={RELEASE_CONFIGURATION}
+                diagnostics={diagnostics}
+              >
+                Report an import problem
+              </FeedbackLink>
+            </section>
           )}
-        </div>
-      )}
-    </div>
+        {phase === "review" && transferPreview && (
+          <ImportTransferReview
+            preview={transferPreview}
+            selectedIds={selectedTransferIds}
+            onChange={setSelectedTransferIds}
+            rejectedAutomaticIds={rejectedAutomaticIds}
+            onRejectedAutomaticChange={setRejectedAutomaticIds}
+            busy={busy}
+          />
+        )}
+        {entries.length > 0 && (
+          <div className="import-footer import-outcome-footer">
+            <div aria-live="polite">
+              <strong>
+                {newCount} new
+                {duplicateCount > 0 &&
+                  ` · ${duplicateCount} duplicate${duplicateCount === 1 ? "" : "s"} skipped`}
+                {balanceStatements.length > 0 &&
+                  ` · ${balanceStatements.length} balance update${balanceStatements.length === 1 ? "" : "s"}`}
+                {excludedCount > 0 && ` · ${excludedCount} excluded`}
+                {skippedFileCount > 0 &&
+                  ` · ${skippedFileCount} file${skippedFileCount === 1 ? "" : "s"} skipped`}
+              </strong>
+              {(busy || phase === "check" || blocking.length > 0) && (
+                <span>
+                  {busy && phase === "review" && !commitStatus
+                    ? "Rechecking source rows…"
+                    : phase === "check"
+                      ? "Checking every selected file before review"
+                      : blocking.length
+                        ? `${blocking.length} statement${blocking.length === 1 ? "" : "s"} need${blocking.length === 1 ? "s" : ""} attention`
+                        : ""}
+                </span>
+              )}
+              {commitStatus && <span role="status">{commitStatus}</span>}
+            </div>
+            {!hasChanges && !blocking.length && phase === "review" ? (
+              <button
+                disabled={busy}
+                onClick={() => navigate("/", { replace: true })}
+              >
+                Back to Home
+              </button>
+            ) : (
+              <button
+                className="primary"
+                disabled={
+                  busy || !!blocking.length || !hasChanges || !transferPreview
+                }
+                onClick={() => void save()}
+              >
+                Confirm import
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </SheetVisibilityContext.Provider>
   );
 }

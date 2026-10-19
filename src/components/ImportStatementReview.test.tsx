@@ -15,7 +15,6 @@ import { importBlockers, type FileReview } from "../import/review-model";
 import { bankRows } from "../tests/helpers";
 import { genericFixture } from "../import/generic/fixtures";
 import { reconstructRows } from "../import/layout";
-import { decimalMoney } from "../domain/money";
 
 beforeEach(async () => {
   cleanup();
@@ -507,29 +506,22 @@ describe("import review corrections", () => {
     );
     fireEvent.click(document.querySelector(".review-compact")!);
     const row = draft.transactions[0];
-    const input = screen.getByLabelText(`Amount for ${row.description}`, {
-      exact: true,
-    });
-    expect(input).toHaveAttribute("readonly");
-    const date = screen.getAllByLabelText("Date", { exact: true })[0];
-    expect(date).toHaveAttribute("readonly");
     expect(
-      screen.getByText(/Open a transaction and choose Correct amount/),
+      screen.queryByRole("textbox", { name: `Amount for ${row.description}` }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("textbox", { name: /^Date$/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      document.querySelector(`.review-row time[datetime="${row.date}"]`),
     ).toBeInTheDocument();
-    fireEvent.blur(input, {
-      target: { value: decimalMoney(row.amount, row.currency) },
-    });
-    expect(onSourceAction).not.toHaveBeenCalled();
-    fireEvent.blur(input, {
-      target: { value: decimalMoney(row.amount + 1, row.currency) },
-    });
-    fireEvent.change(date, {
-      target: { value: "2026-09-04" },
-    });
+    expect(
+      screen.getByText(/Tap an amount to correct its source value/),
+    ).toBeInTheDocument();
     expect(onSourceAction).not.toHaveBeenCalled();
     expect(patch.mock.calls.some(([change]) => change.draft)).toBe(false);
     fireEvent.click(
-      screen.getAllByRole("button", { name: "Correct amount" })[0],
+      screen.getAllByRole("button", { name: /^Correct amount for / })[0],
     );
     expect(onReviewSource).toHaveBeenCalledWith(row);
     expect(onSourceAction).not.toHaveBeenCalled();

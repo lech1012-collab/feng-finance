@@ -14,13 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-19",
   points: [
-    "Correct uncertain transaction amounts in a fixed editing panel.",
-    "Choose Money in or Money out without typing a minus sign.",
-    "Reach source correction directly from a bank-reader transaction.",
+    "Tap a transaction amount to type a correction in one stable editor.",
+    "Change tabs and return to the same import review without selecting PDFs again.",
+    "Source descriptions and filenames wrap within stationary mobile cards.",
   ],
   pleaseTest: [
-    "Correct an uncertain amount, save it and check the statement balance.",
-    "Try the editor on your phone with the keyboard open and larger text.",
+    "Select several PDFs, visit Transactions, then use Import to resume your review.",
+    "Tap an unread or uncertain amount and type a correction with your phone keyboard.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +28,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.9",
+    date: "2026-10-19",
+    points: [
+      "Correct uncertain transaction amounts in a fixed editing panel.",
+      "Choose Money in or Money out without typing a minus sign.",
+      "Reach source correction directly from a bank-reader transaction.",
+    ],
+    pleaseTest: [
+      "Correct an uncertain amount, save it and check the statement balance.",
+      "Try the editor on your phone with the keyboard open and larger text.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.8",
     date: "2026-10-19",

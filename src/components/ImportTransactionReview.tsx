@@ -3,7 +3,8 @@ import { ChevronDown } from "lucide-react";
 import type { Category, ImportDraft } from "../domain/models";
 import { displayMerchant } from "../domain/presentation";
 import { formatUkDate } from "../domain/dates";
-import { decimalMoney, money, parseMoney } from "../domain/money";
+import { money } from "../domain/money";
+import { SourceRowCorrection } from "./SourceRowCorrection";
 import { UKDateInput } from "./UKDateInput";
 import type { FileReview } from "../import/review-model";
 
@@ -15,8 +16,6 @@ export function ImportTransactionReview({
   updateRow,
   correctSource,
   onReviewSource,
-  invalidAmounts,
-  patch,
   isExport,
 }: {
   t: ImportDraft["transactions"][number];
@@ -30,12 +29,22 @@ export function ImportTransactionReview({
   ) => void;
   correctSource: (
     row: ImportDraft["transactions"][number],
-    correction: { date?: string; amount?: number },
+    correction: Partial<
+      Pick<
+        ImportDraft["transactions"][number],
+        | "date"
+        | "bookingDate"
+        | "description"
+        | "amount"
+        | "balanceAfterTransaction"
+      >
+    >,
   ) => void;
   onReviewSource?: () => void;
   invalidAmounts: string[];
   patch: (update: Partial<FileReview>) => void;
 }) {
+  const [correcting, setCorrecting] = useState(false);
   const merchant = displayMerchant(t);
   const rawName = /\S{30,}/.test(merchant);
   const [open, setOpen] = useState(
@@ -80,9 +89,55 @@ export function ImportTransactionReview({
                 "Uncategorised")}
           </small>
         </span>
-        <strong>{money(t.amount, t.currency, true)}</strong>
+        <button
+          type="button"
+          className="import-amount-action"
+          aria-label={`Correct amount for ${merchant}`}
+          disabled={busy}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.focus({ preventScroll: true });
+            if (onReviewSource) onReviewSource();
+            else setCorrecting(true);
+          }}
+        >
+          {money(t.amount, t.currency, true)}
+        </button>
         <ChevronDown size={16} />
       </summary>
+      {correcting && (
+        <SourceRowCorrection
+          reading={{
+            id: t.id,
+            date: t.date,
+            bookingDate: t.bookingDate,
+            description: t.description,
+            amount: t.amount,
+            balanceAfterTransaction: t.balanceAfterTransaction,
+            parseSource: "text",
+          }}
+          currency={t.currency}
+          busy={busy}
+          source={
+            <p className="muted">
+              Compare this transaction with the original statement, page{" "}
+              {t.sourcePage}.
+            </p>
+          }
+          onSave={(action) => {
+            correctSource(t, {
+              date: action.date,
+              bookingDate: action.bookingDate,
+              description: action.description,
+              amount: action.amount,
+              balanceAfterTransaction: action.balanceAfterTransaction,
+            });
+            setCorrecting(false);
+          }}
+          onCancel={() => setCorrecting(false)}
+        />
+      )}
       {open && (
         <>
           <div className="review-row-title">
@@ -162,64 +217,18 @@ export function ImportTransactionReview({
           <div className="form-grid">
             <label>
               Date
-              <UKDateInput
-                disabled={busy}
-
-                value={t.date}
-                readOnly={!!d.bankSource}
-                onChange={(e) => correctSource(t, { date: e })}
-              />
+              {d.bankSource ? (
+                <time className="date-value" dateTime={t.date}>
+                  {formatUkDate(t.date)}
+                </time>
+              ) : (
+                <UKDateInput
+                  disabled={busy}
+                  value={t.date}
+                  onChange={(e) => correctSource(t, { date: e })}
+                />
+              )}
             </label>
-            <label>
-              Amount ({t.currency})
-              <input
-                disabled={busy}
-                aria-label={`Amount for ${t.description}`}
-                type="text"
-                key={`${t.id}:${t.amount}`}
-                inputMode="decimal"
-                readOnly={!!d.bankSource}
-                defaultValue={decimalMoney(t.amount, t.currency)}
-                onBlur={(e) => {
-                  if (d.bankSource) return;
-                  try {
-                    const amount = parseMoney(e.target.value, t.currency);
-                    e.target.setCustomValidity("");
-                    const nextInvalidAmounts = invalidAmounts.filter(
-                      (id) => id !== t.id,
-                    );
-                    patch({ invalidAmounts: nextInvalidAmounts });
-                    if (d.parserFallback && amount === t.amount) return;
-                    if (t.parseRowId && d.parserReview) {
-                      correctSource(t, { amount });
-                    } else {
-                      updateRow(t.id, {
-                        amount,
-                        type: t.isTransfer
-                          ? "transfer"
-                          : amount >= 0
-                            ? "income"
-                            : "expense",
-                        acknowledged: true,
-                      });
-                    }
-                  } catch {
-                    patch({
-                      invalidAmounts: [...new Set([...invalidAmounts, t.id])],
-                    });
-                    e.target.setCustomValidity(
-                      "Enter a valid amount, such as -82.45.",
-                    );
-                    e.target.reportValidity();
-                  }
-                }}
-              />
-            </label>
-            {d.bankSource && onReviewSource && (
-              <button type="button" disabled={busy} onClick={onReviewSource}>
-                Correct amount
-              </button>
-            )}
             <label>
               Category
               <select

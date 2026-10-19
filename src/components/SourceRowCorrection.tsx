@@ -1,4 +1,5 @@
-import { useId, useState, type ReactNode } from "react";
+import { useLayoutEffect, useId, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import type { RowReading, RowReviewAction } from "../import/generic/types";
 import { decimalMoney, parseMoney } from "../domain/money";
 import { parseDate } from "../domain/dates";
@@ -22,6 +23,18 @@ export function SourceRowCorrection({
   onCancel: () => void;
 }) {
   const formId = useId();
+  const [host] = useState(() => {
+    const element = document.createElement("div");
+    element.className = "app import-workspace import-correction-overlay";
+    element.dataset.page = "import";
+    return element;
+  });
+  const [connected, setConnected] = useState(false);
+  useLayoutEffect(() => {
+    document.body.append(host);
+    setConnected(true);
+    return () => host.remove();
+  }, [host]);
   const [amount, setAmount] = useState(() =>
     reading?.amount !== undefined && currency
       ? decimalMoney(Math.abs(reading.amount), currency)
@@ -61,22 +74,21 @@ export function SourceRowCorrection({
   } catch {
     detailsInvalid = true;
   }
-  return (
+  if (!connected) return null;
+  return createPortal(
     <Sheet
-      title="Correct transaction amount"
+      title="Correct amount"
+      closeLabel="Cancel correction"
       onClose={onCancel}
       footer={
         <>
-          <button type="button" disabled={busy} onClick={onCancel}>
-            Cancel correction
-          </button>
           <button
             type="submit"
             className="primary"
             form={formId}
-            disabled={busy || !currency}
+            disabled={busy}
           >
-            Save row
+            Save amount
           </button>
         </>
       }
@@ -138,7 +150,7 @@ export function SourceRowCorrection({
               inputMode="decimal"
               autoComplete="off"
               required
-              disabled={busy || !currency}
+              disabled={busy}
               value={amount}
               onChange={(event) => {
                 setError("");
@@ -214,7 +226,7 @@ export function SourceRowCorrection({
               <input
                 type="text"
                 inputMode="text"
-                disabled={busy || !currency}
+                disabled={busy}
                 value={balance}
                 onChange={(event) => {
                   setError("");
@@ -226,6 +238,7 @@ export function SourceRowCorrection({
           {error && <p role="alert">{error}</p>}
         </form>
       </div>
-    </Sheet>
+    </Sheet>,
+    host,
   );
 }

@@ -363,10 +363,16 @@ test("a one-penny digital discrepancy stays unverified until the source amount i
     ),
   ).toBe(true);
   await row
-    .getByRole("button", { name: "Correct amount", exact: true })
+    .getByRole("button", { name: /Correct amount for .*waitrose/i })
     .click();
-  await row.getByLabel("Amount (GBP)", { exact: true }).fill("-78.43");
-  await row.getByRole("button", { name: "Save row", exact: true }).click();
+  const editor = page.getByRole("dialog", {
+    name: "Correct amount",
+    exact: true,
+  });
+  await editor.getByLabel("Amount (GBP)", { exact: true }).fill("-78.43");
+  await editor
+    .getByRole("button", { name: "Save amount", exact: true })
+    .click();
   await expect(proof).toContainText("Statement figures match exactly");
   await expect(
     page.getByRole("button", { name: "Confirm import", exact: true }),

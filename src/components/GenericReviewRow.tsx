@@ -1,5 +1,5 @@
 import { SourceRowCorrection } from "./SourceRowCorrection";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { displayDate, displayMerchant } from "../domain/presentation";
 import type { RowCheck, RowReading, SourceRect } from "../import/generic/types";
 import {
@@ -156,6 +156,7 @@ export function GenericReviewRow({
     description: reading?.description || "Unread transaction",
   });
   const rawName = /\S{30,}/.test(merchant);
+  const amountButton = useRef<HTMLButtonElement>(null);
   const [correcting, setCorrecting] = useState(false);
   const [open, setOpen] = useState(!row.resolved);
   useEffect(() => {
@@ -163,6 +164,9 @@ export function GenericReviewRow({
   }, [row.resolved]);
   useEffect(() => {
     if (correctionRequest) {
+      const button = amountButton.current;
+      if (button && !button.closest("[hidden], [inert]"))
+        button.focus({ preventScroll: true });
       setOpen(true);
       setCorrecting(true);
     }
@@ -198,7 +202,24 @@ export function GenericReviewRow({
             Page {row.rect.page} · {state}
           </small>
         </span>
-        <strong>{displayMoney(reading?.amount, currency, true)}</strong>
+        <button
+          type="button"
+          className="import-amount-action"
+          ref={amountButton}
+          aria-label={`Correct amount for ${merchant}`}
+          disabled={busy}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.focus({ preventScroll: true });
+            setOpen(true);
+            setCorrecting(true);
+          }}
+        >
+          {reading?.amount === undefined
+            ? "Amount unread"
+            : displayMoney(reading.amount, currency, true)}
+        </button>
       </summary>
       {open && (
         <div className="generic-row-content">
@@ -233,16 +254,6 @@ export function GenericReviewRow({
             </dl>
           )}
           <div className="generic-action-row">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={(event) => {
-                event.currentTarget.focus({ preventScroll: true });
-                setCorrecting(true);
-              }}
-            >
-              Correct amount
-            </button>
             <button
               type="button"
               disabled={busy || excluded}

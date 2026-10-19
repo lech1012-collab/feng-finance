@@ -53,11 +53,9 @@
   min-width: 0;
   max-width: 100%;
   width: 100%;
-  overflow-x: auto;
-  white-space: nowrap;
-  overflow-wrap: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
   word-break: normal;
-  overscroll-behavior-x: contain;
   min-height: 44px;
   padding-block: 8px;
 }
@@ -391,4 +389,84 @@
 }
 .import-workspace .import-correction .generic-source-crop {
   margin-block: 12px;
+}
+
+/* Source text wraps inside stationary cards; only advanced mapping tables pan. */
+.import-workspace
+  :is(
+    .review-row,
+    .review-compact,
+    .review-compact > span,
+    .generic-review-row > summary,
+    .generic-review-row > summary > span,
+    .generic-reading-values dd
+  ) {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+  overflow-wrap: anywhere;
+}
+.import-workspace .import-amount-action {
+  min-width: 44px;
+  min-height: 44px;
+  max-width: 100%;
+  justify-self: end;
+  padding: 8px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  background: var(--surface-2, var(--surface));
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.import-workspace .review-compact > .import-amount-action {
+  grid-column: 1;
+  justify-self: start;
+}
+.import-workspace.import-correction-overlay {
+  display: block;
+  min-height: 0;
+  width: 0;
+  height: 0;
+  min-width: 0;
+}
+.import-workspace.import-correction-overlay .ux-sheet {
+  max-width: min(100vw, 640px);
+}
+.import-workspace .generic-correction input {
+  min-height: 48px;
+}
+@media (min-width: 600px) {
+  .import-workspace .review-compact > .import-amount-action {
+    grid-column: 2;
+    grid-row: 1;
+    justify-self: end;
+  }
+}
+
+/* Override the earlier polish rules that made exact source text touch-scroll. */
+.app .import-workspace .generic-reading-values .generic-original-description,
+.app.import-workspace .generic-reading-values .generic-original-description,
+.app .import-workspace .source-filename,
+.app.import-workspace .source-filename {
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  min-width: 0;
+  max-width: 100%;
+}
+.app .import-workspace .source-filename > strong,
+.app.import-workspace .source-filename > strong {
+  display: block;
+  min-width: 0;
+  max-width: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.import-workspace.import-correction-overlay .sheet-heading h2 {
+  font-size: 1.25rem;
+  line-height: 1.25;
+}
+.import-workspace.import-correction-overlay .sheet-footer > .primary {
+  width: 100%;
 }

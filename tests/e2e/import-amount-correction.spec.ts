@@ -80,8 +80,7 @@ for (const setup of [
       has: page.locator("summary strong", { hasText: "BEAUTY CODE" }),
     });
     const trigger = row.getByRole("button", {
-      name: "Correct amount",
-      exact: true,
+      name: /Correct amount for Beauty Code/i,
     });
     await expect(trigger).toBeVisible();
     const confirm = page.getByRole("button", {
@@ -94,7 +93,7 @@ for (const setup of [
     );
     await trigger.click();
     const editor = page.getByRole("dialog", {
-      name: "Correct transaction amount",
+      name: "Correct amount",
       exact: true,
     });
     await expect(editor).toBeVisible();
@@ -109,7 +108,9 @@ for (const setup of [
       editor.getByRole("img", { name: /Original statement row/ }),
     ).toHaveAttribute("draggable", "false");
     await amount.fill("80.00");
-    await editor.getByRole("button", { name: "Save row", exact: true }).click();
+    await editor
+      .getByRole("button", { name: "Save amount", exact: true })
+      .click();
     await expect(editor.getByRole("alert")).toContainText(
       "Choose Money in or Money out",
     );
@@ -117,7 +118,9 @@ for (const setup of [
       .getByRole("button", { name: "Money out", exact: true })
       .click();
     await amount.fill("80.001");
-    await editor.getByRole("button", { name: "Save row", exact: true }).click();
+    await editor
+      .getByRole("button", { name: "Save amount", exact: true })
+      .click();
     await expect(editor.getByRole("alert")).toContainText(
       "correct decimal places",
     );
@@ -187,7 +190,9 @@ for (const setup of [
     await editor
       .getByRole("button", { name: "Money out", exact: true })
       .click();
-    await editor.getByRole("button", { name: "Save row", exact: true }).click();
+    await editor
+      .getByRole("button", { name: "Save amount", exact: true })
+      .click();
     await expect(editor).toHaveCount(0);
     await expect(
       page.getByText("Statement figures match exactly", { exact: true }),
