@@ -32,6 +32,7 @@ export function GenericImportReview({
   const [visibleRows, setVisibleRows] = useState(10);
   const reviewedRows = result.rowChecks.filter(
     (row) =>
+      (!!correctionRequest && !correctionRequest.rowId) ||
       row.rowId === correctionRequest?.rowId ||
       row.checkLevel === "review" ||
       row.checkLevel === "manual_override" ||
@@ -147,7 +148,9 @@ export function GenericImportReview({
             {result.checks.needsReviewRows
               ? `Needs review (${result.checks.needsReviewRows})`
               : correctionRequest
-                ? "Selected transaction"
+                ? correctionRequest.rowId
+                  ? "Selected transaction"
+                  : "Choose a transaction"
                 : "Reviewed transactions"}
           </summary>
           <p>

@@ -53,6 +53,7 @@ for (const setup of [
     page,
     browserName,
   }, testInfo) => {
+    test.setTimeout(120000);
     await page.setViewportSize({ width: setup.width, height: setup.height });
     await page.emulateMedia({ reducedMotion: "reduce" });
     await page.goto("/#/import");

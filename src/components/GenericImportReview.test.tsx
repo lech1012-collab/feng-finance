@@ -203,6 +203,29 @@ afterEach(() => {
 });
 
 describe("generic PDF evidence review", () => {
+  it("lets the user choose a verified source row when a direct correction cannot be matched uniquely", async () => {
+    const result = resultFixture();
+    result.status = "parsed";
+    result.checks.needsReviewRows = 0;
+    result.rowChecks = [
+      { ...flaggedRow(), checkLevel: "balance", resolved: true, issues: [] },
+    ];
+    const { onAction } = show(result, {
+      correctionRequest: { id: "unmatched-request" },
+    });
+    expect(screen.getByText("Choose a transaction")).toBeVisible();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByText(/fictional store/i, { selector: "summary strong" }),
+    );
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Correct amount" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Correct transaction amount" }),
+    ).toBeVisible();
+    expect(onAction).not.toHaveBeenCalled();
+  });
   it("opens the specifically requested verified row even beyond the first ten rows, without saving it", () => {
     const result = resultFixture();
     result.status = "parsed";
