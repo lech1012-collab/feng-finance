@@ -95,12 +95,20 @@ export function identifyMetadata(
   const suffixes = [
     ...new Set(primaryAccounts.length ? primaryAccounts : ibans),
   ];
+  // A statement may also print the issuer's receiving account in its payment
+  // instructions. An established bank-reader identity or explicit user choice
+  // can disambiguate those candidates; do not ask the same question forever.
+  // A conflicting selection must never replace a unique printed identifier.
+  const chosenIdentifier = options.account?.maskedAccountIdentifier;
+  const chosenSuffix = chosenIdentifier?.replace(/\D/g, "").slice(-4);
   let identifier =
     suffixes.length === 1
       ? `•••• ${suffixes[0]}`
       : suffixes.length > 1
-        ? undefined
-        : options.account?.maskedAccountIdentifier;
+        ? chosenSuffix && suffixes.includes(chosenSuffix)
+          ? `•••• ${chosenSuffix}`
+          : undefined
+        : chosenIdentifier;
   const membership = rows.find((row) => /membership number/i.test(row.text));
   if (!identifier && !suffixes.length && membership) {
     const label = membership.items.find((item) =>

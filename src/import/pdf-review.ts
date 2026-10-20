@@ -239,7 +239,19 @@ export async function preparePdfReading(
   const options: PdfReviewOptions = {
     ...review,
     institution: bank,
-    account: account ?? review.account,
+    // Correcting source rows must retain identity already read by the bank
+    // adapter. Its card number can distinguish the customer's card from the
+    // separate bank account printed in the issuer's payment instructions.
+    account:
+      account ??
+      review.account ??
+      (legacy?.accountIdentifier
+        ? {
+            maskedAccountIdentifier: legacy.accountIdentifier,
+            accountType: legacy.accountType,
+            currency: legacy.currency,
+          }
+        : undefined),
     profile:
       review.profile ?? (profile?.institution === bank ? profile : undefined),
     period:

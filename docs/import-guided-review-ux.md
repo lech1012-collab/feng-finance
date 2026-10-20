@@ -1,4 +1,4 @@
-# Guided import review — 2.2.12 / 2.2.13
+# Guided import review — 2.2.12–2.2.14
 
 This change applies only to import review. It follows the attention-only batch view in `import-batch-focus-ux.md` and replaces the expanded diagnostic tile as the normal way to resolve an exception.
 
@@ -42,3 +42,13 @@ Physical iPhone Safari, installed-PWA keyboard behavior and VoiceOver remain man
 ### Native-reader identity recovery (2.2.13)
 
 The same account step also handles a native bank reader that has extracted its transactions but cannot read the account/card identifier. A transient structured recovery hint carries only the source bank, account type and currency into the account step. After choosing the account, one explicit unverified-statement confirmation explains the unread identifier and names the linked account. The original identifier, amounts and balances remain unchanged. The statement stays unverified even when the arithmetic difference is zero. Valid native amounts require no separate re-entry. The hint is not written to the database. A synthetic missing-number Barclaycard journey verifies all six source transactions, its negative reported closing balance and zero arithmetic difference, with the unverified acceptance recorded. Existing bank-source integrity safeguards remain enforced.
+
+### Recognized accounts and Continue recovery (2.2.14)
+
+The card can already be recognized by its bank adapter while generic source review sees several identifiers, including a separate account printed in the issuer's payment instructions. Previously the generic reader dropped the known identity, and even selecting the correct account could leave its status as identity-required. Continue then repeated the same account question.
+
+Source review now carries the native adapter's already-read account identity. When several printed identifiers exist, an established identity or explicit account choice resolves them only when its last four digits match a printed candidate. Without that evidence the app still asks rather than guesses. A unique printed account cannot be silently replaced by a different selected account. An incompatible choice shows an actionable error inside the account panel and preserves the selected option so it can be corrected.
+
+**Recognized card → Review statement → first unresolved transaction → Save and continue → next exception or Statement checked** is the normal correction journey. Choosing an account is reserved for genuinely unidentified sources. The account and its ID remain attached to this file during subsequent corrections, including staged accounts in a multiple-file import. Verified rows are not presented as manual questions. Balance differences, missing source fields, duplicate decisions and genuine unread-identifier warnings remain enforced. An account choice does not prove an amount or waive reconciliation.
+
+Regression coverage reproduces both lost native identity and the repeated account-selection status. Fictional PDFs include a recognized card with one unread purchase and another account in its payment instructions, plus an unknown bank with competing identifiers. Browser journeys exercise a mixed batch, a rejected account choice with visible feedback, a successful existing-account selection, direct manual correction and the exact final ledger. No private statements are added to the repository.

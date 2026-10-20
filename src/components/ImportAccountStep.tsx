@@ -28,7 +28,7 @@ export function ImportAccountStep({
   const hint = entry.extracted?.accountSelection ?? parsed;
   const periodOnly = result?.errorCode === "missing-period";
   const formId = useId();
-  const [selected, setSelected] = useState("");
+  const [selected, setSelected] = useState(entry.accountId);
   const [creating, setCreating] = useState(!accounts.length);
   const [bank, setBank] = useState<Institution>(
     entry.bank || hint?.institution || "Other",
@@ -293,6 +293,9 @@ export function ImportAccountStep({
             </>
           )}
           {error && <p role="alert">{error}</p>}
+          {!error && entry.accountId && entry.error && (
+            <p role="alert">{entry.error}</p>
+          )}
         </form>
       </div>
     </ImportReviewSheet>

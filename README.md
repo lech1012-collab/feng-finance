@@ -538,3 +538,7 @@ Import exceptions now offer a single Review statement action. A focused modal id
 ## v2.2.13 Missing card identity recovery
 
 A supported digital card statement with an unread identifier now enters the account-identification step with its bank, card type and currency preserved. An explicit account confirmation keeps the source amounts and balances with the native reader. The missing printed identifier keeps the statement labelled unverified; valid amounts need no separate re-entry. No account is saved before the import is confirmed.
+
+## v2.2.14 Recognized accounts stay assigned during review
+
+Correcting a recognized card statement now opens its unresolved transactions directly and retains the card identity. Separate payment-instruction account numbers no longer cause an account-selection loop. For an unfamiliar layout, choosing a matching printed account advances to transaction review; a mismatched choice explains the error. This does not waive source-row or balance validation. See [the guided workflow and regression coverage](docs/import-guided-review-ux.md).

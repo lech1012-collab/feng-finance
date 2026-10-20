@@ -54,8 +54,18 @@ export function guidedReviewStep(entry: FileReview): GuidedReviewStep {
         row.reviewAction?.kind !== "exclude" &&
         (invalid.has(row.rowId) || (!row.resolved && !row.reviewAction)),
     );
-    if (rows.length)
-      return { kind: "source-row", row: rows[0], remaining: rows.length };
+    if (rows.length) {
+      // One unread amount can invalidate a whole card total. Fix the concrete
+      // source errors first, then recompute: the other rows may reconcile
+      // without asking the person to re-enter every readable transaction.
+      const unread = rows.filter((row) => invalid.has(row.rowId));
+      const questions = unread.length ? unread : rows;
+      return {
+        kind: "source-row",
+        row: questions[0],
+        remaining: questions.length,
+      };
+    }
   }
   const row = d.transactions.find(
     (t) =>

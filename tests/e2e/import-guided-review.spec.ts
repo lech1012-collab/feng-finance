@@ -33,6 +33,171 @@ async function enter(page: Page, value: string) {
     .click();
 }
 
+test("a recognized Barclaycard opens its unread transaction directly without asking for its account", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  await page.goto("/#/import");
+  await page
+    .getByLabel("Select statements", { exact: true })
+    .setInputFiles([
+      resolve("tests/fixtures/guided-known-card-amount.pdf"),
+      resolve("tests/fixtures/known-bank-amex.pdf"),
+    ]);
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({ timeout: 90000 });
+  const card = page
+    .locator(".import-statement-card:visible")
+    .filter({ hasText: "4444" });
+  await expect(card).toHaveCount(1);
+  await card
+    .getByRole("button", { name: "Review statement", exact: true })
+    .click();
+  const editor = amountEditor(page);
+  await expect(editor).toBeVisible({ timeout: 30000 });
+  await expect(
+    page.getByRole("dialog", { name: "Identify account", exact: true }),
+  ).toHaveCount(0);
+  await expect(editor).toContainText("WAITROSE");
+  await expect(editor).toContainText("Transaction 1 of 1 to check");
+  await expect(editor).toContainText("4444");
+  await page.screenshot({
+    path: testInfo.outputPath("known-card-direct-amount.png"),
+  });
+  await enter(page, "80.00");
+  const done = page.getByRole("dialog", {
+    name: "Statement checked",
+    exact: true,
+  });
+  await expect(done).toBeVisible();
+  await done.getByRole("button", { name: "Done", exact: true }).click();
+  expect(await stored(page, "transactions")).toHaveLength(0);
+  await page
+    .getByRole("button", { name: "Confirm import", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  const statements = await stored(page, "statements");
+  expect(statements).toHaveLength(2);
+  expect(
+    statements.find((s) => s.sourceFilename === "guided-known-card-amount.pdf"),
+  ).toMatchObject({
+    closingBalance: -10968,
+    transactionCount: 6,
+    validationStatus: "reconciled",
+    validationDifference: 0,
+  });
+  const accounts = await stored(page, "accounts");
+  expect(accounts.filter((a) => a.institution === "Barclays")).toEqual([
+    expect.objectContaining({
+      accountType: "credit",
+      maskedAccountIdentifier: "•••• 4444",
+    }),
+  ]);
+});
+
+test("choosing an account once advances past competing PDF identifiers to its amount question", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  await page.goto("/#/import");
+  // Pre-existing accounts exercise the actual selection dropdown, including a
+  // rejected choice. Only fictional setup data is written directly.
+  await page.evaluate(
+    () =>
+      new Promise<void>((resolveSeed, reject) => {
+        const request = indexedDB.open("feng-finance");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const database = request.result;
+          const tx = database.transaction("accounts", "readwrite");
+          for (const suffix of ["3333", "9999"])
+            tx.objectStore("accounts").put({
+              id: `fictional-account-${suffix}`,
+              institution: "Other",
+              displayName: "Current account",
+              accountType: "current",
+              currency: "GBP",
+              maskedAccountIdentifier: `•••• ${suffix}`,
+              createdAt: "2026-10-20T00:00:00Z",
+              updatedAt: "2026-10-20T00:00:00Z",
+            });
+          tx.oncomplete = () => {
+            database.close();
+            resolveSeed();
+          };
+          tx.onerror = () => {
+            database.close();
+            reject(tx.error);
+          };
+        };
+      }),
+  );
+  await page.reload();
+  await page
+    .getByLabel("Select statements", { exact: true })
+    .setInputFiles(resolve("tests/fixtures/guided-competing-accounts.pdf"));
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({ timeout: 90000 });
+  await page
+    .locator(".import-statement-card:visible")
+    .getByRole("button", { name: "Review statement", exact: true })
+    .click();
+  const account = page.getByRole("dialog", {
+    name: "Identify account",
+    exact: true,
+  });
+  await expect(account).toBeVisible();
+  await account
+    .getByRole("combobox", { name: "Account", exact: true })
+    .selectOption("fictional-account-9999");
+  await account.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(account.getByRole("alert")).toContainText(
+    "could not be matched to the identifiers",
+  );
+  await expect(
+    account.getByRole("combobox", { name: "Account", exact: true }),
+  ).toHaveValue("fictional-account-9999");
+  await account
+    .getByRole("combobox", { name: "Account", exact: true })
+    .selectOption("fictional-account-3333");
+  await account.getByRole("button", { name: "Continue", exact: true }).click();
+  await expect(amountEditor(page)).toBeVisible();
+  await expect(account).toHaveCount(0);
+  await expect(amountEditor(page)).toContainText("FICTIONAL GROCER");
+  await page.screenshot({
+    path: testInfo.outputPath("account-continue-advances.png"),
+  });
+  await enter(page, "80.00");
+  const done = page.getByRole("dialog", {
+    name: "Statement checked",
+    exact: true,
+  });
+  await expect(done).toBeVisible();
+  await done.getByRole("button", { name: "Done", exact: true }).click();
+  await page
+    .getByRole("button", { name: "Confirm import", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  expect(
+    (await stored(page, "transactions"))
+      .map((t) => t.amount)
+      .sort((a, b) => Number(a) - Number(b)),
+  ).toEqual([-8000, 200000]);
+  expect(await stored(page, "accounts")).toHaveLength(2);
+  expect(await stored(page, "statements")).toEqual([
+    expect.objectContaining({
+      accountId: "fictional-account-3333",
+      validationStatus: "reconciled",
+    }),
+  ]);
+});
+
 test("a mixed PDF batch resolves missing account identity before showing one amount question", async ({
   page,
 }, testInfo) => {
