@@ -1,0 +1,90 @@
+name: Verify published Feng 2.2.14 once
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify-published-release:
+    if: github.head_ref == 'verify/published-feng-2.2.14'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Wait for gated deployment and verify public static assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json, os, re, time, urllib.request
+          from urllib.parse import urljoin, urlparse
+          
+          repo = "lech1012-collab/feng-finance"
+          sha = "92daeef373bb719c41a82d55df23a497805c9bee"
+          base = "https://lech1012-collab.github.io/feng-finance/"
+          def api(path):
+              request = urllib.request.Request("https://api.github.com/repos/" + repo + path,
+                  headers={"Authorization": "Bearer " + os.environ["GH_TOKEN"],
+                           "Accept": "application/vnd.github+json", "User-Agent": "Feng-release-verification"})
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  return json.load(response)
+          def fetch(path):
+              url = urljoin(base, path)
+              assert urlparse(url).netloc == urlparse(base).netloc
+              with urllib.request.urlopen(url, timeout=30) as response:
+                  assert response.status == 200
+                  return response.read().decode("utf-8")
+          last = None
+          for attempt in range(60):
+              verify = api("/actions/runs/39470687607")
+              runs = api("/actions/runs?head_sha=" + sha + "&per_page=30")["workflow_runs"]
+              pages = [run for run in runs if run["name"] == "Deploy Feng Finance to GitHub Pages"
+                       and run["head_sha"] == sha and run["event"] == "workflow_run"]
+              deploy = max(pages, key=lambda run: run["id"]) if pages else None
+              status = (verify["status"], verify["conclusion"],
+                        deploy["status"] if deploy else "not-started",
+                        deploy["conclusion"] if deploy else None)
+              if status != last:
+                  print(json.dumps({"main_ci": status[:2], "pages": status[2:],
+                                    "pages_run": deploy["id"] if deploy else None}), flush=True)
+                  last = status
+              if verify["status"] == "completed":
+                  assert verify["conclusion"] == "success", "Main verification must succeed before publication."
+              if deploy and deploy["status"] == "completed" and deploy["conclusion"] != "skipped":
+                  assert deploy["conclusion"] == "success", "GitHub Pages deployment failed."
+                  assert verify["conclusion"] == "success"
+                  break
+              time.sleep(30)
+          else:
+              raise AssertionError("Timed out waiting for verified GitHub Pages publication.")
+          index = fetch("")
+          main_path = re.search(r'<script[^>]+src="([^"]+\.js)"', index).group(1)
+          main = fetch(main_path)
+          import_name = re.search(r"Import-[A-Za-z0-9_-]+\.js", main).group()
+          code = fetch("assets/" + import_name)
+          css_name = re.search(r"Import-[A-Za-z0-9_-]+\.css", main).group()
+          css = fetch("assets/" + css_name)
+          sw = fetch("sw.js")
+          manifest = json.loads(fetch("manifest.webmanifest"))
+          checks = {
+              "version_2_2_14": '"2.2.14"' in main,
+              "account_mismatch_feedback": "The selected account could not be matched to the identifiers on this PDF." in code,
+              "printed_identity_safeguard": "Selected account does not match the account identifier printed on this statement." in code,
+              "guided_manual_correction": all(label in code for label in ["Review statement", "Identify account", "Save and continue", "Check statement totals"]),
+              "native_account_recovery": "accountSelection" in code and "The account number could not be read." in code,
+              "financial_acceptance_guard": "does not verify the statement." in code,
+              "optional_diagnostics": "Statement details" in code,
+              "attention_only_filter": "Needs attention (" in code and "All statements (" in code,
+              "in_flow_confirmation": "Import summary" in code and ".import-outcome-footer{position:static" in css,
+              "stationary_text": "overflow-wrap:anywhere" in css,
+              "standalone": manifest["display"] == "standalone",
+              "main_precached": main_path.split("/")[-1] in sw,
+              "import_precached": import_name in sw,
+              "styles_precached": css_name in sw,
+          }
+          print(json.dumps({"source_commit": sha, "pages_run": deploy["id"], "url": base,
+                            "main_asset": main_path, "import_asset": import_name, "checks": checks}, indent=2), flush=True)
+          assert all(checks.values()), "The expected release assets are not fully published."
+          print("Feng Finance 2.2.14 deployment and 14 live asset checks passed.", flush=True)
+          
+          PY
