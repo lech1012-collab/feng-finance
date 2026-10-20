@@ -135,10 +135,22 @@ function panelTable(
   ];
   const cellsFor = (source: ExtractedTextItem[]): TableCell[] => {
     const groups = new Map<string, ExtractedTextItem[]>();
+    // Amounts are right-aligned: a wider value elsewhere can start to the left
+    // of this row's contactless marker. Classify the marker against this row's
+    // monetary runs, not the panel-wide minimum left edge.
+    const rowAmounts = source.filter(
+      (item) =>
+        item.x >= amountX - 6 &&
+        (MONEY_PATTERN.test(item.text.trim()) ||
+          /^(?:GBP\s*|[£€$])/.test(item.text.trim())),
+    );
     for (const item of source) {
       const text = item.text.trim();
       const marker =
-        item.x >= amountX - 30 && item.x < amountX && /^(?:e|c|m)$/i.test(text);
+        /^(?:e|c|m)$/i.test(text) &&
+        rowAmounts.some(
+          (amount) => item.x >= amount.x - 30 && item.x < amount.x,
+        );
       const header = headerRole(text);
       const role = marker
         ? "marker"

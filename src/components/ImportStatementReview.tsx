@@ -303,7 +303,11 @@ export function ImportStatementReview({
                   // directly rather than sending the user through reading details.
                   if (
                     d?.bankSource?.parsed.accountIdentifier &&
-                    validation?.status === "warning" &&
+                    d.bankSource.sourceCoverageIssues.some((issue) =>
+                      /Some printed transaction rows were not fully matched|Some printed running balances were not read/.test(
+                        issue,
+                      ),
+                    ) &&
                     !entry.optionsChanged &&
                     !entry.requiresBatchRecheck
                   )

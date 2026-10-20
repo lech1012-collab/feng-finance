@@ -11,6 +11,10 @@ import { GenericColumnMapping } from "./GenericColumnMapping";
 import { Sheet } from "./Sheet";
 import { ImportRiskConfirmation } from "./ImportRiskConfirmation";
 import "./GenericImportReview.css";
+import {
+  fieldCorrections,
+  rowReviewDecision,
+} from "../import/generic/review-decision";
 export type { GenericImportReviewProps } from "./generic-review-view";
 export function GenericImportReview({
   result,
@@ -30,13 +34,12 @@ export function GenericImportReview({
   const [showOverride, setShowOverride] = useState(false);
   const overrideRef = useRef<HTMLButtonElement>(null);
   const [visibleRows, setVisibleRows] = useState(10);
+  const inputRows = fieldCorrections(result.rowChecks);
   const reviewedRows = result.rowChecks.filter(
     (row) =>
       (!!correctionRequest && !correctionRequest.rowId) ||
       row.rowId === correctionRequest?.rowId ||
-      row.checkLevel === "review" ||
-      row.checkLevel === "manual_override" ||
-      row.issues.length > 0 ||
+      rowReviewDecision(row).fields.length > 0 ||
       !!row.reviewAction,
   );
   const hasInvalidRows = result.rowChecks.some(
@@ -46,7 +49,7 @@ export function GenericImportReview({
   );
   const needsOverride =
     !result.checks.reconciledExactly || result.checks.needsReviewRows > 0;
-  const chips = result.checks.needsReviewRows
+  const chips = inputRows.length
     ? "Needs review"
     : result.checks.totalCheckedRows
       ? "Checked against statement total"
@@ -62,9 +65,10 @@ export function GenericImportReview({
     >
       <div className="generic-method-heading">
         <p>
+          {result.rowChecks.length} transactions read ·{" "}
           {methodLabel(method, result)} · {result.checks.balanceRowsPassed}{" "}
           balance-checked · {result.checks.totalCheckedRows} total-checked ·{" "}
-          {result.checks.needsReviewRows} need review
+          {inputRows.length} need review
         </p>
         <span className="small-chip">{chips}</span>
       </div>
@@ -142,11 +146,11 @@ export function GenericImportReview({
       {!!reviewedRows.length && (
         <details
           className="generic-review-list"
-          open={result.checks.needsReviewRows > 0 || !!correctionRequest}
+          open={inputRows.length > 0 || !!correctionRequest}
         >
           <summary>
-            {result.checks.needsReviewRows
-              ? `Needs review (${result.checks.needsReviewRows})`
+            {inputRows.length
+              ? `Needs review (${inputRows.length})`
               : correctionRequest
                 ? correctionRequest.rowId
                   ? "Selected transaction"
@@ -240,7 +244,7 @@ export function GenericImportReview({
                     : "s match"}
                   .
                   {selected.checks.needsReviewRows > 0
-                    ? ` ${selected.checks.needsReviewRows} row${selected.checks.needsReviewRows === 1 ? " needs" : "s need"} review.`
+                    ? ` ${selected.checks.needsReviewRows} row${selected.checks.needsReviewRows === 1 ? " is" : "s are"} not independently verified.`
                     : ""}{" "}
                   {selected.checks.reconciledExactly
                     ? "Statement figures match exactly."

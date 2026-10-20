@@ -46,6 +46,61 @@ function show(
   return { onSave, onCancel, ...view };
 }
 describe("source amount correction", () => {
+  it("asks only for an unread date and preserves the known amount and booking date", () => {
+    const save = vi.fn();
+    render(
+      <SourceRowCorrection
+        reading={{ ...reading, date: undefined }}
+        currency="GBP"
+        busy={false}
+        fields={["date"]}
+        source={<p>Original PDF</p>}
+        onSave={save}
+        onCancel={vi.fn()}
+        saveLabel="Save and continue"
+      />,
+    );
+    expect(screen.getByRole("dialog", { name: "Correct date" })).toBeVisible();
+    expect(screen.getByText(/Amount kept:/)).toHaveTextContent("81.00");
+    expect(screen.getByRole("textbox", { name: "Date" })).toHaveValue("");
+    expect(
+      screen.getByRole("textbox", { name: "Amount (GBP)" }).closest("details"),
+    ).not.toHaveAttribute("open");
+    fireEvent.change(screen.getByRole("textbox", { name: "Date" }), {
+      target: { value: "13092026" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Save and continue" }));
+    expect(save).toHaveBeenCalledWith(
+      expect.objectContaining({
+        date: "2026-09-13",
+        bookingDate: "2026-09-06",
+        amount: -8100,
+        description: "BEAUTY CODE",
+      }),
+    );
+  });
+  it("does not reinterpret an incomplete manually entered year as a valid source date", () => {
+    const save = vi.fn();
+    const view = render(
+      <SourceRowCorrection
+        reading={reading}
+        currency="GBP"
+        busy={false}
+        fields={["date"]}
+        source={null}
+        onSave={save}
+        onCancel={vi.fn()}
+      />,
+    );
+    fireEvent.change(screen.getByRole("textbox", { name: "Date" }), {
+      target: { value: "13/06/6" },
+    });
+    fireEvent.submit(view.container.ownerDocument.querySelector("form")!);
+    expect(save).not.toHaveBeenCalled();
+    expect(screen.getByRole("textbox", { name: "Date" })).toHaveValue(
+      "13/06/6",
+    );
+  });
   it("portals outside statement containers and preserves typed values while the import route is hidden", () => {
     const onSave = vi.fn();
     const editor = (active: boolean) => (

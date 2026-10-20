@@ -33,6 +33,12 @@ Every layout still needs its own arithmetic checks; synthetic fixtures do not
 certify every real statement variant. Questionable rows remain visible for
 correction, and an unverified import requires an explicit override.
 
+Import review separates unread fields from financial verification. A card with
+readable transactions and unequal totals shows one statement discrepancy, not
+an amount-entry task for every purchase. Date-only corrections keep the amount.
+See the [exceptions-only review design](docs/import-exceptions-only.md) for the
+parser safeguards, review journey and regression coverage.
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

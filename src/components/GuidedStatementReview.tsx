@@ -5,6 +5,10 @@ import { money } from "../domain/money";
 import { displayMerchant } from "../domain/presentation";
 import { guidedReviewStep } from "../import/guided-review";
 import {
+  fieldCorrections,
+  rowReviewDecision,
+} from "../import/generic/review-decision";
+import {
   importBlockers,
   invalidSourceRows,
   sourceReview,
@@ -52,7 +56,8 @@ export function GuidedStatementReview({
   const [warningIndex, setWarningIndex] = useState(0);
   const [risk, setRisk] = useState(false);
   const [excludeRow, setExcludeRow] = useState(false);
-  const step = guidedReviewStep(entry);
+  const [reviewLargeQueue, setReviewLargeQueue] = useState(false);
+  const step = guidedReviewStep(entry, reviewLargeQueue);
   const result = sourceReview(entry);
   const d = entry.draft;
   const currency =
@@ -129,11 +134,43 @@ export function GuidedStatementReview({
         onClose={onClose}
       />
     );
+  if (step.kind === "layout")
+    return (
+      <ImportReviewSheet
+        title="Check statement layout"
+        onClose={onClose}
+        footer={
+          <button type="button" className="primary" onClick={details}>
+            Inspect statement layout
+          </button>
+        }
+      >
+        <div className="import-guided-content">
+          {filename}
+          <p>
+            {step.count} rows have unread fields. This suggests a layout
+            problem; you do not need to start retyping the whole statement.
+          </p>
+          <p>
+            The source-row checks have already been attempted. Check the layout
+            or leave this statement for later. Nothing has been imported.
+          </p>
+          <button type="button" onClick={() => setReviewLargeQueue(true)}>
+            Review individual fields instead
+          </button>
+          <button type="button" onClick={onClose}>
+            Finish reviewing later
+          </button>
+        </div>
+      </ImportReviewSheet>
+    );
   if (step.kind === "source-row" && !excludeRow)
     return (
       <SourceRowCorrection
         key={step.row.rowId}
         reading={selectedReading(step.row)}
+        fields={rowReviewDecision(step.row).fields}
+        reason={rowReviewDecision(step.row).reason}
         currency={currency}
         busy={busy}
         progress={`${d?.statement.institution ?? "Statement"} · ${d?.account.maskedAccountIdentifier ?? ""} · Transaction ${completed + 1} of ${completed + step.remaining} to check`}
@@ -364,10 +401,16 @@ export function GuidedStatementReview({
             Recheck statement
           </button>
         ) : (
-          <button type="button" className="primary" onClick={details}>
+          <button
+            type="button"
+            className="primary"
+            onClick={step.kind === "validation" ? onClose : details}
+          >
             {step.kind === "mapping"
               ? "Set up columns"
-              : "Review statement details"}
+              : step.kind === "validation"
+                ? "Back to statements"
+                : "Review statement details"}
           </button>
         )
       }
@@ -417,6 +460,13 @@ export function GuidedStatementReview({
         )}
         {step.kind === "validation" && (
           <>
+            {result && fieldCorrections(result.rowChecks).length === 0 && (
+              <p>
+                {result.rowChecks.length} transactions read. No transaction
+                fields need correction. The statement totals still need
+                checking.
+              </p>
+            )}
             <p>
               These figures have not been independently verified. Check the
               original PDF before importing.
@@ -436,6 +486,9 @@ export function GuidedStatementReview({
                   ),
               )}
             </dl>
+            <button type="button" onClick={details}>
+              Inspect statement details
+            </button>
             {result?.checks.unreadPages.length ? (
               <p>
                 Pages {result.checks.unreadPages.join(", ")} have not been read.

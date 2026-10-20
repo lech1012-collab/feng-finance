@@ -364,6 +364,11 @@ function evaluate(
   const hasBalance = mapping.columnRoles.some((c) => c.role === "balance");
   for (const row of table.rows.filter((r) => r.kind === "transaction")) {
     let reading = interpretRow(context, row, mapping, metadata, previousDate);
+    if (
+      reading.amount === undefined &&
+      Number.isSafeInteger(options.bankAmounts?.[row.id])
+    )
+      reading.amount = options.bankAmounts![row.id];
     if (reading.balanceAfterTransaction !== undefined)
       reading.balanceAfterTransaction *= balanceSign;
     reading.id = readingIdentity(row.id, reading);
