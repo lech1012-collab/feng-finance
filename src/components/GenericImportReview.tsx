@@ -146,7 +146,7 @@ export function GenericImportReview({
       {!!reviewedRows.length && (
         <details
           className="generic-review-list"
-          open={inputRows.length > 0 || !!correctionRequest}
+          open={reviewedRows.length > 0}
         >
           <summary>
             {inputRows.length
