@@ -102,6 +102,7 @@ function Shell() {
   const hasPendingImport = useRef(false);
   hasPendingImport.current = !!selectedFiles.length || !!pendingImportCount;
   const importActive = location.pathname === "/import";
+  const previousPath = useRef(location.pathname);
   const openImportPicker = () => fileInput.current?.click();
   const openImport = () => {
     if (pendingImportCount || selectedFiles.length) {
@@ -376,7 +377,13 @@ function Shell() {
     };
   }, []);
   useEffect(() => {
+    const leavingImport = previousPath.current === "/import" && !importActive;
+    previousPath.current = location.pathname;
     if (!importActive) window.scrollTo(0, 0);
+    // WebKit can retain its sequential Tab starting point inside the now inert
+    // import workspace. Put focus on the visible page after leaving review.
+    if (leavingImport)
+      document.getElementById("main")?.focus({ preventScroll: true });
     const targetId = decodeURIComponent(location.hash.slice(1));
     if (!targetId) return;
     const reveal = () => {

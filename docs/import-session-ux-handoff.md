@@ -262,6 +262,20 @@ fallback for scanned statements is unchanged. A regression holds `readCells`
 unresolved forever and proves that the manual editor still opens, a wrong
 correction remains blocked and original source values remain unchanged.
 
+## Release regression: leaving the retained review
+
+The full application suite exposed a WebKit keyboard problem after confirmation:
+focus moved to the body, but sequential Tab navigation retained a starting point
+inside the hidden import workspace. Explicitly focusing the visible main region
+when leaving Import restores navigation. The regression uses real Tab/Enter to
+reach Transactions and categorise a row; it does not increase the navigation
+limit or force focus from the test. Returning to Import still preserves its
+scroll position and editor draft.
+
+Shared Settings test navigation now locates the active accessible heading,
+excluding the intentionally retained hidden Import heading. Financial assertions
+and source-validation requirements remain intact.
+
 ## Measurable acceptance criteria
 
 - Select Barclays debit, Barclaycard, Amex and Revolut synthetic PDFs together.
