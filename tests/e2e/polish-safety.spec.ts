@@ -288,6 +288,7 @@ test("desktop keyboard import, Home and categorisation have accessible names, lo
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
+  await expect(page.locator("#main")).toBeFocused();
   const before = await ledger(page);
   expect(
     before.transactions.map((row) => row.amount).sort((a, b) => a - b),

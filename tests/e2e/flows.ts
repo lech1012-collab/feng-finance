@@ -4,7 +4,11 @@ import { expect, type Page } from "./fixtures";
 export async function settingsSection(page: Page, section: string) {
   const origin = new URL(page.url()).origin;
   await page.goto(`${origin}/#/settings?section=${section}`);
-  await expect(page.locator("main h1")).toBeVisible();
+  // A pending import is retained in a hidden, inert workspace. Wait for the
+  // active page's accessible heading, not every h1 still present in the DOM.
+  const heading = page.getByRole("main").getByRole("heading", { level: 1 });
+  await expect(heading).toHaveCount(1);
+  await expect(heading).toBeVisible();
 }
 
 export async function saveReadableBackup(page: Page) {
