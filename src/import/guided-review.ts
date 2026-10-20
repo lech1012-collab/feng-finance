@@ -31,6 +31,7 @@ export function guidedReviewStep(entry: FileReview): GuidedReviewStep {
     return { kind: "recheck" };
   if (!d) {
     if (
+      entry.extracted?.accountSelection ||
       result?.status === "identity-required" ||
       entry.extracted?.format === "qif"
     )

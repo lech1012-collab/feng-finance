@@ -534,3 +534,7 @@ review states, control labels, interaction sizes and verification requirements.
 ## v2.2.12 Guided statement corrections
 
 Import exceptions now offer a single Review statement action. A focused modal identifies the account first, then shows one transaction at a time with its local PDF crop and a manual amount field. Save and continue rechecks the figures; alternative readings and parser controls remain under optional Statement details. Financial acceptance and import gates are unchanged. See [the guided workflow and review](docs/import-guided-review-ux.md).
+
+## v2.2.13 Missing card identity recovery
+
+A supported digital card statement with an unread identifier now enters the account-identification step with its bank, card type and currency preserved. Choosing an account supplies only the missing identifier; independently checked source amounts and balances stay with the native reader. No account is saved before the import is confirmed.

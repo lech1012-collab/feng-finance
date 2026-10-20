@@ -205,7 +205,21 @@ export async function preparePdfReading(
       fallback: false,
     };
   }
-  const legacy = legacyParsed(extracted.rows, bank, review);
+  let legacy = legacyParsed(extracted.rows, bank, review);
+  // An explicit account choice can supply an absent identifier. It cannot
+  // replace a printed identifier, bank, currency, account type or any amount.
+  if (
+    legacy &&
+    account &&
+    !legacy.accountIdentifier &&
+    account.institution === legacy.institution &&
+    account.currency === legacy.currency &&
+    (account.accountType === "credit" ||
+      account.accountType === "credit_card") ===
+      (legacy.accountType === "credit" || legacy.accountType === "credit_card")
+  ) {
+    legacy = { ...legacy, accountIdentifier: account.maskedAccountIdentifier };
+  }
   const explicitGenericReview =
     !!review.preferGeneric ||
     !!review.mapping ||

@@ -159,3 +159,69 @@ test("successive ambiguous amounts are entered manually without expanding cards 
     }),
   ]);
 });
+
+test("an unread Barclaycard identifier needs one account choice and retains native credit-card checks", async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(120000);
+  await page.goto("/#/import");
+  await page
+    .getByLabel("Select statements", { exact: true })
+    .setInputFiles(resolve("tests/fixtures/guided-credit-account.pdf"));
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({ timeout: 90000 });
+  const card = page.locator(".import-statement-card:visible");
+  await card
+    .getByRole("button", { name: "Review statement", exact: true })
+    .click();
+  const account = page.getByRole("dialog", {
+    name: "Identify account",
+    exact: true,
+  });
+  await expect(account).toBeVisible();
+  await expect(account.getByLabel("Bank", { exact: true })).toHaveValue(
+    "Barclays",
+  );
+  await expect(account.getByLabel("Account type", { exact: true })).toHaveValue(
+    "credit",
+  );
+  await account.getByLabel("Last four account or card digits").fill("4444");
+  await page.screenshot({
+    path: testInfo.outputPath("identify-credit-account.png"),
+  });
+  await account.getByRole("button", { name: "Continue", exact: true }).click();
+  const done = page.getByRole("dialog", {
+    name: "Statement checked",
+    exact: true,
+  });
+  await expect(done).toBeVisible();
+  await expect(amountEditor(page)).toHaveCount(0);
+  await done.getByRole("button", { name: "Done", exact: true }).click();
+  await expect(card.locator(":scope > summary")).toContainText("Credit card");
+  await expect(card.locator(":scope > summary")).toContainText("4444");
+  expect(await stored(page, "accounts")).toHaveLength(0);
+  await page
+    .getByRole("button", { name: "Confirm import", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  expect(await stored(page, "accounts")).toEqual([
+    expect.objectContaining({
+      accountType: "credit",
+      institution: "Barclays",
+      maskedAccountIdentifier: "•••• 4444",
+    }),
+  ]);
+  expect(await stored(page, "transactions")).toHaveLength(6);
+  expect(await stored(page, "statements")).toEqual([
+    expect.objectContaining({
+      bankProfileId: "barclaycard",
+      closingBalance: -10968,
+      validationDifference: 0,
+      validationStatus: "reconciled",
+      rowsNeedingReview: 0,
+    }),
+  ]);
+});

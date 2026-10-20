@@ -16,6 +16,7 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   points: [
     "Review import exceptions one question at a time in a focused panel.",
     "Identify an unread account before checking transaction amounts.",
+    "An unread card number keeps its supported bank reader after you identify the card.",
     "Type uncertain amounts manually and continue without comparing suggested readings.",
   ],
   pleaseTest: [

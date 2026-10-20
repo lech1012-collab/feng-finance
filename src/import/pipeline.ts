@@ -67,6 +67,11 @@ function applyCategory(
   };
 }
 export interface ExtractedFile {
+  /** Transient recovery context; never a stored account or transaction fact. */
+  accountSelection?: Pick<
+    ParsedStatement,
+    "institution" | "accountType" | "currency"
+  >;
   pdfSession?: PdfImportSession;
   extraction?: ExtractionResult;
   generic?: GenericParseResult;
@@ -163,6 +168,7 @@ export async function prepareDraft(
   csvMapping?: CsvMapping,
   pdfReviewOptions: PdfReviewOptions = {},
 ): Promise<ImportDraft> {
+  delete extracted.accountSelection;
   const detection = detectBank(extracted.rows);
   const bank =
     selectedBank ?? selectedAccount?.institution ?? detection.institution;
@@ -251,14 +257,26 @@ export async function prepareDraft(
     !selectedAccount &&
     !parsed.accountIdentifier &&
     existingAccounts.length !== 1
-  )
+  ) {
+    extracted.accountSelection = {
+      institution: parsed.institution,
+      accountType: parsed.accountType,
+      currency: parsed.currency,
+    };
     throw new Error(
       "Account identifier could not be read. Select an existing account, or create one in Settings, then parse again.",
     );
-  if (existingAccounts.length > 1 && !selectedAccount)
+  }
+  if (existingAccounts.length > 1 && !selectedAccount) {
+    extracted.accountSelection = {
+      institution: parsed.institution,
+      accountType: parsed.accountType,
+      currency: parsed.currency,
+    };
     throw new Error(
       "More than one account has this masked identifier. Select the matching account.",
     );
+  }
   const account = selectedAccount ??
     existingAccounts[0] ?? {
       id: id(),

@@ -106,3 +106,23 @@ for (const name of ["guided-two-amounts", "guided-missing-account"]) {
   }
   await writeFile(`tests/fixtures/${name}.pdf`, await document.save());
 }
+
+// A supported card with an unread identifier must retain its native financial checks.
+{
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const pages = [document.addPage([600, 842]), document.addPage([600, 842])];
+  for (const item of knownBankItems("barclaycard").filter(
+    (item) => !item.text.startsWith("Number "),
+  ))
+    pages[item.page - 1].drawText(item.text, {
+      x: item.x,
+      y: 842 - item.y,
+      size: item.fontSize ?? item.height,
+      font,
+    });
+  await writeFile(
+    "tests/fixtures/guided-credit-account.pdf",
+    await document.save(),
+  );
+}

@@ -1,4 +1,4 @@
-# Guided import review — 2.2.12
+# Guided import review — 2.2.12 / 2.2.13
 
 This change applies only to import review. It follows the attention-only batch view in `import-batch-focus-ux.md` and replaces the expanded diagnostic tile as the normal way to resolve an exception.
 
@@ -38,3 +38,7 @@ The close control is labelled **Pause statement review** (or **Cancel correction
 Unit checks cover step ordering, manual progression, invalid-value blocking, independent financial warnings and duplicate handling. Browser checks exercise manual correction and cancellation at narrow widths, reduced keyboard space and 200% text, including source crops, amount signs, exact saved ledger values and no financial network requests. Additional mixed-batch checks cover identity before rows and successive manual corrections. Existing financial-detail regression journeys explicitly open Statement details.
 
 Physical iPhone Safari, installed-PWA keyboard behavior and VoiceOver remain manual device checks. The screenshot supplied by the user is the basis for the design diagnosis, not a claim of a successful parse of that private PDF.
+
+### Native-reader identity recovery (2.2.13)
+
+The same account step also handles a native bank reader that has extracted its transactions but cannot read the account/card identifier. A transient structured recovery hint carries only the source bank, account type and currency into the account step. An explicit matching account supplies an absent identifier before the native independent checks run again; it cannot replace a printed identifier or change an amount, balance, bank, currency or account type. This avoids turning a missing card number into a request to manually review every correctly extracted purchase. The hint is not written to the database. A synthetic missing-number Barclaycard journey verifies all six transactions, its negative closing balance and zero reconciliation difference.
