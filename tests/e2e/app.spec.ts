@@ -3,6 +3,7 @@ import {
   acceptUnverifiedStatement,
   acceptStatementWarnings,
   showAllStatements,
+  showStatementDetails,
 } from "./import-actions";
 import {
   selectPeriod,
@@ -110,6 +111,7 @@ async function openStatementCard(page: Page, bank: string) {
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
   // Legacy financial-detail journeys deliberately inspect the disclosed figures.
+  await showStatementDetails(card);
   const figures = card.locator(".import-statement-figures");
   if (
     (await figures.count()) &&
@@ -664,6 +666,7 @@ async function selectStatement(page: Page, name: string) {
   const card = page.locator(".import-statement-card").first();
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
+  await showStatementDetails(card);
   const figures = card.locator(".import-statement-figures");
   if (
     (await figures.count()) &&

@@ -14,13 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-20",
   points: [
-    "Import review starts with only the statements that need attention.",
-    "Ready and duplicate statements stay in your batch without filling the review list.",
-    "A compact confirmation at the end of review keeps your screen clear while scrolling.",
+    "Review import exceptions one question at a time in a focused panel.",
+    "Identify an unread account before checking transaction amounts.",
+    "Type uncertain amounts manually and continue without comparing suggested readings.",
   ],
   pleaseTest: [
-    "Select several PDFs and switch between Needs attention and All statements.",
-    "Resolve an exception, continue to the summary and confirm the whole batch.",
+    "Select several PDFs and use Review statement on one that needs attention.",
+    "Enter an uncertain amount, check its direction and continue to the next issue.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",

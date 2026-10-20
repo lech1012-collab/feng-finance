@@ -516,3 +516,64 @@
 .import-workspace.import-correction-overlay .sheet-footer > .primary {
   width: 100%;
 }
+
+/* A statement offers one guided task; diagnostic branches stay closed. */
+.import-workspace .import-guided-intro {
+  display: grid;
+  gap: 12px;
+  padding-block: 4px 16px;
+}
+.import-workspace .import-guided-intro p {
+  margin: 0;
+}
+.import-workspace .import-guided-intro > button {
+  justify-self: start;
+}
+.import-workspace .import-statement-details {
+  margin-top: 12px;
+  border-top: 1px solid var(--line);
+}
+.import-workspace .import-statement-details > summary,
+.import-workspace .import-guided-other > summary {
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding-block: 8px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.import-workspace .import-guided-content {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.import-workspace .import-guided-content p {
+  margin: 0;
+}
+.import-workspace .import-guided-filename {
+  color: var(--muted);
+  font-size: 0.875rem;
+  overflow-wrap: anywhere;
+}
+.import-workspace .import-guided-content label {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+.import-workspace .import-guided-content :is(input, select) {
+  width: 100%;
+  min-width: 0;
+}
+.import-workspace .import-guided-content .totals {
+  margin: 0;
+}
+.import-workspace .import-guided-pause {
+  justify-self: start;
+  margin-top: 8px;
+}
+.import-workspace .import-guided-other {
+  min-width: 0;
+  margin-block: 8px;
+}

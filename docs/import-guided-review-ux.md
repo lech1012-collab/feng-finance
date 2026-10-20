@@ -1,0 +1,40 @@
+# Guided import review — 2.2.12
+
+This change applies only to import review. It follows the attention-only batch view in `import-batch-focus-ux.md` and replaces the expanded diagnostic tile as the normal way to resolve an exception.
+
+## Problem and design decision
+
+A single expanded statement previously mixed an account-identification failure, reconciliation figures, parser diagnostics, alternative readings, individual row controls and bank/date settings. A mobile user could not tell which action to take first. Missing identity could expose more than a hundred unverified rows before the account was resolved.
+
+Keep the statement card compact. Its only primary task is **Review statement**. Open a modal sheet and ask one question at a time. Preserve the existing **Leave out this statement** action and put the full diagnostic interface under **Statement details**. A normal manual correction never asks the person to choose an inferred reading or an alternative amount.
+
+## Journey
+
+1. Select several PDFs together. Processing, retained review, Needs attention / All statements and the final in-flow confirmation are unchanged.
+2. Open an exception card. It explains the next task in one sentence. Choose **Review statement**.
+3. If identity is missing, first choose an existing account or enter the last four account/card digits, bank, account type and statement currency. For missing dates, ask only for the statement dates. Account creation is staged until the batch is confirmed; no Settings detour is needed.
+4. Once identity is resolved, show one ambiguous transaction in **Correct amount**. Show its original local PDF crop, description, a decimal-keyboard amount input and Money out / Money in controls. Other transaction details are collapsed unless a required date or description is invalid. No inferred-reading suggestions appear in this flow.
+5. **Save and continue** checks the entered value, rechecks the statement and advances to the next transaction. A short checking state prevents double submission. A valid correction is not asked for repeatedly merely because an independent total is still unequal.
+6. Show any remaining statement notices individually. Explicitly accepting a notice does not change an amount or waive reconciliation. Where totals remain unequal, show reported closing, calculated closing and difference. The normal action is to review the statement details; accepting unverified figures remains a secondary disclosure with the existing explicit financial-risk confirmation.
+7. **Statement checked → Done** returns to the batch. The resolved card remains stationary until the person continues. Confirm the batch once at the end; hidden ready statements remain included.
+
+The close control is labelled **Pause statement review** (or **Cancel correction** in the amount editor). Saved corrections remain in the retained review when changing tabs. Closing an unsaved field editor cancels that field edit. Nothing is written to the ledger until Confirm import. As before, a full reload or closing the app does not persist an unconfirmed PDF session.
+
+## Safety and implementation review
+
+- `guided-review.ts` is a presentation resolver. It does not alter parsers, source arithmetic, duplicate detection, database schemas or commit validation.
+- Identity precedes mapping and row corrections. Checking another row cannot substitute for identifying an account.
+- A manually entered value is a source correction. A wrong valid number still leaves a reconciliation warning; it never becomes verified by being typed.
+- Invalid source amounts/dates/descriptions remain blocking, including after unverified acceptance.
+- Source-row exclusion is optional and requires a separate confirmation. It rechecks the independent totals.
+- Only included duplicate/manual matches require decisions; exact statement duplicates retain their existing automatic skip behavior.
+- Alternative readings, mapping, OCR retry and other diagnostics remain available under Statement details.
+- Every modal uses the shared import sheet surface, bounded to the viewport with independent vertical scrolling, safe-area footer padding and at least 44px interactive controls. Amount inputs are at least 16px to avoid Safari focus zoom.
+- Financial source text wraps inside stationary objects. The document and modal must not pan horizontally at 320px, 390px, or 200% text.
+- Use native dialog focus trapping, return focus to the opener, and keep ordinary tab navigation/review retention working. The amount source crop is local and is not draggable.
+
+## Verification
+
+Unit checks cover step ordering, manual progression, invalid-value blocking, independent financial warnings and duplicate handling. Browser checks exercise manual correction and cancellation at narrow widths, reduced keyboard space and 200% text, including source crops, amount signs, exact saved ledger values and no financial network requests. Additional mixed-batch checks cover identity before rows and successive manual corrections. Existing financial-detail regression journeys explicitly open Statement details.
+
+Physical iPhone Safari, installed-PWA keyboard behavior and VoiceOver remain manual device checks. The screenshot supplied by the user is the basis for the design diagnosis, not a claim of a successful parse of that private PDF.

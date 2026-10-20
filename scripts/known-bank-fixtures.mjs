@@ -68,3 +68,41 @@ console.log("Generated six fictional known-bank and fallback PDFs.");
     await document.save(),
   );
 }
+
+// Guided review keeps identity ahead of rows and asks one manual amount at a time.
+for (const name of ["guided-two-amounts", "guided-missing-account"]) {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const page = document.addPage([595, 842]);
+  const items = knownBankItems("hsbc").filter(
+    (item) => !(name === "guided-missing-account" && item.y === 95),
+  );
+  for (const item of items) {
+    const text =
+      item.text === "FICTIONAL GROCER"
+        ? "BEAUTY CODE"
+        : item.y === 260 && item.x === 320
+          ? "UNREAD"
+          : name === "guided-two-amounts" && item.y === 180 && item.x === 500
+            ? "£100.00"
+            : name === "guided-two-amounts" && item.y === 295 && item.x === 500
+              ? "£2,400.00"
+              : item.text;
+    page.drawText(text, {
+      x: item.x,
+      y: 842 - (item.y === 295 ? 330 : item.y),
+      size: item.fontSize ?? item.height,
+      font,
+    });
+  }
+  if (name === "guided-two-amounts") {
+    for (const [x, text] of [
+      [30, "03 Sep 2026"],
+      [110, "SECOND FICTIONAL SHOP"],
+      [320, "UNREAD"],
+      [500, "£2,400.00"],
+    ])
+      page.drawText(text, { x, y: 842 - 290, size: 8, font });
+  }
+  await writeFile(`tests/fixtures/${name}.pdf`, await document.save());
+}

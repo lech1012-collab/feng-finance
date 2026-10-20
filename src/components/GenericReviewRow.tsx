@@ -10,7 +10,7 @@ import {
   type CropSession,
   type GenericImportReviewProps,
 } from "./generic-review-view";
-function SourceCrop({
+export function SourceCrop({
   session,
   rect,
 }: {
