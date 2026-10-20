@@ -25,20 +25,21 @@ export function ImportAccountStep({
 }) {
   const result = sourceReview(entry);
   const parsed = result?.parsed;
+  const hint = entry.extracted?.accountSelection ?? parsed;
   const periodOnly = result?.errorCode === "missing-period";
   const formId = useId();
   const [selected, setSelected] = useState("");
   const [creating, setCreating] = useState(!accounts.length);
   const [bank, setBank] = useState<Institution>(
-    entry.bank || parsed?.institution || "Other",
+    entry.bank || hint?.institution || "Other",
   );
   const [type, setType] = useState<Account["accountType"]>(
-    parsed?.accountType ??
+    (hint?.accountType === "credit_card" ? "credit" : hint?.accountType) ??
       (result?.profileId === "barclaycard" || result?.profileId === "amex"
         ? "credit"
         : "current"),
   );
-  const [currency, setCurrency] = useState(parsed?.currency ?? "GBP");
+  const [currency, setCurrency] = useState(hint?.currency ?? "GBP");
   const [suffix, setSuffix] = useState("");
   const [start, setStart] = useState(entry.periodStart);
   const [end, setEnd] = useState(entry.periodEnd);

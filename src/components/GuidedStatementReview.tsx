@@ -90,21 +90,30 @@ export function GuidedStatementReview({
         </div>
       </ImportReviewSheet>
     );
-  if (risk && d)
+  if ((risk || step.kind === "account-confirmation") && d)
     return (
       <ImportRiskConfirmation
         result={d.parserFallback ? undefined : result}
         currency={currency}
         reconciliation={validation}
         busy={busy}
-        warnings={d.warnings}
+        warnings={d.warnings.map((warning) =>
+          warning ===
+            "The statement account, dates or currency require review." &&
+          !d.bankSource?.parsed.accountIdentifier
+            ? `The account number could not be read. You linked this statement to ${d.account.institution} ${d.account.displayName} ${d.account.maskedAccountIdentifier}. Check that it belongs to this account. Its figures will remain labelled unverified.`
+            : warning,
+        )}
         unreadPages={
           d.statement.unreadPages ?? entry.extracted?.extraction?.unreadPages
         }
-        onCancel={() => setRisk(false)}
+        onCancel={() => {
+          setRisk(false);
+          if (step.kind === "account-confirmation") onClose();
+        }}
         onConfirm={() => {
           setRisk(false);
-          patch({ override: true });
+          patch({ override: true, draft: { ...d, reviewedWarnings: true } });
         }}
       />
     );
@@ -409,8 +418,8 @@ export function GuidedStatementReview({
         {step.kind === "validation" && (
           <>
             <p>
-              The amounts still do not match independent statement figures.
-              Check the original PDF before importing.
+              These figures have not been independently verified. Check the
+              original PDF before importing.
             </p>
             <dl className="totals">
               {[

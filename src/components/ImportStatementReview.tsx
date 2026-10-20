@@ -32,7 +32,7 @@ import { StatusChip } from "./UIPrimitives";
 import { ImportTransactionReview } from "./ImportTransactionReview";
 import { ImportPeriod } from "./ImportPeriod";
 import { ImportRiskConfirmation } from "./ImportRiskConfirmation";
-import { guidedReviewCopy } from "../import/guided-review";
+import { guidedReviewCopy, guidedReviewStep } from "../import/guided-review";
 import { GuidedStatementReview } from "./GuidedStatementReview";
 
 export function ImportStatementReview({
@@ -283,7 +283,13 @@ export function ImportStatementReview({
       <div className="import-statement-content">
         {!entry.skip && !exactSkipped && entry.state !== "saved" && (
           <div className="import-guided-intro">
-            <p>{guidedReviewCopy(entry)}</p>
+            <p
+              role={
+                guidedReviewStep(entry).kind === "error" ? "alert" : undefined
+              }
+            >
+              {guidedReviewCopy(entry)}
+            </p>
             {blocking && (
               <button
                 type="button"

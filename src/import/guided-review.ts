@@ -18,6 +18,7 @@ export type GuidedReviewStep =
       row: NonNullable<FileReview["draft"]>["transactions"][number];
     }
   | { kind: "warnings" }
+  | { kind: "account-confirmation" }
   | { kind: "validation" }
   | { kind: "error" }
   | { kind: "complete" };
@@ -31,6 +32,7 @@ export function guidedReviewStep(entry: FileReview): GuidedReviewStep {
     return { kind: "recheck" };
   if (!d) {
     if (
+      entry.extracted?.accountSelection ||
       result?.status === "identity-required" ||
       entry.extracted?.format === "qif"
     )
@@ -65,6 +67,10 @@ export function guidedReviewStep(entry: FileReview): GuidedReviewStep {
           !t.acknowledged)),
   );
   if (row) return { kind: "transaction", row };
+  // Choosing an account does not make an unread printed identifier verified.
+  // Confirm this once at statement level; do not retype valid native amounts.
+  if (d.bankSource && !d.bankSource.parsed.accountIdentifier && !entry.override)
+    return { kind: "account-confirmation" };
   if (
     !d.reviewedWarnings &&
     (d.warnings.length ||
@@ -103,10 +109,14 @@ export function guidedReviewCopy(entry: FileReview) {
       return "Check a transaction before importing this statement.";
     case "warnings":
       return "Check the statement notice before continuing.";
+    case "account-confirmation":
+      return "Confirm the linked account. This statement will remain unverified.";
     case "validation":
       return "The statement figures still need checking.";
     case "error":
-      return "This statement needs help before it can be imported.";
+      return (
+        entry.error || "This statement needs help before it can be imported."
+      );
     case "complete":
       return entry.skip
         ? "This statement will be left out."

@@ -60,7 +60,7 @@ export function ImportRiskConfirmation({
       >
         <p>
           This statement will remain <strong>Unverified</strong>. Acceptance
-          does not make its figures reconcile.
+          does not verify the statement.
         </p>
         <dl className="import-risk-figures totals">
           {figures
