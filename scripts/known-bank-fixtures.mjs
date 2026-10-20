@@ -156,3 +156,33 @@ for (const name of ["guided-known-card-amount", "guided-competing-accounts"]) {
   });
   await writeFile(`tests/fixtures/${name}.pdf`, await document.save());
 }
+
+// Exceptions-only review must scale beyond a small six-row sample.
+const largeCompiled = await build({
+  entryPoints: ["src/tests/large-card.ts"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+});
+const { largeCardFixture } = await import(
+  "data:text/javascript;base64," +
+    Buffer.from(largeCompiled.outputFiles[0].text).toString("base64")
+);
+for (const mode of ["exact", "difference", "amount", "date", "layout"]) {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const source = largeCardFixture(mode);
+  const pages = source.pages.map((p) => document.addPage([p.width, p.height]));
+  for (const item of source.items)
+    pages[item.page - 1].drawText(item.text, {
+      x: item.x,
+      y: 842 - item.y,
+      size: item.fontSize ?? item.height,
+      font,
+    });
+  await writeFile(
+    `tests/fixtures/large-card-${mode}.pdf`,
+    await document.save(),
+  );
+}

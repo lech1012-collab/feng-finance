@@ -7,12 +7,14 @@ import {
 import { draftReconciliation } from "./pipeline";
 import type { RowCheck } from "./generic/types";
 import { outsideStatementPeriod } from "./statement-period";
+import { fieldCorrections } from "./generic/review-decision";
 
 export type GuidedReviewStep =
   | { kind: "identity" }
   | { kind: "mapping" }
   | { kind: "recheck" }
   | { kind: "source-row"; row: RowCheck; remaining: number }
+  | { kind: "layout"; count: number }
   | {
       kind: "transaction";
       row: NonNullable<FileReview["draft"]>["transactions"][number];
@@ -24,7 +26,10 @@ export type GuidedReviewStep =
   | { kind: "complete" };
 
 /** Presentation only. All financial gates still belong to importBlockers/commitReviewedBatch. */
-export function guidedReviewStep(entry: FileReview): GuidedReviewStep {
+export function guidedReviewStep(
+  entry: FileReview,
+  reviewLargeQueue = false,
+): GuidedReviewStep {
   if (entry.skip || entry.state === "saved") return { kind: "complete" };
   const result = sourceReview(entry);
   const d = entry.draft;
@@ -49,11 +54,17 @@ export function guidedReviewStep(entry: FileReview): GuidedReviewStep {
     const invalid = new Set(invalidSourceRows(result).map((row) => row.rowId));
     // Show each row once after a valid manual correction. Unequal totals still
     // reach the separate financial warning; a correction never verifies money.
-    const rows = result.rowChecks.filter(
+    const rows = fieldCorrections(result.rowChecks).filter(
       (row) =>
         row.reviewAction?.kind !== "exclude" &&
         (invalid.has(row.rowId) || (!row.resolved && !row.reviewAction)),
     );
+    if (
+      !reviewLargeQueue &&
+      rows.length > 10 &&
+      rows.length > result.rowChecks.length / 4
+    )
+      return { kind: "layout", count: rows.length };
     if (rows.length) {
       // One unread amount can invalidate a whole card total. Fix the concrete
       // source errors first, then recompute: the other rows may reconcile
@@ -81,6 +92,10 @@ export function guidedReviewStep(entry: FileReview): GuidedReviewStep {
   // Confirm this once at statement level; do not retype valid native amounts.
   if (d.bankSource && !d.bankSource.parsed.accountIdentifier && !entry.override)
     return { kind: "account-confirmation" };
+  // A discrepancy is one statement-level decision, never an instruction to
+  // re-enter every otherwise readable transaction or accept repeated notices.
+  if (draftReconciliation(d).status === "warning" && !entry.override)
+    return { kind: "validation" };
   if (
     !d.reviewedWarnings &&
     (d.warnings.length ||
@@ -111,6 +126,8 @@ export function guidedReviewCopy(entry: FileReview) {
       return "Identify the account to continue. Transactions will be checked next.";
     case "mapping":
       return "Identify the transaction columns to continue.";
+    case "layout":
+      return `${step.count} rows have unread fields. This layout needs checking before individual corrections.`;
     case "recheck":
       return "Recheck this statement after your changes.";
     case "source-row":

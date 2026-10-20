@@ -15,6 +15,7 @@ import { importBlockers, type FileReview } from "../import/review-model";
 import { bankRows } from "../tests/helpers";
 import { genericFixture } from "../import/generic/fixtures";
 import { reconstructRows } from "../import/layout";
+import { knownBankItems } from "../tests/known-bank-layouts";
 
 beforeEach(async () => {
   cleanup();
@@ -86,6 +87,74 @@ describe("import review corrections", () => {
     return view;
   };
 
+  it("keeps native card readings when only the statement totals differ", async () => {
+    const entry = await reviewEntry();
+    const items = knownBankItems("barclaycard").map((item) => ({
+      ...item,
+      fontSize: 8,
+      parseSource: "text" as const,
+      text: item.text === "£109.68" ? "£109.69" : item.text,
+    }));
+    entry.extracted = {
+      rows: reconstructRows(
+        items.map((item) => ({ ...item, y: item.y + item.height })),
+      ),
+      hash: "native-totals-only",
+      filename: "fictional-card.pdf",
+      method: "embedded-text",
+      warnings: [],
+      extraction: {
+        items,
+        pages: [1, 2].map((page) => ({
+          page,
+          width: 600,
+          height: 842,
+          rotation: 0,
+        })),
+        quality: [],
+        pageCount: 2,
+        completedPages: [1, 2],
+        unreadPages: [],
+        cancelled: false,
+        method: "text",
+      },
+    };
+    entry.draft = await prepareDraft(entry.extracted!);
+    expect(entry.draft.bankSource).toBeDefined();
+    expect(entry.draft.bankSource!.sourceCoverageIssues).toEqual([]);
+    expect(draftReconciliation(entry.draft).status).toBe("warning");
+    const readings = entry.draft.transactions.map((t) => ({
+      date: t.date,
+      amount: t.amount,
+    }));
+    const prepare = vi.fn();
+    render(
+      <MemoryRouter>
+        <ImportStatementReview
+          entry={entry}
+          accounts={[]}
+          categories={await db.categories.toArray()}
+          history={[]}
+          busy={false}
+          patch={vi.fn()}
+          reparse={vi.fn()}
+          onPrepareSource={prepare}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Review statement" }));
+    expect(prepare).not.toHaveBeenCalled();
+    expect(
+      screen.getByRole("dialog", {
+        name: "Check statement totals",
+      }),
+    ).toBeVisible();
+    expect(screen.queryByRole("dialog", { name: "Correct amount" })).toBeNull();
+    expect(
+      entry.draft.transactions.map((t) => ({ date: t.date, amount: t.amount })),
+    ).toEqual(readings);
+  });
+
   it.each([false, true])(
     "discloses required QIF identity controls only before a draft is prepared (prepared=%s)",
     async (prepared) => {
@@ -110,9 +179,7 @@ describe("import review corrections", () => {
       if (prepared) {
         expect(options).not.toHaveAttribute("open");
         expect(
-          within(options as HTMLElement).getByLabelText("Bank", {
-            exact: true,
-          }),
+          within(options as HTMLElement).getByLabelText("Bank", {}),
         ).not.toBeVisible();
         expect(importBlockers(entry)).toEqual([]);
       } else {

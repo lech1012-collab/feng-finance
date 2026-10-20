@@ -268,6 +268,8 @@ export interface GenericParseOptions {
   actions?: Record<string, RowReviewAction>;
   /** Additional local cell-OCR readings; never persisted as transaction facts. */
   alternatives?: Record<string, RowReading[]>;
+  /** Transient one-to-one native source corroboration, not a user override. */
+  bankAmounts?: Record<string, number>;
   evidence?: {
     openingBalance?: number;
     closingBalance?: number;

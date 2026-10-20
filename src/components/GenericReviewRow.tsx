@@ -1,5 +1,6 @@
 import { SourceRowCorrection } from "./SourceRowCorrection";
 import { useEffect, useRef, useState } from "react";
+import { rowReviewDecision } from "../import/generic/review-decision";
 import { displayDate, displayMerchant } from "../domain/presentation";
 import type { RowCheck, RowReading, SourceRect } from "../import/generic/types";
 import {
@@ -158,10 +159,11 @@ export function GenericReviewRow({
   const rawName = /\S{30,}/.test(merchant);
   const amountButton = useRef<HTMLButtonElement>(null);
   const [correcting, setCorrecting] = useState(false);
-  const [open, setOpen] = useState(!row.resolved);
+  const needsInput = rowReviewDecision(row).fields.length > 0;
+  const [open, setOpen] = useState(needsInput);
   useEffect(() => {
-    setOpen(!row.resolved);
-  }, [row.resolved]);
+    setOpen(needsInput);
+  }, [needsInput]);
   useEffect(() => {
     if (correctionRequest) {
       const button = amountButton.current;
@@ -178,7 +180,11 @@ export function GenericReviewRow({
       ? row.issues.length
         ? "Reviewed · not verified"
         : "Reviewed"
-      : "Needs review";
+      : needsInput
+        ? "Needs review"
+        : row.resolved
+          ? "Checked"
+          : "Read · totals unverified";
   return (
     <details
       className={`generic-review-row${excluded ? " generic-row-excluded" : ""}`}

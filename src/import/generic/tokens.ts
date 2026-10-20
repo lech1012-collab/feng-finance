@@ -30,6 +30,27 @@ export function readDate(
   const text = raw.trim();
   if (!DATE_PATTERN.test(text)) return;
   try {
+    // A yearless source date may cross December/January. Infer a year only
+    // when the printed period contains a unique calendar occurrence.
+    if (/^(?:\d{1,2}\s+[A-Za-z]{3,9}|[A-Za-z]{3,9}\s+\d{1,2})$/.test(text)) {
+      const candidates: string[] = [];
+      for (
+        let year = +period.start.slice(0, 4);
+        year <= +period.end.slice(0, 4);
+        year++
+      ) {
+        try {
+          const date = parseDate(`${text} ${year}`);
+          if (date >= period.start && date <= period.end) candidates.push(date);
+        } catch {
+          /* Invalid calendar dates remain unread. */
+        }
+      }
+      if (candidates.length > 1) return;
+      if (candidates.length === 1) return candidates[0];
+      // Keep an out-of-period reading visible for the existing date check;
+      // card purchase dates can precede their in-period booking date.
+    }
     if (format === "month-first") {
       const numeric = text.match(/^(\d{1,2})[/.](\d{1,2})[/.](\d{2,4})$/);
       if (numeric)

@@ -29,6 +29,7 @@ import type {
 import type { ExtractedFile } from "./pipeline";
 import type { ImportProgress } from "./pdf-session-types";
 import { isImportAbort } from "./pdf-abort";
+import { recoverNativeAmounts } from "./generic/native-recovery";
 import {
   prepareBankAdapterReading,
   type BankAdapterSource,
@@ -270,6 +271,8 @@ export async function preparePdfReading(
     },
     unreadPages: extracted.extraction.unreadPages,
     alternatives: cellReadings.get(extracted),
+    // Source corroboration is rebuilt from this PDF, never trusted from UI options.
+    bankAmounts: undefined,
   };
   let generic = parseGenericStatement(
     extracted.extraction.items,
@@ -291,6 +294,15 @@ export async function preparePdfReading(
         options,
       );
     }
+  }
+  const bankAmounts = recoverNativeAmounts(generic, legacy);
+  if (Object.keys(bankAmounts).length) {
+    options.bankAmounts = bankAmounts;
+    generic = parseGenericStatement(
+      extracted.extraction.items,
+      extracted.extraction.pages,
+      options,
+    );
   }
   // Changed, scanned and unknown layouts retain the complete generic review.
   generic = await checkNumericCells(extracted, generic, options);
