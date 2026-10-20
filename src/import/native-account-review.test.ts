@@ -6,6 +6,7 @@ import { reconstructRows } from "./layout";
 import {
   prepareDraft,
   draftReconciliation,
+  validateDraft,
   type ExtractedFile,
 } from "./pipeline";
 import { preparePdfReading } from "./pdf-review";
@@ -61,7 +62,7 @@ const account: Account = {
   updatedAt: "2026-10-20T00:00:00Z",
 };
 describe("native card identity recovery", () => {
-  it("asks for the unread card identity before source rows, then preserves automatic independent proof", async () => {
+  it("asks for card identity once while preserving the unverified-source safeguard", async () => {
     const file = source();
     await expect(prepareDraft(file)).rejects.toThrow(
       "Account identifier could not be read",
@@ -97,11 +98,18 @@ describe("native card identity recovery", () => {
     expect(draft.account).toMatchObject(account);
     expect(draft.bankSource).toBeDefined();
     expect(draft.parserReview).toBeUndefined();
-    expect(draft.statement.rowsNeedingReview).toBe(0);
+    expect(draft.statement.rowsNeedingReview).toBe(6);
     expect(draft.transactions).toHaveLength(6);
-    expect(draft.warnings).toEqual([]);
+    expect(draft.warnings).toContain(
+      "The statement account, dates or currency require review.",
+    );
+    expect(draft.bankSource?.reconciledExactly).toBe(false);
+    expect(() => validateDraft(draft, false)).toThrow(/review|reconciliation/i);
+    expect(guidedReviewStep({ ...entry, draft, state: "review" }).kind).toBe(
+      "account-confirmation",
+    );
     expect(draftReconciliation(draft)).toMatchObject({
-      status: "reconciled",
+      status: "warning",
       difference: 0,
       reported: -10968,
     });

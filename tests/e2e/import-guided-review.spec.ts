@@ -160,7 +160,7 @@ test("successive ambiguous amounts are entered manually without expanding cards 
   ]);
 });
 
-test("an unread Barclaycard identifier needs one account choice and retains native credit-card checks", async ({
+test("an unread Barclaycard identifier needs one account confirmation without retyping native amounts", async ({
   page,
 }, testInfo) => {
   test.setTimeout(120000);
@@ -191,6 +191,27 @@ test("an unread Barclaycard identifier needs one account choice and retains nati
     path: testInfo.outputPath("identify-credit-account.png"),
   });
   await account.getByRole("button", { name: "Continue", exact: true }).click();
+  const risk = page.getByRole("dialog", {
+    name: "Import an unverified statement?",
+    exact: true,
+  });
+  await expect(risk).toBeVisible();
+  await expect(risk).toContainText("The account number could not be read.");
+  await page.screenshot({
+    path: testInfo.outputPath("confirm-linked-card.png"),
+  });
+  const accept = risk.getByRole("button", {
+    name: "Accept unverified statement",
+    exact: true,
+  });
+  await expect(accept).toBeDisabled();
+  await risk
+    .getByRole("checkbox", {
+      name: "I checked the original statement and accept importing these unverified figures.",
+      exact: true,
+    })
+    .check();
+  await accept.click();
   const done = page.getByRole("dialog", {
     name: "Statement checked",
     exact: true,
@@ -220,8 +241,9 @@ test("an unread Barclaycard identifier needs one account choice and retains nati
       bankProfileId: "barclaycard",
       closingBalance: -10968,
       validationDifference: 0,
-      validationStatus: "reconciled",
-      rowsNeedingReview: 0,
+      validationStatus: "warning",
+      validationOverride: true,
+      rowsNeedingReview: 6,
     }),
   ]);
 });

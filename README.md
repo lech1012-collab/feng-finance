@@ -537,4 +537,4 @@ Import exceptions now offer a single Review statement action. A focused modal id
 
 ## v2.2.13 Missing card identity recovery
 
-A supported digital card statement with an unread identifier now enters the account-identification step with its bank, card type and currency preserved. Choosing an account supplies only the missing identifier; independently checked source amounts and balances stay with the native reader. No account is saved before the import is confirmed.
+A supported digital card statement with an unread identifier now enters the account-identification step with its bank, card type and currency preserved. An explicit account confirmation keeps the source amounts and balances with the native reader. The missing printed identifier keeps the statement labelled unverified; valid amounts need no separate re-entry. No account is saved before the import is confirmed.
