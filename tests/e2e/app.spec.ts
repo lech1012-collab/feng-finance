@@ -2363,8 +2363,15 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
     .click();
   await (await choose).setFiles(fixture("barclays-sort"));
   await expect(
-    page.getByRole("heading", { name: "Barclays", exact: true }),
-  ).toBeVisible();
+    page.getByRole("button", { name: "Needs attention (0)", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("region", { name: "Batch review", exact: true }),
+  ).toContainText("1 ready");
+  await expect(page.locator(".import-statement-heading h2")).toHaveText(
+    "Barclays",
+  );
+  await expect(page.locator(".import-statement-card:visible")).toHaveCount(0);
   await confirmImport(page);
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),
