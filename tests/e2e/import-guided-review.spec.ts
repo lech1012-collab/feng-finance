@@ -180,12 +180,12 @@ test("an unread Barclaycard identifier needs one account choice and retains nati
     exact: true,
   });
   await expect(account).toBeVisible();
-  await expect(account.getByLabel("Bank", { exact: true })).toHaveValue(
-    "Barclays",
-  );
-  await expect(account.getByLabel("Account type", { exact: true })).toHaveValue(
-    "credit",
-  );
+  await expect(
+    account.getByRole("combobox", { name: "Bank", exact: true }),
+  ).toHaveValue("Barclays");
+  await expect(
+    account.getByRole("combobox", { name: "Account type", exact: true }),
+  ).toHaveValue("credit");
   await account.getByLabel("Last four account or card digits").fill("4444");
   await page.screenshot({
     path: testInfo.outputPath("identify-credit-account.png"),
