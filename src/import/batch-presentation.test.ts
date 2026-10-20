@@ -11,6 +11,7 @@ import {
   nextAttentionStatement,
   reviewedRowSelection,
   statementPresentation,
+  statementVisibleInReview,
 } from "./batch-presentation";
 
 beforeEach(async () => {
@@ -154,6 +155,64 @@ describe("import batch presentation", () => {
       completedCount: 2,
       attention: [],
     });
+  });
+
+  it("filters attention for presentation while preserving every statement and financial gate", async () => {
+    const ready = await entry("ready-hidden");
+    const duplicate = await entry("duplicate-hidden");
+    duplicate.draft!.exactDuplicate = true;
+    const changed = {
+      ...(await entry("changed-visible")),
+      optionsChanged: true,
+    };
+    const entries = [ready, duplicate, changed];
+    expect(
+      entries.filter((file) => statementVisibleInReview(file, "attention")),
+    ).toEqual([changed]);
+    expect(
+      entries.filter((file) => statementVisibleInReview(file, "all")),
+    ).toEqual(entries);
+    expect(batchPresentation(entries)).toMatchObject({
+      readyCount: 1,
+      skippedCount: 1,
+    });
+    expect(importBlockers(changed)).toContain(
+      "Parse again to apply the bank, account or statement dates.",
+    );
+    expect(ready.draft!.transactions.some((row) => row.include)).toBe(true);
+    expect(duplicate.draft!.duplicateOverride).not.toBe(true);
+    expect(await db.transactions.count()).toBe(0);
+  });
+
+  it("retains only the active attention card through resolution and recheck", async () => {
+    const file = { ...(await entry("active-attention")), open: true };
+    const other = { ...(await entry("unrelated-ready")), open: true };
+    expect(statementVisibleInReview(file, "attention")).toBe(false);
+    expect(statementVisibleInReview(file, "attention", file.id)).toBe(true);
+    expect(
+      statementVisibleInReview(
+        { ...file, state: "checking" },
+        "attention",
+        file.id,
+      ),
+    ).toBe(true);
+    expect(
+      statementVisibleInReview({ ...file, skip: true }, "attention", file.id),
+    ).toBe(true);
+    expect(
+      statementVisibleInReview({ ...file, open: false }, "attention", file.id),
+    ).toBe(false);
+    expect(statementVisibleInReview(other, "attention", file.id)).toBe(false);
+  });
+
+  it("shows new blockers immediately even if a ready card was previously hidden", async () => {
+    const file = await entry("new-blocker");
+    expect(statementVisibleInReview(file, "attention")).toBe(false);
+    file.requiresBatchRecheck = true;
+    expect(statementVisibleInReview(file, "attention")).toBe(true);
+    expect(importBlockers(file)).toContain(
+      "Recheck this statement because another selected file was skipped or changed.",
+    );
   });
 
   it("appends without replacing reviewed drafts, source sessions or row decisions", async () => {

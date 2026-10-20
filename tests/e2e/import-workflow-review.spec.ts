@@ -9,6 +9,7 @@ import {
   type Locator,
 } from "./fixtures";
 import { startStaticHost } from "./static-host";
+import { revealStatement, showAllStatements } from "./import-actions";
 
 const fixture = (name: string) =>
   resolve(`tests/fixtures/known-bank-${name}.pdf`);
@@ -49,6 +50,7 @@ function statement(page: Page, filename: string) {
 }
 
 async function expand(card: Locator) {
+  await revealStatement(card);
   if (!(await card.evaluate((node) => (node as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
 }
@@ -151,6 +153,9 @@ test("adding PDFs and cancelling the picker preserve prior category and row deci
     .setInputFiles(fixture("amex"));
   await expect(page.locator(".import-statement-card")).toHaveCount(2);
   await expect(
+    page.getByRole("button", { name: "All statements (2)", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
     page.getByRole("region", { name: "Batch review", exact: true }),
   ).toBeVisible();
   await expand(original);
@@ -247,6 +252,7 @@ test("a mixed batch exposes one exception at a time and a failed balance cannot 
     .click();
   await expect(confirm).toBeEnabled();
   const bad = statement(page, "known-bank-barclays-malformed.pdf");
+  await showAllStatements(page);
   await expand(bad);
   await bad
     .getByRole("button", { name: "Include and recheck statement", exact: true })

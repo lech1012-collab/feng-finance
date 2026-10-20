@@ -514,3 +514,19 @@ the diagnosis, intended journey, interaction sizes and verification contract.
 Browser regressions use actual taps and sequential keystrokes, not only value
 replacement, and inspect inner text scrolling as well as page width. Physical
 iPhone keyboard, Safari/PWA touch and VoiceOver checks remain manual beta gates.
+
+## v2.2.11 Focused batch review
+
+After checking multiple statements, Import opens **Needs attention**. Ready,
+duplicate and saved statements remain part of the batch but are hidden from
+that view; **All statements** reveals their details. Counts, reconciliation,
+duplicate checks and the final save always use the entire batch.
+
+An active corrected statement remains visible until Continue or closing its
+card takes you to the next exception or the final summary. Confirmation is a
+compact section at the end of the page, so it scrolls with the review instead
+of covering the screen. A completed duplicate-only review returns Home and
+releases its temporary sources without changing stored financial records.
+
+The [UX designer's developer handoff](docs/import-batch-focus-ux.md) records the
+review states, control labels, interaction sizes and verification requirements.

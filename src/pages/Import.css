@@ -128,18 +128,47 @@
   min-width: 0;
 }
 .import-workspace .import-batch-summary {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 16px;
-  align-items: center;
+  display: grid;
+  gap: 8px;
+  padding: 12px 16px;
   margin-bottom: 16px;
 }
 .import-workspace .import-batch-summary > p {
   margin: 0;
-  flex: 1 1 16rem;
 }
-.import-workspace .import-batch-summary > p:nth-child(2) {
-  flex-basis: 100%;
+.import-workspace .import-batch-summary > button {
+  justify-self: start;
+}
+.import-workspace .import-view-filter {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9rem), 1fr));
+  gap: 8px;
+  min-width: 0;
+}
+.import-workspace .import-view-filter > button {
+  min-width: 0;
+  min-height: 44px;
+  padding: 8px 12px;
+  line-height: 1.35;
+  text-wrap: balance;
+}
+.import-workspace .import-view-filter > button[aria-pressed="true"] {
+  background: var(--raised);
+  border-color: var(--accent);
+  color: var(--ink);
+  font-weight: 650;
+}
+.import-workspace .import-resolved-statement {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px 16px;
+  padding-block: 12px;
+}
+.import-workspace .import-resolved-statement > p {
+  flex: 1 1 12rem;
+  margin: 0;
 }
 .import-workspace .import-change-files {
   margin-top: 8px;
@@ -266,15 +295,35 @@
 .import-workspace .import-transfer-pair > button {
   justify-self: start;
 }
-.import-workspace .import-outcome-footer {
-  bottom: 0;
-  flex-wrap: wrap;
-  background: var(--surface);
+.app .import-workspace .import-outcome-footer {
+  position: static;
+  inset: auto;
+  z-index: auto;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+  padding: 12px 0;
+  margin-top: 16px;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+  font-size: 0.875rem;
+  scroll-margin-block: 24px;
 }
-.import-workspace .import-outcome-footer > div {
+.app .import-workspace .import-outcome-footer > div {
   min-width: 0;
+  gap: 4px;
 }
-.import-workspace .import-outcome-footer > button {
+.app .import-workspace .import-review-list[hidden] + .import-outcome-footer {
+  margin-top: 0;
+}
+.app .import-workspace .import-outcome-footer > button {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px 16px;
+  line-height: 1.25;
   white-space: normal;
 }
 .import-workspace .generic-reading-values > div,
@@ -307,6 +356,14 @@
   min-width: 0;
 }
 @media (min-width: 600px) {
+  .app .import-workspace .import-outcome-footer {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 16px;
+    align-items: center;
+  }
+  .app .import-workspace .import-outcome-footer > button {
+    width: auto;
+  }
   .import-workspace .import-statement-heading {
     grid-template-columns: minmax(0, 1fr) auto auto;
   }
@@ -333,17 +390,6 @@
     grid-column: 3;
   }
 }
-@media (max-width: 899px) {
-  .import-workspace .import-outcome-footer {
-    bottom: calc(
-      var(--mobile-nav-height, 78px) + env(safe-area-inset-bottom) + 8px
-    );
-  }
-  .import-workspace .import-outcome-footer > button {
-    width: 100%;
-  }
-}
-
 /* Editing amounts must not reflow or horizontally pan the statement objects. */
 .import-workspace
   :is(

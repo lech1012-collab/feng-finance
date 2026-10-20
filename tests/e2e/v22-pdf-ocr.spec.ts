@@ -1,6 +1,7 @@
 import { resolve } from "node:path";
 import { test as base, expect, acknowledgeBeta, type Page } from "./fixtures";
 import { startStaticHost, type LocalHost } from "./static-host";
+import { revealStatement } from "./import-actions";
 
 const test = base.extend<{ offlineHost: LocalHost }>({
   offlineHost: async ({}, use) => {
@@ -124,10 +125,13 @@ async function select(page: Page, name: string) {
   await page
     .getByLabel("Select statements", { exact: true })
     .setInputFiles(fixture(name));
-  await expect(page.locator(".import-review-list")).toBeVisible({
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({
     timeout: 150000,
   });
   const card = page.locator(".import-statement-card").first();
+  await revealStatement(card);
   if (!(await card.evaluate((node) => (node as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
   return card;
@@ -255,10 +259,13 @@ test("stopping scanned-page reading retains completed rows and requires explicit
     timeout: 150000,
   });
   await progress.getByRole("button", { name: "Stop processing" }).click();
-  await expect(page.locator(".import-review-list")).toBeVisible({
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({
     timeout: 30000,
   });
   const card = page.locator(".import-statement-card").first();
+  await revealStatement(card);
   if (!(await card.evaluate((node) => (node as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
   await expect(card).toContainText("Not imported: unread pages 2.");

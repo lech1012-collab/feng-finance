@@ -1,5 +1,18 @@
 import { expect, type Page, type Locator } from "./fixtures";
 
+/** Financial-detail journeys deliberately reveal statements hidden by the default view. */
+export async function showAllStatements(page: Page) {
+  const all = page.getByRole("button", { name: /^All statements \(\d+\)$/ });
+  await expect(all).toBeVisible({ timeout: 90000 });
+  if ((await all.getAttribute("aria-pressed")) !== "true") await all.click();
+}
+
+export async function revealStatement(statement: Locator) {
+  await expect(statement).toBeAttached({ timeout: 90000 });
+  if (!(await statement.isVisible())) await showAllStatements(statement.page());
+  await expect(statement).toBeVisible();
+}
+
 /** Deliberate UI decisions only. These helpers never alter imported state directly. */
 export async function showTransferChoices(page: Page) {
   const disclosure = page.locator("details.import-transfer-review");

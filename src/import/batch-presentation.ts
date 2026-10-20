@@ -32,6 +32,7 @@ export function reviewedRowSelection(
 
 export type StatementPresentationState =
   "checking" | "attention" | "ready" | "skipped" | "saved";
+export type StatementReviewFilter = "attention" | "all";
 
 /** Display state only: the existing review service owns every import gate. */
 export function statementPresentation(entry: FileReview) {
@@ -67,6 +68,21 @@ export function batchPresentation(entries: FileReview[]) {
       ...statements.filter((item) => item.state !== "attention"),
     ].map((item) => item.entry),
   };
+}
+
+/** A view filter never changes the reviewed batch or its financial gates. */
+export function statementVisibleInReview(
+  entry: FileReview,
+  filter: StatementReviewFilter,
+  retainedAttentionId?: string,
+) {
+  if (entry.state === "queued" || (entry.state === "checking" && !entry.draft))
+    return false;
+  return (
+    filter === "all" ||
+    statementPresentation(entry).state === "attention" ||
+    (entry.id === retainedAttentionId && entry.open)
+  );
 }
 
 /** Keep source sessions, drafts and row decisions by retaining existing objects. */

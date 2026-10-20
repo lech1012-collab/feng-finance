@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { test, expect, type Page, type Locator } from "./fixtures";
+import { revealStatement } from "./import-actions";
 
 test.use({ hasTouch: true });
 const fixture = (name: string) =>
@@ -30,6 +31,7 @@ async function records(page: Page, store: string) {
   );
 }
 async function expand(node: Locator) {
+  await revealStatement(node);
   await expect(node).toBeVisible();
   if (!(await node.evaluate((element) => (element as HTMLDetailsElement).open)))
     await node.locator(":scope > summary").click();
@@ -95,6 +97,10 @@ test("four PDFs survive navigation during reading and review, including category
     row.getByRole("combobox", { name: "Category", exact: true }),
   ).toHaveValue("shopping");
   await expect(current).toHaveAttribute("open");
+  await expect(current).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: "All statements (4)", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(row).toHaveAttribute("open");
   expect(choosers).toBe(0);
   expect(await records(page, "transactions")).toHaveLength(0);

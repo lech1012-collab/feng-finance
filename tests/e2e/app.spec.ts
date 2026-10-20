@@ -2,6 +2,7 @@ import {
   showTransferChoices,
   acceptUnverifiedStatement,
   acceptStatementWarnings,
+  showAllStatements,
 } from "./import-actions";
 import {
   selectPeriod,
@@ -97,9 +98,12 @@ async function closeCategorySheet(page: Page) {
     await dialog.getByRole("button", { name: "Close categorisation" }).click();
 }
 async function openStatementCard(page: Page, bank: string) {
-  await expect(page.locator(".import-review-list")).toBeVisible({
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({
     timeout: 90000,
   });
+  await showAllStatements(page);
   const card = page.locator(".import-statement-card").filter({
     has: page.getByRole("heading", { name: bank, exact: true }),
   });
@@ -651,9 +655,12 @@ async function selectStatement(page: Page, name: string) {
     await expect(page.locator(".import-statement-card")).toHaveCount(0);
   }
   await page.getByLabel("Select statements").setInputFiles(fixture(name));
-  await expect(page.locator(".import-review-list")).toBeVisible({
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({
     timeout: 90000,
   });
+  await showAllStatements(page);
   const card = page.locator(".import-statement-card").first();
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
