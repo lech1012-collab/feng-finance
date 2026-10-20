@@ -203,6 +203,41 @@ afterEach(() => {
 });
 
 describe("generic PDF evidence review", () => {
+  it("keeps a manually corrected row accessible for another edit when totals still differ", () => {
+    const result = resultFixture();
+    result.rowChecks[0].reviewAction = {
+      kind: "correct",
+      date: "2026-09-05",
+      description: "FICTIONAL STORE",
+      amount: -2499,
+    };
+    const { container } = show(result);
+    expect(
+      screen.getByText("Reviewed transactions", { selector: "summary" }),
+    ).toBeInTheDocument();
+    expect(container.querySelector(".generic-review-list")).toHaveAttribute(
+      "open",
+    );
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Correct amount for .*fictional store/i,
+      }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Correct amount" }),
+    ).toBeVisible();
+    expect(screen.getByLabelText("Amount (GBP)")).toHaveValue("24.99");
+  });
+  it("does not open a row-editing list for a totals-only warning", () => {
+    const result = resultFixture();
+    result.rowChecks[0].issues = [];
+    const { container } = show(result);
+    expect(container.querySelector(".generic-review-list")).toBeNull();
+    expect(
+      screen.getByText("This statement is not verified yet"),
+    ).toBeVisible();
+  });
   it("lets the user choose a verified source row when a direct correction cannot be matched uniquely", async () => {
     const result = resultFixture();
     result.status = "parsed";

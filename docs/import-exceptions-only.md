@@ -14,6 +14,9 @@ The correction sheet names the field: **Correct amount**, **Correct date**,
 transaction**. It preserves other values and shows the original local PDF crop.
 A date-only question shows the amount kept, with optional editing under More
 options. An incomplete manually typed year is never silently expanded.
+Rows already corrected remain accessible under **Reviewed transactions**, so
+an incorrect entry can be reopened while the statement totals still differ.
+They are not added back to the mandatory correction queue.
 
 If more than ten rows and a quarter of the statement have actual field errors,
 show **Check statement layout** once. The user can inspect mapping/source details
