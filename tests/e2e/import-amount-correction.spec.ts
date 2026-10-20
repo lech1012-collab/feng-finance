@@ -72,6 +72,9 @@ for (const setup of [
     await page
       .getByLabel("Select statements", { exact: true })
       .setInputFiles(resolve("tests/fixtures/beauty-code-correction.pdf"));
+    await expect(
+      page.getByRole("group", { name: "Statement view", exact: true }),
+    ).toBeVisible({ timeout: 90000 });
     const card = page.locator(".import-statement-card");
     await expect(card).toBeVisible();
     if (!(await card.evaluate((node) => (node as HTMLDetailsElement).open)))

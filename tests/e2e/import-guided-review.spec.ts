@@ -45,6 +45,9 @@ test("a mixed PDF batch resolves missing account identity before showing one amo
       resolve("tests/fixtures/guided-missing-account.pdf"),
       resolve("tests/fixtures/known-bank-barclaycard.pdf"),
     ]);
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({ timeout: 90000 });
   const card = page.locator(".import-statement-card:visible");
   await expect(card).toHaveCount(1);
   const confirm = page.getByRole("button", {
@@ -109,6 +112,9 @@ test("successive ambiguous amounts are entered manually without expanding cards 
   await page
     .getByLabel("Select statements", { exact: true })
     .setInputFiles(resolve("tests/fixtures/guided-two-amounts.pdf"));
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({ timeout: 90000 });
   const card = page.locator(".import-statement-card:visible");
   await card
     .getByRole("button", { name: "Review statement", exact: true })
