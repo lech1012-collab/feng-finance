@@ -1268,7 +1268,10 @@ export default function ImportPage({
               .filter(
                 (entry) =>
                   entry.state !== "queued" &&
-                  (entry.state !== "checking" || !!entry.draft),
+                  (entry.state !== "checking" ||
+                    !!entry.draft ||
+                    !!entry.extracted ||
+                    entry.open),
               )
               .map((entry) => (
                 <div

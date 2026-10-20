@@ -106,8 +106,10 @@ function showAllStatements() {
   expect(all).toHaveAttribute("aria-pressed", "true");
 }
 
-function showStatementDetails() {
-  const card = document.querySelector(".import-statement-card[open]");
+function showStatementDetails(target?: HTMLElement) {
+  const card = target ?? document.querySelector(".import-statement-card[open]");
+  if (target && !(target as HTMLDetailsElement).open)
+    fireEvent.click(target.querySelector("summary")!);
   const details = card?.querySelector<HTMLDetailsElement>(
     ".import-statement-details",
   );
@@ -381,6 +383,7 @@ describe("PDF review session lifecycle", () => {
         name: "All transactions (3)",
       }),
     );
+    showStatementDetails(regenerated());
     if (!(salaryRow(regenerated()) as HTMLDetailsElement).open)
       fireEvent.click(salaryRow(regenerated()).querySelector("summary")!);
     expect(
@@ -411,6 +414,7 @@ describe("PDF review session lifecycle", () => {
       ).toBeEnabled(),
     );
     const duplicateRow = salaryRow(regenerated());
+    showStatementDetails(regenerated());
     fireEvent.click(duplicateRow.querySelector("summary")!);
     expect(
       within(duplicateRow).getByRole("button", {

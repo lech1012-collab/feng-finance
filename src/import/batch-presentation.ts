@@ -76,7 +76,13 @@ export function statementVisibleInReview(
   filter: StatementReviewFilter,
   retainedAttentionId?: string,
 ) {
-  if (entry.state === "queued" || (entry.state === "checking" && !entry.draft))
+  if (
+    entry.state === "queued" ||
+    (entry.state === "checking" &&
+      !entry.draft &&
+      !entry.extracted &&
+      !entry.open)
+  )
     return false;
   return (
     filter === "all" ||

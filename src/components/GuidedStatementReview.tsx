@@ -127,7 +127,7 @@ export function GuidedStatementReview({
         reading={selectedReading(step.row)}
         currency={currency}
         busy={busy}
-        progress={`Transaction ${completed + 1} of ${completed + step.remaining} to check`}
+        progress={`${d?.statement.institution ?? "Statement"} · ${d?.account.maskedAccountIdentifier ?? ""} · Transaction ${completed + 1} of ${completed + step.remaining} to check`}
         saveLabel="Save and continue"
         source={
           <>

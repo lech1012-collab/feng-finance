@@ -187,6 +187,20 @@ describe("import batch presentation", () => {
   it("retains only the active attention card through resolution and recheck", async () => {
     const file = { ...(await entry("active-attention")), open: true };
     const other = { ...(await entry("unrelated-ready")), open: true };
+    expect(
+      statementVisibleInReview(
+        { ...file, draft: undefined, state: "checking" },
+        "attention",
+        file.id,
+      ),
+    ).toBe(true);
+    expect(
+      statementVisibleInReview(
+        { ...file, draft: undefined, open: false, state: "checking" },
+        "attention",
+        file.id,
+      ),
+    ).toBe(false);
     expect(statementVisibleInReview(file, "attention")).toBe(false);
     expect(statementVisibleInReview(file, "attention", file.id)).toBe(true);
     expect(
