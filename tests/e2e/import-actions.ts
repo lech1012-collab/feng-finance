@@ -11,7 +11,12 @@ export async function revealStatement(statement: Locator) {
   await expect(statement).toBeAttached({ timeout: 90000 });
   if (!(await statement.isVisible())) await showAllStatements(statement.page());
   await expect(statement).toBeVisible();
-  await showStatementDetails(statement);
+  if (
+    await statement.evaluate((node) =>
+      node.classList.contains("import-statement-card"),
+    )
+  )
+    await showStatementDetails(statement);
 }
 
 /** Legacy financial-detail journeys deliberately open the optional diagnostic view. */
