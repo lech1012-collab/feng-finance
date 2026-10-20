@@ -97,6 +97,15 @@ function show(files = [new File(["fictitious"], "fictitious.pdf")]) {
   );
 }
 
+function showAllStatements() {
+  const all = within(
+    screen.getByRole("group", { name: "Statement view" }),
+  ).getByRole("button", { name: /^All statements \(\d+\)$/ });
+  expect(all).toBeVisible();
+  fireEvent.click(all);
+  expect(all).toHaveAttribute("aria-pressed", "true");
+}
+
 function RetainedReview({
   files,
   pending,
@@ -195,6 +204,7 @@ describe("PDF review session lifecycle", () => {
         screen.getByRole("button", { name: "Confirm import" }),
       ).toBeEnabled(),
     );
+    showAllStatements();
     fireEvent.click(document.querySelector(".import-statement-heading")!);
     fireEvent.click(
       screen.getByRole("button", { name: "All transactions (3)" }),
@@ -262,6 +272,7 @@ describe("PDF review session lifecycle", () => {
         screen.getByRole("button", { name: "Confirm import" }),
       ).toBeEnabled(),
     );
+    showAllStatements();
     const earlierCard = container.querySelector<HTMLElement>(
       ".import-statement-card",
     )!;
@@ -310,6 +321,7 @@ describe("PDF review session lifecycle", () => {
         screen.getByRole("button", { name: "Confirm import" }),
       ).toBeEnabled(),
     );
+    showAllStatements();
     const card = (filename: string) =>
       [
         ...container.querySelectorAll<HTMLElement>(".import-statement-card"),
@@ -413,6 +425,7 @@ describe("PDF review session lifecycle", () => {
         screen.getByRole("button", { name: "Confirm import" }),
       ).toBeEnabled(),
     );
+    showAllStatements();
     expect(
       container.querySelectorAll(".import-statement-card[open]"),
     ).toHaveLength(0);
@@ -575,6 +588,7 @@ describe("PDF review session lifecycle", () => {
         ).toBeEnabled(),
       { timeout: 5000 },
     );
+    showAllStatements();
     fireEvent.click(container.querySelector(".import-statement-heading")!);
     fireEvent.click(
       screen.getByRole("button", { name: "Leave out this statement" }),
