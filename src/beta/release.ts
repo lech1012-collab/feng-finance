@@ -12,15 +12,15 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-19",
+  date: "2026-10-20",
   points: [
-    "Tap a transaction amount to type a correction in one stable editor.",
-    "Change tabs and return to the same import review without selecting PDFs again.",
-    "Source descriptions and filenames wrap within stationary mobile cards.",
+    "Import review starts with only the statements that need attention.",
+    "Ready and duplicate statements stay in your batch without filling the review list.",
+    "A compact confirmation at the end of review keeps your screen clear while scrolling.",
   ],
   pleaseTest: [
-    "Select several PDFs, visit Transactions, then use Import to resume your review.",
-    "Tap an unread or uncertain amount and type a correction with your phone keyboard.",
+    "Select several PDFs and switch between Needs attention and All statements.",
+    "Resolve an exception, continue to the summary and confirm the whole batch.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +28,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.10",
+    date: "2026-10-19",
+    points: [
+      "Tap a transaction amount to type a correction in one stable editor.",
+      "Change tabs and return to the same import review without selecting PDFs again.",
+      "Source descriptions and filenames wrap within stationary mobile cards.",
+    ],
+    pleaseTest: [
+      "Select several PDFs, visit Transactions, then use Import to resume your review.",
+      "Tap an unread or uncertain amount and type a correction with your phone keyboard.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.9",
     date: "2026-10-19",

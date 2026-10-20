@@ -1,5 +1,6 @@
 import { resolve } from "node:path";
 import { test, expect, type Page } from "./fixtures";
+import { revealStatement } from "./import-actions";
 
 const fixture = (name: string) =>
   resolve(`tests/fixtures/known-bank-${name}.pdf`);
@@ -77,7 +78,9 @@ async function select(page: Page, names: string[]) {
   await page
     .getByLabel("Select statements", { exact: true })
     .setInputFiles(names.map(fixture));
-  await expect(page.locator(".import-review-list")).toBeVisible({
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({
     timeout: 120000,
   });
   await expect(page.locator(".import-statement-card")).toHaveCount(
@@ -92,6 +95,7 @@ async function openCard(page: Page, name: string) {
     }),
   });
   await expect(card).toHaveCount(1);
+  await revealStatement(card);
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
   return card;

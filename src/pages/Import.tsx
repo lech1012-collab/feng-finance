@@ -47,6 +47,8 @@ import {
   nextAttentionStatement,
   reviewedRowSelection,
   statementPresentation,
+  statementVisibleInReview,
+  type StatementReviewFilter,
 } from "../import/batch-presentation";
 
 export default function ImportPage({
@@ -63,6 +65,9 @@ export default function ImportPage({
   onImported: (month: string, currency: string) => void;
 }) {
   const [entries, setEntries] = useState<FileReview[]>([]);
+  const [reviewFilter, setReviewFilter] =
+    useState<StatementReviewFilter>("attention");
+  const [retainedAttentionId, setRetainedAttentionId] = useState<string>();
   const [discarding, setDiscarding] = useState(false);
   const scrollPosition = useRef(0);
   useLayoutEffect(() => {
@@ -97,6 +102,8 @@ export default function ImportPage({
   const navigate = useNavigate();
   const localPicker = useRef<HTMLInputElement>(null);
   const statementCards = useRef(new Map<string, HTMLDivElement>());
+  const confirmation = useRef<HTMLElement>(null);
+  const reviewFocus = useRef<{ entryId?: string } | undefined>(undefined);
   const reviewedInclusions = useRef(new Map<string, Set<string>>());
   const accounts = useLiveQuery(
     () => db.accounts.filter((a) => !a.isDemo).toArray(),
@@ -161,6 +168,9 @@ export default function ImportPage({
     reviewedInclusions.current.clear();
     initialTransferLinkIds.current.clear();
     setEntries([]);
+    setReviewFilter("attention");
+    setRetainedAttentionId(undefined);
+    reviewFocus.current = undefined;
     setSourceCorrection(undefined);
     setSelectedTransferIds([]);
     setRejectedAutomaticIds([]);
@@ -428,6 +438,10 @@ export default function ImportPage({
   };
   const selectFiles = async (files: File[]) => {
     if (!files.length || busy) return;
+    if (!entries.length) {
+      setReviewFilter("attention");
+      setRetainedAttentionId(undefined);
+    }
     const token = ++operation.current;
     processing.current?.abort();
     processing.current = new AbortController();
@@ -715,15 +729,60 @@ export default function ImportPage({
   );
   const hasChanges = newCount > 0 || balanceStatements.length > 0;
   const batch = batchPresentation(entries);
+  const visibleReviewIds = new Set(
+    entries
+      .filter((entry) =>
+        statementVisibleInReview(entry, reviewFilter, retainedAttentionId),
+      )
+      .map((entry) => entry.id),
+  );
+  useEffect(() => {
+    const opened =
+      reviewFilter === "attention"
+        ? batch.attention.find((item) => item.entry.open)?.entry
+        : undefined;
+    if (opened) setRetainedAttentionId(opened.id);
+    else if (
+      retainedAttentionId &&
+      !entries.some((entry) => entry.id === retainedAttentionId && entry.open)
+    )
+      setRetainedAttentionId(undefined);
+  }, [entries, reviewFilter, retainedAttentionId]);
+  useLayoutEffect(() => {
+    if (!visible || phase !== "review" || !reviewFocus.current) return;
+    const target = reviewFocus.current.entryId
+      ? statementCards.current
+          .get(reviewFocus.current.entryId)
+          ?.querySelector<HTMLElement>(".import-statement-heading")
+      : confirmation.current;
+    if (!target) return;
+    reviewFocus.current = undefined;
+    target.focus({ preventScroll: true });
+    target.scrollIntoView?.({ block: "start", behavior: "instant" });
+  }, [entries, reviewFilter, phase, visible]);
   const reviewNextStatement = () => {
     const next = nextAttentionStatement(entries);
-    if (!next) return;
-    setEntries((current) => expandBatchStatement(current, next.id));
-    const summary = statementCards.current
-      .get(next.id)
-      ?.querySelector<HTMLElement>(".import-statement-heading");
-    summary?.focus();
-    summary?.scrollIntoView?.({ block: "start", behavior: "instant" });
+    reviewFocus.current = { entryId: next?.id };
+    setRetainedAttentionId(next?.id);
+    setEntries((current) => expandBatchStatement(current, next?.id));
+  };
+  const patchVisibleReview = (
+    entry: FileReview,
+    patch: Partial<FileReview>,
+  ) => {
+    patchReviewEntry(entry.id, patch);
+    if (
+      patch.open === false &&
+      reviewFilter === "attention" &&
+      retainedAttentionId === entry.id &&
+      statementPresentation(entry).state !== "attention"
+    )
+      reviewNextStatement();
+  };
+  const finishNoChangeReview = () => {
+    if (busy || blocking.length || hasChanges || phase !== "review") return;
+    discardReview();
+    navigate("/", { replace: true });
   };
   const save = async () => {
     if (busy || blocking.length || !hasChanges || !transferPreview) return;
@@ -878,6 +937,8 @@ export default function ImportPage({
         .count();
       releaseAllSessions();
       setEntries([]);
+      setReviewFilter("attention");
+      setRetainedAttentionId(undefined);
       reviewedInclusions.current.clear();
       setSelectedTransferIds([]);
       setRejectedAutomaticIds([]);
@@ -1156,21 +1217,54 @@ export default function ImportPage({
                 {batch.savedCount > 0 && ` · ${batch.savedCount} saved`}
               </strong>
             </p>
+            <div
+              className="import-view-filter"
+              role="group"
+              aria-label="Statement view"
+            >
+              <button
+                type="button"
+                aria-pressed={reviewFilter === "attention"}
+                disabled={busy}
+                onClick={() => setReviewFilter("attention")}
+              >
+                Needs attention ({batch.attention.length})
+              </button>
+              <button
+                type="button"
+                aria-pressed={reviewFilter === "all"}
+                disabled={busy}
+                onClick={() => setReviewFilter("all")}
+              >
+                All statements ({entries.length})
+              </button>
+            </div>
             {batch.attention.length > 0 && (
               <>
                 <p>
-                  Resolve each statement below, or leave it out of this import.
+                  Resolve the statements needing attention, or leave them out.
+                  Ready statements will be included when you confirm.
                 </p>
                 <button disabled={busy} onClick={reviewNextStatement}>
                   Review next statement
                 </button>
               </>
             )}
+            {reviewFilter === "attention" && !batch.attention.length && (
+              <p className="import-review-clear" role="status">
+                {hasChanges
+                  ? "No statements need attention. Ready statements will be included when you confirm."
+                  : "No statements need attention. There is nothing new to import."}
+              </p>
+            )}
           </section>
         )}
         {entries.length > 0 && (
-          <div className="import-review-list" hidden={phase === "check"}>
-            {batch.sorted
+          <div
+            className="import-review-list"
+            hidden={phase === "check" || visibleReviewIds.size === 0}
+          >
+            {entries
               .filter(
                 (entry) =>
                   entry.state !== "queued" &&
@@ -1179,184 +1273,209 @@ export default function ImportPage({
               .map((entry) => (
                 <div
                   key={entry.id}
+                  className="import-review-entry"
+                  hidden={!visibleReviewIds.has(entry.id)}
                   ref={(element) => {
                     if (element) statementCards.current.set(entry.id, element);
                     else statementCards.current.delete(entry.id);
                   }}
                 >
-                  {entry.extracted?.csv &&
-                    entry.open &&
-                    (!entry.draft || entry.optionsChanged) && (
-                      <CsvMappingPanel
-                        table={entry.extracted.csv}
-                        initial={
-                          entry.csvMapping ??
-                          entry.draft?.csvMapping ??
-                          entry.extracted.preset
-                        }
-                        initialAccountId={entry.draft?.account.id}
-                        accounts={[
-                          ...(accounts ?? []),
-                          ...(entry.draft &&
-                          !accounts?.some(
-                            (account) => account.id === entry.draft!.account.id,
-                          )
-                            ? [entry.draft.account]
-                            : []),
-                        ]}
-                        savedMappings={savedMappings}
-                        busy={busy}
-                        onCheck={(mapping, account) =>
-                          checkMappedCsv(entry, mapping, account)
-                        }
-                      />
-                    )}
-                  <ImportStatementReview
-                    key={entry.id}
-                    entry={entry}
-                    accounts={accounts ?? []}
-                    categories={categories ?? []}
-                    history={[
-                      ...(history ?? []),
-                      ...entries
-                        .filter(
-                          (other) =>
-                            other.id !== entry.id &&
-                            !other.skip &&
-                            other.draft &&
-                            !other.draft.exactDuplicate &&
-                            other.state !== "saved",
-                        )
-                        .map((other) => other.draft!.statement),
-                    ]}
-                    busy={busy}
-                    patch={(patch) => patchReviewEntry(entry.id, patch)}
-                    reparse={(ocr) => void reparse(entry, ocr)}
-                    onInclude={() => includeAndRecheck(entry)}
-                    onReviewSource={
-                      entry.extracted?.pdfSession ||
-                      sourceReview(entry) ||
-                      entry.draft?.bankSource
-                        ? (row) => reviewNativeSource(entry, row)
-                        : undefined
-                    }
-                    onSourceAction={(rowId, action) =>
-                      reviewSourceRow(entry, rowId, action)
-                    }
-                    onCreateAccount={(account) => {
-                      const changed = {
-                        ...entry,
-                        accountOverride: account,
-                        accountId: account.id,
-                        bank: account.institution,
-                      };
-                      patchEntry(entry.id, {
-                        accountOverride: account,
-                        accountId: account.id,
-                        bank: account.institution,
-                      });
-                      void reparse(changed, false, true);
-                    }}
-                    sourceReview={(() => {
-                      if (entry.skip || entry.state === "saved")
-                        return undefined;
-                      if (entry.draft?.bankSource) {
-                        return (
-                          <details className="generic-parser-details">
-                            <summary>Reading details</summary>
-                            <p>
-                              This statement uses its bank reader. If a date or
-                              amount looks wrong, review the PDF layout to
-                              correct the source reading and check the figures
-                              again.
-                            </p>
-                            <button
-                              type="button"
-                              disabled={busy}
-                              onClick={() => {
-                                const changed: FileReview = {
-                                  ...entry,
-                                  pdfReviewOptions: {
-                                    ...entry.pdfReviewOptions,
-                                    preferGeneric: true,
-                                  },
-                                };
-                                patchEntry(entry.id, {
-                                  pdfReviewOptions: changed.pdfReviewOptions,
-                                });
-                                void reparse(changed, false, true);
-                              }}
-                            >
-                              Review PDF layout
-                            </button>
-                          </details>
-                        );
-                      }
-                      const result = sourceReview(entry);
-                      if (!result) return undefined;
-                      const review = (
-                        <GenericImportReview
-                          result={result}
-                          correctionRequest={
-                            sourceCorrection?.entryId === entry.id
-                              ? {
-                                  id: sourceCorrection.id,
-                                  rowId: sourceCorrectionRow(
-                                    result,
-                                    sourceCorrection.target,
-                                  ),
-                                }
-                              : undefined
+                  <SheetVisibilityContext.Provider
+                    value={visible && visibleReviewIds.has(entry.id)}
+                  >
+                    {entry.extracted?.csv &&
+                      entry.open &&
+                      (!entry.draft || entry.optionsChanged) && (
+                        <CsvMappingPanel
+                          table={entry.extracted.csv}
+                          initial={
+                            entry.csvMapping ??
+                            entry.draft?.csvMapping ??
+                            entry.extracted.preset
                           }
-                          session={entry.extracted?.pdfSession}
-                          currency={
-                            entry.draft?.statement.currency ??
-                            entry.accountOverride?.currency
-                          }
-                          method={
-                            entry.draft?.statement.parserMethod ??
-                            entry.extracted?.extraction?.method
-                          }
+                          initialAccountId={entry.draft?.account.id}
+                          accounts={[
+                            ...(accounts ?? []),
+                            ...(entry.draft &&
+                            !accounts?.some(
+                              (account) =>
+                                account.id === entry.draft!.account.id,
+                            )
+                              ? [entry.draft.account]
+                              : []),
+                          ]}
+                          savedMappings={savedMappings}
                           busy={busy}
-                          onAction={(rowId, action) =>
-                            reviewSourceRow(entry, rowId, action)
+                          onCheck={(mapping, account) =>
+                            checkMappedCsv(entry, mapping, account)
                           }
-                          onMapping={(mapping) =>
-                            mapSourceColumns(entry, mapping)
-                          }
-                          onSaveTemplate={(name, mapping) =>
-                            void saveSourceLayout(entry, name, mapping)
-                          }
-                          canImportAnyway={
-                            !!entry.draft && !entry.optionsChanged
-                          }
-                          showImportAnyway={false}
-                          onImportAnyway={() => {
-                            if (!entry.draft) return;
-                            patchReviewEntry(entry.id, {
-                              override: true,
-                              draft: entry.draft,
-                            });
-                          }}
                         />
-                      );
-                      return entry.draft?.parserFallback ? (
-                        <details className="generic-parser-details">
-                          <summary>Alternative column reading</summary>
-                          <p>
-                            The bank-specific reader checked this recognised
-                            statement automatically. Column mapping and
-                            source-row corrections are available here if you
-                            need them. Changing the mapping or rows selects that
-                            reading for this import.
-                          </p>
-                          {review}
-                        </details>
-                      ) : (
-                        review
-                      );
-                    })()}
-                  />
+                      )}
+                    <ImportStatementReview
+                      key={entry.id}
+                      entry={entry}
+                      accounts={accounts ?? []}
+                      categories={categories ?? []}
+                      history={[
+                        ...(history ?? []),
+                        ...entries
+                          .filter(
+                            (other) =>
+                              other.id !== entry.id &&
+                              !other.skip &&
+                              other.draft &&
+                              !other.draft.exactDuplicate &&
+                              other.state !== "saved",
+                          )
+                          .map((other) => other.draft!.statement),
+                      ]}
+                      busy={busy}
+                      patch={(patch) => patchVisibleReview(entry, patch)}
+                      reparse={(ocr) => void reparse(entry, ocr)}
+                      onInclude={() => includeAndRecheck(entry)}
+                      onReviewSource={
+                        entry.extracted?.pdfSession ||
+                        sourceReview(entry) ||
+                        entry.draft?.bankSource
+                          ? (row) => reviewNativeSource(entry, row)
+                          : undefined
+                      }
+                      onSourceAction={(rowId, action) =>
+                        reviewSourceRow(entry, rowId, action)
+                      }
+                      onCreateAccount={(account) => {
+                        const changed = {
+                          ...entry,
+                          accountOverride: account,
+                          accountId: account.id,
+                          bank: account.institution,
+                        };
+                        patchEntry(entry.id, {
+                          accountOverride: account,
+                          accountId: account.id,
+                          bank: account.institution,
+                        });
+                        void reparse(changed, false, true);
+                      }}
+                      sourceReview={(() => {
+                        if (entry.skip || entry.state === "saved")
+                          return undefined;
+                        if (entry.draft?.bankSource) {
+                          return (
+                            <details className="generic-parser-details">
+                              <summary>Reading details</summary>
+                              <p>
+                                This statement uses its bank reader. If a date
+                                or amount looks wrong, review the PDF layout to
+                                correct the source reading and check the figures
+                                again.
+                              </p>
+                              <button
+                                type="button"
+                                disabled={busy}
+                                onClick={() => {
+                                  const changed: FileReview = {
+                                    ...entry,
+                                    pdfReviewOptions: {
+                                      ...entry.pdfReviewOptions,
+                                      preferGeneric: true,
+                                    },
+                                  };
+                                  patchEntry(entry.id, {
+                                    pdfReviewOptions: changed.pdfReviewOptions,
+                                  });
+                                  void reparse(changed, false, true);
+                                }}
+                              >
+                                Review PDF layout
+                              </button>
+                            </details>
+                          );
+                        }
+                        const result = sourceReview(entry);
+                        if (!result) return undefined;
+                        const review = (
+                          <GenericImportReview
+                            result={result}
+                            correctionRequest={
+                              sourceCorrection?.entryId === entry.id
+                                ? {
+                                    id: sourceCorrection.id,
+                                    rowId: sourceCorrectionRow(
+                                      result,
+                                      sourceCorrection.target,
+                                    ),
+                                  }
+                                : undefined
+                            }
+                            session={entry.extracted?.pdfSession}
+                            currency={
+                              entry.draft?.statement.currency ??
+                              entry.accountOverride?.currency
+                            }
+                            method={
+                              entry.draft?.statement.parserMethod ??
+                              entry.extracted?.extraction?.method
+                            }
+                            busy={busy}
+                            onAction={(rowId, action) =>
+                              reviewSourceRow(entry, rowId, action)
+                            }
+                            onMapping={(mapping) =>
+                              mapSourceColumns(entry, mapping)
+                            }
+                            onSaveTemplate={(name, mapping) =>
+                              void saveSourceLayout(entry, name, mapping)
+                            }
+                            canImportAnyway={
+                              !!entry.draft && !entry.optionsChanged
+                            }
+                            showImportAnyway={false}
+                            onImportAnyway={() => {
+                              if (!entry.draft) return;
+                              patchReviewEntry(entry.id, {
+                                override: true,
+                                draft: entry.draft,
+                              });
+                            }}
+                          />
+                        );
+                        return entry.draft?.parserFallback ? (
+                          <details className="generic-parser-details">
+                            <summary>Alternative column reading</summary>
+                            <p>
+                              The bank-specific reader checked this recognised
+                              statement automatically. Column mapping and
+                              source-row corrections are available here if you
+                              need them. Changing the mapping or rows selects
+                              that reading for this import.
+                            </p>
+                            {review}
+                          </details>
+                        ) : (
+                          review
+                        );
+                      })()}
+                    />
+                  </SheetVisibilityContext.Provider>
+                  {reviewFilter === "attention" &&
+                    retainedAttentionId === entry.id &&
+                    entry.open &&
+                    !busy &&
+                    ["ready", "skipped"].includes(
+                      statementPresentation(entry).state,
+                    ) && (
+                      <div className="import-resolved-statement" role="status">
+                        <p>
+                          {statementPresentation(entry).state === "skipped"
+                            ? "This statement will be skipped."
+                            : "This statement is ready."}
+                        </p>
+                        <button type="button" onClick={reviewNextStatement}>
+                          Continue
+                        </button>
+                      </div>
+                    )}
                 </div>
               ))}
           </div>
@@ -1393,8 +1512,14 @@ export default function ImportPage({
             busy={busy}
           />
         )}
-        {entries.length > 0 && (
-          <div className="import-footer import-outcome-footer">
+        {entries.length > 0 && phase === "review" && (
+          <section
+            ref={confirmation}
+            id="import-confirmation"
+            aria-label="Import summary"
+            tabIndex={-1}
+            className="import-outcome-footer"
+          >
             <div aria-live="polite">
               <strong>
                 {newCount} new
@@ -1406,24 +1531,22 @@ export default function ImportPage({
                 {skippedFileCount > 0 &&
                   ` · ${skippedFileCount} file${skippedFileCount === 1 ? "" : "s"} skipped`}
               </strong>
-              {(busy || phase === "check" || blocking.length > 0) && (
+              {!busy && !hasChanges && !blocking.length && (
+                <span>No changes to save.</span>
+              )}
+              {(busy || blocking.length > 0) && (
                 <span>
-                  {busy && phase === "review" && !commitStatus
+                  {busy && !commitStatus
                     ? "Rechecking source rows…"
-                    : phase === "check"
-                      ? "Checking every selected file before review"
-                      : blocking.length
-                        ? `${blocking.length} statement${blocking.length === 1 ? "" : "s"} need${blocking.length === 1 ? "s" : ""} attention`
-                        : ""}
+                    : blocking.length
+                      ? `${blocking.length} statement${blocking.length === 1 ? "" : "s"} need${blocking.length === 1 ? "s" : ""} attention`
+                      : ""}
                 </span>
               )}
               {commitStatus && <span role="status">{commitStatus}</span>}
             </div>
             {!hasChanges && !blocking.length && phase === "review" ? (
-              <button
-                disabled={busy}
-                onClick={() => navigate("/", { replace: true })}
-              >
+              <button disabled={busy} onClick={finishNoChangeReview}>
                 Back to Home
               </button>
             ) : (
@@ -1437,7 +1560,7 @@ export default function ImportPage({
                 Confirm import
               </button>
             )}
-          </div>
+          </section>
         )}
       </div>
     </SheetVisibilityContext.Provider>

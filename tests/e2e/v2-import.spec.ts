@@ -1,4 +1,4 @@
-import { showTransferChoices } from "./import-actions";
+import { showTransferChoices, revealStatement } from "./import-actions";
 import { settingsSection } from "./flows";
 import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
@@ -42,6 +42,7 @@ async function confirm(page: Page) {
 }
 async function expandFirst(page: Page) {
   const card = page.locator(".import-statement-card").first();
+  await revealStatement(card);
   await expect(card).toBeVisible();
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();

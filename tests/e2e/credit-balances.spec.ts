@@ -2,6 +2,7 @@ import { saveReadableBackup, settingsSection, loadDemoUi } from "./flows";
 import {
   acceptStatementWarnings,
   acceptUnverifiedStatement,
+  revealStatement,
 } from "./import-actions";
 import { test, expect, type Page } from "./fixtures";
 import { resolve } from "node:path";
@@ -16,11 +17,14 @@ async function importStatement(page: Page, name: string) {
     page.getByRole("heading", { name: "Import statements", exact: true }),
   ).toBeVisible();
   await page.getByLabel("Select statements").setInputFiles(fixture(name));
-  await expect(page.locator(".import-review-list")).toBeVisible({
+  await expect(
+    page.getByRole("group", { name: "Statement view", exact: true }),
+  ).toBeVisible({
     timeout: 90000,
   });
   const card = page.locator(".import-statement-card");
   await expect(card).toHaveCount(1);
+  await revealStatement(card);
   if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
     await card.locator(":scope > summary").click();
   if (name === "amex-uk-layout")
