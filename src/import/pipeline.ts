@@ -238,6 +238,10 @@ export async function prepareDraft(
       periodSource: "manual",
     });
   const now = new Date().toISOString();
+  if (selectedAccount && pdfReading?.generic?.errorCode === "missing-account")
+    throw new Error(
+      "The selected account could not be matched to the identifiers on this PDF. Choose the account whose last four digits are printed on this statement.",
+    );
   const accounts = await db.accounts.toArray();
   for (const pending of pendingDrafts)
     if (!accounts.some((a) => a.id === pending.account.id))
@@ -301,6 +305,13 @@ export async function prepareDraft(
   )
     throw new Error(
       "Selected account does not match this statement bank, currency and account type.",
+    );
+  if (
+    parsed.accountIdentifier &&
+    account.maskedAccountIdentifier !== parsed.accountIdentifier
+  )
+    throw new Error(
+      "Selected account does not match the account identifier printed on this statement. Choose the matching account.",
     );
   const sid = id();
   // A ledger-only OFX balance is useful evidence, but it must never manufacture

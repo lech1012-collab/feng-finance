@@ -314,7 +314,13 @@ export default function ImportPage({
         extracted,
         entry.bank || undefined,
         accounts?.find((a) => a.id === entry.accountId) ??
-          entry.accountOverride,
+          entry.accountOverride ??
+          // The source-review reader must keep the account already recognized
+          // for this file, including one staged earlier in this import batch.
+          (entry.draft &&
+          (!entry.bank || entry.bank === entry.draft.account.institution)
+            ? entry.draft.account
+            : undefined),
         period,
         pendingDrafts,
         entry.csvMapping,

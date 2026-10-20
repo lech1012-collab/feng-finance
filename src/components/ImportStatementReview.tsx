@@ -298,6 +298,16 @@ export function ImportStatementReview({
                 onClick={(event) => {
                   event.currentTarget.focus({ preventScroll: true });
                   setGuided(true);
+                  // A recognized account is not a question for the user. When
+                  // native figures fail their checks, open its source exceptions
+                  // directly rather than sending the user through reading details.
+                  if (
+                    d?.bankSource?.parsed.accountIdentifier &&
+                    validation?.status === "warning" &&
+                    !entry.optionsChanged &&
+                    !entry.requiresBatchRecheck
+                  )
+                    onPrepareSource?.();
                 }}
               >
                 Review statement

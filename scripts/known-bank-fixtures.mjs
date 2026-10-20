@@ -126,3 +126,33 @@ for (const name of ["guided-two-amounts", "guided-missing-account"]) {
     await document.save(),
   );
 }
+
+// Payment instructions contain a different account number from the customer's
+// card. Correcting one unread purchase must not lose the recognized identity.
+for (const name of ["guided-known-card-amount", "guided-competing-accounts"]) {
+  const credit = name === "guided-known-card-amount";
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const items = knownBankItems(credit ? "barclaycard" : "hsbc");
+  const pages = Array.from({ length: credit ? 2 : 1 }, () =>
+    document.addPage([credit ? 600 : 595, 842]),
+  );
+  for (const item of items) {
+    const unread = credit
+      ? item.page === 2 && item.y === 195 && item.x === 260
+      : item.y === 260 && item.x === 320;
+    pages[item.page - 1].drawText(unread ? "UNREAD" : item.text, {
+      x: item.x,
+      y: 842 - item.y,
+      size: item.fontSize ?? item.height,
+      font,
+    });
+  }
+  pages[0].drawText("To pay by bank transfer use account number 87654321", {
+    x: 48,
+    y: 842 - 740,
+    size: 8,
+    font,
+  });
+  await writeFile(`tests/fixtures/${name}.pdf`, await document.save());
+}
