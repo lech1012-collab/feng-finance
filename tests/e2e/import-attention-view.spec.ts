@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { test, expect, type Page } from "./fixtures";
+import { showStatementDetails } from "./import-actions";
 
 const fixture = (name: string) =>
   resolve(`tests/fixtures/known-bank-${name}.pdf`);
@@ -274,6 +275,7 @@ for (const setup of [
       .click();
     const card = page.locator(".import-statement-card");
     await card.locator(":scope > summary").click();
+    await showStatementDetails(card);
     await card
       .getByRole("button", { name: "All transactions (6)", exact: true })
       .click();

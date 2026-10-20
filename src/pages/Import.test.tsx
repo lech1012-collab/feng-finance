@@ -106,6 +106,17 @@ function showAllStatements() {
   expect(all).toHaveAttribute("aria-pressed", "true");
 }
 
+function showStatementDetails(target?: HTMLElement) {
+  const card = target ?? document.querySelector(".import-statement-card[open]");
+  if (target && !(target as HTMLDetailsElement).open)
+    fireEvent.click(target.querySelector("summary")!);
+  const details = card?.querySelector<HTMLDetailsElement>(
+    ".import-statement-details",
+  );
+  if (details && !details.open)
+    fireEvent.click(details.querySelector("summary")!);
+}
+
 function RetainedReview({
   files,
   pending,
@@ -206,6 +217,7 @@ describe("PDF review session lifecycle", () => {
     );
     showAllStatements();
     fireEvent.click(document.querySelector(".import-statement-heading")!);
+    showStatementDetails();
     fireEvent.click(
       screen.getByRole("button", { name: "All transactions (3)" }),
     );
@@ -289,6 +301,7 @@ describe("PDF review session lifecycle", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Review next statement" }),
     );
+    showStatementDetails();
     fireEvent.click(screen.getByRole("button", { name: "Recheck statement" }));
     await waitFor(() =>
       expect(
@@ -332,6 +345,7 @@ describe("PDF review session lifecycle", () => {
     const original = () => card("first.pdf");
     const regenerated = () => card("regenerated.pdf");
     fireEvent.click(original().querySelector("summary")!);
+    showStatementDetails();
     fireEvent.click(
       within(original()).getByRole("button", { name: "All transactions (3)" }),
     );
@@ -353,6 +367,7 @@ describe("PDF review session lifecycle", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Review next statement" }),
     );
+    showStatementDetails();
     fireEvent.click(
       within(regenerated()).getByRole("button", {
         name: "Recheck statement",
@@ -368,7 +383,9 @@ describe("PDF review session lifecycle", () => {
         name: "All transactions (3)",
       }),
     );
-    fireEvent.click(salaryRow(regenerated()).querySelector("summary")!);
+    showStatementDetails(regenerated());
+    if (!(salaryRow(regenerated()) as HTMLDetailsElement).open)
+      fireEvent.click(salaryRow(regenerated()).querySelector("summary")!);
     expect(
       within(salaryRow(regenerated())).getByRole("button", {
         name: "Exclude transaction",
@@ -376,6 +393,7 @@ describe("PDF review session lifecycle", () => {
     ).toBeVisible();
     // Restoring the original now discovers this row as a duplicate again.
     fireEvent.click(original().querySelector("summary")!);
+    showStatementDetails();
     fireEvent.click(
       within(salaryRow(original())).getByRole("button", {
         name: "Include transaction",
@@ -384,6 +402,7 @@ describe("PDF review session lifecycle", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Review next statement" }),
     );
+    showStatementDetails();
     fireEvent.click(
       within(regenerated()).getByRole("button", {
         name: "Recheck statement",
@@ -395,6 +414,7 @@ describe("PDF review session lifecycle", () => {
       ).toBeEnabled(),
     );
     const duplicateRow = salaryRow(regenerated());
+    showStatementDetails(regenerated());
     fireEvent.click(duplicateRow.querySelector("summary")!);
     expect(
       within(duplicateRow).getByRole("button", {
@@ -430,6 +450,7 @@ describe("PDF review session lifecycle", () => {
       container.querySelectorAll(".import-statement-card[open]"),
     ).toHaveLength(0);
     fireEvent.click(container.querySelector(".import-statement-heading")!);
+    showStatementDetails();
     fireEvent.click(
       screen.getByRole("button", { name: "All transactions (3)" }),
     );
@@ -468,6 +489,7 @@ describe("PDF review session lifecycle", () => {
     expect(firstSource.pdfSession!.dispose).not.toHaveBeenCalled();
     expect(repeatedSource.pdfSession!.dispose).not.toHaveBeenCalled();
     fireEvent.click(container.querySelector(".import-statement-heading")!);
+    showStatementDetails();
     const preserved = container.querySelector<HTMLElement>(".review-row")!;
     if (!(preserved as HTMLDetailsElement).open)
       fireEvent.click(preserved.querySelector("summary")!);
@@ -590,6 +612,7 @@ describe("PDF review session lifecycle", () => {
     );
     showAllStatements();
     fireEvent.click(container.querySelector(".import-statement-heading")!);
+    showStatementDetails();
     fireEvent.click(
       screen.getByRole("button", { name: "Leave out this statement" }),
     );
@@ -629,6 +652,7 @@ describe("PDF review session lifecycle", () => {
     ).findByText("Reading scanned page 2 of 2");
     fireEvent.click(screen.getByRole("button", { name: "Stop processing" }));
     await screen.findByRole("button", { name: "Review next statement" });
+    showStatementDetails();
     expect(screen.getByText(/Not imported: unread pages 2/)).toBeVisible();
     expect(
       container.querySelectorAll(".import-statement-card[open]"),
@@ -636,6 +660,7 @@ describe("PDF review session lifecycle", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Review next statement" }),
     );
+    showStatementDetails();
     const unreadCard = container.querySelector(".import-statement-card[open]")!;
     expect(
       within(unreadCard as HTMLElement).getAllByText(
@@ -670,6 +695,8 @@ describe("PDF review session lifecycle", () => {
     );
     vi.mocked(extractFile).mockResolvedValue(source);
     show();
+    await screen.findByRole("button", { name: "Review statement" });
+    showStatementDetails();
     fireEvent.click(
       await screen.findByRole("button", { name: "All transactions (3)" }),
     );

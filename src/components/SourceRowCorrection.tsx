@@ -1,9 +1,8 @@
-import { useLayoutEffect, useId, useState, type ReactNode } from "react";
-import { createPortal } from "react-dom";
+import { useId, useState, type ReactNode } from "react";
 import type { RowReading, RowReviewAction } from "../import/generic/types";
 import { decimalMoney, parseMoney } from "../domain/money";
 import { parseDate } from "../domain/dates";
-import { Sheet } from "./Sheet";
+import { ImportReviewSheet } from "./ImportReviewSheet";
 import { UKDateInput } from "./UKDateInput";
 
 /** Editing is isolated from the statement list; only a valid Save emits a source action. */
@@ -14,6 +13,9 @@ export function SourceRowCorrection({
   source,
   onSave,
   onCancel,
+  progress,
+  saveLabel = "Save amount",
+  otherOptions,
 }: {
   reading?: RowReading;
   currency?: string;
@@ -21,20 +23,11 @@ export function SourceRowCorrection({
   source: ReactNode;
   onSave: (action: Extract<RowReviewAction, { kind: "correct" }>) => void;
   onCancel: () => void;
+  progress?: string;
+  saveLabel?: string;
+  otherOptions?: ReactNode;
 }) {
   const formId = useId();
-  const [host] = useState(() => {
-    const element = document.createElement("div");
-    element.className = "app import-workspace import-correction-overlay";
-    element.dataset.page = "import";
-    return element;
-  });
-  const [connected, setConnected] = useState(false);
-  useLayoutEffect(() => {
-    document.body.append(host);
-    setConnected(true);
-    return () => host.remove();
-  }, [host]);
   const [amount, setAmount] = useState(() =>
     reading?.amount !== undefined && currency
       ? decimalMoney(Math.abs(reading.amount), currency)
@@ -74,9 +67,8 @@ export function SourceRowCorrection({
   } catch {
     detailsInvalid = true;
   }
-  if (!connected) return null;
-  return createPortal(
-    <Sheet
+  return (
+    <ImportReviewSheet
       title="Correct amount"
       closeLabel="Cancel correction"
       onClose={onCancel}
@@ -88,12 +80,17 @@ export function SourceRowCorrection({
             form={formId}
             disabled={busy}
           >
-            Save amount
+            {saveLabel}
           </button>
         </>
       }
     >
       <div className="import-correction">
+        {progress && (
+          <p className="muted" role="status">
+            {progress}
+          </p>
+        )}
         <p>{reading?.description || "Unread transaction"}</p>
         {source}
         <form
@@ -184,8 +181,7 @@ export function SourceRowCorrection({
             </button>
           </div>
           <p className="muted">
-            Enter the amount shown in the PDF. Money out is saved as a negative
-            amount; no minus key is needed. Saving rechecks the statement.
+            Copy the amount from your statement. Feng will recheck the totals.
           </p>
           {!currency && (
             <p role="alert">
@@ -196,7 +192,9 @@ export function SourceRowCorrection({
             className="import-correction-details"
             open={detailsInvalid || undefined}
           >
-            <summary>Other transaction details</summary>
+            <summary>
+              {otherOptions ? "More options" : "Other transaction details"}
+            </summary>
             <label>
               Date
               <UKDateInput
@@ -234,11 +232,11 @@ export function SourceRowCorrection({
                 }}
               />
             </label>
+            {otherOptions}
           </details>
           {error && <p role="alert">{error}</p>}
         </form>
       </div>
-    </Sheet>,
-    host,
+    </ImportReviewSheet>
   );
 }

@@ -66,8 +66,8 @@ describe("import review corrections", () => {
   const showReview = async (
     entry: FileReview,
     patch: (change: Partial<FileReview>) => void = () => undefined,
-  ) =>
-    render(
+  ) => {
+    const view = render(
       <MemoryRouter>
         <ImportStatementReview
           entry={entry}
@@ -80,6 +80,11 @@ describe("import review corrections", () => {
         />
       </MemoryRouter>,
     );
+    fireEvent.click(
+      screen.getByText("Statement details", { selector: "summary" }),
+    );
+    return view;
+  };
 
   it.each([false, true])(
     "discloses required QIF identity controls only before a draft is prepared (prepared=%s)",

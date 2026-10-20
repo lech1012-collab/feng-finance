@@ -1268,7 +1268,10 @@ export default function ImportPage({
               .filter(
                 (entry) =>
                   entry.state !== "queued" &&
-                  (entry.state !== "checking" || !!entry.draft),
+                  (entry.state !== "checking" ||
+                    !!entry.draft ||
+                    !!entry.extracted ||
+                    entry.open),
               )
               .map((entry) => (
                 <div
@@ -1343,6 +1346,24 @@ export default function ImportPage({
                       onSourceAction={(rowId, action) =>
                         reviewSourceRow(entry, rowId, action)
                       }
+                      onGuidedOptions={(options) => {
+                        const changed = { ...entry, ...options };
+                        patchReviewEntry(entry.id, options);
+                        void reparse(changed, false, true);
+                      }}
+                      onPrepareSource={() => {
+                        const pdfReviewOptions = {
+                          ...entry.pdfReviewOptions,
+                          preferGeneric: true,
+                          skipCellOcr: true,
+                        };
+                        patchEntry(entry.id, { pdfReviewOptions });
+                        void reparse(
+                          { ...entry, pdfReviewOptions },
+                          false,
+                          true,
+                        );
+                      }}
                       onCreateAccount={(account) => {
                         const changed = {
                           ...entry,

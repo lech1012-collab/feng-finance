@@ -72,23 +72,30 @@ for (const setup of [
     await page
       .getByLabel("Select statements", { exact: true })
       .setInputFiles(resolve("tests/fixtures/beauty-code-correction.pdf"));
+    await expect(
+      page.getByRole("group", { name: "Statement view", exact: true }),
+    ).toBeVisible({ timeout: 90000 });
     const card = page.locator(".import-statement-card");
     await expect(card).toBeVisible();
     if (!(await card.evaluate((node) => (node as HTMLDetailsElement).open)))
       await card.locator(":scope > summary").click();
-    const row = page.locator(".generic-review-row").filter({
-      has: page.locator("summary strong", { hasText: "BEAUTY CODE" }),
-    });
-    const trigger = row.getByRole("button", {
-      name: /Correct amount for Beauty Code/i,
+    const trigger = card.getByRole("button", {
+      name: "Review statement",
+      exact: true,
     });
     await expect(trigger).toBeVisible();
+    await expect(
+      card.getByText("Compare extracted readings", { exact: false }),
+    ).not.toBeVisible();
+    await expect(card.locator(".import-statement-details")).not.toHaveAttribute(
+      "open",
+    );
     const confirm = page.getByRole("button", {
       name: "Confirm import",
       exact: true,
     });
     await expect(confirm).toBeDisabled();
-    const cardX = await row.evaluate(
+    const cardX = await card.evaluate(
       (node) => node.getBoundingClientRect().left,
     );
     await trigger.click();
@@ -109,7 +116,7 @@ for (const setup of [
     ).toHaveAttribute("draggable", "false");
     await amount.fill("80.00");
     await editor
-      .getByRole("button", { name: "Save amount", exact: true })
+      .getByRole("button", { name: "Save and continue", exact: true })
       .click();
     await expect(editor.getByRole("alert")).toContainText(
       "Choose Money in or Money out",
@@ -119,7 +126,7 @@ for (const setup of [
       .click();
     await amount.fill("80.001");
     await editor
-      .getByRole("button", { name: "Save amount", exact: true })
+      .getByRole("button", { name: "Save and continue", exact: true })
       .click();
     await expect(editor.getByRole("alert")).toContainText(
       "correct decimal places",
@@ -155,7 +162,7 @@ for (const setup of [
     }
     expect(await page.evaluate(() => window.scrollX)).toBe(0);
     expect(
-      await row.evaluate((node) => node.getBoundingClientRect().left),
+      await card.evaluate((node) => node.getBoundingClientRect().left),
     ).toBe(cardX);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth),
@@ -191,12 +198,15 @@ for (const setup of [
       .getByRole("button", { name: "Money out", exact: true })
       .click();
     await editor
-      .getByRole("button", { name: "Save amount", exact: true })
+      .getByRole("button", { name: "Save and continue", exact: true })
       .click();
     await expect(editor).toHaveCount(0);
-    await expect(
-      page.getByText("Statement figures match exactly", { exact: true }),
-    ).toBeVisible();
+    const complete = page.getByRole("dialog", {
+      name: "Statement checked",
+      exact: true,
+    });
+    await expect(complete).toBeVisible();
+    await complete.getByRole("button", { name: "Done", exact: true }).click();
     await expect(confirm).toBeEnabled();
     expect((await ledger(page)).transactions).toHaveLength(0);
     await confirm.click();

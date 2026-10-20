@@ -11,6 +11,21 @@ export async function revealStatement(statement: Locator) {
   await expect(statement).toBeAttached({ timeout: 90000 });
   if (!(await statement.isVisible())) await showAllStatements(statement.page());
   await expect(statement).toBeVisible();
+  if (
+    await statement.evaluate((node) =>
+      node.classList.contains("import-statement-card"),
+    )
+  )
+    await showStatementDetails(statement);
+}
+
+/** Legacy financial-detail journeys deliberately open the optional diagnostic view. */
+export async function showStatementDetails(statement: Locator) {
+  if (!(await statement.evaluate((node) => (node as HTMLDetailsElement).open)))
+    await statement.locator(":scope > summary").click();
+  const details = statement.locator(".import-statement-details");
+  if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open)))
+    await details.locator(":scope > summary").click();
 }
 
 /** Deliberate UI decisions only. These helpers never alter imported state directly. */
@@ -30,6 +45,7 @@ export async function acceptUnverifiedStatement(
   statement?: Locator,
 ) {
   const source = statement ?? page.locator(".import-statement-card[open]");
+  await showStatementDetails(source);
   await source
     .getByRole("button", { name: "Import anyway…", exact: true })
     .click();
@@ -59,6 +75,7 @@ export async function acceptUnverifiedStatement(
 }
 
 export async function acceptStatementWarnings(statement: Locator) {
+  await showStatementDetails(statement);
   await statement
     .getByRole("button", {
       name: "Accept these statement warnings",
