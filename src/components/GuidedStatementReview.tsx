@@ -23,6 +23,8 @@ import { ImportReviewSheet } from "./ImportReviewSheet";
 import { ImportAccountStep } from "./ImportAccountStep";
 import { ImportRiskConfirmation } from "./ImportRiskConfirmation";
 
+import type { ReviewSection } from "./StatementReviewWorkspace";
+
 type DraftRow = ImportDraft["transactions"][number];
 export function GuidedStatementReview({
   entry,
@@ -49,7 +51,7 @@ export function GuidedStatementReview({
     row: DraftRow,
     action: Extract<RowReviewAction, { kind: "correct" }>,
   ) => void;
-  onDetails: () => void;
+  onDetails: (section?: ReviewSection) => void;
   onClose: () => void;
 }) {
   const [completed, setCompleted] = useState(0);
@@ -75,9 +77,9 @@ export function GuidedStatementReview({
         ),
       },
     });
-  const details = () => {
+  const details = (section: ReviewSection = "overview") => {
     onClose();
-    onDetails();
+    onDetails(section);
   };
   const filename = <p className="import-guided-filename">{entry.file.name}</p>;
   if (busy)
@@ -140,7 +142,11 @@ export function GuidedStatementReview({
         title="Check statement layout"
         onClose={onClose}
         footer={
-          <button type="button" className="primary" onClick={details}>
+          <button
+            type="button"
+            className="primary"
+            onClick={() => details("mapping")}
+          >
             Inspect statement layout
           </button>
         }
@@ -404,7 +410,11 @@ export function GuidedStatementReview({
           <button
             type="button"
             className="primary"
-            onClick={step.kind === "validation" ? onClose : details}
+            onClick={
+              step.kind === "validation"
+                ? onClose
+                : () => details(step.kind === "mapping" ? "mapping" : "reading")
+            }
           >
             {step.kind === "mapping"
               ? "Set up columns"
@@ -486,7 +496,7 @@ export function GuidedStatementReview({
                   ),
               )}
             </dl>
-            <button type="button" onClick={details}>
+            <button type="button" onClick={() => details("totals")}>
               Inspect statement details
             </button>
             {result?.checks.unreadPages.length ? (

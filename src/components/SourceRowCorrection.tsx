@@ -202,7 +202,9 @@ export function SourceRowCorrection({
             {progress}
           </p>
         )}
-        <p>{reading?.description || "Unread transaction"}</p>
+        <p className="import-correction-description">
+          {reading?.description || "Unread transaction"}
+        </p>
         {reason && <p className="muted">{reason}</p>}
         {!editAmount && reading?.amount !== undefined && currency && (
           <p className="amount">

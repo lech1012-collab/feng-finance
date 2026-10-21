@@ -1349,6 +1349,10 @@ export default function ImportPage({
                           ? (row) => reviewNativeSource(entry, row)
                           : undefined
                       }
+                      onMapping={(mapping) => mapSourceColumns(entry, mapping)}
+                      onSaveTemplate={(name, mapping) =>
+                        void saveSourceLayout(entry, name, mapping)
+                      }
                       onSourceAction={(rowId, action) =>
                         reviewSourceRow(entry, rowId, action)
                       }

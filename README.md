@@ -548,3 +548,16 @@ A supported digital card statement with an unread identifier now enters the acco
 ## v2.2.14 Recognized accounts stay assigned during review
 
 Correcting a recognized card statement now opens its unresolved transactions directly and retains the card identity. Separate payment-instruction account numbers no longer cause an account-selection loop. For an unfamiliar layout, choosing a matching printed account advances to transaction review; a mismatched choice explains the error. This does not waive source-row or balance validation. See [the guided workflow and regression coverage](docs/import-guided-review-ux.md).
+
+## v2.2.16 Manual import review
+
+Statement details and manual fallback actions now open a focused review sheet.
+Tap a compact transaction row to correct one amount or date against its original
+PDF crop. Saving rechecks the figures, returns to the list and retains the
+multi-file batch. Totals, account/date settings and column identification each
+have their own screen. Categories can be assigned after import.
+
+The expanded source diagnostics require an explicit **Source and technical
+tools → Open diagnostic tools** action. Financial acceptance, duplicate checks
+and source validation remain required. See the [design and implementation
+review](docs/manual-import-workspace-ux.md).

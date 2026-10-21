@@ -34,6 +34,10 @@ import { ImportPeriod } from "./ImportPeriod";
 import { ImportRiskConfirmation } from "./ImportRiskConfirmation";
 import { guidedReviewCopy, guidedReviewStep } from "../import/guided-review";
 import { GuidedStatementReview } from "./GuidedStatementReview";
+import {
+  StatementReviewWorkspace,
+  type ReviewSection,
+} from "./StatementReviewWorkspace";
 
 export function ImportStatementReview({
   entry,
@@ -50,6 +54,8 @@ export function ImportStatementReview({
   onReviewSource,
   onGuidedOptions,
   onPrepareSource,
+  onMapping,
+  onSaveTemplate,
 }: {
   entry: FileReview;
   accounts: Account[];
@@ -65,11 +71,20 @@ export function ImportStatementReview({
   onReviewSource?: (row: ImportDraft["transactions"][number]) => void;
   onGuidedOptions?: (options: Partial<FileReview>) => void;
   onPrepareSource?: () => void;
+  onMapping?: (
+    mapping: import("../import/generic/types").LayoutMapping,
+  ) => void;
+  onSaveTemplate?: (
+    name: string,
+    mapping: import("../import/generic/types").LayoutMapping,
+  ) => void;
 }) {
   const d = entry.draft;
   const [showRisk, setShowRisk] = useState(false);
   const [guided, setGuided] = useState(false);
   const [detailsVisited, setDetailsVisited] = useState(false);
+  const [workspace, setWorkspace] = useState<ReviewSection>();
+  const [diagnostics, setDiagnostics] = useState(false);
   const detailsRef = useRef<HTMLDetailsElement>(null);
   const validation = d && draftReconciliation(d);
   const [creatingAccount, setCreatingAccount] = useState(false);
@@ -319,6 +334,13 @@ export function ImportStatementReview({
             )}
           </div>
         )}
+        {exactSkipped && !diagnostics && (
+          <p className="import-duplicate-note">
+            {entry.duplicateInBatch
+              ? "This PDF was selected more than once."
+              : "This statement has already been imported."}
+          </p>
+        )}
         {entry.state !== "saved" && (
           <div className="import-file-actions">
             {entry.skip ? (
@@ -360,16 +382,9 @@ export function ImportStatementReview({
             onCorrectTransaction={(row, { kind: _kind, ...values }) =>
               correctSource(row, values)
             }
-            onDetails={() => {
+            onDetails={(section = "overview") => {
               setGuided(false);
-              setDetailsVisited(true);
-              patch({ showAll: true });
-              if (detailsRef.current) detailsRef.current.open = true;
-              requestAnimationFrame(() => {
-                const summary = detailsRef.current?.querySelector("summary");
-                summary?.focus({ preventScroll: true });
-                summary?.scrollIntoView?.({ block: "start" });
-              });
+              setWorkspace(section);
             }}
           />
         )}
@@ -380,795 +395,880 @@ export function ImportStatementReview({
             if (event.currentTarget.open) setDetailsVisited(true);
           }}
         >
-          <summary onClick={() => setDetailsVisited(true)}>
+          <summary
+            aria-haspopup="dialog"
+            onClick={(event) => {
+              event.preventDefault();
+              setWorkspace("overview");
+            }}
+          >
             Statement details
           </summary>
           <p className="muted import-source-name import-raw-reference">
             {entry.file.name}
           </p>
-          {!entry.skip && (
-            <>
-              {blocking && d && (
-                <div className="notice import-blocking-warning">
-                  <div>
-                    <strong>Needs attention before import</strong>
-                    <p>{blockers[0]}</p>
-                    {blockers.length > 1 && (
-                      <details className="import-all-checks">
-                        <summary>All checks ({blockers.length})</summary>
-                        <ul>
-                          {blockers.map((reason) => (
-                            <li key={reason}>{reason}</li>
-                          ))}
-                        </ul>
-                      </details>
-                    )}
-                  </div>
-                </div>
-              )}
-              {entry.state === "checking" && (
-                <p role="status">{entry.progress}</p>
-              )}
-              {entry.error && (
-                <div className="notice import-blocking-warning" role="alert">
-                  <AlertTriangle size={18} />
-                  <div>
-                    <strong>
-                      {d
-                        ? "This statement couldn't be saved"
-                        : "This statement couldn't be read"}
-                    </strong>
-                    <p>{entry.error}</p>
-                    <p>
-                      {d
-                        ? "Review this statement and confirm again. Previously saved statements will not be imported twice."
-                        : "Use a PDF, CSV, OFX, QFX or QIF statement, or select the bank and account below."}
-                    </p>
-                  </div>
-                </div>
-              )}
-              {d && validation && flow && (
+          {diagnostics && (
+            <div className="import-expert-tools">
+              <button
+                type="button"
+                onClick={() => {
+                  setDiagnostics(false);
+                  if (detailsRef.current) detailsRef.current.open = false;
+                }}
+              >
+                Close diagnostic tools
+              </button>
+              {!entry.skip && (
                 <>
-                  <p>
-                    {d.account.displayName} ·{" "}
-                    {d.account.maskedAccountIdentifier} · {d.statement.currency}{" "}
-                    ·{" "}
-                    {d.statement.extractionMethod === "OCR"
-                      ? "Read from images"
-                      : d.statement.extractionMethod === "embedded-text"
-                        ? "Read from text"
-                        : `${d.statement.extractionMethod} export`}
-                  </p>
-                  <p>
-                    <ImportPeriod
-                      start={d.statement.statementPeriodStart}
-                      end={d.statement.statementPeriodEnd}
-                    />
-                    {d.statement.periodSource === "transaction-coverage" &&
-                      " · transaction coverage"}
-                  </p>
-                  {d.statement.statementDate && (
-                    <p className="muted">
-                      Statement issued {formatUkDate(d.statement.statementDate)}
-                    </p>
-                  )}
-                  <div className="review-metrics">
-                    <div>
-                      <span>Transactions extracted</span>
-                      <strong>{d.transactions.length}</strong>
-                    </div>
-                  </div>
-                  <p className="coverage-note">
-                    Money in and Money out include transfers and card
-                    repayments. Only selected rows are imported.
-                  </p>
-                  <div
-                    className={`validation ${validation.status === "reconciled" ? "valid" : validation.status === "warning" ? "import-blocking-warning" : ""}`}
-                  >
-                    <strong>
-                      {validation.status === "reconciled"
-                        ? "✓ Statement reconciled"
-                        : validation.status === "warning"
-                          ? validation.difference
-                            ? "Balances don't add up"
-                            : "Statement needs review"
-                          : "Balance validation unavailable"}
-                    </strong>
-                    {validation.status === "unavailable" &&
-                      ["CSV", "OFX", "QIF"].includes(
-                        d.statement.extractionMethod,
-                      ) && (
-                        <p>
-                          {d.statement.openingBalance === undefined &&
-                          d.statement.closingBalance === undefined
-                            ? "File has no balances"
-                            : "File has no complete opening and closing balances. This period remains unverified."}
-                        </p>
-                      )}
-                    {validation.status === "warning" &&
-                      !!validation.difference &&
-                      !d.parserReview && (
-                        <p>
-                          Your statement closes at{" "}
-                          {money(
-                            d.statement.closingBalance ?? 0,
-                            d.statement.currency,
-                          )}
-                          . Feng calculates{" "}
-                          {money(
-                            validation.calculated ?? 0,
-                            d.statement.currency,
-                          )}
-                          , a difference of{" "}
-                          {money(
-                            Math.abs(validation.difference ?? 0),
-                            d.statement.currency,
-                          )}
-                          . Check for a missing row, incorrect sign or misread
-                          amount.
-                        </p>
-                      )}
-                    {d.account.accountType === "credit" && (
-                      <p className="muted">
-                        Credit card balances use a minus sign for money owed.
-                      </p>
-                    )}
-                    <details className="import-statement-figures">
-                      <summary>Statement figures</summary>
-                      <dl className="totals">
-                        <div>
-                          <dt>Opening balance</dt>
-                          <dd>
-                            {d.statement.openingBalance === undefined
-                              ? "Not available"
-                              : money(
-                                  d.statement.openingBalance,
-                                  d.statement.currency,
-                                )}
-                          </dd>
-                        </div>
-                        <div>
-                          <dt>Money in (including transfers)</dt>
-                          <dd>+{money(flow.moneyIn, d.statement.currency)}</dd>
-                        </div>
-                        <div>
-                          <dt>Money out (including transfers)</dt>
-                          <dd>−{money(flow.moneyOut, d.statement.currency)}</dd>
-                        </div>
-                        <div>
-                          <dt>Reported closing balance</dt>
-                          <dd>
-                            {d.statement.closingBalance === undefined
-                              ? "Not available"
-                              : money(
-                                  d.statement.closingBalance,
-                                  d.statement.currency,
-                                )}
-                          </dd>
-                        </div>
-                        {validation.calculated !== undefined && (
-                          <>
-                            <div>
-                              <dt>Calculated closing balance</dt>
-                              <dd>
-                                {money(
-                                  validation.calculated,
-                                  d.statement.currency,
-                                )}
-                              </dd>
-                            </div>
-                            <div>
-                              <dt>Difference</dt>
-                              <dd>
-                                {money(
-                                  validation.difference ?? 0,
-                                  d.statement.currency,
-                                )}
-                              </dd>
-                            </div>
-                          </>
+                  {blocking && d && (
+                    <div className="notice import-blocking-warning">
+                      <div>
+                        <strong>Needs attention before import</strong>
+                        <p>{blockers[0]}</p>
+                        {blockers.length > 1 && (
+                          <details className="import-all-checks">
+                            <summary>All checks ({blockers.length})</summary>
+                            <ul>
+                              {blockers.map((reason) => (
+                                <li key={reason}>{reason}</li>
+                              ))}
+                            </ul>
+                          </details>
                         )}
-                      </dl>
-                    </details>
-                    {validation.status === "warning" && (
-                      <>
-                        <button
-                          disabled={busy}
-                          onClick={() => patch({ showAll: true })}
-                        >
-                          {validation.difference
-                            ? "Find the difference"
-                            : "Review transactions"}
-                        </button>
-                        <p className="muted">
-                          Importing anyway leaves this statement unverified.
+                      </div>
+                    </div>
+                  )}
+                  {entry.state === "checking" && (
+                    <p role="status">{entry.progress}</p>
+                  )}
+                  {entry.error && (
+                    <div
+                      className="notice import-blocking-warning"
+                      role="alert"
+                    >
+                      <AlertTriangle size={18} />
+                      <div>
+                        <strong>
+                          {d
+                            ? "This statement couldn't be saved"
+                            : "This statement couldn't be read"}
+                        </strong>
+                        <p>{entry.error}</p>
+                        <p>
+                          {d
+                            ? "Review this statement and confirm again. Previously saved statements will not be imported twice."
+                            : "Use a PDF, CSV, OFX, QFX or QIF statement, or select the bank and account below."}
                         </p>
-                      </>
-                    )}
-                  </div>
-                  {needsFinancialAcceptance && (
-                    <div className="import-financial-acceptance">
-                      {entry.override ? (
-                        <>
-                          <p role="status">
-                            Unverified statement accepted. Its validation status
-                            stays unverified.
-                          </p>
-                          <button
-                            disabled={busy}
-                            onClick={() => patch({ override: false })}
-                          >
-                            Undo unverified acceptance
-                          </button>
-                        </>
-                      ) : (
-                        <>
-                          <button
-                            disabled={busy || invalidReading}
-                            onClick={(event) => {
-                              event.currentTarget.focus();
-                              setShowRisk(true);
-                            }}
-                          >
-                            Import anyway…
-                          </button>
-                          {invalidReading && (
+                      </div>
+                    </div>
+                  )}
+                  {d && validation && flow && (
+                    <>
+                      <p>
+                        {d.account.displayName} ·{" "}
+                        {d.account.maskedAccountIdentifier} ·{" "}
+                        {d.statement.currency} ·{" "}
+                        {d.statement.extractionMethod === "OCR"
+                          ? "Read from images"
+                          : d.statement.extractionMethod === "embedded-text"
+                            ? "Read from text"
+                            : `${d.statement.extractionMethod} export`}
+                      </p>
+                      <p>
+                        <ImportPeriod
+                          start={d.statement.statementPeriodStart}
+                          end={d.statement.statementPeriodEnd}
+                        />
+                        {d.statement.periodSource === "transaction-coverage" &&
+                          " · transaction coverage"}
+                      </p>
+                      {d.statement.statementDate && (
+                        <p className="muted">
+                          Statement issued{" "}
+                          {formatUkDate(d.statement.statementDate)}
+                        </p>
+                      )}
+                      <div className="review-metrics">
+                        <div>
+                          <span>Transactions extracted</span>
+                          <strong>{d.transactions.length}</strong>
+                        </div>
+                      </div>
+                      <p className="coverage-note">
+                        Money in and Money out include transfers and card
+                        repayments. Only selected rows are imported.
+                      </p>
+                      <div
+                        className={`validation ${validation.status === "reconciled" ? "valid" : validation.status === "warning" ? "import-blocking-warning" : ""}`}
+                      >
+                        <strong>
+                          {validation.status === "reconciled"
+                            ? "✓ Statement reconciled"
+                            : validation.status === "warning"
+                              ? validation.difference
+                                ? "Balances don't add up"
+                                : "Statement needs review"
+                              : "Balance validation unavailable"}
+                        </strong>
+                        {validation.status === "unavailable" &&
+                          ["CSV", "OFX", "QIF"].includes(
+                            d.statement.extractionMethod,
+                          ) && (
                             <p>
-                              Correct or exclude invalid source values and
-                              recheck before accepting this statement.
+                              {d.statement.openingBalance === undefined &&
+                              d.statement.closingBalance === undefined
+                                ? "File has no balances"
+                                : "File has no complete opening and closing balances. This period remains unverified."}
                             </p>
                           )}
-                        </>
-                      )}
-                    </div>
-                  )}
-                  {detailsVisited && sourceReview}
-                  {notices.map((notice, index) => (
-                    <p
-                      className="coverage-note"
-                      key={`${notice.kind}-${index}`}
-                    >
-                      <strong>
-                        {notice.kind === "gap" ? "Gap" : "Overlap"}:
-                      </strong>{" "}
-                      <ImportPeriod start={notice.start} end={notice.end} />{" "}
-                      {notice.kind === "gap"
-                        ? "has no statement between these imports."
-                        : "is also covered by another statement. Duplicate rows are skipped by default."}
-                    </p>
-                  ))}
-                  {entry.requiresBatchRecheck && (
-                    <div className="notice import-blocking-warning">
-                      <AlertTriangle size={18} />
-                      <div>
-                        <strong>Recheck this statement</strong>
-                        <p>
-                          Another selected file was skipped or corrected. Parse
-                          again so Feng can update duplicate checks before
-                          importing.
-                        </p>
-                        <button disabled={busy} onClick={() => reparse(false)}>
-                          Recheck statement
-                        </button>
-                      </div>
-                    </div>
-                  )}
-                  {d.exactDuplicate && (
-                    <div className="import-duplicate-note">
-                      <strong>
-                        {entry.duplicateInBatch
-                          ? "This PDF was selected more than once."
-                          : "This statement has already been imported."}
-                      </strong>
-                      <p>
-                        {entry.duplicateInBatch
-                          ? "The repeated file will be skipped."
-                          : "It will be skipped. Your existing records are unchanged."}
-                      </p>
-                      <details className="import-duplicate-advanced">
-                        <summary>Review repeated statement</summary>
-                        <p>
-                          Restoring review keeps the duplicate checks. Only
-                          transactions explicitly kept below can be imported.
-                        </p>
-                        <button
-                          disabled={busy}
-                          onClick={() => {
-                            updateDraft({
-                              duplicateOverride: !d.duplicateOverride,
-                            });
-                            if (!d.duplicateOverride) patch({ showAll: true });
-                          }}
-                        >
-                          {d.duplicateOverride
-                            ? "Skip repeated statement"
-                            : "Restore review of duplicate statement"}
-                        </button>
-                      </details>
-                    </div>
-                  )}
-                  {duplicateCount > 0 && (
-                    <p>
-                      {duplicateCount} possible or confirmed duplicate
-                      transaction
-                      {duplicateCount === 1 ? "" : "s"}; excluded by default.
-                    </p>
-                  )}
-                  {!exactSkipped && (d.warnings.length > 0 || outsideDates) && (
-                    <div
-                      className={`notice ${d.reviewedWarnings ? "warning" : "import-blocking-warning"}`}
-                    >
-                      <AlertTriangle size={18} />
-                      <div>
-                        <strong>Extraction requires review</strong>
-                        <ul>
-                          {outsideDates &&
-                            !d.warnings.some((w) => w.includes("outside")) && (
-                              <li>
-                                A transaction date is outside the statement
-                                period. Compare it with the source PDF.
-                              </li>
+                        {validation.status === "warning" &&
+                          !!validation.difference &&
+                          !d.parserReview && (
+                            <p>
+                              Your statement closes at{" "}
+                              {money(
+                                d.statement.closingBalance ?? 0,
+                                d.statement.currency,
+                              )}
+                              . Feng calculates{" "}
+                              {money(
+                                validation.calculated ?? 0,
+                                d.statement.currency,
+                              )}
+                              , a difference of{" "}
+                              {money(
+                                Math.abs(validation.difference ?? 0),
+                                d.statement.currency,
+                              )}
+                              . Check for a missing row, incorrect sign or
+                              misread amount.
+                            </p>
+                          )}
+                        {d.account.accountType === "credit" && (
+                          <p className="muted">
+                            Credit card balances use a minus sign for money
+                            owed.
+                          </p>
+                        )}
+                        <details className="import-statement-figures">
+                          <summary>Statement figures</summary>
+                          <dl className="totals">
+                            <div>
+                              <dt>Opening balance</dt>
+                              <dd>
+                                {d.statement.openingBalance === undefined
+                                  ? "Not available"
+                                  : money(
+                                      d.statement.openingBalance,
+                                      d.statement.currency,
+                                    )}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Money in (including transfers)</dt>
+                              <dd>
+                                +{money(flow.moneyIn, d.statement.currency)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Money out (including transfers)</dt>
+                              <dd>
+                                −{money(flow.moneyOut, d.statement.currency)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt>Reported closing balance</dt>
+                              <dd>
+                                {d.statement.closingBalance === undefined
+                                  ? "Not available"
+                                  : money(
+                                      d.statement.closingBalance,
+                                      d.statement.currency,
+                                    )}
+                              </dd>
+                            </div>
+                            {validation.calculated !== undefined && (
+                              <>
+                                <div>
+                                  <dt>Calculated closing balance</dt>
+                                  <dd>
+                                    {money(
+                                      validation.calculated,
+                                      d.statement.currency,
+                                    )}
+                                  </dd>
+                                </div>
+                                <div>
+                                  <dt>Difference</dt>
+                                  <dd>
+                                    {money(
+                                      validation.difference ?? 0,
+                                      d.statement.currency,
+                                    )}
+                                  </dd>
+                                </div>
+                              </>
                             )}
-                          {d.warnings.map((w, i) => (
-                            <li key={i}>{w}</li>
-                          ))}
-                        </ul>
-                        {d.reviewedWarnings ? (
+                          </dl>
+                        </details>
+                        {validation.status === "warning" && (
                           <>
-                            <p role="status">Statement warnings accepted</p>
                             <button
                               disabled={busy}
-                              onClick={() =>
-                                updateDraft({ reviewedWarnings: false })
-                              }
+                              onClick={() => patch({ showAll: true })}
                             >
-                              Undo warning acceptance
+                              {validation.difference
+                                ? "Find the difference"
+                                : "Review transactions"}
                             </button>
+                            <p className="muted">
+                              Importing anyway leaves this statement unverified.
+                            </p>
                           </>
-                        ) : (
-                          <button
-                            disabled={busy}
-                            onClick={() =>
-                              updateDraft({ reviewedWarnings: true })
-                            }
-                          >
-                            Accept these statement warnings
-                          </button>
-                        )}
-                        {d.statement.extractionMethod === "OCR" && (
-                          <p>
-                            Every uncertain amount must be verified before
-                            importing. Categorisation can wait.
-                          </p>
                         )}
                       </div>
-                    </div>
-                  )}
-                  {checks.some((t) => t.include) && (
-                    <p>
-                      <strong>
-                        {checks.filter((t) => t.include).length} transaction
-                        {checks.filter((t) => t.include).length === 1
-                          ? ""
-                          : "s"}{" "}
-                        to check.
-                      </strong>
-                    </p>
-                  )}
-                  {d.transactions.some(
-                    (t) => t.include && !t.categoryId && !t.isTransfer,
-                  ) && (
-                    <p className="coverage-note">
-                      {
-                        d.transactions.filter(
-                          (t) => t.include && !t.categoryId && !t.isTransfer,
-                        ).length
-                      }{" "}
-                      can be categorised later.
-                    </p>
-                  )}
-                  {!exactSkipped && (
-                    <section className="review-transactions">
-                      <h3>Review transactions</h3>
-                      <div
-                        className="review-tabs"
-                        role="group"
-                        aria-label="Transaction review"
-                      >
-                        <button
-                          disabled={busy}
-                          aria-pressed={!entry.showAll}
-                          onClick={() => patch({ showAll: false })}
-                        >
-                          To check{checks.length > 0 && ` (${checks.length})`}
-                        </button>
-                        <button
-                          disabled={busy}
-                          aria-pressed={entry.showAll}
-                          onClick={() => patch({ showAll: true })}
-                        >
-                          All transactions ({d.transactions.length})
-                        </button>
-                      </div>
-                      {!entry.showAll && !checks.length && (
-                        <div className="review-clear">
-                          <CheckCircle2 size={24} />
-                          <p>
-                            Nothing to check. Open all transactions to make
-                            changes.
-                          </p>
+                      {needsFinancialAcceptance && (
+                        <div className="import-financial-acceptance">
+                          {entry.override ? (
+                            <>
+                              <p role="status">
+                                Unverified statement accepted. Its validation
+                                status stays unverified.
+                              </p>
+                              <button
+                                disabled={busy}
+                                onClick={() => patch({ override: false })}
+                              >
+                                Undo unverified acceptance
+                              </button>
+                            </>
+                          ) : (
+                            <>
+                              <button
+                                disabled={busy || invalidReading}
+                                onClick={(event) => {
+                                  event.currentTarget.focus();
+                                  setShowRisk(true);
+                                }}
+                              >
+                                Import anyway…
+                              </button>
+                              {invalidReading && (
+                                <p>
+                                  Correct or exclude invalid source values and
+                                  recheck before accepting this statement.
+                                </p>
+                              )}
+                            </>
+                          )}
                         </div>
                       )}
-                      {entry.showAll && d.bankSource && (
-                        <p className="hint">
-                          Dates and amounts come from the bank reader. Tap an
-                          amount to correct its source value.
+                      {detailsVisited && sourceReview}
+                      {notices.map((notice, index) => (
+                        <p
+                          className="coverage-note"
+                          key={`${notice.kind}-${index}`}
+                        >
+                          <strong>
+                            {notice.kind === "gap" ? "Gap" : "Overlap"}:
+                          </strong>{" "}
+                          <ImportPeriod start={notice.start} end={notice.end} />{" "}
+                          {notice.kind === "gap"
+                            ? "has no statement between these imports."
+                            : "is also covered by another statement. Duplicate rows are skipped by default."}
+                        </p>
+                      ))}
+                      {entry.requiresBatchRecheck && (
+                        <div className="notice import-blocking-warning">
+                          <AlertTriangle size={18} />
+                          <div>
+                            <strong>Recheck this statement</strong>
+                            <p>
+                              Another selected file was skipped or corrected.
+                              Parse again so Feng can update duplicate checks
+                              before importing.
+                            </p>
+                            <button
+                              disabled={busy}
+                              onClick={() => reparse(false)}
+                            >
+                              Recheck statement
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                      {d.exactDuplicate && (
+                        <div className="import-duplicate-note">
+                          <strong>
+                            {entry.duplicateInBatch
+                              ? "This PDF was selected more than once."
+                              : "This statement has already been imported."}
+                          </strong>
+                          <p>
+                            {entry.duplicateInBatch
+                              ? "The repeated file will be skipped."
+                              : "It will be skipped. Your existing records are unchanged."}
+                          </p>
+                          <details className="import-duplicate-advanced">
+                            <summary>Review repeated statement</summary>
+                            <p>
+                              Restoring review keeps the duplicate checks. Only
+                              transactions explicitly kept below can be
+                              imported.
+                            </p>
+                            <button
+                              disabled={busy}
+                              onClick={() => {
+                                updateDraft({
+                                  duplicateOverride: !d.duplicateOverride,
+                                });
+                                if (!d.duplicateOverride)
+                                  patch({ showAll: true });
+                              }}
+                            >
+                              {d.duplicateOverride
+                                ? "Skip repeated statement"
+                                : "Restore review of duplicate statement"}
+                            </button>
+                          </details>
+                        </div>
+                      )}
+                      {duplicateCount > 0 && (
+                        <p>
+                          {duplicateCount} possible or confirmed duplicate
+                          transaction
+                          {duplicateCount === 1 ? "" : "s"}; excluded by
+                          default.
                         </p>
                       )}
-                      {(entry.showAll ? [...d.transactions] : [...checks])
-                        .sort(
-                          (a, b) =>
-                            Number(a.extractionConfidence >= 0.8) -
-                              Number(b.extractionConfidence >= 0.8) ||
-                            Number(a.duplicate === "none") -
-                              Number(b.duplicate === "none"),
-                        )
-                        .map((t) => (
-                          <ImportTransactionReview
-                            key={t.id}
-                            t={t}
-                            d={d}
-                            categories={categories}
-                            busy={busy}
-                            updateRow={updateRow}
-                            correctSource={correctSource}
-                            onReviewSource={
-                              onReviewSource
-                                ? () => onReviewSource(t)
-                                : undefined
-                            }
-                            invalidAmounts={entry.invalidAmounts}
-                            patch={patch}
-                            isExport={!!entry.extracted?.format}
-                          />
-                        ))}
-                    </section>
-                  )}
-                </>
-              )}
-              {!d && detailsVisited && sourceReview}
-              <details
-                className="parse-options"
-                open={
-                  !d &&
-                  (entry.extracted?.format === "qif" ||
-                    entry.extracted?.generic?.status === "identity-required")
-                }
-              >
-                <summary>
-                  Bank, account and statement dates <ChevronDown size={16} />
-                </summary>
-                <div className="form-grid">
-                  {entry.extracted?.format === "qif" && (
-                    <label>
-                      QIF date format
-                      <select
-                        aria-label="QIF date format"
-                        disabled={busy}
-                        value={entry.csvMapping?.dateOrder ?? ""}
-                        onChange={(e) =>
-                          patch({
-                            csvMapping: {
-                              date: 0,
-                              description: 0,
-                              ...entry.csvMapping,
-                              dateOrder: e.target.value as
-                                "day-first" | "month-first",
-                            },
-                            optionsChanged: true,
-                          })
-                        }
-                      >
-                        <option value="">Choose</option>
-                        <option
-                          value="day-first"
-                          aria-label="Day / month / year"
-                        >
-                          DD/MM/YYYY
-                        </option>
-                        <option
-                          value="month-first"
-                          aria-label="Month / day / year"
-                        >
-                          MM/DD/YYYY
-                        </option>
-                      </select>
-                    </label>
-                  )}
-                  <label>
-                    Bank
-                    <select
-                      aria-label="Bank"
-                      disabled={busy}
-                      value={entry.bank}
-                      onChange={(e) =>
-                        patch({
-                          bank: e.target.value as Institution | "",
-                          optionsChanged: true,
-                        })
-                      }
-                    >
-                      <option value="">Automatic</option>
-                      {["Barclays", "American Express", "Revolut", "Other"].map(
-                        (b) => (
-                          <option key={b}>{b}</option>
-                        ),
-                      )}
-                    </select>
-                  </label>
-                  <label>
-                    Account
-                    <select
-                      aria-label="Account"
-                      disabled={busy}
-                      value={entry.accountId}
-                      onChange={(e) =>
-                        patch({
-                          accountId: e.target.value,
-                          accountOverride: undefined,
-                          optionsChanged: true,
-                        })
-                      }
-                    >
-                      <option value="">Automatic</option>
-                      {entry.accountOverride &&
-                        !accounts.some(
-                          (account) => account.id === entry.accountOverride?.id,
-                        ) && (
-                          <option value={entry.accountOverride.id}>
-                            {entry.accountOverride.displayName} ·{" "}
-                            {entry.accountOverride.maskedAccountIdentifier} ·{" "}
-                            {entry.accountOverride.currency}
-                          </option>
+                      {!exactSkipped &&
+                        (d.warnings.length > 0 || outsideDates) && (
+                          <div
+                            className={`notice ${d.reviewedWarnings ? "warning" : "import-blocking-warning"}`}
+                          >
+                            <AlertTriangle size={18} />
+                            <div>
+                              <strong>Extraction requires review</strong>
+                              <ul>
+                                {outsideDates &&
+                                  !d.warnings.some((w) =>
+                                    w.includes("outside"),
+                                  ) && (
+                                    <li>
+                                      A transaction date is outside the
+                                      statement period. Compare it with the
+                                      source PDF.
+                                    </li>
+                                  )}
+                                {d.warnings.map((w, i) => (
+                                  <li key={i}>{w}</li>
+                                ))}
+                              </ul>
+                              {d.reviewedWarnings ? (
+                                <>
+                                  <p role="status">
+                                    Statement warnings accepted
+                                  </p>
+                                  <button
+                                    disabled={busy}
+                                    onClick={() =>
+                                      updateDraft({ reviewedWarnings: false })
+                                    }
+                                  >
+                                    Undo warning acceptance
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  disabled={busy}
+                                  onClick={() =>
+                                    updateDraft({ reviewedWarnings: true })
+                                  }
+                                >
+                                  Accept these statement warnings
+                                </button>
+                              )}
+                              {d.statement.extractionMethod === "OCR" && (
+                                <p>
+                                  Every uncertain amount must be verified before
+                                  importing. Categorisation can wait.
+                                </p>
+                              )}
+                            </div>
+                          </div>
                         )}
-                      {accounts.map((a) => (
-                        <option key={a.id} value={a.id}>
-                          {a.institution} · {a.displayName} ·{" "}
-                          {a.maskedAccountIdentifier} · {a.currency}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-                <button
-                  disabled={busy}
-                  onClick={() =>
-                    patch({
-                      manualPeriod: !entry.manualPeriod,
-                      optionsChanged: true,
-                    })
-                  }
-                >
-                  {entry.manualPeriod
-                    ? "Use detected statement dates"
-                    : "Enter statement dates from the source file"}
-                </button>
-                {entry.manualPeriod && (
-                  <>
-                    <p className="muted">
-                      Copy both dates from this statement's header. Balance
-                      validation still runs.
-                    </p>
+                      {checks.some((t) => t.include) && (
+                        <p>
+                          <strong>
+                            {checks.filter((t) => t.include).length} transaction
+                            {checks.filter((t) => t.include).length === 1
+                              ? ""
+                              : "s"}{" "}
+                            to check.
+                          </strong>
+                        </p>
+                      )}
+                      {d.transactions.some(
+                        (t) => t.include && !t.categoryId && !t.isTransfer,
+                      ) && (
+                        <p className="coverage-note">
+                          {
+                            d.transactions.filter(
+                              (t) =>
+                                t.include && !t.categoryId && !t.isTransfer,
+                            ).length
+                          }{" "}
+                          can be categorised later.
+                        </p>
+                      )}
+                      {!exactSkipped && (
+                        <section className="review-transactions">
+                          <h3>Review transactions</h3>
+                          <div
+                            className="review-tabs"
+                            role="group"
+                            aria-label="Transaction review"
+                          >
+                            <button
+                              disabled={busy}
+                              aria-pressed={!entry.showAll}
+                              onClick={() => patch({ showAll: false })}
+                            >
+                              To check
+                              {checks.length > 0 && ` (${checks.length})`}
+                            </button>
+                            <button
+                              disabled={busy}
+                              aria-pressed={entry.showAll}
+                              onClick={() => patch({ showAll: true })}
+                            >
+                              All transactions ({d.transactions.length})
+                            </button>
+                          </div>
+                          {!entry.showAll && !checks.length && (
+                            <div className="review-clear">
+                              <CheckCircle2 size={24} />
+                              <p>
+                                Nothing to check. Open all transactions to make
+                                changes.
+                              </p>
+                            </div>
+                          )}
+                          {entry.showAll && d.bankSource && (
+                            <p className="hint">
+                              Dates and amounts come from the bank reader. Tap
+                              an amount to correct its source value.
+                            </p>
+                          )}
+                          {(entry.showAll ? [...d.transactions] : [...checks])
+                            .sort(
+                              (a, b) =>
+                                Number(a.extractionConfidence >= 0.8) -
+                                  Number(b.extractionConfidence >= 0.8) ||
+                                Number(a.duplicate === "none") -
+                                  Number(b.duplicate === "none"),
+                            )
+                            .map((t) => (
+                              <ImportTransactionReview
+                                key={t.id}
+                                t={t}
+                                d={d}
+                                categories={categories}
+                                busy={busy}
+                                updateRow={updateRow}
+                                correctSource={correctSource}
+                                onReviewSource={
+                                  onReviewSource
+                                    ? () => onReviewSource(t)
+                                    : undefined
+                                }
+                                invalidAmounts={entry.invalidAmounts}
+                                patch={patch}
+                                isExport={!!entry.extracted?.format}
+                              />
+                            ))}
+                        </section>
+                      )}
+                    </>
+                  )}
+                  {!d && detailsVisited && sourceReview}
+                  <details
+                    className="parse-options"
+                    open={
+                      !d &&
+                      (entry.extracted?.format === "qif" ||
+                        entry.extracted?.generic?.status ===
+                          "identity-required")
+                    }
+                  >
+                    <summary>
+                      Bank, account and statement dates{" "}
+                      <ChevronDown size={16} />
+                    </summary>
                     <div className="form-grid">
+                      {entry.extracted?.format === "qif" && (
+                        <label>
+                          QIF date format
+                          <select
+                            aria-label="QIF date format"
+                            disabled={busy}
+                            value={entry.csvMapping?.dateOrder ?? ""}
+                            onChange={(e) =>
+                              patch({
+                                csvMapping: {
+                                  date: 0,
+                                  description: 0,
+                                  ...entry.csvMapping,
+                                  dateOrder: e.target.value as
+                                    "day-first" | "month-first",
+                                },
+                                optionsChanged: true,
+                              })
+                            }
+                          >
+                            <option value="">Choose</option>
+                            <option
+                              value="day-first"
+                              aria-label="Day / month / year"
+                            >
+                              DD/MM/YYYY
+                            </option>
+                            <option
+                              value="month-first"
+                              aria-label="Month / day / year"
+                            >
+                              MM/DD/YYYY
+                            </option>
+                          </select>
+                        </label>
+                      )}
                       <label>
-                        Statement start date
-                        <UKDateInput
+                        Bank
+                        <select
+                          aria-label="Bank"
                           disabled={busy}
-
-                          value={entry.periodStart}
+                          value={entry.bank}
                           onChange={(e) =>
                             patch({
-                              periodStart: e,
+                              bank: e.target.value as Institution | "",
                               optionsChanged: true,
                             })
                           }
-                        />
-                      </label>
-                      <label>
-                        Statement end date
-                        <UKDateInput
-                          disabled={busy}
-
-                          value={entry.periodEnd}
-                          onChange={(e) =>
-                            patch({ periodEnd: e, optionsChanged: true })
-                          }
-                        />
-                      </label>
-                    </div>
-                  </>
-                )}
-                <div className="actions">
-                  {entry.extracted?.csv && (
-                    <button
-                      disabled={busy}
-                      onClick={() => patch({ optionsChanged: true })}
-                    >
-                      Change export columns
-                    </button>
-                  )}
-                  <button disabled={busy} onClick={() => reparse(false)}>
-                    Parse again
-                  </button>
-                  {!entry.extracted?.format && (
-                    <button disabled={busy} onClick={() => reparse(true)}>
-                      Try local OCR
-                    </button>
-                  )}
-                  {onCreateAccount ? (
-                    <button
-                      disabled={busy}
-                      onClick={() => {
-                        const parsed = entry.extracted?.generic?.parsed;
-                        if (parsed) {
-                          setNewAccountCurrency(parsed.currency);
-                          setNewAccountType(parsed.accountType);
-                          setNewAccountName(
-                            parsed.accountType === "credit"
-                              ? "Credit card"
-                              : "Current account",
-                          );
-                        }
-                        setCreatingAccount((value) => !value);
-                      }}
-                    >
-                      Create an account
-                    </button>
-                  ) : (
-                    <Link to="/settings">Create an account</Link>
-                  )}
-                </div>
-                {creatingAccount && onCreateAccount && (
-                  <form
-                    onSubmit={(event) => {
-                      event.preventDefault();
-                      if (busy) return;
-                      try {
-                        const name = newAccountName.trim();
-                        const currency = newAccountCurrency
-                          .trim()
-                          .toUpperCase();
-                        if (!name) throw new Error("Enter an account name.");
-                        if (!/^\d{4}$/.test(newAccountSuffix))
-                          throw new Error(
-                            "Copy the last four account or card digits from this statement.",
-                          );
-                        currencyPrecision(currency);
-                        const now = new Date().toISOString();
-                        onCreateAccount({
-                          id: id(),
-                          institution:
-                            entry.bank ||
-                            entry.extracted?.generic?.parsed?.institution ||
-                            "Other",
-                          displayName: name,
-                          accountType: newAccountType,
-                          currency,
-                          maskedAccountIdentifier: `•••• ${newAccountSuffix}`,
-                          tracking: "statement",
-                          createdAt: now,
-                          updatedAt: now,
-                        });
-                        setAccountError("");
-                        setCreatingAccount(false);
-                      } catch (cause) {
-                        setAccountError(
-                          cause instanceof Error
-                            ? cause.message
-                            : "Check the account details.",
-                        );
-                      }
-                    }}
-                  >
-                    <h3>Identify this account</h3>
-                    <p>
-                      These details stay on your device and are saved only when
-                      you confirm the import.
-                    </p>
-                    <div className="form-grid">
-                      <label>
-                        Account name
-                        <input
-                          disabled={busy}
-                          value={newAccountName}
-                          onChange={(event) =>
-                            setNewAccountName(event.target.value)
-                          }
-                          maxLength={200}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Account type
-                        <select
-                          disabled={busy}
-                          value={newAccountType}
-                          onChange={(event) =>
-                            setNewAccountType(
-                              event.target.value as Account["accountType"],
-                            )
-                          }
                         >
-                          <option value="current">Current account</option>
-                          <option value="credit">Credit card</option>
-                          <option value="savings">Savings</option>
+                          <option value="">Automatic</option>
+                          {[
+                            "Barclays",
+                            "American Express",
+                            "Revolut",
+                            "Other",
+                          ].map((b) => (
+                            <option key={b}>{b}</option>
+                          ))}
                         </select>
                       </label>
                       <label>
-                        Currency
-                        <input
+                        Account
+                        <select
+                          aria-label="Account"
                           disabled={busy}
-                          value={newAccountCurrency}
-                          onChange={(event) =>
-                            setNewAccountCurrency(event.target.value)
+                          value={entry.accountId}
+                          onChange={(e) =>
+                            patch({
+                              accountId: e.target.value,
+                              accountOverride: undefined,
+                              optionsChanged: true,
+                            })
                           }
-                          minLength={3}
-                          maxLength={3}
-                          required
-                        />
-                      </label>
-                      <label>
-                        Last four account or card digits
-                        <input
-                          disabled={busy}
-                          inputMode="numeric"
-                          pattern="[0-9]{4}"
-                          maxLength={4}
-                          value={newAccountSuffix}
-                          onChange={(event) =>
-                            setNewAccountSuffix(
-                              event.target.value.replace(/\D/g, ""),
-                            )
-                          }
-                          required
-                        />
+                        >
+                          <option value="">Automatic</option>
+                          {entry.accountOverride &&
+                            !accounts.some(
+                              (account) =>
+                                account.id === entry.accountOverride?.id,
+                            ) && (
+                              <option value={entry.accountOverride.id}>
+                                {entry.accountOverride.displayName} ·{" "}
+                                {entry.accountOverride.maskedAccountIdentifier}{" "}
+                                · {entry.accountOverride.currency}
+                              </option>
+                            )}
+                          {accounts.map((a) => (
+                            <option key={a.id} value={a.id}>
+                              {a.institution} · {a.displayName} ·{" "}
+                              {a.maskedAccountIdentifier} · {a.currency}
+                            </option>
+                          ))}
+                        </select>
                       </label>
                     </div>
-                    {accountError && <p role="alert">{accountError}</p>}
-                    <button disabled={busy} type="submit">
-                      Use this account
+                    <button
+                      disabled={busy}
+                      onClick={() =>
+                        patch({
+                          manualPeriod: !entry.manualPeriod,
+                          optionsChanged: true,
+                        })
+                      }
+                    >
+                      {entry.manualPeriod
+                        ? "Use detected statement dates"
+                        : "Enter statement dates from the source file"}
                     </button>
-                  </form>
-                )}
-              </details>{" "}
-              {showRisk && d && (
-                <ImportRiskConfirmation
-                  result={
-                    d.parserReview && !d.parserFallback
-                      ? d.parserReview
-                      : undefined
-                  }
-                  currency={d.statement.currency}
-                  reconciliation={validation}
-                  warnings={d.warnings}
-                  unreadPages={
-                    d.statement.unreadPages ??
-                    entry.extracted?.extraction?.unreadPages
-                  }
-                  busy={busy}
-                  onCancel={() => setShowRisk(false)}
-                  onConfirm={() => {
-                    setShowRisk(false);
-                    patch({
-                      override: true,
-                      draft: { ...d, reviewedWarnings: true },
-                    });
-                  }}
-                />
+                    {entry.manualPeriod && (
+                      <>
+                        <p className="muted">
+                          Copy both dates from this statement's header. Balance
+                          validation still runs.
+                        </p>
+                        <div className="form-grid">
+                          <label>
+                            Statement start date
+                            <UKDateInput
+                              disabled={busy}
+
+                              value={entry.periodStart}
+                              onChange={(e) =>
+                                patch({
+                                  periodStart: e,
+                                  optionsChanged: true,
+                                })
+                              }
+                            />
+                          </label>
+                          <label>
+                            Statement end date
+                            <UKDateInput
+                              disabled={busy}
+
+                              value={entry.periodEnd}
+                              onChange={(e) =>
+                                patch({ periodEnd: e, optionsChanged: true })
+                              }
+                            />
+                          </label>
+                        </div>
+                      </>
+                    )}
+                    <div className="actions">
+                      {entry.extracted?.csv && (
+                        <button
+                          disabled={busy}
+                          onClick={() => patch({ optionsChanged: true })}
+                        >
+                          Change export columns
+                        </button>
+                      )}
+                      <button disabled={busy} onClick={() => reparse(false)}>
+                        Parse again
+                      </button>
+                      {!entry.extracted?.format && (
+                        <button disabled={busy} onClick={() => reparse(true)}>
+                          Try local OCR
+                        </button>
+                      )}
+                      {onCreateAccount ? (
+                        <button
+                          disabled={busy}
+                          onClick={() => {
+                            const parsed = entry.extracted?.generic?.parsed;
+                            if (parsed) {
+                              setNewAccountCurrency(parsed.currency);
+                              setNewAccountType(parsed.accountType);
+                              setNewAccountName(
+                                parsed.accountType === "credit"
+                                  ? "Credit card"
+                                  : "Current account",
+                              );
+                            }
+                            setCreatingAccount((value) => !value);
+                          }}
+                        >
+                          Create an account
+                        </button>
+                      ) : (
+                        <Link to="/settings">Create an account</Link>
+                      )}
+                    </div>
+                    {creatingAccount && onCreateAccount && (
+                      <form
+                        onSubmit={(event) => {
+                          event.preventDefault();
+                          if (busy) return;
+                          try {
+                            const name = newAccountName.trim();
+                            const currency = newAccountCurrency
+                              .trim()
+                              .toUpperCase();
+                            if (!name)
+                              throw new Error("Enter an account name.");
+                            if (!/^\d{4}$/.test(newAccountSuffix))
+                              throw new Error(
+                                "Copy the last four account or card digits from this statement.",
+                              );
+                            currencyPrecision(currency);
+                            const now = new Date().toISOString();
+                            onCreateAccount({
+                              id: id(),
+                              institution:
+                                entry.bank ||
+                                entry.extracted?.generic?.parsed?.institution ||
+                                "Other",
+                              displayName: name,
+                              accountType: newAccountType,
+                              currency,
+                              maskedAccountIdentifier: `•••• ${newAccountSuffix}`,
+                              tracking: "statement",
+                              createdAt: now,
+                              updatedAt: now,
+                            });
+                            setAccountError("");
+                            setCreatingAccount(false);
+                          } catch (cause) {
+                            setAccountError(
+                              cause instanceof Error
+                                ? cause.message
+                                : "Check the account details.",
+                            );
+                          }
+                        }}
+                      >
+                        <h3>Identify this account</h3>
+                        <p>
+                          These details stay on your device and are saved only
+                          when you confirm the import.
+                        </p>
+                        <div className="form-grid">
+                          <label>
+                            Account name
+                            <input
+                              disabled={busy}
+                              value={newAccountName}
+                              onChange={(event) =>
+                                setNewAccountName(event.target.value)
+                              }
+                              maxLength={200}
+                              required
+                            />
+                          </label>
+                          <label>
+                            Account type
+                            <select
+                              disabled={busy}
+                              value={newAccountType}
+                              onChange={(event) =>
+                                setNewAccountType(
+                                  event.target.value as Account["accountType"],
+                                )
+                              }
+                            >
+                              <option value="current">Current account</option>
+                              <option value="credit">Credit card</option>
+                              <option value="savings">Savings</option>
+                            </select>
+                          </label>
+                          <label>
+                            Currency
+                            <input
+                              disabled={busy}
+                              value={newAccountCurrency}
+                              onChange={(event) =>
+                                setNewAccountCurrency(event.target.value)
+                              }
+                              minLength={3}
+                              maxLength={3}
+                              required
+                            />
+                          </label>
+                          <label>
+                            Last four account or card digits
+                            <input
+                              disabled={busy}
+                              inputMode="numeric"
+                              pattern="[0-9]{4}"
+                              maxLength={4}
+                              value={newAccountSuffix}
+                              onChange={(event) =>
+                                setNewAccountSuffix(
+                                  event.target.value.replace(/\D/g, ""),
+                                )
+                              }
+                              required
+                            />
+                          </label>
+                        </div>
+                        {accountError && <p role="alert">{accountError}</p>}
+                        <button disabled={busy} type="submit">
+                          Use this account
+                        </button>
+                      </form>
+                    )}
+                  </details>{" "}
+                  {showRisk && d && (
+                    <ImportRiskConfirmation
+                      result={
+                        d.parserReview && !d.parserFallback
+                          ? d.parserReview
+                          : undefined
+                      }
+                      currency={d.statement.currency}
+                      reconciliation={validation}
+                      warnings={d.warnings}
+                      unreadPages={
+                        d.statement.unreadPages ??
+                        entry.extracted?.extraction?.unreadPages
+                      }
+                      busy={busy}
+                      onCancel={() => setShowRisk(false)}
+                      onConfirm={() => {
+                        setShowRisk(false);
+                        patch({
+                          override: true,
+                          draft: { ...d, reviewedWarnings: true },
+                        });
+                      }}
+                    />
+                  )}
+                </>
               )}
-            </>
+            </div>
           )}
         </details>
+        {workspace && (
+          <StatementReviewWorkspace
+            key={entry.id + workspace}
+            entry={entry}
+            accounts={accounts}
+            busy={busy}
+            initialSection={workspace}
+            onClose={() => setWorkspace(undefined)}
+            onContinue={() => {
+              setWorkspace(undefined);
+              setGuided(true);
+            }}
+            onDiagnostics={() => {
+              setWorkspace(undefined);
+              setDiagnostics(true);
+              setDetailsVisited(true);
+              if (detailsRef.current) detailsRef.current.open = true;
+            }}
+            onPrepareSource={onPrepareSource}
+            onSourceAction={onSourceAction}
+            onOptions={(change) => {
+              if (onGuidedOptions) onGuidedOptions(change);
+              else {
+                patch(change);
+                reparse(false);
+              }
+            }}
+            onAccount={(account) => onCreateAccount?.(account)}
+            onMapping={onMapping}
+            onSaveTemplate={onSaveTemplate}
+            reparse={reparse}
+            correctSource={(row, { kind: _kind, ...values }) =>
+              correctSource(row, values)
+            }
+          />
+        )}
       </div>
     </details>
   );

@@ -1,8 +1,8 @@
 import { useState } from "react";
 import type { GenericParseResult } from "../import/generic/types";
 import { displayMoney } from "./generic-review-view";
-import { Sheet } from "./Sheet";
-import { CheckboxRow, WarningBox } from "./UIPrimitives";
+import { ImportReviewSheet } from "./ImportReviewSheet";
+import { CheckboxRow } from "./UIPrimitives";
 
 export function ImportRiskConfirmation({
   result,
@@ -36,7 +36,7 @@ export function ImportRiskConfirmation({
     ["Money-out difference", result?.checks.moneyOutDifference],
   ] as const;
   return (
-    <Sheet
+    <ImportReviewSheet
       title="Import an unverified statement?"
       onClose={onCancel}
       footer={
@@ -54,10 +54,8 @@ export function ImportRiskConfirmation({
         </>
       }
     >
-      <WarningBox
-        title="Some statement figures are unverified"
-        severity="error"
-      >
+      <div className="import-risk-summary">
+        <h3>Some statement figures are unverified</h3>
         <p>
           This statement will remain <strong>Unverified</strong>. Acceptance
           does not verify the statement.
@@ -81,23 +79,26 @@ export function ImportRiskConfirmation({
           </p>
         )}
         {warnings.length > 0 && (
-          <ul>
-            {warnings.map((warning, index) => (
-              <li key={index}>{warning}</li>
-            ))}
-          </ul>
+          <details className="statement-more">
+            <summary>Statement notices ({warnings.length})</summary>
+            <ul>
+              {warnings.map((warning, index) => (
+                <li key={index}>{warning}</li>
+              ))}
+            </ul>
+          </details>
         )}
         <p>
           Only selected, valid transactions can be added. Check the original PDF
           before relying on these figures.
         </p>
-      </WarningBox>
+      </div>
       <CheckboxRow
         checked={accepted}
         onChange={setAccepted}
         disabled={busy}
         label="I checked the original statement and accept importing these unverified figures."
       />
-    </Sheet>
+    </ImportReviewSheet>
   );
 }
