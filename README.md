@@ -39,6 +39,11 @@ an amount-entry task for every purchase. Date-only corrections keep the amount.
 See the [exceptions-only review design](docs/import-exceptions-only.md) for the
 parser safeguards, review journey and regression coverage.
 
+Barclaycard's single-ledger layout keeps the adjacent cash/contactless limits,
+cover-page dates and payment instructions out of transaction rows. Native and
+manual source correction use the same panel boundary. See the
+[column-recognition diagnosis and regression coverage](docs/barclaycard-column-reliability.md).
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

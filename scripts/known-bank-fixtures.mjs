@@ -186,3 +186,35 @@ for (const mode of ["exact", "difference", "amount", "date", "layout"]) {
     await document.save(),
   );
 }
+
+// One ledger beside credit-limit information, plus cover dates and help pages.
+const sidebarCompiled = await build({
+  entryPoints: ["src/tests/barclaycard-sidebar.ts"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+});
+const { sidebarCardFixture } = await import(
+  "data:text/javascript;base64," +
+    Buffer.from(sidebarCompiled.outputFiles[0].text).toString("base64")
+);
+for (const unread of [false, true]) {
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const source = sidebarCardFixture(unread);
+  const pages = source.pages.map((page) =>
+    document.addPage([page.width, page.height]),
+  );
+  for (const item of source.items)
+    pages[item.page - 1].drawText(item.text, {
+      x: item.x,
+      y: 842 - item.y,
+      size: item.fontSize,
+      font,
+    });
+  await writeFile(
+    `tests/fixtures/card-sidebar-${unread ? "unread" : "exact"}.pdf`,
+    await document.save(),
+  );
+}

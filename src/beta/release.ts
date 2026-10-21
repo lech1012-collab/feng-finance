@@ -14,13 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-21",
   points: [
-    "Manual import review now opens a compact workspace instead of an expanded diagnostic form.",
-    "Tap a transaction to correct its amount or date, with totals and reading options on separate screens.",
-    "Only a deliberate technical-tools action opens diagnostics. Financial checks remain required.",
+    "Barclaycard imports keep cash and contactless limits separate from posted transaction amounts.",
+    "Cover-page dates and payment instructions no longer turn into source-review transactions.",
+    "Readable card transactions pass their financial checks; only genuinely unread fields need correction.",
   ],
   pleaseTest: [
-    "Open Statement details, correct one transaction, then check its totals.",
-    "Import several PDFs and pause or resume the same review on your phone.",
+    "Import a Barclaycard statement beside Amex or Revolut and check its purchases, repayment and closing balance.",
+    "If a source amount is unreadable, correct that one field and check that the statement reconciles.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",

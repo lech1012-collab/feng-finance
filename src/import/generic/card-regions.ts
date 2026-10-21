@@ -1,5 +1,6 @@
 import { bounds, reconstructFontRows, reconstructTable } from "./table";
 import { DATE_PATTERN, headerRole, MONEY_PATTERN } from "./tokens";
+import { barclaycardPanelRight } from "../../parsers/barclaycard-layout";
 import type {
   ColumnBand,
   ExtractedTextItem,
@@ -28,6 +29,7 @@ const footer =
 /** PDF.js combines neighbouring date/merchant draws. Amount runs stay untouched. */
 function separateDate(item: ExtractedTextItem): ExtractedTextItem[] {
   const text = item.text.trim();
+  if (cardDate.test(text)) return [item];
   const match = text.match(combinedDate);
   if (!match) return [item];
   const width = (item.width * match[1].length) / text.length;
@@ -53,6 +55,24 @@ function dateAnchors(items: ExtractedTextItem[]): number[] {
     )
       result.push(item.x);
   return result;
+}
+
+function coverWithoutLedger(source: ExtractedTextItem[]) {
+  const raw = reconstructFontRows(source);
+  return (
+    !source.some((item) => /^Your transactions\b/i.test(item.text.trim())) &&
+    source.some((item) => /^Number\s+[\d•*xX]/i.test(item.text.trim())) &&
+    !raw.some(
+      (row) =>
+        row.items.some((item) => cardDate.test(item.text.trim())) &&
+        row.items.some((item) => MONEY_PATTERN.test(item.text.trim())),
+    ) &&
+    !raw.some(
+      (row) =>
+        row.items.some((item) => headerRole(item.text) === "date") &&
+        row.items.some((item) => headerRole(item.text) === "amount"),
+    )
+  );
 }
 
 function panelTable(
@@ -183,6 +203,7 @@ function panelTable(
   const result: ReconstructedRow[] = [];
   let previous: ReconstructedRow | undefined;
   let active = false;
+  let ended = false;
   let section = "";
   for (let index = 0; index < rows.length; index++) {
     const row = rows[index];
@@ -199,12 +220,23 @@ function panelTable(
       current.section = section;
       current.kind = "section";
       previous = undefined;
+      if (/^Your transactions\b/i.test(row.text)) ended = false;
     } else if (carry.test(row.text)) {
       current.kind = "carry";
       previous = undefined;
+      if (/^Your new balance\b/i.test(row.text)) {
+        active = false;
+        ended = true;
+      }
     } else if (footer.test(row.text)) {
       current.kind = "footer";
       active = false;
+      previous = undefined;
+      ended = true;
+    } else if (ended) {
+      // Payment instructions often start in the date band. They cannot
+      // reactivate the ledger just because that band contains some text.
+      current.kind = "footer";
       previous = undefined;
     } else if (
       row.items.some((item) => headerRole(item.text) === "date") &&
@@ -296,8 +328,8 @@ function prefixTable(
 }
 
 /**
- * Only call for a Barclaycard profile. Two reading panels must be separated
- * before Y grouping; they are not a single row with two amount/balance columns.
+ * Only call for a Barclaycard profile. Reading panels must be separated before
+ * Y grouping, including a single ledger beside non-transaction information.
  * An uncertain region count returns undefined so the ordinary evidence review
  * remains available. Coordinates and page dimensions always refer to the PDF.
  */
@@ -312,13 +344,20 @@ export function reconstructCardRegions(
       dateAnchors(items.filter((item) => item.page === page.page)),
     ]),
   );
-  if (
-    ![...anchors.values()].some((value) => value.length === 2) ||
-    [...anchors.values()].some((value) => value.length > 2)
-  )
-    return;
+  const knownSingleLedger = pages.some((page) => {
+    const source = items.filter((item) => item.page === page.page);
+    const dateXs = anchors.get(page.page)!;
+    return (
+      dateXs.length === 1 &&
+      source.some((item) => /^Your transactions\b/i.test(item.text.trim())) &&
+      barclaycardPanelRight(source, dateXs[0], undefined, page.width) <
+        page.width
+    );
+  });
+  if ([...anchors.values()].some((value) => value.length > 2)) return;
   // Two date columns in one table (purchase date and posting date) are not two
   // reading panels. A genuine left panel also has a transaction description.
+  const independentPanels = new Set<number>();
   for (const page of pages) {
     const dateXs = anchors.get(page.page)!;
     if (dateXs.length !== 2) continue;
@@ -336,31 +375,46 @@ export function reconstructCardRegions(
             !/^(?:[£€$]|GBP\b|e$|c$|m$)/i.test(item.text.trim()),
         ),
     );
-    if (!hasDescription) return;
+    // Cover-page issue/due dates are metadata, not two reading panels. Leave
+    // that page with ordinary reconstruction without vetoing a real ledger
+    // on a later page. The original items remain available to metadata/proof.
+    if (hasDescription) independentPanels.add(page.page);
   }
+  if (!knownSingleLedger && !independentPanels.size) return;
   const tables: ReconstructedTable[] = [];
   for (const page of pages) {
     const source = items.filter((item) => item.page === page.page);
     const dateXs = anchors.get(page.page)!;
-    if (dateXs.length < 2) {
+    // Identity, issue/due dates and balances are read from the untouched
+    // original items by identifyMetadata, not inferred as transactions.
+    if (coverWithoutLedger(source)) continue;
+    if (
+      !dateXs.length ||
+      (dateXs.length === 2 && !independentPanels.has(page.page))
+    ) {
       tables.push(prefixTable(reconstructTable(source, [page]), 0));
       continue;
     }
-    // Bound each panel at the next date anchor. Section labels can begin a few
-    // points before their date anchor; merchants stay inside the same panel.
-    const split = dateXs[1] - 15;
-    for (let panel = 0; panel < 2; panel++)
+    // Keep a one-ledger page in the same source-correction model. Ordinary
+    // full-page inference can otherwise interpret help pages as transactions.
+    for (let panel = 0; panel < dateXs.length; panel++) {
+      const left = dateXs[panel] - 15;
+      const right = barclaycardPanelRight(
+        source,
+        dateXs[panel],
+        dateXs[panel + 1],
+        page.width,
+      );
       tables.push(
         panelTable(
-          source.filter((item) =>
-            panel === 0 ? item.x < split : item.x >= split,
-          ),
+          source.filter((item) => item.x >= left && item.x < right),
           page,
           dateXs[panel],
-          panel === 0 ? split : page.width,
+          right,
           panel,
         ),
       );
+    }
   }
   return {
     columns: tables.flatMap((table) => table.columns),
