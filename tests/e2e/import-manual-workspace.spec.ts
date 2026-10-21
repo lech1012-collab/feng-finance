@@ -189,7 +189,11 @@ test("the manual amount editor stays usable with keyboard-sized space in the lig
   await select(page, ["beauty-code-correction", "known-bank-amex"]);
   await page
     .locator(".import-statement-card:visible")
-    .filter({ hasText: "Barclays" })
+    .filter({
+      has: page.locator(".import-source-name", {
+        hasText: "beauty-code-correction.pdf",
+      }),
+    })
     .getByText("Statement details", { exact: true })
     .click();
   await page.getByRole("button", { name: /Check transactions/ }).click();
