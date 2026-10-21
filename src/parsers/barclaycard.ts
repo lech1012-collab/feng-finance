@@ -8,6 +8,7 @@ import { parseMoney } from "../domain/money";
 import { normalizeDescription, normalizeMerchant } from "../domain/normalize";
 import { reconstructRows } from "../import/layout";
 import { BaseParser } from "./common";
+import { barclaycardPanelRight } from "./barclaycard-layout";
 import {
   identifyPeriod,
   PERIOD_ERROR,
@@ -98,14 +99,15 @@ export class BarclaycardStatementParser extends BaseParser {
         "The Barclaycard transaction section could not be located. No transactions have been saved.",
       );
     for (const page of pages) {
-      // Split the two reading columns BEFORE row reconstruction. Otherwise an
-      // amount or description from the other column can contaminate a row.
+      // Separate the ledger from both a second ledger and an information panel
+      // BEFORE grouping Y coordinates. Cash limits are not transaction amounts.
       const items = rows
         .filter((r) => r.page === page)
         .flatMap((r) => r.items)
         .flatMap((item) => {
           // PDF.js may combine a date and merchant drawn in the same text run.
           // Splitting that text does not estimate or alter the amount column.
+          if (dateRE.test(item.text.trim())) return [item];
           const match = item.text.trim().match(datePrefixRE);
           if (!match) return [item];
           const dateWidth =
@@ -135,10 +137,11 @@ export class BarclaycardStatementParser extends BaseParser {
         );
       for (let column = 0; column < anchors.length; column++) {
         const left = anchors[column] - 15;
-        const right =
-          anchors[column + 1] === undefined
-            ? Infinity
-            : anchors[column + 1] - 15;
+        const right = barclaycardPanelRight(
+          items,
+          anchors[column],
+          anchors[column + 1],
+        );
         const columnRows = reconstructRows(
           items.filter((i) => i.x >= left && i.x < right),
         );
