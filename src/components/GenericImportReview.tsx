@@ -144,10 +144,7 @@ export function GenericImportReview({
         </p>
       )}
       {!!reviewedRows.length && (
-        <details
-          className="generic-review-list"
-          open={reviewedRows.length > 0}
-        >
+        <details className="generic-review-list" open={reviewedRows.length > 0}>
           <summary>
             {inputRows.length
               ? `Needs review (${inputRows.length})`

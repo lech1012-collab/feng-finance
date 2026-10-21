@@ -84,8 +84,53 @@ describe("import review corrections", () => {
     fireEvent.click(
       screen.getByText("Statement details", { selector: "summary" }),
     );
+    fireEvent.click(
+      screen.getByText("Source and technical tools", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open diagnostic tools" }),
+    );
     return view;
   };
+
+  it("opens the compact workspace from Statement details without mounting diagnostic forms", async () => {
+    const entry = await reviewEntry();
+    const { container } = render(
+      <MemoryRouter>
+        <ImportStatementReview
+          entry={entry}
+          accounts={[]}
+          categories={await db.categories.toArray()}
+          history={[]}
+          busy={false}
+          patch={vi.fn()}
+          reparse={vi.fn()}
+        />
+      </MemoryRouter>,
+    );
+    fireEvent.click(
+      screen.getByText("Statement details", { selector: "summary" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Statement overview" }),
+    ).toBeVisible();
+    expect(
+      container.querySelector(
+        ".import-expert-tools,.parse-options,.review-row",
+      ),
+    ).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Check transactions/ }));
+    expect(
+      screen.getByRole("dialog", { name: "Check transactions" }),
+    ).toBeVisible();
+    expect(screen.getByRole("button", { name: /John Lewis/ })).toBeVisible();
+    expect(screen.queryByRole("combobox", { name: "Category" })).toBeNull();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Close statement review" }),
+    );
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(await db.transactions.count()).toBe(0);
+  });
 
   it("keeps native card readings when only the statement totals differ", async () => {
     const entry = await reviewEntry();
@@ -521,6 +566,15 @@ describe("import review corrections", () => {
         />
       </MemoryRouter>,
     );
+    fireEvent.click(
+      screen.getByText("Statement details", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByText("Source and technical tools", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open diagnostic tools" }),
+    );
     fireEvent.change(screen.getByLabelText("Type", { exact: true }), {
       target: { value: "transfer" },
     });
@@ -575,6 +629,15 @@ describe("import review corrections", () => {
           onReviewSource={onReviewSource}
         />
       </MemoryRouter>,
+    );
+    fireEvent.click(
+      screen.getByText("Statement details", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByText("Source and technical tools", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open diagnostic tools" }),
     );
     fireEvent.click(document.querySelector(".review-compact")!);
     const row = draft.transactions[0];

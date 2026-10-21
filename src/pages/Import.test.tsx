@@ -107,14 +107,26 @@ function showAllStatements() {
 }
 
 function showStatementDetails(target?: HTMLElement) {
-  const card = target ?? document.querySelector(".import-statement-card[open]");
+  const card =
+    target ??
+    document.querySelector(
+      ".import-statement-card.import-statement-blocking[open]",
+    ) ??
+    document.querySelector(".import-statement-card[open]");
   if (target && !(target as HTMLDetailsElement).open)
     fireEvent.click(target.querySelector("summary")!);
   const details = card?.querySelector<HTMLDetailsElement>(
     ".import-statement-details",
   );
-  if (details && !details.open)
+  if (details && !details.open) {
     fireEvent.click(details.querySelector("summary")!);
+    fireEvent.click(
+      screen.getByText("Source and technical tools", { selector: "summary" }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: "Open diagnostic tools" }),
+    );
+  }
 }
 
 function RetainedReview({

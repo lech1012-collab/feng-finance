@@ -1,6 +1,6 @@
 {
   "name": "feng-finance",
-  "version": "2.2.15",
+  "version": "2.2.16",
   "private": true,
   "type": "module",
   "scripts": {
@@ -42,14 +42,15 @@
     "@types/node": "^24.7.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "@vitejs/plugin-react": "^5.0.4",
+    "@vitejs/plugin-react": "^5.2.0",
+    "esbuild": "^0.28.2",
     "fake-indexeddb": "^6.2.3",
     "jsdom": "^27.0.0",
     "pdf-lib": "^1.17.1",
     "prettier": "^3.9.9",
     "sharp": "^0.35.5",
     "typescript": "^5.9.3",
-    "vite": "^7.1.9",
+    "vite": "^8.3.5",
     "vite-plugin-pwa": "^1.1.0",
     "vitest": "^5.0.3"
   }

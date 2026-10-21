@@ -24,8 +24,18 @@ export async function showStatementDetails(statement: Locator) {
   if (!(await statement.evaluate((node) => (node as HTMLDetailsElement).open)))
     await statement.locator(":scope > summary").click();
   const details = statement.locator(".import-statement-details");
-  if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open)))
+  if (!(await details.evaluate((node) => (node as HTMLDetailsElement).open))) {
     await details.locator(":scope > summary").click();
+    const workspace = statement
+      .page()
+      .getByRole("dialog", { name: "Statement overview", exact: true });
+    await workspace
+      .getByText("Source and technical tools", { exact: true })
+      .click();
+    await workspace
+      .getByRole("button", { name: "Open diagnostic tools", exact: true })
+      .click();
+  }
 }
 
 /** Deliberate UI decisions only. These helpers never alter imported state directly. */

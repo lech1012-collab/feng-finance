@@ -12,16 +12,15 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-20",
+  date: "2026-10-21",
   points: [
-    "Review only unread transaction fields, rather than every row when statement totals differ.",
-    "Card payment markers no longer obscure readable amounts in mixed-width columns.",
-    "Date corrections preserve the amount already read; statement differences stay visible in one totals check.",
-    "Large layout failures open one explanation before individual correction; financial checks remain required.",
+    "Manual import review now opens a compact workspace instead of an expanded diagnostic form.",
+    "Tap a transaction to correct its amount or date, with totals and reading options on separate screens.",
+    "Only a deliberate technical-tools action opens diagnostics. Financial checks remain required.",
   ],
   pleaseTest: [
-    "Import several PDFs and correct only the fields that need attention.",
-    "Check a card statement's reported and calculated balances before confirming.",
+    "Open Statement details, correct one transaction, then check its totals.",
+    "Import several PDFs and pause or resume the same review on your phone.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",

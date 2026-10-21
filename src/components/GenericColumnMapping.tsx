@@ -15,10 +15,11 @@ export function GenericColumnMapping({
   onMapping,
   onSaveTemplate,
   currency = "GBP",
+  guided = false,
 }: Pick<
   GenericImportReviewProps,
   "result" | "busy" | "onMapping" | "onSaveTemplate" | "currency"
->) {
+> & { guided?: boolean }) {
   const [mapping, setMapping] = useState(() => initialMapping(result));
   const [name, setName] = useState(() =>
     result.parsed
@@ -69,57 +70,141 @@ export function GenericColumnMapping({
   const swipe = useSwipe((direction) =>
     changeColumn(direction === "left" ? 1 : -1),
   );
+  const saveControls = (
+    <>
+      <p className="generic-live-check" role="status">
+        {result.checks.reconciledExactly
+          ? "These columns reconcile exactly to the statement."
+          : `${result.checks.balanceRowsPassed} rows match their running balance. The statement is not verified yet.`}
+        {result.checks.reconciliation.difference !== undefined && (
+          <>
+            {" "}
+            Difference{" "}
+            <span className="amount">
+              {money(
+                result.checks.reconciliation.difference,
+                result.parsed?.currency ?? currency,
+              )}
+            </span>
+            .
+          </>
+        )}
+      </p>
+      <button
+        type="submit"
+        form={layoutFormId}
+        disabled={busy || !completeMapping(mapping) || !name.trim()}
+      >
+        Save layout
+      </button>
+    </>
+  );
+  const saveForm = (
+    <form
+      id={layoutFormId}
+      className="generic-save-layout"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!name.trim()) {
+          setError("Give this layout a name.");
+          return;
+        }
+        if (!completeMapping(mapping)) {
+          setError(
+            "Choose a date, description and amount column before saving.",
+          );
+          return;
+        }
+        onSaveTemplate(name.trim(), mapping);
+        setError("");
+        setSaved(true);
+      }}
+    >
+      <label>
+        Layout name
+        <input
+          type="text"
+          maxLength={80}
+          value={name}
+          disabled={busy}
+          onChange={(event) => {
+            setName(event.target.value);
+            setSaved(false);
+          }}
+          placeholder="For example, current account statement"
+          required
+        />
+      </label>
+    </form>
+  );
+  const formatControls = (
+    <div className="generic-mapping-controls">
+      <label>
+        Amount signs
+        <select
+          disabled={busy}
+          value={mapping.signConvention}
+          onChange={(event) =>
+            update({
+              ...mapping,
+              signConvention: event.target
+                .value as LayoutMapping["signConvention"],
+            })
+          }
+        >
+          <option value="in_out_columns">In and out columns</option>
+          <option value="signed_positive_in">One signed column</option>
+          <option value="signed_positive_out">Card spending</option>
+        </select>
+      </label>
+      <label>
+        Date format
+        <select
+          disabled={busy}
+          value={mapping.dateFormat}
+          onChange={(event) =>
+            update({
+              ...mapping,
+              dateFormat: event.target.value as LayoutMapping["dateFormat"],
+            })
+          }
+        >
+          <option value="auto">Automatic</option>
+          <option value="day-first" aria-label="Day / month / year">
+            DD/MM/YYYY
+          </option>
+          <option value="month-first" aria-label="Month / day / year">
+            MM/DD/YYYY
+          </option>
+          <option value="iso" aria-label="Year / month / day">
+            YYYY-MM-DD
+          </option>
+          <option value="named-month">Named month</option>
+        </select>
+      </label>
+    </div>
+  );
   return (
     <div className="generic-column-mapping">
       <p>
         The columns must add up to the statement figures. Choose what each
         column contains.
       </p>
-      <div className="generic-mapping-controls">
-        <label>
-          Amount signs
-          <select
-            disabled={busy}
-            value={mapping.signConvention}
-            onChange={(event) =>
-              update({
-                ...mapping,
-                signConvention: event.target
-                  .value as LayoutMapping["signConvention"],
-              })
-            }
-          >
-            <option value="in_out_columns">In and out columns</option>
-            <option value="signed_positive_in">One signed column</option>
-            <option value="signed_positive_out">Card spending</option>
-          </select>
-        </label>
-        <label>
-          Date format
-          <select
-            disabled={busy}
-            value={mapping.dateFormat}
-            onChange={(event) =>
-              update({
-                ...mapping,
-                dateFormat: event.target.value as LayoutMapping["dateFormat"],
-              })
-            }
-          >
-            <option value="auto">Automatic</option>
-            <option value="day-first" aria-label="Day / month / year">
-              DD/MM/YYYY
-            </option>
-            <option value="month-first" aria-label="Month / day / year">
-              MM/DD/YYYY
-            </option>
-            <option value="iso" aria-label="Year / month / day">
-              YYYY-MM-DD
-            </option>
-            <option value="named-month">Named month</option>
-          </select>
-        </label>
-      </div>
+      {guided ? (
+        <details className="statement-more">
+          <summary>Number and date format</summary>
+          {formatControls}
+        </details>
+      ) : (
+        formatControls
+      )}
+      {guided && (
+        <p role="status">
+          {result.checks.reconciledExactly
+            ? "The columns reconcile to the statement."
+            : "Choose each column, then check the statement totals."}
+        </p>
+      )}
       {previews.length > 0 && (
         <div
           className="generic-column-navigation"
@@ -229,69 +314,19 @@ export function GenericColumnMapping({
           </div>
         );
       })}
-      <SheetFooter>
-        <p className="generic-live-check" role="status">
-          {result.checks.reconciledExactly
-            ? "These columns reconcile exactly to the statement."
-            : `${result.checks.balanceRowsPassed} rows match their running balance. The statement is not verified yet.`}
-          {result.checks.reconciliation.difference !== undefined && (
-            <>
-              {" "}
-              Difference{" "}
-              <span className="amount">
-                {money(
-                  result.checks.reconciliation.difference,
-                  result.parsed?.currency ?? currency,
-                )}
-              </span>
-              .
-            </>
-          )}
-        </p>
-        <button
-          type="submit"
-          form={layoutFormId}
-          disabled={busy || !completeMapping(mapping) || !name.trim()}
-        >
-          Save layout
-        </button>
-      </SheetFooter>
-      <form
-        id={layoutFormId}
-        className="generic-save-layout"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!name.trim()) {
-            setError("Give this layout a name.");
-            return;
-          }
-          if (!completeMapping(mapping)) {
-            setError(
-              "Choose a date, description and amount column before saving.",
-            );
-            return;
-          }
-          onSaveTemplate(name.trim(), mapping);
-          setError("");
-          setSaved(true);
-        }}
-      >
-        <label>
-          Layout name
-          <input
-            type="text"
-            maxLength={80}
-            value={name}
-            disabled={busy}
-            onChange={(event) => {
-              setName(event.target.value);
-              setSaved(false);
-            }}
-            placeholder="For example, current account statement"
-            required
-          />
-        </label>
-      </form>
+      {guided ? (
+        <details className="statement-more">
+          <summary>Save layout for next month</summary>
+          {saveControls}
+          {saveForm}
+        </details>
+      ) : (
+        <>
+          <SheetFooter>{saveControls}</SheetFooter>
+          {saveForm}
+        </>
+      )}
+
       {!completeMapping(mapping) && (
         <p className="muted">
           Choose date, description and money columns to enable Save layout.

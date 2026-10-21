@@ -15,6 +15,7 @@ export function ImportAccountStep({
   onAccount,
   onOptions,
   onClose,
+  mode,
 }: {
   entry: FileReview;
   accounts: Account[];
@@ -22,11 +23,14 @@ export function ImportAccountStep({
   onAccount: (account: Account) => void;
   onOptions: (options: Partial<FileReview>) => void;
   onClose: () => void;
+  mode?: "account" | "period";
 }) {
   const result = sourceReview(entry);
   const parsed = result?.parsed;
-  const hint = entry.extracted?.accountSelection ?? parsed;
-  const periodOnly = result?.errorCode === "missing-period";
+  const hint =
+    entry.extracted?.accountSelection ?? parsed ?? entry.draft?.account;
+  const periodOnly =
+    mode === "period" || (!mode && result?.errorCode === "missing-period");
   const formId = useId();
   const [selected, setSelected] = useState(entry.accountId);
   const [creating, setCreating] = useState(!accounts.length);
@@ -49,7 +53,13 @@ export function ImportAccountStep({
   const [error, setError] = useState("");
   return (
     <ImportReviewSheet
-      title={periodOnly ? "Confirm statement dates" : "Identify account"}
+      title={
+        periodOnly
+          ? "Confirm statement dates"
+          : mode === "account"
+            ? "Statement account"
+            : "Identify account"
+      }
       onClose={onClose}
       closeLabel="Pause statement review"
       footer={
@@ -63,7 +73,9 @@ export function ImportAccountStep({
         <p>
           {periodOnly
             ? "Copy the dates printed on this statement."
-            : "We couldn't read the account identifier. Choose your account or enter its last four digits. Transactions are checked after this step."}
+            : mode === "account"
+              ? "Choose the account this statement belongs to. The source figures will be checked again."
+              : "We couldn't read the account identifier. Choose your account or enter its last four digits. Transactions are checked after this step."}
         </p>
         <form
           id={formId}
