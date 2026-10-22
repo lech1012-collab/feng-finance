@@ -48,6 +48,23 @@ export function sourceReview(
   return entry.draft?.parserReview ?? entry.extracted?.generic;
 }
 
+/** Date correction keeps any dates already read, including recovery-only source metadata. */
+export function statementReviewDates(entry: FileReview) {
+  const parsed = sourceReview(entry)?.parsed;
+  return {
+    start:
+      entry.periodStart ||
+      entry.draft?.statement.statementPeriodStart ||
+      parsed?.periodStart ||
+      "",
+    end:
+      entry.periodEnd ||
+      entry.draft?.statement.statementPeriodEnd ||
+      parsed?.periodEnd ||
+      "",
+  };
+}
+
 export function invalidSourceRows(result: GenericParseResult) {
   return result.rowChecks.filter((row) => {
     if (row.reviewAction?.kind === "exclude") return false;

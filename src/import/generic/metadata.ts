@@ -1,5 +1,7 @@
 import type { Institution, ParsedStatement } from "../../domain/models";
-import { identifyPeriod } from "../../parsers/period";
+import { identifyPeriod, PERIOD_ERROR } from "../../parsers/period";
+import { barclaycardIssueDate } from "../../parsers/barclaycard-dates";
+import { parseDate } from "../../domain/dates";
 import type {
   BankProfile,
   GenericParseOptions,
@@ -15,6 +17,8 @@ export interface StatementMetadata {
   accountType: ParsedStatement["accountType"];
   currency?: string;
   period?: { start: string; end: string };
+  periodSource?: ParsedStatement["periodSource"];
+  statementDate?: string;
   openingBalance?: number;
   closingBalance?: number;
   printedMoneyIn?: number;
@@ -25,7 +29,7 @@ export interface StatementMetadata {
 const currencyCodes = /\b(?:GBP|EUR|USD|CHF|AUD|CAD|NZD|HKD|SGD|JPY|KWD)\b/gi;
 export function identifyMetadata(
   items: ExtractedTextItem[],
-  _table: ReconstructedTable,
+  table: ReconstructedTable,
   options: GenericParseOptions,
 ): StatementMetadata {
   const rows = reconstructFontRows(items);
@@ -61,8 +65,13 @@ export function identifyMetadata(
       ? undefined
       : (detectedCurrency ?? options.account?.currency);
   let period = options.period;
+  let periodSource: ParsedStatement["periodSource"] = options.period
+    ? "manual"
+    : "printed";
+  let statementDate: string | undefined;
   if (!period) {
     const found = new Map<string, { start: string; end: string }>();
+    let unreadPrintedPeriod = false;
     for (const page of [...new Set(rows.map((row) => row.page))])
       try {
         const candidate = identifyPeriod(
@@ -79,10 +88,60 @@ export function identifyMetadata(
           Number.MAX_SAFE_INTEGER,
         );
         found.set(`${candidate.start}/${candidate.end}`, candidate);
-      } catch {
-        /* Missing/ambiguous printed dates require explicit source review. */
+      } catch (cause) {
+        if (!(cause instanceof Error) || cause.message !== PERIOD_ERROR)
+          unreadPrintedPeriod = true;
       }
-    if (found.size === 1) period = [...found.values()][0];
+    if (found.size === 1 && !unreadPrintedPeriod)
+      period = [...found.values()][0];
+    // The issue-date-only Barclaycard format is supported independently of a
+    // successful native transaction parse. Recovery must not discard readable
+    // dates just because an amount or account needs attention. Restrict the
+    // start to dated ledger cells; cover dates and payment instructions do not
+    // establish transaction coverage. Conflicting printed ranges still need
+    // manual resolution rather than being replaced by inferred coverage.
+    if (
+      !found.size &&
+      !unreadPrintedPeriod &&
+      options.profile?.id === "barclaycard"
+    ) {
+      const issue = barclaycardIssueDate(rows);
+      const dateColumns = new Set(
+        table.columns
+          .filter((column) => column.inferredRole === "date")
+          .map((column) => column.id),
+      );
+      const dates = issue
+        ? table.rows
+            .filter((row) => row.kind === "transaction")
+            .flatMap((row) => {
+              const action = options.actions?.[row.id];
+              if (action?.kind === "exclude") return [];
+              const values =
+                action?.kind === "correct" && action.date
+                  ? [action.date]
+                  : row.cells
+                      .filter((cell) => dateColumns.has(cell.columnId))
+                      .map((cell) => cell.text);
+              return values.flatMap((text) => {
+                try {
+                  return [parseDate(text, issue)];
+                } catch {
+                  // The normal row checks retain and flag unread dates.
+                  return [];
+                }
+              });
+            })
+        : [];
+      if (issue && dates.length) {
+        period = {
+          start: dates.reduce((a, b) => (a < b ? a : b), issue),
+          end: issue,
+        };
+        periodSource = "transaction-coverage";
+        statementDate = issue;
+      }
+    }
   }
   const primaryAccounts = [
     ...text.matchAll(
@@ -135,6 +194,8 @@ export function identifyMetadata(
       "current",
     currency,
     period,
+    periodSource,
+    statementDate,
     issuerText: rows
       .filter((row) => row.page === Math.min(...items.map((item) => item.page)))
       .slice(0, 3)

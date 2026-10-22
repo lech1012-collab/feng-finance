@@ -44,6 +44,11 @@ cover-page dates and payment instructions out of transaction rows. Native and
 manual source correction use the same panel boundary. See the
 [column-recognition diagnosis and regression coverage](docs/barclaycard-column-reliability.md).
 
+Issue-date-only Barclaycard statements retain their date evidence during source
+recovery. The displayed range is explicitly transaction coverage from the first
+dated ledger entry to the issue date, rather than an invented billing start.
+See [date recognition and recovery](docs/barclaycard-date-recognition.md).
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

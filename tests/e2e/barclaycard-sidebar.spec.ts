@@ -162,3 +162,86 @@ test("one unread purchase asks one amount question without rechecking cover date
     validationDifference: 0,
   });
 });
+
+test("issue-date-only card imports keep their dates through source review without manual date entry", async ({
+  page,
+}) => {
+  test.setTimeout(150000);
+  await page.goto("/#/import");
+  await page
+    .getByLabel("Select statements", { exact: true })
+    .setInputFiles([
+      resolve("tests/fixtures/card-sidebar-issue-date-only.pdf"),
+      resolve("tests/fixtures/known-bank-amex.pdf"),
+    ]);
+  const card = page
+    .locator(".import-statement-card:visible")
+    .filter({ hasText: "card-sidebar-issue-date-only.pdf" });
+  await card
+    .getByRole("button", { name: "Review statement", exact: true })
+    .click({ timeout: 90000 });
+  const notice = page.getByRole("dialog", {
+    name: "Check statement notice",
+    exact: true,
+  });
+  await expect(notice).toBeVisible();
+  await expect(notice).toContainText("no period start");
+  await expect(notice.getByRole("textbox")).toHaveCount(0);
+  await notice
+    .getByRole("button", { name: "I checked this — continue", exact: true })
+    .click();
+  await page
+    .getByRole("dialog", { name: "Statement checked", exact: true })
+    .getByRole("button", { name: "Done", exact: true })
+    .click();
+  await showAllStatements(page);
+  if (!(await card.evaluate((element) => (element as HTMLDetailsElement).open)))
+    await card.locator(":scope > summary").click();
+  await card.getByText("Statement details", { exact: true }).click();
+  const overview = page.getByRole("dialog", {
+    name: "Statement overview",
+    exact: true,
+  });
+  await overview.getByRole("button", { name: /Reading options/ }).click();
+  const reading = page.getByRole("dialog", {
+    name: "Reading options",
+    exact: true,
+  });
+  await reading.getByRole("button", { name: /Statement dates/ }).click();
+  const dates = page.getByRole("dialog", {
+    name: "Statement dates",
+    exact: true,
+  });
+  await expect(dates.getByLabel("Start date", { exact: true })).toHaveValue(
+    "02/09/2026",
+  );
+  await expect(dates.getByLabel("End date", { exact: true })).toHaveValue(
+    "04/10/2026",
+  );
+  await dates
+    .getByRole("button", { name: "Close Statement dates", exact: true })
+    .click();
+  await reading.getByRole("button", { name: "Done", exact: true }).click();
+  expect(await records(page, "transactions")).toHaveLength(0);
+  await page
+    .getByRole("button", { name: "Confirm import", exact: true })
+    .click();
+  await expect(
+    page.getByRole("heading", { name: "Home", exact: true }),
+  ).toBeVisible();
+  const statements = await records(page, "statements");
+  expect(
+    statements.find(
+      (s) => s.sourceFilename === "card-sidebar-issue-date-only.pdf",
+    ),
+  ).toMatchObject({
+    statementPeriodStart: "2026-09-02",
+    statementPeriodEnd: "2026-10-04",
+    statementDate: "2026-10-04",
+    periodSource: "transaction-coverage",
+    transactionCount: 23,
+    validationStatus: "reconciled",
+    validationDifference: 0,
+  });
+  expect(await records(page, "transactions")).toHaveLength(30);
+});

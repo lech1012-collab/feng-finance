@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import type { Account, Institution } from "../domain/models";
 import type { FileReview } from "../import/review-model";
-import { sourceReview } from "../import/review-model";
+import { sourceReview, statementReviewDates } from "../import/review-model";
 import { currencyPrecision } from "../domain/money";
 import { id } from "../domain/normalize";
 import { validatePeriod } from "../parsers/period";
@@ -45,8 +45,9 @@ export function ImportAccountStep({
   );
   const [currency, setCurrency] = useState(hint?.currency ?? "GBP");
   const [suffix, setSuffix] = useState("");
-  const [start, setStart] = useState(entry.periodStart);
-  const [end, setEnd] = useState(entry.periodEnd);
+  const dates = statementReviewDates(entry);
+  const [start, setStart] = useState(dates.start);
+  const [end, setEnd] = useState(dates.end);
   const [dateOrder, setDateOrder] = useState<"day-first" | "month-first" | "">(
     entry.csvMapping?.dateOrder ?? "",
   );
