@@ -283,9 +283,6 @@ export default function ImportPage({
     });
     let extracted = entry.extracted;
     try {
-      const period = entry.manualPeriod
-        ? validatePeriod({ start: entry.periodStart, end: entry.periodEnd })
-        : undefined;
       extracted =
         reuse && extracted
           ? extracted
@@ -310,6 +307,25 @@ export default function ImportPage({
       )
         releaseSession(entry.extracted.pdfSession);
       patchEntry(entry.id, { extracted });
+      if (extracted.summary) {
+        patchEntry(entry.id, {
+          state: "review",
+          extracted,
+          draft: undefined,
+          error: "",
+          skip: true,
+          progress: "Annual summary recognised · totals only",
+          override: false,
+          optionsChanged: false,
+          requiresBatchRecheck: false,
+          invalidAmounts: [],
+          pdfReviewOptions: undefined,
+        });
+        return;
+      }
+      const period = entry.manualPeriod
+        ? validatePeriod({ start: entry.periodStart, end: entry.periodEnd })
+        : undefined;
       const draft = await prepareDraft(
         extracted,
         entry.bank || undefined,

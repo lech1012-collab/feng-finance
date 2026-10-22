@@ -53,6 +53,10 @@ import type {
 } from "./pdf-session-types";
 import { firstRealImportAt } from "../beta/policy";
 import { statementMovements } from "./movements";
+import {
+  identifyBarclaycardAnnualSummary,
+  type AnnualStatementSummary,
+} from "../parsers/barclaycard-annual";
 import { retainImportDiagnostics } from "../storage/import-diagnostics";
 function applyCategory(
   transaction: Transaction,
@@ -67,6 +71,8 @@ function applyCategory(
   };
 }
 export interface ExtractedFile {
+  /** Read-only aggregate document metadata, retained only during this import. */
+  summary?: AnnualStatementSummary;
   /** Transient recovery context; never a stored account or transaction fact. */
   accountSelection?: Pick<
     ParsedStatement,
@@ -137,10 +143,18 @@ export async function extractFile(
         options.detailedProgress?.(detail);
       },
     });
+    const rows = reconstructRows(
+      extraction.items.map((item) => ({ ...item, y: item.y + item.height })),
+    );
     return {
-      rows: reconstructRows(
-        extraction.items.map((item) => ({ ...item, y: item.y + item.height })),
-      ),
+      rows,
+      summary:
+        !extraction.cancelled &&
+        !extraction.unreadPages.length &&
+        extraction.completedPages.length === extraction.pageCount &&
+        extraction.quality.every((page) => page.usable)
+          ? identifyBarclaycardAnnualSummary(rows)
+          : undefined,
       hash: session.hash,
       filename: file.name,
       method: extraction.method === "text" ? "embedded-text" : "OCR",

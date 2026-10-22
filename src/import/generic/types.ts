@@ -7,6 +7,7 @@ import type {
   Reconciliation,
 } from "../../domain/models";
 import type { StatementPeriod } from "../../parsers/period";
+import type { AnnualStatementSummary } from "../../parsers/barclaycard-annual";
 export type ISODate = string;
 export type ISOInstant = string;
 export type ParserMethod =
@@ -233,7 +234,8 @@ export interface ParserComparison {
   legacyTransactions?: ParsedTransaction[];
 }
 export interface GenericParseResult {
-  status: "parsed" | "mapping-required" | "identity-required";
+  status: "parsed" | "mapping-required" | "identity-required" | "summary-only";
+  summary?: AnnualStatementSummary;
   parsed?: ParsedStatement;
   table: ReconstructedTable;
   rowChecks: RowCheck[];
@@ -248,6 +250,7 @@ export interface GenericParseResult {
   /** Never include account numbers or raw statement values in thrown errors. */
   errorCode?:
     | "missing-period"
+    | "summary-only"
     | "missing-currency"
     | "missing-account"
     | "mapping-needed"

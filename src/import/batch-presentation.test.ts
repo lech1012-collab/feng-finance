@@ -2,6 +2,9 @@ import { afterAll, beforeEach, describe, expect, it } from "vitest";
 import { db, initializeDatabase } from "../storage/database";
 import { clearLocalData } from "../storage/backup";
 import { bankRows } from "../tests/helpers";
+import { annualCardFixture } from "../tests/barclaycard-annual";
+import { identifyBarclaycardAnnualSummary } from "../parsers/barclaycard-annual";
+import { reconstructRows } from "./layout";
 import { prepareDraft } from "./pipeline";
 import { importBlockers, type FileReview } from "./review-model";
 import {
@@ -51,6 +54,28 @@ async function entry(id: string): Promise<FileReview> {
 }
 
 describe("import batch presentation", () => {
+  it("keeps an excluded annual summary and its dates visible without blocking transaction statements", async () => {
+    const annual = await entry("annual");
+    const rows = reconstructRows(annualCardFixture().items);
+    annual.draft = undefined;
+    annual.skip = true;
+    annual.extracted = {
+      rows,
+      hash: "annual",
+      filename: "fictional.pdf",
+      method: "embedded-text",
+      warnings: [],
+      summary: identifyBarclaycardAnnualSummary(rows),
+    };
+    const ready = await entry("monthly");
+    expect(batchPresentation([annual, ready])).toMatchObject({
+      readyCount: 1,
+      skippedCount: 1,
+      attention: [],
+    });
+    expect(statementVisibleInReview(annual, "attention")).toBe(true);
+    expect(importBlockers(annual)).toEqual([]);
+  });
   it("refreshes automatic duplicate decisions in both directions without carrying acknowledgement", async () => {
     const file = await entry("duplicate-transition");
     const row = file.draft!.transactions[0];

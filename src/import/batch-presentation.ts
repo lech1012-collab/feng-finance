@@ -84,6 +84,9 @@ export function statementVisibleInReview(
       !entry.open)
   )
     return false;
+  // Classification results do not ask for review. Keep the compact explanation
+  // and its recognized dates visible even when actionable files are filtered.
+  if (entry.extracted?.summary) return true;
   return (
     filter === "all" ||
     statementPresentation(entry).state === "attention" ||

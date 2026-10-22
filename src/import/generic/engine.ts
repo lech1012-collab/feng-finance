@@ -29,12 +29,13 @@ import type {
   TableCell,
   TransactionParserMetadata,
 } from "./types";
-import { reconstructTable, textQuality } from "./table";
+import { reconstructTable, reconstructFontRows, textQuality } from "./table";
 import { reconstructCardRegions } from "./card-regions";
 import { readDate, readMoney } from "./tokens";
 import { detectProfile } from "./profiles";
 import { identifyMetadata, type StatementMetadata } from "./metadata";
 import { BARCLAYCARD_COVERAGE_NOTICE } from "../../parsers/barclaycard-dates";
+import { identifyBarclaycardAnnualSummary } from "../../parsers/barclaycard-annual";
 
 function pageFor(table: ReconstructedTable, columnId: string) {
   return (
@@ -800,12 +801,18 @@ export function parseGenericStatement(
 ): GenericParseResult {
   const profile = options.profile ?? detectProfile(items);
   const effective = { ...options, profile };
+  const quality = textQuality(items, pages);
+  const summary =
+    !options.unreadPages?.length && quality.every((page) => page.usable)
+      ? identifyBarclaycardAnnualSummary(reconstructFontRows(items))
+      : undefined;
   const table =
+    (summary ? { columns: [], rows: [], pages } : undefined) ??
     (profile?.id === "barclaycard"
       ? reconstructCardRegions(items, pages)
-      : undefined) ?? reconstructTable(items, pages);
+      : undefined) ??
+    reconstructTable(items, pages);
   const metadata = identifyMetadata(items, table, effective);
-  const quality = textQuality(items, pages);
   const emptyChecks: StatementChecks = {
     policy: "exact-v2.2",
     reconciliation: { status: "unavailable" },
@@ -832,6 +839,13 @@ export function parseGenericStatement(
     sessions.set(result, { items, pages, options: effective });
     return result;
   };
+  if (summary)
+    return finish({
+      ...initial,
+      status: "summary-only",
+      errorCode: "summary-only",
+      summary,
+    });
   if (!pages.length) return finish({ ...initial, errorCode: "mapping-needed" });
   if (!metadata.period)
     return finish({

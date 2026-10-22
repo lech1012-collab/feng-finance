@@ -577,3 +577,20 @@
   min-width: 0;
   margin-block: 8px;
 }
+.import-annual-figures {
+  margin: 0;
+}
+.import-annual-figures > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding-block: 0.5rem;
+}
+.import-annual-figures dd {
+  margin: 0;
+  text-align: end;
+}
+.import-annual-filename {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}

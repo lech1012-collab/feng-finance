@@ -14,13 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-22",
   points: [
-    "Barclaycard issue dates and transaction coverage are recognised during both automatic import and source recovery.",
-    "Date correction keeps dates already read instead of asking you to enter them again.",
-    "Payment deadlines remain separate from statement dates; genuinely missing or conflicting dates still need review.",
+    "Barclaycard annual summaries show their printed period, issue date and annual totals without transaction-correction questions.",
+    "Annual totals stay separate from monthly purchases and payments to prevent double counting.",
+    "Monthly statements in the same selection continue through the normal import workflow.",
   ],
   pleaseTest: [
-    "Import an issue-date-only Barclaycard statement beside another PDF and check the displayed transaction coverage.",
-    "Check that reviewing an unread transaction keeps the statement dates and exact balance checks.",
+    "Select an annual Barclaycard summary beside monthly statements and check the annual dates and totals.",
+    "Confirm the monthly imports and check that annual totals have not been added as transactions or account balances.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
