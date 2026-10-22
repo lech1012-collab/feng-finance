@@ -229,3 +229,35 @@ for (const mode of ["exact", "unread", "issue-date-only"]) {
     await document.save(),
   );
 }
+
+// Annual summaries contain aggregate figures, not a transaction ledger.
+const annualCompiled = await build({
+  entryPoints: ["src/tests/barclaycard-annual.ts"],
+  bundle: true,
+  write: false,
+  format: "esm",
+  platform: "node",
+});
+const { annualCardFixture } = await import(
+  "data:text/javascript;base64," +
+    Buffer.from(annualCompiled.outputFiles[0].text).toString("base64")
+);
+{
+  const document = await PDFDocument.create();
+  const font = await document.embedFont(StandardFonts.Helvetica);
+  const source = annualCardFixture();
+  const pages = source.pages.map((page) =>
+    document.addPage([page.width, page.height]),
+  );
+  for (const item of source.items)
+    pages[item.page - 1].drawText(item.text, {
+      x: item.x,
+      y: 842 - item.y,
+      size: item.fontSize,
+      font,
+    });
+  await writeFile(
+    "tests/fixtures/annual-card-summary.pdf",
+    await document.save(),
+  );
+}

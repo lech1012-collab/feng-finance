@@ -31,6 +31,7 @@ import type { RowReviewAction } from "../import/generic/types";
 import { StatusChip } from "./UIPrimitives";
 import { ImportTransactionReview } from "./ImportTransactionReview";
 import { ImportPeriod } from "./ImportPeriod";
+import { ImportAnnualSummary } from "./ImportAnnualSummary";
 import { ImportRiskConfirmation } from "./ImportRiskConfirmation";
 import { guidedReviewCopy, guidedReviewStep } from "../import/guided-review";
 import { GuidedStatementReview } from "./GuidedStatementReview";
@@ -94,6 +95,15 @@ export function ImportStatementReview({
   const [newAccountCurrency, setNewAccountCurrency] = useState("GBP");
   const [newAccountSuffix, setNewAccountSuffix] = useState("");
   const [accountError, setAccountError] = useState("");
+  if (entry.extracted?.summary)
+    return (
+      <ImportAnnualSummary
+        summary={entry.extracted.summary}
+        filename={entry.file.name}
+        open={entry.open}
+        onToggle={(open) => patch({ open })}
+      />
+    );
   const flow = d && statementMovements(d.transactions, d.statement.currency);
   const exactSkipped =
     d?.exactDuplicate && !d.duplicateOverride && !entry.requiresBatchRecheck;

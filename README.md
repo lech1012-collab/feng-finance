@@ -49,6 +49,12 @@ recovery. The displayed range is explicitly transaction coverage from the first
 dated ledger entry to the issue date, rather than an invented billing start.
 See [date recognition and recovery](docs/barclaycard-date-recognition.md).
 
+Barclaycard annual summaries show their printed dates and aggregate figures as
+read-only reference information. Monthly statements supply the actual purchase
+and payment rows; annual totals are excluded from cash flow and cannot create an
+account balance. Other files in the same selection import normally. See
+[annual-summary recognition](docs/annual-statement-recognition.md).
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

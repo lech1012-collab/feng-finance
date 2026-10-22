@@ -31,6 +31,10 @@ import type { ImportProgress } from "./pdf-session-types";
 import { isImportAbort } from "./pdf-abort";
 import { recoverNativeAmounts } from "./generic/native-recovery";
 import {
+  identifyBarclaycardAnnualSummary,
+  AnnualSummaryOnlyError,
+} from "../parsers/barclaycard-annual";
+import {
   prepareBankAdapterReading,
   type BankAdapterSource,
 } from "./bank-adapter-proof";
@@ -195,6 +199,22 @@ export async function preparePdfReading(
   account: Account | undefined,
   review: PdfReviewOptions = {},
 ): Promise<PdfReading> {
+  const completeDocument =
+    !extracted.extraction ||
+    (!extracted.extraction.cancelled &&
+      !extracted.extraction.unreadPages.length &&
+      extracted.extraction.completedPages.length ===
+        extracted.extraction.pageCount &&
+      extracted.extraction.quality.every((page) => page.usable));
+  const summary = completeDocument
+    ? identifyBarclaycardAnnualSummary(extracted.rows)
+    : undefined;
+  if (summary) {
+    extracted.summary = summary;
+    extracted.generic = undefined;
+    throw new AnnualSummaryOnlyError(summary);
+  }
+  delete extracted.summary;
   if (!extracted.extraction) {
     // In-memory callers and old synthetic fixtures keep the existing adapter API.
     const parsed = getParser(bank, extracted.rows).parse(
