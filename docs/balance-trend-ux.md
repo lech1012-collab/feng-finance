@@ -76,3 +76,8 @@ states, card truth after missing rows, themes, 320/390/430 px, large text and
 desktop. Screenshots used for design review contain fictional data only.
 
 Real-device Safari/VoiceOver checks remain in the manual release checklist.
+
+The hosted verification initially stalled downloading browser libraries from
+the Azure Ubuntu mirror. CI uses Ubuntu's canonical archive with normal APT
+signature verification and a bounded browser-setup step. The unit, build,
+browser, vulnerability and deployment gates remain required.
