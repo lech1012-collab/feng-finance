@@ -87,22 +87,30 @@ async function assertSingleClosingPoint(
   date: string,
   balance: string,
 ) {
-  await page
-    .getByRole("button", { name: "Account breakdown", exact: true })
-    .click();
-  const points = page.locator(".position-history circle");
-  await expect(points).toHaveCount(1);
-  await expect(points.locator("title")).toContainText(
-    `${date} 2026: ${balance} debt owed`,
+  const trend = page.getByRole("region", {
+    name: "Balance trend",
+    exact: true,
+  });
+  await expect(trend.locator(".balance-trend-headline")).toContainText(balance);
+  await expect(trend.locator(".balance-trend-headline")).toContainText(
+    "Debt owed",
   );
-  await expect(points).toHaveAttribute("data-verified", "true");
+  await expect(trend.locator(".balance-trend-headline time")).toHaveText(
+    `${date} 2026`,
+  );
+  await expect(trend.locator(".balance-trend-headline")).toHaveAttribute(
+    "data-verified",
+    "true",
+  );
+  await expect(trend.getByRole("img")).toHaveCount(0);
+  await expect(trend.getByRole("slider")).toHaveCount(0);
+  await expect(trend.locator(".balance-periods")).toHaveCount(0);
+  await expect(trend.getByText(/Earlier statements will show/)).toBeVisible();
+  await trend.getByText("How this is calculated", { exact: true }).click();
   await expect(
-    page.locator(".position-history [data-total-position]"),
-  ).toHaveCount(0);
-  await expect(page.locator(".balance-periods")).toHaveCount(0);
-  await page.getByText("How balances work", { exact: true }).click();
-  await expect(
-    page.getByText(/Issue-date-only cards show their dated balance/),
+    trend.getByText(
+      /Card summaries supply balances only on their statement dates/,
+    ),
   ).toBeVisible();
 }
 
@@ -208,9 +216,6 @@ test("Amex dates outside the period preserve reported debt while remaining unver
   await expect(cardAccount).toContainText("As of 5 Oct · Unverified");
   await expect(cardAccount).toContainText("£160.00");
   await page.goto("/#/");
-  await page
-    .getByRole("button", { name: "Account breakdown", exact: true })
-    .click();
   await expect(page.locator(".month-summary")).toContainText(
     "Monthly history is not fully verified",
   );
@@ -218,8 +223,8 @@ test("Amex dates outside the period preserve reported debt while remaining unver
     page.locator(".position-history circle[data-verified=true]"),
   ).toHaveCount(0);
   await expect(
-    page.locator(".position-history circle[data-verified=false] title"),
-  ).toContainText("5 Oct 2026: £160.00 debt owed");
+    page.locator(".balance-trend-headline[data-verified=false]"),
+  ).toContainText("£160.00Debt owedAs of 5 Oct 2026 · Reported, unverified");
   await page.reload();
   await expect(positionMetric(page, "Card debt").locator("strong")).toHaveText(
     "Unknown",
@@ -334,8 +339,8 @@ test("a missing stored card row retains the reported balance but removes verifie
   await expect(reportedCard).toContainText("Stored transactions do not match");
   await page.goto("/#/");
   await page
-    .getByRole("button", { name: "Account breakdown", exact: true })
-    .click();
+    .getByRole("combobox", { name: "Balance to show", exact: true })
+    .selectOption({ label: "Barclaycard · •••• 4444" });
   await expect(page.locator(".month-summary")).toContainText(
     "Monthly history is not fully verified",
   );
@@ -345,10 +350,12 @@ test("a missing stored card row retains the reported balance but removes verifie
       .filter({ hasText: "£109.68 debt owed" }),
   ).toHaveCount(0);
   await expect(
-    page
-      .locator(".position-history circle[data-verified=false] title")
-      .filter({ hasText: "£109.68 debt owed" }),
-  ).toHaveCount(1);
+    page.locator(".balance-trend-headline[data-verified=false]"),
+  ).toContainText("£109.68");
+  await expect(page.locator(".balance-trend-headline")).toContainText(
+    "Reported, unverified",
+  );
+  await expect(page.locator(".balance-trend-change")).toHaveCount(0);
   await expect(
     page.locator(".position-history [data-total-position][data-verified=true]"),
   ).toHaveCount(0);

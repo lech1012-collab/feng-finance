@@ -28,7 +28,17 @@ jobs:
       - run: npm run fixtures
       - run: npm test
       - run: npm run build
-      - run: npx playwright install --with-deps chromium webkit
+      - name: Install browser dependencies
+        timeout-minutes: 15
+        run: |
+          # The Azure Ubuntu mirror can stall hosted runners for many minutes.
+          # Use the canonical archive; APT signature verification stays enabled.
+          for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources; do
+            if [ -f "$source_file" ]; then
+              sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$source_file"
+            fi
+          done
+          npx playwright install --with-deps chromium webkit
       - run: node --test scripts/feng-ui-audit.test.mjs scripts/feng-polish-audit-evidence.test.mjs
       - run: npm run test:e2e
       - run: npm audit --audit-level=moderate

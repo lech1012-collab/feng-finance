@@ -12,7 +12,7 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
-import { useId, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { compactMoney, money, currencyPrecision } from "../domain/money";
 import type { MonthCoverage } from "../analytics/coverage";
 
@@ -81,6 +81,15 @@ export function CashChart({
   showValues?: boolean;
 }) {
   const chartRem = useRootFontSize();
+  // Safari can retain an off-screen ResponsiveContainer's previous width after
+  // rotation/resizing. Remount its measurement on viewport changes so an old
+  // SVG width cannot widen Home before the chart is scrolled into view.
+  const [viewportWidth, setViewportWidth] = useState(() => window.innerWidth);
+  useEffect(() => {
+    const resize = () => setViewportWidth(window.innerWidth);
+    window.addEventListener("resize", resize);
+    return () => window.removeEventListener("resize", resize);
+  }, []);
   const hatchId = `missing-${useId().replaceAll(":", "")}`;
   const [selectedGap, setSelectedGap] = useState<string>();
   const factor = 10 ** currencyPrecision(currency);
@@ -111,7 +120,7 @@ export function CashChart({
             : "Monthly income, expense and net cash flow chart"
         }
       >
-        <ResponsiveContainer width="100%" height={210}>
+        <ResponsiveContainer key={viewportWidth} width="100%" height={210}>
           <ComposedChart
             data={displayed}
             margin={{ top: 12, right: 8, left: 0, bottom: 0 }}

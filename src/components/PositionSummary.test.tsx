@@ -1,4 +1,4 @@
-import { render, screen, cleanup, fireEvent } from "@testing-library/react";
+import { render, screen, cleanup } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PositionSummary } from "./PositionSummary";
@@ -87,17 +87,18 @@ it("does not attribute an October issue-date balance to September", () => {
     "Unavailable",
   );
 });
-it("retains the card's single dated chart point with a debt label instead of fabricating a trend", () => {
+it("shows a single dated card balance clearly without fabricating a trend", () => {
   const rendered = view("2026-10", true);
   expect(screen.queryByRole("img")).not.toBeInTheDocument();
-  fireEvent.click(screen.getByRole("button", { name: "Account breakdown" }));
+  expect(screen.getByText("Debt owed")).toBeVisible();
+  expect(screen.getByText("£109.68")).toBeVisible();
   expect(
-    screen.getByRole("img", { name: /Verified daily account balances/ }),
-  ).toBeVisible();
-  expect(rendered.container.querySelectorAll("circle")).toHaveLength(1);
-  expect(rendered.container.querySelector("circle title")).toHaveTextContent(
-    "2 Oct 2026: £109.68 debt owed",
-  );
+    rendered.container.querySelector('time[datetime="2026-10-02"]'),
+  ).toHaveTextContent("2 Oct 2026");
+  expect(screen.getByText(/Earlier statements will show/)).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: "Account breakdown" }),
+  ).not.toBeInTheDocument();
 });
 it("a removed stored card row invalidates debt and net while keeping the reported account observation explicit", () => {
   render(

@@ -14,13 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-22",
   points: [
-    "Barclaycard annual summaries show their printed period, issue date and annual totals without transaction-correction questions.",
-    "Annual totals stay separate from monthly purchases and payments to prevent double counting.",
-    "Monthly statements in the same selection continue through the normal import workflow.",
+    "Balance trend shows one selected balance with its value, actual date and verified change.",
+    "Cash history stays readable when credit cards have only dated statement balances.",
+    "Drag across the chart or use arrow keys to inspect dates; missing history is never joined or shown as zero.",
   ],
   pleaseTest: [
-    "Select an annual Barclaycard summary beside monthly statements and check the annual dates and totals.",
-    "Confirm the monthly imports and check that annual totals have not been added as transactions or account balances.",
+    "Switch between cash, an individual account and net worth; check the displayed dates and amounts.",
+    "Check that a card's debt or credit is labelled clearly, and one recorded balance does not become an invented trend.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
