@@ -41,6 +41,8 @@ export interface ReportingBalancePoint {
   values: Record<string, number | null>;
   nativeValues: Record<string, number | null>;
   verified: Record<string, boolean>;
+  /** Display provenance only; false means a dated observation, not a daily ledger. */
+  daily: Record<string, boolean>;
   total: number | null;
   complete: boolean;
   cash: number | null;
@@ -104,7 +106,7 @@ export function reportingBalanceHistory(
     start = previousDate(end, period);
   const nativeByAccount = new Map<
     string,
-    Map<string, { value: number | null; verified: boolean }>
+    Map<string, { value: number | null; verified: boolean; daily?: boolean }>
   >();
   const valid = statements.filter(
     (s) =>
@@ -126,12 +128,13 @@ export function reportingBalanceHistory(
     for (const [index, account] of scoped.entries()) {
       const points = new Map<
         string,
-        { value: number | null; verified: boolean }
+        { value: number | null; verified: boolean; daily?: boolean }
       >();
       for (const point of history.data)
         points.set(point.date, {
           value: point.balances[`account${index}`],
           verified: point.balances[`account${index}`] !== null,
+          daily: point.daily?.[account.id] ?? false,
         });
       nativeByAccount.set(account.id, points);
     }
@@ -217,6 +220,7 @@ export function reportingBalanceHistory(
       values: ReportingBalancePoint["values"] = {},
       nativeValues: ReportingBalancePoint["nativeValues"] = {},
       verified: ReportingBalancePoint["verified"] = {},
+      daily: ReportingBalancePoint["daily"] = {},
       rateDates: ReportingBalancePoint["rateDates"] = {};
     for (const account of included) {
       let amount: number | undefined | null,
@@ -244,6 +248,9 @@ export function reportingBalanceHistory(
         reliable = observation?.verified ?? false;
       }
       nativeValues[account.id] = amount ?? null;
+      daily[account.id] =
+        account.tracking === "manual" ||
+        (nativeByAccount.get(account.id)?.get(date)?.daily ?? false);
       const conversion =
         amount == null
           ? undefined
@@ -273,6 +280,7 @@ export function reportingBalanceHistory(
       values,
       nativeValues,
       verified,
+      daily,
       rateDates,
       cash,
       total,

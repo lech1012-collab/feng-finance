@@ -55,6 +55,11 @@ and payment rows; annual totals are excluded from cash flow and cannot create an
 account balance. Other files in the same selection import normally. See
 [annual-summary recognition](docs/annual-statement-recognition.md).
 
+Home's Balance trend defaults to verified cash history. Select an account to
+inspect its dated balance, debt or credit. Changes compare the exact displayed
+dates, and single statement snapshots remain dated values rather than invented
+trends. See the [balance-trend design and safeguards](docs/balance-trend-ux.md).
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

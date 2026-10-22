@@ -152,6 +152,14 @@ const dayMilliseconds = 86_400_000;
 const dateStamp = (date: string) => Date.parse(`${date}T00:00:00Z`);
 const dateString = (stamp: number) =>
   new Date(stamp).toISOString().slice(0, 10);
+export interface DatedBalanceHistoryPoint {
+  stamp: number;
+  date: string;
+  balances: Record<string, number | null>;
+  total: number | null;
+  /** Present for statement-backed daily histories, absent in projections. */
+  daily?: Record<string, boolean>;
+}
 
 /** Daily balances are reconstructed only when every stored row reconciles.
  * Transfers move account balances and must be included here. Missing or
@@ -201,6 +209,9 @@ export function datedBalanceHistory(
     rows.set(t.statementId, existing);
   }
   const values = new Map<string, Map<number, number | null>>();
+  // Transient chart provenance: a printed closing observation alone cannot
+  // establish the intervening daily path, even beside another closing date.
+  const daily = new Map<string, Set<number>>();
   const record = (
     account: string,
     stamp: number,
@@ -251,6 +262,11 @@ export function datedBalanceHistory(
         stamp <= dateStamp(s.statementPeriodEnd);
         stamp += dayMilliseconds
       ) {
+        if (stamp >= start && stamp <= end) {
+          const dates = daily.get(s.accountId) ?? new Set<number>();
+          dates.add(stamp);
+          daily.set(s.accountId, dates);
+        }
         balance = safeSum([balance, changes.get(stamp) ?? 0]);
         record(
           s.accountId,
@@ -270,7 +286,7 @@ export function datedBalanceHistory(
       );
     }
   }
-  const data = [];
+  const data: DatedBalanceHistoryPoint[] = [];
   for (let stamp = start; stamp <= end; stamp += dayMilliseconds) {
     const balances = Object.fromEntries(
       scoped.map((a, i) => [
@@ -283,6 +299,13 @@ export function datedBalanceHistory(
       stamp,
       date: dateString(stamp),
       balances,
+      daily: Object.fromEntries(
+        scoped.map((account, index) => [
+          account.id,
+          balances[`account${index}`] !== null &&
+            daily.get(account.id)?.has(stamp) === true,
+        ]),
+      ),
       total:
         known.length && known.every((v) => v !== null)
           ? safeSum(known as number[])

@@ -2390,27 +2390,27 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   ).toContainText("£935.00");
   await expect(
     page.getByRole("img", {
-      name: "Verified daily account balances with gaps for missing bank coverage and stepped manual valuations",
+      name: /Cash balances balance trend/,
     }),
   ).toBeVisible();
   await expect(
     page.getByText("Browse all categories", { exact: true }),
   ).toHaveCount(0);
   const balanceCard = page.locator("section.card").filter({
-    has: page.getByRole("heading", { name: "Balance history", exact: true }),
+    has: page.getByRole("heading", { name: "Balance trend", exact: true }),
   });
   await expect(
-    balanceCard.getByRole("group", { name: "Balance comparison period" }),
-  ).toHaveCount(1);
+    balanceCard.getByRole("group", { name: "Balance trend range" }),
+  ).toHaveCount(0);
   await expect(page.locator(".position-summary .balance-change")).toContainText(
     "-6.5% vs last month",
   );
-  await page
-    .getByRole("button", { name: "Account breakdown", exact: true })
-    .click();
   await expect(
-    page.locator(".position-history g[data-account-id] path").first(),
+    balanceCard.locator(".position-history path[data-verified=true]").first(),
   ).toHaveAttribute("d", /[HV]/);
+  await expect(balanceCard.locator(".balance-trend-headline")).toContainText(
+    "£935.00",
+  );
   await page.setViewportSize({ width: 1440, height: 900 });
   const settingsPosition = await page
     .locator(".sidebar nav")
