@@ -34,6 +34,7 @@ import { reconstructCardRegions } from "./card-regions";
 import { readDate, readMoney } from "./tokens";
 import { detectProfile } from "./profiles";
 import { identifyMetadata, type StatementMetadata } from "./metadata";
+import { BARCLAYCARD_COVERAGE_NOTICE } from "../../parsers/barclaycard-dates";
 
 function pageFor(table: ReconstructedTable, columnId: string) {
   return (
@@ -994,7 +995,8 @@ export function parseGenericStatement(
     accountType: metadata.accountType,
     periodStart: metadata.period.start,
     periodEnd: metadata.period.end,
-    periodSource: options.period ? "manual" : "printed",
+    periodSource: metadata.periodSource,
+    statementDate: metadata.statementDate,
     currency: metadata.currency,
     openingBalance: metadata.openingBalance,
     closingBalance: metadata.closingBalance,
@@ -1003,7 +1005,10 @@ export function parseGenericStatement(
       metadata.currency,
       options.template?.id,
     ),
-    warnings: [],
+    warnings:
+      metadata.periodSource === "transaction-coverage"
+        ? [BARCLAYCARD_COVERAGE_NOTICE]
+        : [],
     parserMethod: options.mapping
       ? "user_mapping"
       : options.template

@@ -257,7 +257,7 @@ export async function preparePdfReading(
       review.profile ?? (profile?.institution === bank ? profile : undefined),
     period:
       review.period ??
-      (legacy
+      (legacy && legacy.periodSource !== "transaction-coverage"
         ? { start: legacy.periodStart, end: legacy.periodEnd }
         : undefined),
     evidence: {

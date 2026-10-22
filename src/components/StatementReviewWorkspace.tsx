@@ -7,6 +7,7 @@ import { validatePeriod } from "../parsers/period";
 import {
   importBlockers,
   sourceReview,
+  statementReviewDates,
   type FileReview,
 } from "../import/review-model";
 import { draftReconciliation } from "../import/pipeline";
@@ -501,12 +502,9 @@ function StatementDates({
   onClose: () => void;
   onSave: (change: Partial<FileReview>) => void;
 }) {
-  const [start, setStart] = useState(
-    entry.periodStart || entry.draft?.statement.statementPeriodStart || "",
-  );
-  const [end, setEnd] = useState(
-    entry.periodEnd || entry.draft?.statement.statementPeriodEnd || "",
-  );
+  const dates = statementReviewDates(entry);
+  const [start, setStart] = useState(dates.start);
+  const [end, setEnd] = useState(dates.end);
   const [error, setError] = useState("");
   return (
     <ImportReviewSheet title="Statement dates" onClose={onClose}>

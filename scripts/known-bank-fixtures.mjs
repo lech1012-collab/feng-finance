@@ -199,10 +199,21 @@ const { sidebarCardFixture } = await import(
   "data:text/javascript;base64," +
     Buffer.from(sidebarCompiled.outputFiles[0].text).toString("base64")
 );
-for (const unread of [false, true]) {
+for (const mode of ["exact", "unread", "issue-date-only"]) {
   const document = await PDFDocument.create();
   const font = await document.embedFont(StandardFonts.Helvetica);
-  const source = sidebarCardFixture(unread);
+  const source = sidebarCardFixture(mode === "unread");
+  if (mode === "issue-date-only") {
+    source.items = source.items.filter(
+      (item) => !item.text.startsWith("Statement period:"),
+    );
+    // The issue label and value can be separate PDF text rows. The standalone
+    // header and payment deadline remain in the cover as competing dates.
+    const footer = source.items.find((item) => item.text.includes("issued on"));
+    const date = { ...footer, y: footer.y + 12, text: "04 October 2026" };
+    footer.text = "Page 1 of 4 // issued on";
+    source.items.push(date);
+  }
   const pages = source.pages.map((page) =>
     document.addPage([page.width, page.height]),
   );
@@ -214,7 +225,7 @@ for (const unread of [false, true]) {
       font,
     });
   await writeFile(
-    `tests/fixtures/card-sidebar-${unread ? "unread" : "exact"}.pdf`,
+    `tests/fixtures/card-sidebar-${mode}.pdf`,
     await document.save(),
   );
 }

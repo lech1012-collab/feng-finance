@@ -201,6 +201,14 @@ describe("manual statement review workspace", () => {
       periodEnd: "2026-09-30",
     });
   });
+  it("prefills dates already recognized by the recovery reader", () => {
+    const p = props();
+    render(<StatementReviewWorkspace {...p} initialSection="reading" />);
+    fireEvent.click(screen.getByRole("button", { name: /Statement dates/ }));
+    expect(screen.getByLabelText("Start date")).toHaveValue("01/09/2026");
+    expect(screen.getByLabelText("End date")).toHaveValue("30/09/2026");
+    expect(p.onOptions).not.toHaveBeenCalled();
+  });
   it("does not choose between identical source occurrences during native handoff", async () => {
     const items = knownBankItems("barclaycard").map((i) => ({
       ...i,

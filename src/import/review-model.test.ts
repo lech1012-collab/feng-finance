@@ -9,6 +9,7 @@ import {
   importBlockers,
   invalidSourceRows,
   sourceReview,
+  statementReviewDates,
   type FileReview,
 } from "./review-model";
 
@@ -53,6 +54,36 @@ function source(id: "T6" | "T11" = "T6") {
 }
 
 describe("source review financial gates", () => {
+  it("keeps known statement dates in the editor and gives explicit corrections priority", async () => {
+    const file = await entry();
+    expect(statementReviewDates(file)).toEqual({
+      start: "2026-09-01",
+      end: "2026-09-30",
+    });
+    file.periodStart = "2026-08-31";
+    expect(statementReviewDates(file)).toEqual({
+      start: "2026-08-31",
+      end: "2026-09-30",
+    });
+  });
+  it("keeps recovery dates even before an import draft exists, without supplying invented dates", async () => {
+    const file = await entry();
+    file.draft = undefined;
+    file.extracted = {
+      rows: [],
+      hash: "fictional-recovery",
+      filename: "fictional.pdf",
+      method: "embedded-text",
+      warnings: [],
+      generic: source(),
+    };
+    expect(statementReviewDates(file)).toEqual({
+      start: "2026-09-01",
+      end: "2026-09-30",
+    });
+    file.extracted.generic!.parsed = undefined;
+    expect(statementReviewDates(file)).toEqual({ start: "", end: "" });
+  });
   it("retains malformed raw rows even without a normalized draft", async () => {
     const file = await entry();
     const raw = source();

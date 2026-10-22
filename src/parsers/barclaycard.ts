@@ -10,6 +10,10 @@ import { reconstructRows } from "../import/layout";
 import { BaseParser } from "./common";
 import { barclaycardPanelRight } from "./barclaycard-layout";
 import {
+  barclaycardIssueDate,
+  BARCLAYCARD_COVERAGE_NOTICE,
+} from "./barclaycard-dates";
+import {
   identifyPeriod,
   PERIOD_ERROR,
   validatePeriod,
@@ -62,22 +66,6 @@ export class BarclaycardStatementParser extends BaseParser {
 
   identifyStatementPeriod(rows: TextRow[]) {
     return identifyPeriod(rows, true);
-  }
-
-  private issueDate(rows: TextRow[]) {
-    const firstPage = Math.min(...rows.map((r) => r.page));
-    const dates = new Set(
-      rows
-        .filter((r) => r.page === firstPage)
-        .flatMap((r) => {
-          const match = r.text.match(
-            /\bissued on\s+(\d{1,2}\s+[A-Za-z]{3,9}\s+\d{4})\b/i,
-          );
-          return match ? [parseDate(match[1])] : [];
-        }),
-    );
-    if (dates.size !== 1) throw new Error(PERIOD_ERROR);
-    return [...dates][0];
   }
 
   extractTransactions(rows: TextRow[], periodEnd: string, currency: string) {
@@ -296,7 +284,8 @@ export class BarclaycardStatementParser extends BaseParser {
           throw error;
       }
     }
-    const statementDate = printed ? undefined : this.issueDate(rows);
+    const statementDate = printed ? undefined : barclaycardIssueDate(rows);
+    if (!printed && !statementDate) throw new Error(PERIOD_ERROR);
     const end = printed?.end ?? statementDate!;
     const currency = this.identifyCurrency(rows);
     const account = this.identifyAccount(rows);
@@ -334,11 +323,7 @@ export class BarclaycardStatementParser extends BaseParser {
               "Statement dates were entered manually. Check both dates against the source PDF before importing.",
             ]
           : []),
-        ...(!printed
-          ? [
-              "This Barclaycard statement prints an issue date but no period start. The displayed dates show coverage from the earliest extracted transaction to the issue date. Check this coverage against the PDF before importing.",
-            ]
-          : []),
+        ...(!printed ? [BARCLAYCARD_COVERAGE_NOTICE] : []),
         ...(outside
           ? [
               "Transaction dates fall outside the statement dates. Review the source PDF before importing.",
