@@ -14,13 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-23",
   points: [
-    "Category averages use a consistent set of category accounts, so unrelated incomplete accounts do not block them.",
-    "See exactly which previous months qualify for the average and why others are excluded.",
-    "Category charts show every month used by the average, plus the selected month.",
+    "Category averages and standard deviation now use recorded monthly totals, including partial months.",
+    "Missing months remain gaps; incomplete statement coverage is explained without hiding your statistics.",
+    "Change the month or history window to recalculate your recorded spending comparison.",
   ],
   pleaseTest: [
-    "Open a category with three or more complete previous months and check its average and standard deviation.",
-    "Open Months used for comparison and check the accounts, included months and any missing date or amount checks.",
+    "Open a category with partial previous months and check its average, standard deviation and difference from average.",
+    "Change between 1, 3, 6 and 12 months and inspect Months used for comparison.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",

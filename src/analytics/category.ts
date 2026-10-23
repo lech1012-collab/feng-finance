@@ -61,6 +61,7 @@ export function categoryOverview(
   isComplete?: (month: string) => boolean,
   periodSettings: Setting[] = [],
   periodRows: Transaction[] = transactions,
+  hasMissingAmounts: (month: string) => boolean = () => false,
 ) {
   const incomeCategory = categories.find((c) => c.id === id)?.kind === "income";
   const eligible = effectiveTransactions(transactions).filter(
@@ -78,31 +79,38 @@ export function categoryOverview(
       inReportingPeriod(t.date, m, periodSettings, periodRows),
     );
     const flow = cashFlow(items, currency);
-    const amount = amountFor(items.filter((t) => categoryMatches(t, id)));
+    const categoryItems = items.filter((t) => categoryMatches(t, id));
+    const amount = amountFor(categoryItems);
+    const complete = isComplete
+      ? isComplete(m)
+      : completeMonth(
+          m,
+          accounts.filter((a) => a.currency === currency),
+          statements,
+          today,
+        );
     return {
       month: m,
       amount,
       income: flow.income,
       incomePercent: flow.income > 0 ? (amount / flow.income) * 100 : undefined,
-      complete: isComplete
-        ? isComplete(m)
-        : completeMonth(
-            m,
-            accounts.filter((a) => a.currency === currency),
-            statements,
-            today,
-          ),
+      complete,
+      // Coverage describes confidence, not whether recorded totals can be
+      // averaged. An absent category month is unknown unless coverage proves
+      // zero; an explicit recorded zero (e.g. a fully refunded purchase) counts.
+      available:
+        !hasMissingAmounts(m) && (categoryItems.length > 0 || complete),
     };
   };
   const history = Array.from({ length: window }, (_, i) =>
     monthly(monthOffset(month, i - window)),
   );
-  const baseline = history.filter((m) => m.complete);
+  const baseline = history.filter((m) => m.available);
   const mean = baseline.length
     ? safeSum(baseline.map((m) => m.amount)) / baseline.length
     : undefined;
   const std =
-    mean !== undefined && baseline.length >= 3
+    mean !== undefined && baseline.length >= 2
       ? Math.sqrt(
           baseline.reduce((sum, m) => sum + (m.amount - mean) ** 2, 0) /
             (baseline.length - 1),
@@ -112,7 +120,10 @@ export function categoryOverview(
   const selected = relevant.filter((t) =>
     inReportingPeriod(t.date, month, periodSettings, periodRows),
   );
-  const difference = mean === undefined ? undefined : current.amount - mean;
+  const difference =
+    mean === undefined || !current.available
+      ? undefined
+      : current.amount - mean;
   return {
     current,
     history,
@@ -124,6 +135,7 @@ export function categoryOverview(
       mean && difference !== undefined ? (difference / mean) * 100 : undefined,
     aboveUsual:
       current.complete &&
+      baseline.every((point) => point.complete) &&
       mean !== undefined &&
       std !== undefined &&
       current.amount > mean + std,

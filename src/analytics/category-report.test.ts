@@ -15,7 +15,7 @@ const input = () => ({
   today: "2026-11-08",
 });
 
-describe("category-specific verified comparisons", () => {
+describe("recorded category statistics with separate coverage confidence", () => {
   it("uses complete category accounts despite unrelated missing/card history, retaining global coverage", () => {
     const source = input();
     const before = structuredClone(source);
@@ -57,7 +57,74 @@ describe("category-specific verified comparisons", () => {
     expect(report.stats.mean).toBe(300000);
     expect(report.stats.std).toBe(0);
   });
-  it("does not switch account sets from month to month to create a convenient baseline", () => {
+  it("calculates a moving average and sample deviation when every recorded month is partial", () => {
+    const source = input();
+    for (const document of source.statements)
+      document.periodSource = "transaction-coverage";
+    const before = structuredClone(source);
+    const report = categoryReport(source);
+    expect(report.stats.baseline).toHaveLength(6);
+    expect(report.stats.mean).toBe(130000);
+    expect(report.stats.std).toBeCloseTo(37416.5738677394);
+    expect(report.stats.difference).toBe(70000);
+    expect(report.series.every((point) => !point.coverage.complete)).toBe(true);
+    expect(report.stats.aboveUsual).toBe(false);
+    const three = categoryReport({ ...source, window: 3 });
+    expect(three.stats.mean).toBe(160000);
+    expect(three.stats.std).toBe(20000);
+    const previous = categoryReport({ ...source, month: "2026-09", window: 3 });
+    expect(previous.stats.mean).toBe(140000);
+    expect(previous.stats.std).toBe(20000);
+    expect(source).toEqual(before);
+  });
+  it("skips absent category observations in partial months but includes verified zero months", () => {
+    const source = input();
+    source.transactions = source.transactions.filter(
+      (row) => row.id !== "bank-2026-04-cost",
+    );
+    const partial = categoryReport(source);
+    expect(partial.stats.baseline).toHaveLength(5);
+    expect(partial.series[0].amount).toBeNull();
+    expect(partial.series[0].available).toBe(false);
+    const document = source.statements.find((s) => s.id === "bank-2026-04")!;
+    document.transactionCount = 1;
+    document.closingBalance = 400000;
+    const verified = categoryReport(source);
+    expect(verified.stats.baseline).toHaveLength(6);
+    expect(verified.series[0].amount).toBe(0);
+  });
+  it("does not average a subtotal when some category amounts cannot be converted", () => {
+    const source = input();
+    source.accounts[1].currency = "EUR";
+    source.transactions.push(
+      transaction({
+        id: "euro-cost",
+        accountId: "a2",
+        currency: "EUR",
+        categoryId: "property",
+        amount: -12000,
+        date: "2026-09-10",
+      }),
+    );
+    const report = categoryReport(source);
+    expect(report.stats.baseline).toHaveLength(5);
+    expect(
+      report.series.find((point) => point.month === "2026-09")!.amount,
+    ).toBeNull();
+    expect(
+      report.series.find((point) => point.month === "2026-09")!
+        .unavailableReason,
+    ).toBe("Exchange rates needed");
+    const unrelated = categoryReport({
+      ...source,
+      transactions: source.transactions.map((row) =>
+        row.id === "euro-cost" ? { ...row, categoryId: "shopping" } : row,
+      ),
+    });
+    expect(unrelated.stats.baseline).toHaveLength(6);
+    expect(unrelated.stats.mean).toBe(130000);
+  });
+  it("includes observed months when category account coverage is incomplete", () => {
     const source = input();
     source.transactions.find((row) => row.id === "card-purchase")!.categoryId =
       "property";
@@ -66,9 +133,10 @@ describe("category-specific verified comparisons", () => {
       "a1",
       "a3",
     ]);
-    expect(report.stats.baseline).toHaveLength(0);
-    expect(report.stats.mean).toBeUndefined();
-    expect(report.stats.std).toBeUndefined();
+    expect(report.stats.baseline).toHaveLength(6);
+    expect(report.stats.mean).toBe(130165);
+    expect(report.stats.std).toBeCloseTo(37682.40106468801);
+    expect(report.stats.aboveUsual).toBe(false);
     expect(
       report.series
         .find((point) => point.month === "2026-09")!
@@ -80,7 +148,7 @@ describe("category-specific verified comparisons", () => {
         .coverage.reasons.join(" "),
     ).toContain("no statement covers this period");
   });
-  it("counts verified zero spending while rejecting a missing source instead of inventing zero", () => {
+  it("counts an explicit recorded zero even when its statement is missing", () => {
     const source = input();
     source.transactions.find((row) => row.id === "bank-2026-04-cost")!.amount =
       0;
@@ -93,8 +161,8 @@ describe("category-specific verified comparisons", () => {
       ...source,
       statements: source.statements.filter((s) => s.id !== "bank-2026-04"),
     });
-    expect(missing.stats.baseline).toHaveLength(5);
-    expect(missing.series[0].amount).toBeNull();
+    expect(missing.stats.baseline).toHaveLength(6);
+    expect(missing.series[0].amount).toBe(0);
     expect(missing.series[0].coverage.reasons.join(" ")).toContain(
       "no statement covers this period",
     );
@@ -105,7 +173,7 @@ describe("category-specific verified comparisons", () => {
     "unverified period",
     "one-day gap",
   ])(
-    "explains and excludes a %s without trusting a saved reconciliation flag",
+    "separates recorded statistics from incomplete verification after a %s",
     (problem) => {
       const source = input();
       const document = source.statements.find((s) => s.id === "bank-2026-06")!;
@@ -122,7 +190,9 @@ describe("category-specific verified comparisons", () => {
       if (problem === "one-day gap")
         document.statementPeriodStart = "2026-06-02";
       const report = categoryReport(source);
-      expect(report.stats.baseline).toHaveLength(5);
+      expect(report.stats.baseline).toHaveLength(
+        problem === "deleted row" ? 5 : 6,
+      );
       expect(
         report.series.find((point) => point.month === "2026-06")!.coverage
           .complete,
@@ -133,7 +203,7 @@ describe("category-specific verified comparisons", () => {
       ).toBeGreaterThan(0);
     },
   );
-  it("needs three verified months for sample deviation, but can show a labelled one-month average", () => {
+  it("needs two recorded months for sample deviation and only one for an average", () => {
     const report = categoryReport({ ...input(), window: 1 });
     expect(report.stats.mean).toBe(180000);
     expect(report.stats.std).toBeUndefined();
@@ -144,6 +214,9 @@ describe("category-specific verified comparisons", () => {
     const three = categoryReport({ ...input(), window: 3 });
     expect(three.stats.mean).toBe(160000);
     expect(three.stats.std).toBe(20000);
+    const two = categoryReport({ ...input(), window: 2 });
+    expect(two.stats.mean).toBe(170000);
+    expect(two.stats.std).toBeCloseTo(14142.13562373095);
   });
   it("retains a category account before FX projection and withholds unavailable converted comparisons", () => {
     const source = input();
@@ -166,7 +239,7 @@ describe("category-specific verified comparisons", () => {
     );
     expect(report.series.every((point) => point.amount === null)).toBe(true);
   });
-  it("supports converted EUR history and rejects stale conversion rates without changing native records", () => {
+  it("supports converted EUR history and labels stale rates without blocking recorded statistics", () => {
     const source = input();
     source.accounts[0].currency = "EUR";
     source.statements
@@ -200,7 +273,9 @@ describe("category-specific verified comparisons", () => {
       ...source,
       rates: [{ ...rates[0], date: "2026-03-01" }],
     });
-    expect(stale.stats.baseline).toHaveLength(0);
+    expect(stale.stats.baseline).toHaveLength(6);
+    expect(stale.stats.mean).toBe(110500);
+    expect(stale.coverage.complete).toBe(false);
     expect(stale.coverage.reasons).toContain(
       "Exchange rates need updating for this period.",
     );
@@ -218,7 +293,9 @@ describe("category-specific verified comparisons", () => {
       }),
     );
     const report = categoryReport(source);
-    expect(report.stats.baseline).toHaveLength(0);
+    expect(report.stats.baseline).toHaveLength(6);
+    expect(report.stats.mean).toBeCloseTo(130166.66666666667);
+    expect(report.coverage.complete).toBe(false);
     expect(report.coverage.reasons.join(" ")).toContain(
       "manual activity cannot verify a full period",
     );
@@ -231,7 +308,7 @@ describe("category-specific verified comparisons", () => {
     expect(report.stats.baseline).toHaveLength(0);
     expect(report.series.every((point) => point.amount === null)).toBe(true);
   });
-  it("ignores unrelated pending transfers, but never ignores one on a category account", () => {
+  it("keeps pending transfer confidence separate from recorded category statistics", () => {
     const source = input();
     const proposal = {
       id: "pending",
@@ -244,7 +321,7 @@ describe("category-specific verified comparisons", () => {
     ).toHaveLength(6);
     const relevant = { ...proposal, debitTxId: "bank-2026-09-cost" };
     const report = categoryReport({ ...source, proposals: [relevant] });
-    expect(report.stats.baseline).toHaveLength(5);
+    expect(report.stats.baseline).toHaveLength(6);
     expect(
       report.series.find((point) => point.month === "2026-09")!.coverage
         .reasons,
@@ -319,8 +396,8 @@ describe("category-specific verified comparisons", () => {
       (document) => document.id === "refund-proof",
     )!.validationStatus = "warning";
     const unverified = categoryReport(source);
-    expect(unverified.stats.baseline).toHaveLength(5);
-    expect(unverified.series[0].amount).toBeNull();
+    expect(unverified.stats.baseline).toHaveLength(6);
+    expect(unverified.series[0].amount).toBe(0);
     expect(unverified.series[0].coverage.reasons.join(" ")).toContain(
       "Linked refund",
     );
@@ -360,7 +437,7 @@ describe("category-specific verified comparisons", () => {
       }),
     );
     const report = categoryReport(source);
-    expect(report.stats.baseline).toHaveLength(5);
+    expect(report.stats.baseline).toHaveLength(6);
     expect(report.series[0].coverage.reasons.join(" ")).toContain(
       "Linked refund",
     );
