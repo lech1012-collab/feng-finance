@@ -289,6 +289,17 @@ export function categoryReport({
     (period) => coverageFor(period).complete,
     settings,
     transactions,
+    (period) => {
+      const [start, end] = reportingPeriod(period, settings, transactions);
+      return projection.missing.some(
+        (row) =>
+          categoryMatches(row, categoryId) &&
+          financialType(row) !== "transfer" &&
+          row.amount !== 0 &&
+          row.date >= start &&
+          row.date < end,
+      );
+    },
   );
   // Keep every baseline month visible alongside the selected month. Previously
   // the chart dropped the oldest month even though it contributed to the mean.
@@ -296,13 +307,12 @@ export function categoryReport({
     const coverage = coverageFor(point.month);
     return {
       ...point,
-      amount: point.amount === 0 && !coverage.complete ? null : point.amount,
-      unavailableReason:
-        incomeCategory && !coverage.hasIncomeSource
+      amount: point.available ? point.amount : null,
+      unavailableReason: coverage.missingRates
+        ? "Exchange rates needed"
+        : incomeCategory && !coverage.hasIncomeSource
           ? "No income source imported"
-          : coverage.hasData
-            ? "Verification incomplete"
-            : "No verified statements",
+          : "No category transactions or verified zero",
       coverage,
       incomeCoverage: overallCoverageFor(point.month),
     };

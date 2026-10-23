@@ -165,7 +165,7 @@ it("shows Salary averages and zero deviation despite incomplete unrelated card a
     ".category-kpis .metric:nth-child(2)",
   );
   expect(average).toHaveTextContent("£3,000.00");
-  expect(average).toHaveTextContent("5 verified previous months out of 6");
+  expect(average).toHaveTextContent("5 recorded previous months out of 6");
   expect(container.querySelector(".category-range")).toHaveTextContent(
     "Standard deviation: £0.00",
   );
@@ -179,7 +179,7 @@ it("shows Salary averages and zero deviation despite incomplete unrelated card a
     container.querySelector(".category-comparison-list"),
   ).toHaveTextContent("no statement covers this period");
 });
-it("explains the exact excluded source month and keeps an available one-month average separate from sample deviation", () => {
+it("includes unverified recorded months and explains the two-month minimum for sample deviation", () => {
   const source = categoryHistoryFixture();
   source.statements.find(
     (document) => document.id === "bank-2026-08",
@@ -187,7 +187,7 @@ it("explains the exact excluded source month and keeps an available one-month av
   fixture(source.accounts, source.transactions, source.statements);
   const { container } = showSalary();
   fireEvent.click(
-    screen.getByText("Months used for comparison (4 of 6)", { exact: true }),
+    screen.getByText("Months used for comparison (5 of 6)", { exact: true }),
   );
   expect(
     container.querySelector(".category-comparison-list"),
@@ -196,7 +196,7 @@ it("explains the exact excluded source month and keeps an available one-month av
   // August is the sole previous month, and its dates are unverified.
   expect(
     container.querySelector(".category-kpis .metric:nth-child(2) strong"),
-  ).toHaveTextContent("Unavailable");
+  ).toHaveTextContent("£3,000.00");
   fireEvent.click(
     screen.getByText("Average and standard deviation explained", {
       exact: true,
@@ -204,7 +204,7 @@ it("explains the exact excluded source month and keeps an available one-month av
   );
   expect(
     screen.getByText(
-      /Needs at least three verified previous months; 0 currently qualify/,
+      /Needs at least two recorded previous months; 1 currently available/,
     ),
   ).toBeVisible();
 });
@@ -224,9 +224,32 @@ it("shows an available one-month mean while explaining why sample deviation need
   );
   expect(
     screen.getByText(
-      /Needs at least three verified previous months; 1 currently qualify/,
+      /Needs at least two recorded previous months; 1 currently available/,
     ),
   ).toBeVisible();
+});
+it("shows the average, zero deviation and difference when all recorded Salary months are partial", () => {
+  const source = categoryHistoryFixture();
+  for (const document of source.statements)
+    document.periodSource = "transaction-coverage";
+  fixture(source.accounts, source.transactions, source.statements);
+  const { container } = showSalary();
+  expect(
+    container.querySelector(".category-kpis .metric:nth-child(2)"),
+  ).toHaveTextContent("£3,000.00");
+  expect(
+    container.querySelector(".category-kpis .metric:nth-child(2)"),
+  ).toHaveTextContent("5 recorded previous months out of 6");
+  expect(container.querySelector(".category-range")).toHaveTextContent(
+    "Standard deviation: £0.00",
+  );
+  expect(
+    container.querySelector(".category-kpis .metric:nth-child(4)"),
+  ).toHaveTextContent("£0.00");
+  expect(screen.getByRole("status")).toHaveTextContent(
+    "Partial months are included",
+  );
+  expect(screen.queryByText(/comparison withheld/i)).not.toBeInTheDocument();
 });
 it("warns about mixed unverified imports and plots the same recorded outflow as its KPI", () => {
   fixture(

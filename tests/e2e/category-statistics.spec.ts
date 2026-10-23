@@ -1,9 +1,12 @@
 import { test, expect, type Page } from "./fixtures";
 import { categoryHistoryFixture } from "../../src/tests/category-history";
 
-async function seed(page: Page) {
+async function seed(page: Page, partial = false) {
   await page.clock.setFixedTime(new Date("2026-11-08T12:00:00Z"));
   const source = categoryHistoryFixture();
+  if (partial)
+    for (const document of source.statements)
+      document.periodSource = "transaction-coverage";
   await page.evaluate(
     (data) =>
       new Promise<void>((done, reject) => {
@@ -40,12 +43,80 @@ async function seed(page: Page) {
   return page.locator(".category-kpis").first();
 }
 
+test("all-partial recorded history has averages and deviation offline without changing financial records", async ({
+  page,
+  context,
+}) => {
+  const kpis = await seed(page, true);
+  await expect(kpis.locator(".metric").nth(1)).toContainText("£1,300.00");
+  await expect(page.locator(".category-range")).toContainText(
+    "Standard deviation: £374.17",
+  );
+  await expect(kpis.locator(".metric").nth(3)).toContainText("+£700.00");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Partial months are included" }),
+  ).toBeVisible();
+  const months = page.locator(".category-comparison-months");
+  await months.locator(":scope > summary").click();
+  await expect(
+    months
+      .locator(".category-comparison-list > li")
+      .filter({ hasText: "Included" }),
+  ).toHaveCount(6);
+  await expect(
+    months
+      .locator(".category-comparison-list > li")
+      .filter({ hasText: "Partial history" }),
+  ).toHaveCount(6);
+  await context.setOffline(true);
+  await page.getByRole("button", { name: "3 months", exact: true }).click();
+  await expect(kpis.locator(".metric").nth(1)).toContainText("£1,600.00");
+  await expect(page.locator(".category-range")).toContainText(
+    "Standard deviation: £200.00",
+  );
+  await page.getByRole("button", { name: "1 month", exact: true }).click();
+  await expect(kpis.locator(".metric").nth(1)).toContainText("£1,800.00");
+  await expect(page.locator(".category-range")).toHaveCount(0);
+  const saved = await page.evaluate(
+    () =>
+      new Promise<unknown>((done, reject) => {
+        const request = indexedDB.open("feng-finance");
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => {
+          const db = request.result;
+          const tx = db.transaction(
+            ["accounts", "statements", "transactions"],
+            "readonly",
+          );
+          const reads = ["accounts", "statements", "transactions"].map(
+            (name) => [name, tx.objectStore(name).getAll()] as const,
+          );
+          tx.oncomplete = () => {
+            db.close();
+            done(
+              Object.fromEntries(
+                reads.map(([name, result]) => [name, result.result]),
+              ),
+            );
+          };
+          tx.onerror = () => reject(tx.error);
+        };
+      }),
+  );
+  const expected = categoryHistoryFixture();
+  for (const document of expected.statements)
+    document.periodSource = "transaction-coverage";
+  for (const records of Object.values(expected))
+    records.sort((a, b) => a.id.localeCompare(b.id));
+  expect(saved).toEqual(expected);
+});
+
 test("category averages use six complete bank months while unrelated card history stays incomplete", async ({
   page,
 }) => {
   const kpis = await seed(page);
   await expect(kpis.locator(".metric").nth(1)).toContainText("£1,300.00");
-  await expect(kpis).toContainText("6 verified previous months out of 6");
+  await expect(kpis).toContainText("6 recorded previous months out of 6");
   await expect(page.locator(".category-range")).toContainText(
     "Standard deviation: £374.17",
   );
@@ -54,7 +125,7 @@ test("category averages use six complete bank months while unrelated card histor
     "Travel",
   );
   const months = page.locator(".category-comparison-months");
-  await months.locator("summary").click();
+  await months.locator(":scope > summary").click();
   await expect(months.locator(".category-comparison-list > li")).toHaveCount(6);
   await expect(months).toContainText("April 2026");
   await expect(months).toContainText(
@@ -75,7 +146,7 @@ test("category averages use six complete bank months while unrelated card histor
   ).toBeVisible();
 });
 
-test("comparisons update when another category account enters scope and explain its missing dates on mobile", async ({
+test("recorded comparisons remain available when another category account has missing dates", async ({
   page,
 }) => {
   const kpis = await seed(page);
@@ -106,17 +177,24 @@ test("comparisons update when another category account enters scope and explain 
     )
     .toBe("property");
   await page.goto("/#/categories/property?month=2026-10");
-  await expect(kpis.locator(".metric").nth(1)).toContainText("Unavailable");
-  await expect(kpis).toContainText("0 verified previous months out of 6");
+  await expect(kpis.locator(".metric").nth(1)).toContainText("£1,301.65");
+  await expect(kpis).toContainText("6 recorded previous months out of 6");
+  await expect(page.locator(".category-range")).toContainText(
+    "Standard deviation: £376.82",
+  );
   const months = page.locator(".category-comparison-months");
-  await months.locator("summary").click();
-  await expect(months).toContainText("statement dates need verification");
+  await months.locator(":scope > summary").click();
+  const september = months.locator(".category-comparison-list > li").filter({
+    hasText: "September 2026",
+  });
+  await september.locator("summary").click();
+  await expect(september).toContainText("statement dates need verification");
   await expect(months.locator(".category-comparison-list > li")).toHaveCount(6);
   await expect(
     months
       .locator(".category-comparison-list > li")
       .filter({ hasText: "Included" }),
-  ).toHaveCount(0);
+  ).toHaveCount(6);
   for (const [width, fontSize] of [
     [390, "100%"],
     [320, "100%"],

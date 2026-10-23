@@ -60,10 +60,12 @@ inspect its dated balance, debt or credit. Changes compare the exact displayed
 dates, and single statement snapshots remain dated values rather than invented
 trends. See the [balance-trend design and safeguards](docs/balance-trend-ux.md).
 
-Category comparisons use the same known category accounts in every previous
-month, with full verification still required for those accounts. Open “Months
-used for comparison” to see which months qualify and why others are excluded.
-The chart includes every month used in the mean. See the
+Category averages and sample standard deviation use recorded monthly category
+totals, including partial months. Incomplete statement coverage is shown as a
+confidence note and does not block the calculation. Missing months remain gaps;
+a zero needs explicit recorded activity or verified coverage. The selected month
+is compared with the previous 1, 3, 6 or 12 months, with every baseline month
+visible in the chart. See the
 [category-statistics diagnosis and safeguards](docs/category-statistics.md).
 
 Records belong to the browser or installed app where they were imported. The

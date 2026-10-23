@@ -56,7 +56,7 @@ const stats = (items = tx, docs = statements) =>
     "2026-05-01",
   );
 describe("category comparisons and coverage", () => {
-  it("lets stricter source eligibility exclude a mixed-source month from averages and overspending", () => {
+  it("uses recorded totals despite incomplete coverage, keeping verified overspending claims separate", () => {
     const result = categoryOverview(
       tx,
       [accounts[0]],
@@ -71,10 +71,11 @@ describe("category comparisons and coverage", () => {
     );
     expect(result.baseline.map((point) => point.month)).toEqual([
       "2026-01",
+      "2026-02",
       "2026-03",
     ]);
     expect(result.mean).toBe(20000);
-    expect(result.std).toBeUndefined();
+    expect(result.std).toBe(10000);
     expect(result.current.complete).toBe(false);
     expect(result.aboveUsual).toBe(false);
   });
@@ -88,7 +89,7 @@ describe("category comparisons and coverage", () => {
     expect(s.current.incomePercent).toBe(45);
     expect(s.aboveUsual).toBe(true);
   });
-  it("counts genuine zero-spending months but omits missing statements", () => {
+  it("counts verified zeros and recorded months even without source statements", () => {
     const s = stats(tx.filter((t) => t.id !== "e0"));
     expect(s.baseline[0].amount).toBe(0);
     expect(
@@ -96,13 +97,13 @@ describe("category comparisons and coverage", () => {
         tx,
         statements.filter((s) => s.id !== "2026-01"),
       ).baseline,
-    ).toHaveLength(2);
+    ).toHaveLength(3);
     expect(
       stats(
         tx,
         statements.filter((s) => s.id !== "2026-01"),
       ).std,
-    ).toBeUndefined();
+    ).toBe(10000);
   });
   it("merges contiguous coverage and rejects gaps, inferred periods and failed reconciliation", () => {
     const a = statement("2026-03", { statementPeriodEnd: "2026-03-15" }),

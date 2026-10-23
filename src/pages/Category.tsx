@@ -105,6 +105,7 @@ export default function CategoryPage({
   };
   const mean = stats.mean === undefined ? undefined : Math.round(stats.mean);
   const std = stats.std === undefined ? undefined : Math.round(stats.std);
+  const partialBaseline = stats.baseline.some((point) => !point.complete);
   const isProperty = id === "property";
   const categoryColor = category?.color ?? "var(--chart-expense)";
   const gapHeight = Math.max(1, ...series.map((point) => point.amount ?? 0));
@@ -143,9 +144,7 @@ export default function CategoryPage({
         />
       </div>
       <section className="card category-kpis">
-        {stats.current.amount > 0 ||
-        (coverage.hasData &&
-          (!stats.incomeCategory || coverage.hasIncomeSource)) ? (
+        {stats.current.available || coverage.missingRates ? (
           <Metric
             label={
               stats.incomeCategory ? "Income this month" : "Spent this month"
@@ -175,7 +174,7 @@ export default function CategoryPage({
             {mean === undefined ? "Unavailable" : money(mean, currency)}
           </strong>
           <small>
-            {stats.baseline.length} verified previous month
+            {stats.baseline.length} recorded previous month
             {stats.baseline.length === 1 ? "" : "s"} out of {window}
           </small>
         </div>
@@ -205,15 +204,17 @@ export default function CategoryPage({
         <div className="metric">
           <span>Difference from average</span>
           <strong>
-            {!coverage.complete || stats.difference === undefined
+            {stats.difference === undefined
               ? "Unavailable"
               : money(Math.round(stats.difference), currency, true)}
           </strong>
           <small>
-            {!coverage.complete || stats.change === undefined
+            {stats.change === undefined
               ? ""
               : `${stats.change >= 0 ? "+" : ""}${stats.change.toFixed(1)}%`}
-            {!coverage.complete ? "Month incomplete; comparison withheld" : ""}
+            {stats.difference !== undefined && !coverage.complete
+              ? " · Based on recorded totals"
+              : ""}
           </small>
         </div>
       </section>
@@ -241,11 +242,10 @@ export default function CategoryPage({
           remain in each transaction.
         </p>
       )}
-      {coverage.hasUnverifiedStatements && (
-        <p className="notice warning" role="status">
-          Statements with incomplete date or balance verification are included
-          in recorded totals; comparisons with usual spending are withheld for
-          this month.
+      {(partialBaseline || (stats.current.available && !coverage.complete)) && (
+        <p className="coverage-note" role="status">
+          Based on recorded transactions. Partial months are included in the
+          average; totals may change when you import more statements.
         </p>
       )}
       {stats.aboveUsual && (
@@ -321,7 +321,8 @@ export default function CategoryPage({
         {mean !== undefined && std !== undefined && (
           <p className="category-range">
             <strong>
-              Usual range: {money(Math.max(0, mean - std), currency)}–
+              Average ± standard deviation:{" "}
+              {money(Math.max(0, mean - std), currency)}–
               {money(mean + std, currency)}
             </strong>
             <br />
@@ -336,12 +337,12 @@ export default function CategoryPage({
           previous month{window === 1 ? "" : "s"} and the selected month are
           shown.
           {std !== undefined
-            ? " The shaded band shows usual variation; it is not a budget."
-            : " Only verified previous months enter the average."}
+            ? " The shaded band is the recorded average ± one standard deviation, not a budget."
+            : " The average uses recorded monthly totals, including partial months."}
         </p>
         <div
           role="img"
-          aria-label={`${name} monthly trend with average and usual variation`}
+          aria-label={`${name} monthly trend with recorded average and variation`}
         >
           <ResponsiveContainer width="100%" height={260}>
             <ComposedChart
@@ -391,7 +392,7 @@ export default function CategoryPage({
                     ? [
                         String(
                           entry.payload?.unavailableReason ??
-                            "No verified statements",
+                            "No recorded category data",
                         ),
                         "",
                       ]
@@ -449,9 +450,9 @@ export default function CategoryPage({
           </ResponsiveContainer>
         </div>
         <p className="coverage-note">
-          Faded bars show recorded totals with incomplete verification; they are
-          excluded from the average. Hatched months cannot establish a value. A
-          zero needs complete verified coverage.
+          Faded bars are partial months and still count in the average. Hatched
+          months are missing data and are skipped. A zero counts when recorded
+          explicitly or supported by verified coverage.
         </p>
         <details className="category-comparison-months">
           <summary>
@@ -462,9 +463,12 @@ export default function CategoryPage({
               <li key={point.month}>
                 <strong>{monthLabel(point.month)}</strong>
                 <span>
-                  {point.coverage.complete
+                  {point.available
                     ? `Included · ${money(point.amount!, currency)}`
-                    : "Excluded"}
+                    : `Skipped · ${point.unavailableReason}`}
+                  {point.available && !point.coverage.complete
+                    ? " · Partial history"
+                    : ""}
                 </span>
                 <small>
                   {formatDateRange(
@@ -472,13 +476,17 @@ export default function CategoryPage({
                     shiftDate(point.coverage.end, -1),
                   )}
                 </small>
-                {!point.coverage.complete && (
-                  <ul>
-                    {point.coverage.reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
-                    ))}
-                  </ul>
-                )}
+                {!point.coverage.complete &&
+                  point.coverage.reasons.length > 0 && (
+                    <details>
+                      <summary>Coverage details</summary>
+                      <ul>
+                        {point.coverage.reasons.map((reason) => (
+                          <li key={reason}>{reason}</li>
+                        ))}
+                      </ul>
+                    </details>
+                  )}
               </li>
             ))}
           </ul>
@@ -492,19 +500,18 @@ export default function CategoryPage({
           <p>
             Average:{" "}
             {mean === undefined
-              ? "unavailable because no previous month has complete verified coverage for these accounts"
+              ? "unavailable because no previous month has usable category data"
               : money(mean, currency)}
             . Sample standard deviation:{" "}
             {std === undefined
-              ? `unavailable. Needs at least three verified previous months; ${stats.baseline.length} currently qualify`
+              ? `unavailable. Needs at least two recorded previous months; ${stats.baseline.length} currently available`
               : money(std, currency)}
-            . The comparison uses the same accounts with known transactions in
-            this category for every month. Categorising transactions on another
-            account can change this scope. Incomplete coverage, unverified dates
-            or amounts, pending transfers and missing or stale exchange rates
-            exclude a month. A fully verified month with no category spending
-            counts as zero. Transfers and the selected month are excluded. Past
-            variation does not predict a spending limit.
+            . Average = total of the included monthly category totals ÷ number
+            of included months. Sample standard deviation measures their spread
+            using n−1. Partial months count; months without a recorded total or
+            verified zero are skipped. Missing currency conversions cannot be
+            added together. Transfers and the selected month are excluded.
+            Changing the month or history window recalculates both statistics.
           </p>
         </details>
         <details>

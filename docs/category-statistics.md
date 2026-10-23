@@ -1,76 +1,77 @@
-# Category averages and standard deviation — 2.2.21
+# Recorded category statistics — 2.2.22
 
-## Diagnosis
+## What changed
 
-The category screen used whole-finance coverage to admit months into its
-comparison. A missing Revolut month or an issue-date-only card statement could
-therefore block a category recorded entirely in verified Barclays bank history.
-The bars still displayed recorded totals, using faded bars for partial coverage.
-The explanation did not identify which source prevented the comparison.
+The previous implementation admitted only fully verified months into the
+average. The chart could show six usable recorded monthly totals yet
+show no average or standard deviation because every statement was labelled
+partial. This confused completeness of the source history with the ability to
+describe the records already imported.
 
-There was also a chart/calculation mismatch: a six-month comparison used six
-previous months, but the chart discarded the oldest one to make room for the
-selected month. The reference average could include a month absent from the plot.
+Category statistics now use recorded monthly totals. Verification remains a
+separate confidence indicator. No import, statement reconciliation, balance,
+planning or whole-finance coverage rule is weakened by this display change.
 
-## Comparison scope
+## Calculation
 
-`categoryReport` selects the accounts with known non-transfer transactions in
-the category across native history. The same account set applies to every
-comparison month and is named on screen. It is selected before currency
-projection and includes fully refunded purchases at zero, so unavailable rates
-or refunds cannot silently remove a category account. Split parents and linked
-refund credits do not create a second copy of spending. Categorising a new
-account's transactions can expand this scope.
+- Sum this category's effective transactions within each reporting month.
+  Transfers and card repayments are excluded; splits and allocated refunds use
+  the existing effective-transaction projection without double counting.
+- Use the previous 1, 3, 6 or 12 months according to the selected window. The
+  selected month is excluded from its own historical baseline.
+- Include any month with recorded category activity, even with incomplete
+  coverage, inferred source dates, pending transfer review or manual accounts.
+  Include an explicit recorded zero, including a fully refunded purchase.
+- A month with no category activity counts as zero only when verified coverage
+  establishes that value. Otherwise it is a gap and is omitted from both the
+  sum and the sample count. Unrelated activity does not establish category zero.
+- Average = sum of included monthly totals / number of included months.
+  One observation is enough to show an average.
+- Sample standard deviation = square root of the sum of squared deviations
+  from the average divided by n−1. Two observations are enough; a single
+  observation has no sample deviation. Identical monthly totals give zero.
+- Changing the selected month or history window recalculates the comparison.
+  The difference from average is shown for recorded selected-month totals too,
+  labelled as recorded when coverage is partial.
 
-If a category has no known history, all statement accounts must support a true
-zero; the app cannot infer where unrecorded category spending would have occurred.
-Manual or missing account details cannot establish complete historical coverage.
-These account-scoped figures are not a claim that uncategorised transactions on
-other accounts cannot belong to the category.
+The chart shows every baseline month plus the selected month. The dashed line is
+the recorded average; the band is average ± sample standard deviation, bounded
+at zero for display. It is a descriptive band, not a budget or prediction.
 
-Each included month still needs full verified statement coverage for the same
-category accounts. Existing row-count, account/currency, reconciliation, date,
-FX and pending-transfer safeguards apply. A failed or overridden statement,
-missing row, inferred period, one-day coverage gap, missing/stale conversion or
-pending transfer on a category account excludes that month. Known transfer kinds
-also remain excluded when older records have inconsistent transfer flags.
+## Confidence and currency
 
-The selected month is excluded from its own baseline. The mean uses the eligible
-previous months; sample standard deviation needs at least three and uses n−1.
-A genuine verified zero participates. A missing zero remains unknown. Unverified
-nonzero recorded totals can be displayed as faded observations but cannot enter
-the mean, usual range or overspending comparison.
+Partial months are included and identified on the chart, in View values and in
+Months used for comparison. A short note explains that further imports may
+change the totals. Coverage details remain available but do not block the
+statistics. The stronger verified “above usual variation” alert still requires
+complete current and historical data; ordinary recorded differences do not.
 
-Linked refund credits are verified in their own source statements, including
-cross-account credits and refunds allocated to split parents. An unverified
-refund excludes the original purchase month that it adjusts, even when that
-month's purchase statement reconciles. Unrelated refunds do not block the
-category. Refund allocations must also fit the credit amount and currency.
+The known category account scope stays consistent and is selected from native
+history before display-currency projection. Fully refunded purchases and
+accounts with missing exchange rates remain in scope. With no category history,
+all statement accounts must support a verified zero rather than guessing which
+accounts would have contained the missing spending.
 
-Whole-finance coverage remains unchanged. Income-share denominators and property
-cash-flow summaries retain their complete financial scope, not just the category
-accounts. Payday-aligned dates are resolved from the full ledger, including
-salary on an account outside this category. Native ledger amounts, dates, saved
-statement provenance, schema and parser versions are not modified.
+Missing conversions for category transactions prevent that month's mixed-
+currency total from being calculated: the app never averages an understated
+converted subtotal as if it were the whole category. Existing cached rates can
+be used for recorded statistics, with stale/approximate conversion still
+labelled. Missing rates for unrelated categories do not block the category mean.
+Income shares and property summaries keep their full financial scope. Reporting
+dates, including payday-aligned periods, are resolved from the full ledger.
 
-## Visible explanation
+Refund provenance checks remain visible in coverage even when a recorded
+refund-adjusted total participates in descriptive statistics. Linked refunds,
+split parents and native account/currency inconsistencies cannot manufacture
+verified coverage. No native amounts, dates, statements, schema or parser
+versions are rewritten. Existing imports work without reimporting.
 
-- The comparison names the category accounts and the number of qualifying months.
-- The plot shows all prior comparison months plus the selected month.
-- “Months used for comparison” lists every prior month, its actual reporting
-  dates, inclusion/exclusion and the particular account or check that blocks it.
-- The explanation distinguishes an available mean from insufficient samples for
-  standard deviation. It mentions a shaded band only when one exists.
-- Source dates inferred by an older import remain unverified; an app update does
-  not manufacture a printed billing period or rewrite old financial records.
+## Verification
 
-## Regression coverage
-
-Fictional tests cover six complete bank months beside unrelated missing card and
-Revolut history, stable multi-account scope, Salary/zero variance, genuine zeros,
-missing/tampered rows, inferred dates, one-day gaps, minimum sample size, EUR
-conversion and stale/missing rates, manual accounts, transfer review, legacy
-transfer kinds, cross-account refunds and full-ledger payday boundaries.
-Browser cases check live categorisation updates, the month-by-month explanation,
-transaction drill-down, narrow widths and enlarged text. No real statements or
-financial data are included in repository fixtures.
+Fictional tests cover all-partial history, moving month/window selection, sample
+sizes, zero deviation, explicit and verified zeros, missing months, altered or
+deleted rows, inferred dates, manual accounts, transfers, refunds, splits,
+foreign-currency subtotals and stale/missing rates. Browser checks cover live
+categorisation, offline calculation, unchanged saved financial records,
+transaction drill-down, 320–430 px widths and enlarged text. Real financial
+records and the user's screenshots are not published as fixtures.
