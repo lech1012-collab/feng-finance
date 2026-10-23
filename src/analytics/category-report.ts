@@ -9,10 +9,13 @@ import type {
 } from "../domain/models";
 import { reportingPeriod } from "../domain/period";
 import { financialType } from "../domain/transaction-type";
+import { formatUkDate } from "../domain/dates";
+import { safeSum } from "../domain/money";
 import { categoryMatches, categoryOverview } from "./category";
 import { effectiveTransactions } from "./effective-transactions";
 import { projectedReportingTransactions } from "./fx";
 import { reportingCoverage } from "./reporting";
+import { verifiedStatements } from "./coverage";
 
 interface CategoryReportInput {
   accounts: Account[];
@@ -54,6 +57,47 @@ export function categoryReport({
     (row) =>
       categoryMatches(row, categoryId) && financialType(row) !== "transfer",
   );
+  // A linked refund can reduce a purchase in an earlier month, including a
+  // split line, even when its credit is on another account. Its source must be
+  // verified too; checking only the purchase month's statements is insufficient.
+  const categoryTargets = new Map<string, typeof categoryRows>();
+  for (const row of categoryRows)
+    for (const id of [row.id, row.parentId]) {
+      if (!id) continue;
+      const targets = categoryTargets.get(id) ?? [];
+      targets.push(row);
+      categoryTargets.set(id, targets);
+    }
+  const linkedRefunds = transactions.flatMap((refund) => {
+    if (
+      refund.kind !== "refund" &&
+      !(refund.categoryId === "refund" && refund.amount > 0)
+    )
+      return [];
+    const allocations = refund.refundAllocations ?? [];
+    const targets = allocations.flatMap(
+      (allocation) => categoryTargets.get(allocation.transactionId) ?? [],
+    );
+    const dates = [...new Set(targets.map((row) => row.date))];
+    const validAllocation =
+      Number.isSafeInteger(refund.amount) &&
+      refund.amount > 0 &&
+      allocations.every(
+        (allocation) =>
+          Number.isSafeInteger(allocation.amount) && allocation.amount > 0,
+      ) &&
+      safeSum(allocations.map((allocation) => allocation.amount)) <=
+        refund.amount &&
+      targets.every((row) => row.currency === refund.currency);
+    return dates.length ? [{ refund, dates, validAllocation }] : [];
+  });
+  const verifiedSourceIds = linkedRefunds.length
+    ? new Set(
+        verifiedStatements(statements, transactions, today).map(
+          (statement) => statement.id,
+        ),
+      )
+    : new Set<string>();
   const knownIds = new Set(categoryRows.map((row) => row.accountId));
   const scopedAccounts = knownIds.size
     ? accounts.filter((account) => knownIds.has(account.id))
@@ -163,10 +207,27 @@ export function categoryReport({
       reasons.push("Transfer matches need review for this period.");
     if (incomeCategory && !coverage.hasIncomeSource)
       reasons.push("No verified income-source statement for this period.");
+    const unverifiedRefunds = linkedRefunds.filter(
+      ({ refund, dates, validAllocation }) =>
+        dates.some((date) => date >= start && date < end) &&
+        (!validAllocation ||
+          !verifiedSourceIds.has(refund.statementId) ||
+          !accounts.some(
+            (account) =>
+              account.id === refund.accountId &&
+              account.currency === refund.currency &&
+              account.tracking !== "manual",
+          )),
+    );
+    for (const { refund } of unverifiedRefunds)
+      reasons.push(
+        `Linked refund dated ${formatUkDate(refund.date)}: source amounts or dates need verification.`,
+      );
     const complete =
       coverage.complete &&
       !unknownAccounts &&
       !manualAccounts.length &&
+      !unverifiedRefunds.length &&
       (!incomeCategory || coverage.hasIncomeSource);
     const observedCategoryData = categoryRows.some(
       (row) => row.date >= start && row.date < end,
@@ -177,6 +238,7 @@ export function categoryReport({
       hasData: coverage.hasData || observedCategoryData,
       hasUnverifiedStatements:
         coverage.hasUnverifiedStatements ||
+        unverifiedRefunds.length > 0 ||
         (observedCategoryData &&
           (unknownAccounts || manualAccounts.length > 0)),
       reasons,
@@ -238,7 +300,9 @@ export function categoryReport({
       unavailableReason:
         incomeCategory && !coverage.hasIncomeSource
           ? "No income source imported"
-          : "No verified statements",
+          : coverage.hasData
+            ? "Verification incomplete"
+            : "No verified statements",
       coverage,
       incomeCoverage: overallCoverageFor(point.month),
     };

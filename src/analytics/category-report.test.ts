@@ -274,12 +274,22 @@ describe("category-specific verified comparisons", () => {
     source.transactions.push(
       transaction({
         id: "refund",
+        statementId: "refund-proof",
         kind: "refund",
         accountId: "a2",
         amount: 80000,
         refundAllocations: [{ transactionId: purchase.id, amount: 80000 }],
       }),
     );
+    source.statements.push({
+      ...source.statements.find((document) => document.id === "bank-2026-09")!,
+      id: "refund-proof",
+      accountId: "a2",
+      institution: "Revolut",
+      openingBalance: 0,
+      closingBalance: 80000,
+      transactionCount: 1,
+    });
     const report = categoryReport(source);
     expect(report.scopedAccounts.map((account) => account.id)).toEqual(["a1"]);
     expect(report.stats.baseline[0].amount).toBe(0);
@@ -299,5 +309,76 @@ describe("category-specific verified comparisons", () => {
     expect(transfer.scopedAccounts.map((account) => account.id)).toEqual([
       "a1",
     ]);
+    const refundAccount = source.accounts.find(
+      (account) => account.id === "a2",
+    )!;
+    refundAccount.currency = "EUR";
+    expect(categoryReport(source).series[0].coverage.complete).toBe(false);
+    refundAccount.currency = "GBP";
+    source.statements.find(
+      (document) => document.id === "refund-proof",
+    )!.validationStatus = "warning";
+    const unverified = categoryReport(source);
+    expect(unverified.stats.baseline).toHaveLength(5);
+    expect(unverified.series[0].amount).toBeNull();
+    expect(unverified.series[0].coverage.reasons.join(" ")).toContain(
+      "Linked refund",
+    );
+    expect(unverified.series[0].coverage.complete).toBe(false);
+  });
+  it("checks split-parent refund sources in the purchase month without blocking unrelated categories", () => {
+    const source = input();
+    const parent = source.transactions.find(
+      (row) => row.id === "bank-2026-04-cost",
+    )!;
+    parent.kind = "split_parent";
+    source.transactions.push(
+      {
+        ...parent,
+        id: "property-line",
+        parentId: parent.id,
+        kind: "normal",
+        source: "split",
+        amount: -60000,
+      },
+      {
+        ...parent,
+        id: "shopping-line",
+        parentId: parent.id,
+        kind: "normal",
+        source: "split",
+        categoryId: "shopping",
+        amount: -20000,
+      },
+      transaction({
+        id: "unverified-refund",
+        accountId: "a2",
+        statementId: "missing-refund",
+        kind: "refund",
+        amount: 80000,
+        refundAllocations: [{ transactionId: parent.id, amount: 80000 }],
+      }),
+    );
+    const report = categoryReport(source);
+    expect(report.stats.baseline).toHaveLength(5);
+    expect(report.series[0].coverage.reasons.join(" ")).toContain(
+      "Linked refund",
+    );
+    expect(
+      report.series.find((point) => point.month === "2026-05")!.coverage
+        .complete,
+    ).toBe(true);
+    const unrelated = input();
+    unrelated.transactions.push(
+      transaction({
+        id: "unrelated-refund",
+        accountId: "a2",
+        statementId: "missing-refund",
+        kind: "refund",
+        amount: 990,
+        refundAllocations: [{ transactionId: "card-purchase", amount: 990 }],
+      }),
+    );
+    expect(categoryReport(unrelated).stats.baseline).toHaveLength(6);
   });
 });

@@ -41,6 +41,12 @@ A genuine verified zero participates. A missing zero remains unknown. Unverified
 nonzero recorded totals can be displayed as faded observations but cannot enter
 the mean, usual range or overspending comparison.
 
+Linked refund credits are verified in their own source statements, including
+cross-account credits and refunds allocated to split parents. An unverified
+refund excludes the original purchase month that it adjusts, even when that
+month's purchase statement reconciles. Unrelated refunds do not block the
+category. Refund allocations must also fit the credit amount and currency.
+
 Whole-finance coverage remains unchanged. Income-share denominators and property
 cash-flow summaries retain their complete financial scope, not just the category
 accounts. Payday-aligned dates are resolved from the full ledger, including
