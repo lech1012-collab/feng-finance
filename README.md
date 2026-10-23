@@ -60,6 +60,12 @@ inspect its dated balance, debt or credit. Changes compare the exact displayed
 dates, and single statement snapshots remain dated values rather than invented
 trends. See the [balance-trend design and safeguards](docs/balance-trend-ux.md).
 
+Category comparisons use the same known category accounts in every previous
+month, with full verification still required for those accounts. Open “Months
+used for comparison” to see which months qualify and why others are excluded.
+The chart includes every month used in the mean. See the
+[category-statistics diagnosis and safeguards](docs/category-statistics.md).
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

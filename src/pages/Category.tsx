@@ -1,6 +1,3 @@
-import { effectiveTransactions } from "../analytics/effective-transactions";
-import { projectedReportingTransactions } from "../analytics/fx";
-import { reportingCoverage } from "../analytics/reporting";
 import { reportingPeriodLabel } from "../domain/period";
 import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
 import { useState } from "react";
@@ -18,19 +15,12 @@ import {
   Cell,
 } from "recharts";
 import { db } from "../storage/database";
-import { categoryOverview } from "../analytics/category";
-import {
-  monthBounds,
-  monthOffset,
-  monthLabel,
-  formatUkDate,
-  formatDateRange,
-} from "../domain/dates";
-import { monthCoverage, verifiedStatements } from "../analytics/coverage";
+import { categoryReport } from "../analytics/category-report";
+import { monthLabel, formatUkDate, formatDateRange } from "../domain/dates";
 import { localToday } from "../analytics/reminders";
 import { shiftDate } from "../analytics/analysis-period";
 import { displayMerchant } from "../domain/presentation";
-import { compactMoney, money, currencyPrecision } from "../domain/money";
+import { compactMoney, money } from "../domain/money";
 import { MonthPicker, Metric, RangeControl } from "../components/common";
 import {
   chartTickFontSize,
@@ -72,11 +62,6 @@ export default function CategoryPage({
         settings: source.settings ?? [],
         rates: source.rates ?? [],
         proposals: source.proposals ?? [],
-        transactions: projectedReportingTransactions(
-          effectiveTransactions(source.transactions),
-          currency,
-          source.rates ?? [],
-        ).transactions,
       }
     : undefined;
   if (!data) return <p role="status">Loading category overview…</p>;
@@ -90,79 +75,27 @@ export default function CategoryPage({
     );
   const name = category?.name ?? "Uncategorised";
   const today = localToday();
-  const documents = verifiedStatements(
-    data.statements,
-    source!.transactions,
-    today,
-  );
-  const coverage = reportingCoverage(
-    data.accounts,
-    data.statements,
-    source!.transactions,
-    selected,
-    currency,
-    data.rates,
-    data.settings,
-    data.proposals,
-    today,
-  );
-  const approximate = data.transactions.some((t) => "conversion" in t);
-  const stats = categoryOverview(
-    data.transactions,
-    data.accounts,
-    documents,
-    data.categories,
-    id,
-    selected,
+  const {
+    stats,
+    series,
+    coverage,
+    financialCoverage,
+    approximate,
+    scopedAccounts,
+    inferredScope,
+  } = categoryReport({
+    accounts: data.accounts,
+    statements: data.statements,
+    transactions: source!.transactions,
+    categories: data.categories,
+    categoryId: id,
+    month: selected,
     currency,
     window,
     today,
-    (m) => {
-      const eligible = reportingCoverage(
-        data.accounts,
-        data.statements,
-        source!.transactions,
-        m,
-        currency,
-        data.rates,
-        data.settings,
-        data.proposals,
-        today,
-      );
-      return (
-        eligible.complete &&
-        (category?.kind !== "income" || eligible.hasIncomeSource)
-      );
-    },
-    data.settings,
-    source!.transactions,
-  );
-  const series = stats.series.slice(-window).map((point) => {
-    const covered = reportingCoverage(
-      data.accounts,
-      data.statements,
-      source!.transactions,
-      point.month,
-      currency,
-      data.rates,
-      data.settings,
-      data.proposals,
-      today,
-    );
-    return {
-      ...point,
-      amount:
-        covered.status === "No data" ||
-        covered.status === "Unverified" ||
-        (stats.incomeCategory && !covered.hasIncomeSource)
-          ? null
-          : point.amount,
-      unavailableReason:
-        stats.incomeCategory && !covered.hasIncomeSource
-          ? "No income source imported"
-          : "No verified statements",
-      coverage: covered,
-    };
+    rates: data.rates,
+    settings: data.settings,
+    proposals: data.proposals,
   });
   const transactionUrl = (m: string) =>
     `/transactions?category=${encodeURIComponent(id)}&month=${m}`;
@@ -188,6 +121,19 @@ export default function CategoryPage({
       <p className="muted">
         {reportingPeriodLabel(selected, data.settings, source!.transactions)}
       </p>
+      <p className="coverage-note">
+        Comparison accounts:{" "}
+        {scopedAccounts
+          .map(
+            (account) =>
+              `${account.displayName} (${account.maskedAccountIdentifier})`,
+          )
+          .join(", ") || "none yet"}
+        .
+        {inferredScope
+          ? " The same category accounts are used in every month."
+          : " With no category history, all statement accounts must support a verified zero."}
+      </p>
       <div className="toolbar">
         <MonthPicker month={selected} onChange={chooseMonth} />
         <RangeControl
@@ -197,8 +143,9 @@ export default function CategoryPage({
         />
       </div>
       <section className="card category-kpis">
-        {coverage.hasData &&
-        (!stats.incomeCategory || coverage.hasIncomeSource) ? (
+        {stats.current.amount > 0 ||
+        (coverage.hasData &&
+          (!stats.incomeCategory || coverage.hasIncomeSource)) ? (
           <Metric
             label={
               stats.incomeCategory ? "Income this month" : "Spent this month"
@@ -228,9 +175,8 @@ export default function CategoryPage({
             {mean === undefined ? "Unavailable" : money(mean, currency)}
           </strong>
           <small>
-            {stats.baseline.length} complete month
-            {stats.baseline.length === 1 ? "" : "s"} in previous {window} month
-            {window === 1 ? "" : "s"}
+            {stats.baseline.length} verified previous month
+            {stats.baseline.length === 1 ? "" : "s"} out of {window}
           </small>
         </div>
         <div className="metric">
@@ -240,18 +186,20 @@ export default function CategoryPage({
               : "Share of income spent"}
           </span>
           <strong>
-            {coverage.missingRates ||
-            !coverage.hasIncomeSource ||
+            {financialCoverage.missingRates ||
+            !financialCoverage.hasIncomeSource ||
             stats.current.incomePercent === undefined
               ? "Unavailable"
               : `${stats.current.incomePercent.toFixed(1)}%`}
           </strong>
           <small>
-            {!coverage.hasIncomeSource
-              ? "No income source imported"
-              : stats.current.income > 0
-                ? `Of ${money(stats.current.income, currency)} recorded income`
-                : "No income recorded for this period"}
+            {financialCoverage.missingRates
+              ? "Exchange rates needed for recorded income"
+              : !financialCoverage.hasIncomeSource
+                ? "No income source imported"
+                : stats.current.income > 0
+                  ? `Of ${money(stats.current.income, currency)} recorded income`
+                  : "No income recorded for this period"}
           </small>
         </div>
         <div className="metric">
@@ -274,8 +222,8 @@ export default function CategoryPage({
         {coverage.status}. Trend:{" "}
         <span className="date-value">
           {formatDateRange(
-            `${monthOffset(selected, 1 - window)}-01`,
-            shiftDate(monthBounds(selected)[1], -1),
+            series[0].coverage.start,
+            shiftDate(series.at(-1)!.coverage.end, -1),
           )}
         </span>
         .
@@ -312,14 +260,16 @@ export default function CategoryPage({
         <section className="card">
           <h2>Property cash flow</h2>
           <div className="category-kpis">
-            {coverage.hasIncomeSource ? (
+            {financialCoverage.hasIncomeSource ? (
               <Metric
                 label="Rent received"
                 value={stats.property.income}
                 currency={currency}
                 approximate={approximate}
-                partial={!coverage.complete}
-                unavailable={coverage.missingRates ? "Rates needed" : undefined}
+                partial={!financialCoverage.complete}
+                unavailable={
+                  financialCoverage.missingRates ? "Rates needed" : undefined
+                }
               />
             ) : (
               <div className="metric">
@@ -327,14 +277,16 @@ export default function CategoryPage({
                 <strong>Not imported</strong>
               </div>
             )}
-            {coverage.hasData ? (
+            {financialCoverage.hasData ? (
               <Metric
                 label="Property costs"
                 value={stats.property.expenses}
                 currency={currency}
                 approximate={approximate}
-                partial={!coverage.complete}
-                unavailable={coverage.missingRates ? "Rates needed" : undefined}
+                partial={!financialCoverage.complete}
+                unavailable={
+                  financialCoverage.missingRates ? "Rates needed" : undefined
+                }
               />
             ) : (
               <div className="metric">
@@ -342,14 +294,16 @@ export default function CategoryPage({
                 <strong>Not imported</strong>
               </div>
             )}
-            {coverage.hasIncomeSource ? (
+            {financialCoverage.hasIncomeSource ? (
               <Metric
                 label="Net property cash flow"
                 value={stats.property.net}
                 currency={currency}
                 approximate={approximate}
-                partial={!coverage.complete}
-                unavailable={coverage.missingRates ? "Rates needed" : undefined}
+                partial={!financialCoverage.complete}
+                unavailable={
+                  financialCoverage.missingRates ? "Rates needed" : undefined
+                }
               />
             ) : (
               <div className="metric">
@@ -378,8 +332,12 @@ export default function CategoryPage({
         )}
         <h2>{stats.incomeCategory ? "Income" : "Spending"} over time</h2>
         <p className="muted">
-          Tap a bar or month below to inspect its transactions. The shaded band
-          shows usual variation; it is not a budget.
+          Tap a bar or month below to inspect its transactions. {window}{" "}
+          previous month{window === 1 ? "" : "s"} and the selected month are
+          shown.
+          {std !== undefined
+            ? " The shaded band shows usual variation; it is not a budget."
+            : " Only verified previous months enter the average."}
         </p>
         <div
           role="img"
@@ -483,7 +441,7 @@ export default function CategoryPage({
                 {series.map((point) => (
                   <Cell
                     key={point.month}
-                    fillOpacity={point.coverage.status === "Partial" ? 0.55 : 1}
+                    fillOpacity={point.coverage.complete ? 1 : 0.55}
                   />
                 ))}
               </Bar>
@@ -491,22 +449,62 @@ export default function CategoryPage({
           </ResponsiveContainer>
         </div>
         <p className="coverage-note">
-          Hatched months have no verified statements; faded bars are partial.
-          Zero is shown only when verified coverage supports it.
+          Faded bars show recorded totals with incomplete verification; they are
+          excluded from the average. Hatched months cannot establish a value. A
+          zero needs complete verified coverage.
         </p>
+        <details className="category-comparison-months">
+          <summary>
+            Months used for comparison ({stats.baseline.length} of {window})
+          </summary>
+          <ul className="category-comparison-list">
+            {series.slice(0, -1).map((point) => (
+              <li key={point.month}>
+                <strong>{monthLabel(point.month)}</strong>
+                <span>
+                  {point.coverage.complete
+                    ? `Included · ${money(point.amount!, currency)}`
+                    : "Excluded"}
+                </span>
+                <small>
+                  {formatDateRange(
+                    point.coverage.start,
+                    shiftDate(point.coverage.end, -1),
+                  )}
+                </small>
+                {!point.coverage.complete && (
+                  <ul>
+                    {point.coverage.reasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="muted">
+            {monthLabel(selected)} is the selected month and is excluded from
+            the historical average.
+          </p>
+        </details>
         <details>
           <summary>Average and standard deviation explained</summary>
           <p>
             Average:{" "}
-            {mean === undefined ? "unavailable" : money(mean, currency)}. Sample
-            standard deviation:{" "}
+            {mean === undefined
+              ? "unavailable because no previous month has complete verified coverage for these accounts"
+              : money(mean, currency)}
+            . Sample standard deviation:{" "}
             {std === undefined
-              ? "unavailable. Needs at least three complete months"
+              ? `unavailable. Needs at least three verified previous months; ${stats.baseline.length} currently qualify`
               : money(std, currency)}
-            . The baseline excludes this month, missing coverage, and accounts
-            with mismatched currency. A verified month with no category spending
-            counts as zero. Transfers are excluded. Past variation does not
-            predict a spending limit.
+            . The comparison uses the same accounts with known transactions in
+            this category for every month. Categorising transactions on another
+            account can change this scope. Incomplete coverage, unverified dates
+            or amounts, pending transfers and missing or stale exchange rates
+            exclude a month. A fully verified month with no category spending
+            counts as zero. Transfers and the selected month are excluded. Past
+            variation does not predict a spending limit.
           </p>
         </details>
         <details>
@@ -526,7 +524,8 @@ export default function CategoryPage({
                     : money(point.amount, currency)}
                 </strong>
                 <small>
-                  {!point.coverage.hasIncomeSource ||
+                  {!point.incomeCoverage.hasIncomeSource ||
+                  point.incomeCoverage.missingRates > 0 ||
                   point.incomePercent === undefined
                     ? "Income share unavailable"
                     : `${point.incomePercent.toFixed(1)}% of income`}

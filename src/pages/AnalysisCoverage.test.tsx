@@ -9,6 +9,7 @@ import type {
 } from "../domain/models";
 import { accounts, transaction } from "../tests/helpers";
 import { defaultCategories } from "../storage/database";
+import { categoryHistoryFixture } from "../tests/category-history";
 import CategoryPage from "./Category";
 import Analysis from "./Analysis";
 
@@ -128,7 +129,7 @@ it("keeps card-only Salary history unknown instead of plotting zero", () => {
   );
   const { container } = showSalary();
   expect(screen.getByTestId("category-series")).toHaveTextContent(
-    "[null,null,null,null,null,null]",
+    "[null,null,null,null,null,null,null]",
   );
   expect(
     container.querySelector(".category-kpis .metric strong"),
@@ -153,8 +154,79 @@ it("retains a genuine zero Salary value when an income source has complete verif
   );
   showSalary();
   expect(screen.getByTestId("category-series")).toHaveTextContent(
-    "[null,null,null,null,null,0]",
+    "[null,null,null,null,null,null,0]",
   );
+});
+it("shows Salary averages and zero deviation despite incomplete unrelated card and Revolut history", () => {
+  const source = categoryHistoryFixture();
+  fixture(source.accounts, source.transactions, source.statements);
+  const { container } = showSalary();
+  const average = container.querySelector(
+    ".category-kpis .metric:nth-child(2)",
+  );
+  expect(average).toHaveTextContent("£3,000.00");
+  expect(average).toHaveTextContent("5 verified previous months out of 6");
+  expect(container.querySelector(".category-range")).toHaveTextContent(
+    "Standard deviation: £0.00",
+  );
+  fireEvent.click(
+    screen.getByText("Months used for comparison (5 of 6)", { exact: true }),
+  );
+  expect(
+    container.querySelector(".category-comparison-list"),
+  ).toHaveTextContent("Included · £3,000.00");
+  expect(
+    container.querySelector(".category-comparison-list"),
+  ).toHaveTextContent("no statement covers this period");
+});
+it("explains the exact excluded source month and keeps an available one-month average separate from sample deviation", () => {
+  const source = categoryHistoryFixture();
+  source.statements.find(
+    (document) => document.id === "bank-2026-08",
+  )!.periodSource = "transaction-coverage";
+  fixture(source.accounts, source.transactions, source.statements);
+  const { container } = showSalary();
+  fireEvent.click(
+    screen.getByText("Months used for comparison (4 of 6)", { exact: true }),
+  );
+  expect(
+    container.querySelector(".category-comparison-list"),
+  ).toHaveTextContent("statement dates need verification");
+  fireEvent.click(screen.getByRole("button", { name: "1 month" }));
+  // August is the sole previous month, and its dates are unverified.
+  expect(
+    container.querySelector(".category-kpis .metric:nth-child(2) strong"),
+  ).toHaveTextContent("Unavailable");
+  fireEvent.click(
+    screen.getByText("Average and standard deviation explained", {
+      exact: true,
+    }),
+  );
+  expect(
+    screen.getByText(
+      /Needs at least three verified previous months; 0 currently qualify/,
+    ),
+  ).toBeVisible();
+});
+it("shows an available one-month mean while explaining why sample deviation needs more history", () => {
+  const source = categoryHistoryFixture();
+  fixture(source.accounts, source.transactions, source.statements);
+  const { container } = showSalary();
+  fireEvent.click(screen.getByRole("button", { name: "1 month" }));
+  expect(
+    container.querySelector(".category-kpis .metric:nth-child(2) strong"),
+  ).toHaveTextContent("£3,000.00");
+  expect(container.querySelector(".category-range")).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByText("Average and standard deviation explained", {
+      exact: true,
+    }),
+  );
+  expect(
+    screen.getByText(
+      /Needs at least three verified previous months; 1 currently qualify/,
+    ),
+  ).toBeVisible();
 });
 it("warns about mixed unverified imports and plots the same recorded outflow as its KPI", () => {
   fixture(
