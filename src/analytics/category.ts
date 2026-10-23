@@ -10,6 +10,7 @@ import { cashFlow, propertyFlow } from "./calculations";
 import { safeSum } from "../domain/money";
 import { effectiveTransactions } from "./effective-transactions";
 import { inReportingPeriod } from "../domain/period";
+import { financialType } from "../domain/transaction-type";
 const day = (s: string) => Date.parse(s) / 86400000;
 export function completeMonth(
   month: string,
@@ -63,11 +64,7 @@ export function categoryOverview(
 ) {
   const incomeCategory = categories.find((c) => c.id === id)?.kind === "income";
   const eligible = effectiveTransactions(transactions).filter(
-    (t) =>
-      t.currency === currency &&
-      !t.isTransfer &&
-      t.type !== "transfer" &&
-      !t.transferPairId,
+    (t) => t.currency === currency && financialType(t) !== "transfer",
   );
   const relevant = eligible.filter((t) => categoryMatches(t, id));
   const amountFor = (items: Transaction[]) =>

@@ -3305,6 +3305,29 @@ h3 {
 .category-months small {
   color: var(--muted);
 }
+.category-comparison-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.category-comparison-list > li {
+  min-width: 0;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--line);
+  overflow-wrap: anywhere;
+}
+.category-comparison-list > li > strong,
+.category-comparison-list > li > span,
+.category-comparison-list > li > small {
+  display: block;
+}
+.category-comparison-list small {
+  color: var(--muted);
+}
+.category-comparison-list ul {
+  padding-inline-start: 20px;
+  margin-top: 8px;
+}
 .category-months a:hover {
   background: var(--soft);
 }

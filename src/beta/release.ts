@@ -12,15 +12,15 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-22",
+  date: "2026-10-23",
   points: [
-    "Balance trend shows one selected balance with its value, actual date and verified change.",
-    "Cash history stays readable when credit cards have only dated statement balances.",
-    "Drag across the chart or use arrow keys to inspect dates; missing history is never joined or shown as zero.",
+    "Category averages use a consistent set of category accounts, so unrelated incomplete accounts do not block them.",
+    "See exactly which previous months qualify for the average and why others are excluded.",
+    "Category charts show every month used by the average, plus the selected month.",
   ],
   pleaseTest: [
-    "Switch between cash, an individual account and net worth; check the displayed dates and amounts.",
-    "Check that a card's debt or credit is labelled clearly, and one recorded balance does not become an invented trend.",
+    "Open a category with three or more complete previous months and check its average and standard deviation.",
+    "Open Months used for comparison and check the accounts, included months and any missing date or amount checks.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
