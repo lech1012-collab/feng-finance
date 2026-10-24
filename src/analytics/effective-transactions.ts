@@ -210,21 +210,44 @@ export function markRefundCandidates(
   );
 }
 
-export function needsReview(transaction: Transaction): boolean {
-  if (transaction.parentId) return false;
-  if (!transaction.isReviewed) return true;
+export type TransactionReviewReason =
+  "category" | "refund" | "split" | "source";
+
+/** A manual review stamp is audit history, not a second approval of an already
+ * assigned category. Source uncertainty is resolved during import; only an
+ * explicit outstanding source check should ask for another financial decision.
+ */
+export function transactionReviewReason(
+  transaction: Transaction,
+): TransactionReviewReason | undefined {
+  if (transaction.parentId) return;
+  if (transaction.checkLevel === "review" && !transaction.isReviewed)
+    return "source";
   if (
     transaction.kind === "refund" ||
     (transaction.amount > 0 && transaction.categoryId === "refund")
   )
-    return !transaction.refundAllocations?.length;
-  if (transaction.kind === "split_parent") return false;
-  return (
+    return transaction.refundAllocations?.length ? undefined : "refund";
+  if (transaction.kind === "split_parent")
+    return transaction.isReviewed ? undefined : "split";
+  if (
     !transaction.categoryId &&
+    !transaction.subcategoryId &&
     !transaction.isTransfer &&
     transaction.type !== "transfer" &&
-    !transaction.transferPairId
-  );
+    !transaction.transferPairId &&
+    transaction.kind !== "transfer" &&
+    transaction.kind !== "card_repayment"
+  )
+    return "category";
+}
+
+export function needsReview(transaction: Transaction): boolean {
+  return transactionReviewReason(transaction) !== undefined;
+}
+
+export function needsCategory(transaction: Transaction): boolean {
+  return transactionReviewReason(transaction) === "category";
 }
 
 export function ledgerTransactions(transactions: Transaction[]): Transaction[] {

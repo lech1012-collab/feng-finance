@@ -34,6 +34,50 @@ const detail = (id = "t1") =>
     </MemoryRouter>,
   );
 
+it("does not ask for another review of an already categorised rule match", async () => {
+  const row = transaction({
+    categoryId: "groceries",
+    categorySource: "rule",
+    isReviewed: false,
+    checkLevel: "total",
+  });
+  await db.transactions.put(row);
+  detail();
+  expect(await screen.findByRole("combobox", { name: "Category" })).toHaveValue(
+    "groceries",
+  );
+  expect(
+    screen.queryByRole("button", { name: "Mark reviewed" }),
+  ).not.toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /Confirm.*checked/ }),
+  ).not.toBeInTheDocument();
+  expect(await db.transactions.get(row.id)).toEqual(row);
+});
+
+it("still offers an explicit confirmation when a source check is genuinely outstanding", async () => {
+  await db.transactions.put(
+    transaction({
+      categoryId: "groceries",
+      isReviewed: false,
+      checkLevel: "review",
+    }),
+  );
+  detail();
+  const confirm = await screen.findByRole("button", {
+    name: "Confirm source checked",
+  });
+  fireEvent.click(confirm);
+  await waitFor(async () =>
+    expect((await db.transactions.get("t1"))?.isReviewed).toBe(true),
+  );
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("button", { name: "Confirm source checked" }),
+    ).not.toBeInTheDocument(),
+  );
+});
+
 it("shows the original counted month directly under a refund amount only once", async () => {
   await db.transactions.bulkPut([
     transaction({

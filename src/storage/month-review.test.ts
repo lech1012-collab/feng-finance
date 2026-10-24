@@ -5,6 +5,7 @@ import { db, initializeDatabase } from "./database";
 import {
   authorizeMonthEdit,
   closeMonth,
+  autoCloseEligibleMonths,
   ClosedMonthError,
   ensureMonthsOpen,
 } from "./month-review";
@@ -77,6 +78,26 @@ afterEach(async () => {
   });
 });
 describe("closed monthly review integrity", () => {
+  it("allows an intentional close of categorised history without 189 redundant stamps", async () => {
+    await db.transactions.update(purchase.id, {
+      isReviewed: false,
+      categorySource: "rule",
+    });
+    await closeMonth("2026-08", "GBP");
+    expect((await db.monthCloses.get("2026-08"))?.snapshot.expenses).toBe(4000);
+    expect((await db.transactions.get(purchase.id))?.isReviewed).toBe(false);
+  });
+  it("does not retrospectively auto-close unreviewed history after the attention fix", async () => {
+    vi.setSystemTime(new Date("2027-01-08T12:00:00Z"));
+    await db.transactions.update(purchase.id, {
+      isReviewed: false,
+      categorySource: "rule",
+    });
+    const before = await db.transactions.toArray();
+    await autoCloseEligibleMonths();
+    expect(await db.monthCloses.get("2026-08")).toBeUndefined();
+    expect(await db.transactions.toArray()).toEqual(before);
+  });
   it("refuses financial edits until the closed month is explicitly reopened", async () => {
     await closeMonth("2026-08", "GBP");
     const before = await db.monthCloses.get("2026-08");

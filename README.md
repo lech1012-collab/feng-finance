@@ -68,6 +68,10 @@ is compared with the previous 1, 3, 6 or 12 months, with every baseline month
 visible in the chart. See the
 [category-statistics diagnosis and safeguards](docs/category-statistics.md).
 
+Home asks only for missing categories and genuine refund, split or source
+decisions. Already categorised rule matches need no second review. See
+[transaction attention](docs/transaction-attention.md).
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

@@ -11,6 +11,8 @@ import { SplitRuleOffer } from "../components/SplitRuleOffer";
 import { TransferReview } from "../components/TransferReview";
 import {
   needsReview,
+  needsCategory,
+  transactionReviewReason,
   effectiveTransactions,
 } from "../analytics/effective-transactions";
 import { liabilityTypes } from "../analytics/net-worth";
@@ -65,7 +67,6 @@ import {
   categorySuggestions,
   categorySuggestionReason,
 } from "../categorization/suggestions";
-const needsCategory = needsReview;
 export default function Transactions({
   month,
   currency,
@@ -75,6 +76,7 @@ export default function Transactions({
 }) {
   const [params] = useSearchParams();
   const [toReview, setToReview] = useState(params.get("review") === "1");
+  const exceptionsOnly = params.get("attention") === "1";
   const [queryIds, setQueryIds] = useState<Set<string>>();
   const [activeQuery, setActiveQuery] = useState<{
     query: string;
@@ -214,16 +216,7 @@ export default function Transactions({
           statementBalanceEvidence(statement, balanceRows),
         ]),
       ),
-      uncategorizedCount: await db.transactions
-        .filter(
-          (t) =>
-            !t.parentId &&
-            !t.categoryId &&
-            !t.isTransfer &&
-            t.kind !== "refund" &&
-            t.kind !== "split_parent",
-        )
-        .count(),
+      uncategorizedCount: await db.transactions.filter(needsCategory).count(),
       reviewCount: await db.transactions.filter(needsReview).count(),
       tags: await db.tags.toArray(),
       rates: await db.fxRates.toArray(),
@@ -329,7 +322,8 @@ export default function Transactions({
     () =>
       baseFiltered.filter(
         (t) =>
-          (!toReview || needsReview(t)) &&
+          (!toReview ||
+            (needsReview(t) && (!exceptionsOnly || !needsCategory(t)))) &&
           (!category ||
             category === "uncategorized" ||
             matchesTransactionCategory(t, category, categoryIndex)) &&
@@ -337,12 +331,7 @@ export default function Transactions({
             (type === "income"
               ? matchesTransactionIncome(t)
               : financialType(t) === type)) &&
-          (!uncategorized ||
-            (!t.categoryId &&
-              !t.subcategoryId &&
-              financialType(t) !== "transfer" &&
-              t.kind !== "refund" &&
-              t.kind !== "split_parent")) &&
+          (!uncategorized || needsCategory(t)) &&
           (!property ||
             matchesQuickTransactionFilter(t, "property", categoryIndex)),
       ),
@@ -350,6 +339,7 @@ export default function Transactions({
       baseFiltered,
       categoryIndex,
       toReview,
+      exceptionsOnly,
       category,
       type,
       uncategorized,
@@ -744,6 +734,7 @@ export default function Transactions({
     accountScope: params.get("accountScope") ?? "",
     reporting: params.get("reporting") ?? "",
     review: toReview ? "1" : "",
+    attention: toReview && exceptionsOnly ? "1" : "",
   }))
     if (value) returnParams.set(key, value);
   const returnTo = `/transactions?${returnParams}`;
@@ -982,6 +973,9 @@ export default function Transactions({
         </div>
         <p className="filter-context">
           {allDates ? "All imported dates" : displayDateRange(from, to)}
+          {toReview && exceptionsOnly
+            ? " · Refunds, splits and source checks"
+            : ""}
         </p>
         <div ref={setViewsTarget} className="saved-view-chips" />
       </section>
@@ -1295,7 +1289,7 @@ export default function Transactions({
             <SwipeTransaction
               key={t.id}
               transaction={t}
-              accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId) ? displayAccountName(data.accounts.find((a) => a.id === t.accountId)!) : "Account"}, ${money(t.amount, t.currency, true)}`}
+              accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : t.kind === "split_parent" ? "Split payment" : t.kind === "refund" ? "Refund" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId) ? displayAccountName(data.accounts.find((a) => a.id === t.accountId)!) : "Account"}, ${money(t.amount, t.currency, true)}`}
               returnTo={returnTo}
               selected={selectedIds.includes(t.id)}
               onSelect={(event) => selectRow(t, event)}
@@ -1312,15 +1306,15 @@ export default function Transactions({
             >
               <div className="transaction-description">
                 <strong>{displayMerchant(t)}</strong>
-                {!t.isReviewed &&
-                  (t.categoryId ||
-                    t.isTransfer ||
-                    t.kind === "refund" ||
-                    t.kind === "split_parent") && (
-                    <StatusChip className="review-status" tone="warning">
-                      To review
-                    </StatusChip>
-                  )}
+                {needsReview(t) && !needsCategory(t) && (
+                  <StatusChip className="review-status" tone="warning">
+                    {transactionReviewReason(t) === "source"
+                      ? "Check source"
+                      : transactionReviewReason(t) === "split"
+                        ? "Confirm split"
+                        : "Link refund"}
+                  </StatusChip>
+                )}
                 {t.kind === "split_parent" && (
                   <StatusChip className="transaction-status">
                     Split ·{" "}
@@ -1357,7 +1351,7 @@ export default function Transactions({
                         ? "warning"
                         : "neutral"
                     }
-                    className={`transaction-status ${t.isTransfer || t.type === "transfer" || t.transferPairId ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+                    className={`transaction-status ${financialType(t) === "transfer" ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
                   >
                     <span
                       className="category-dot"
@@ -1371,7 +1365,7 @@ export default function Transactions({
                       }}
                       aria-hidden="true"
                     />
-                    {t.isTransfer || t.type === "transfer" || t.transferPairId
+                    {financialType(t) === "transfer"
                       ? "Transfer"
                       : t.categoryId || t.subcategoryId
                         ? (data?.categories.find(

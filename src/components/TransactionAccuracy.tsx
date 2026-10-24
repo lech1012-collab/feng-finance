@@ -8,6 +8,7 @@ import { displayDate, displayMerchant } from "../domain/presentation";
 import {
   allocateMinor,
   refundCandidates,
+  transactionReviewReason,
 } from "../analytics/effective-transactions";
 import { db } from "../storage/database";
 import { authorizeMonthEdit } from "../storage/month-review";
@@ -199,7 +200,9 @@ export function TransactionAccuracy({
               Restore as normal income
             </button>
           )}
-          {!transaction.isReviewed && (
+          {["split", "source"].includes(
+            transactionReviewReason(transaction) ?? "",
+          ) && (
             <button
               onClick={() =>
                 void execute(
@@ -209,7 +212,9 @@ export function TransactionAccuracy({
               }
               disabled={busy}
             >
-              Mark reviewed
+              {transactionReviewReason(transaction) === "split"
+                ? "Confirm split"
+                : "Confirm source checked"}
             </button>
           )}
         </div>

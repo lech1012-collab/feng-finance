@@ -1,3 +1,4 @@
+import { needsCategory } from "../analytics/effective-transactions";
 import {
   useEffect,
   useRef,
@@ -57,7 +58,13 @@ export function SwipeTransaction({
       window.removeEventListener("keydown", cancel);
     };
   }, [isDragging]);
-  const enabled = !t.isTransfer && t.type !== "transfer" && !t.transferPairId;
+  const enabled =
+    !t.isTransfer &&
+    t.type !== "transfer" &&
+    !t.transferPairId &&
+    !t.parentId &&
+    t.kind !== "refund" &&
+    t.kind !== "split_parent";
   const swipe = useSwipe((direction) => {
     if (!enabled) return;
     if (direction === "left" && suggestion && onQuickCategorize)
@@ -146,7 +153,7 @@ export function SwipeTransaction({
           swipe.bind.onPointerCancel();
         }}
         style={{ transform: `translateX(${revealed ? -160 : swipe.offset}px)` }}
-        aria-haspopup={enabled && !t.categoryId ? "dialog" : undefined}
+        aria-haspopup={enabled && needsCategory(t) ? "dialog" : undefined}
         aria-keyshortcuts={enabled ? "C" : undefined}
         onClick={(e) => {
           if (dragged.current) {
@@ -170,7 +177,7 @@ export function SwipeTransaction({
           }
           if (
             enabled &&
-            !t.categoryId &&
+            needsCategory(t) &&
             !e.metaKey &&
             !e.ctrlKey &&
             !e.shiftKey &&

@@ -36,6 +36,7 @@ import { accountSnapshot } from "../analytics/balances";
 import {
   effectiveTransactions,
   needsReview,
+  needsCategory,
 } from "../analytics/effective-transactions";
 import { projectedReportingTransactions } from "../analytics/fx";
 import {
@@ -153,16 +154,7 @@ export default function Home({
             statements,
             settings: await db.settings.toArray(),
             count: await db.transactions.count(),
-            uncategorized: await db.transactions
-              .filter(
-                (t) =>
-                  !t.parentId &&
-                  !t.categoryId &&
-                  !t.isTransfer &&
-                  t.kind !== "refund" &&
-                  t.kind !== "split_parent",
-              )
-              .count(),
+            uncategorized: await db.transactions.filter(needsCategory).count(),
             toReview: await db.transactions.filter(needsReview).count(),
             rates: await db.fxRates.toArray(),
             valuations: await db.valuations.toArray(),
@@ -317,12 +309,14 @@ export default function Home({
   );
   const insight = insights.items[0];
   const health = homeDataHealth(data.settings, today);
-  const sortHref = "/transactions?review=1&allDates=1&sort=1";
+  const sortHref = "/transactions?uncategorized=1&allDates=1&sort=1";
+  const attentionCount = data.toReview - data.uncategorized;
   const missingAccounts = data.accounts.filter((a) =>
     coverage.incompleteAccountIds.includes(a.id),
   );
   const todo = [
-    ...(data.toReview > 0 ? [{ kind: "sort", account: undefined }] : []),
+    ...(data.uncategorized > 0 ? [{ kind: "sort", account: undefined }] : []),
+    ...(attentionCount > 0 ? [{ kind: "attention", account: undefined }] : []),
     ...(coverage.pendingTransfers > 0
       ? [{ kind: "transfers", account: undefined }]
       : []),
@@ -383,15 +377,16 @@ export default function Home({
               ` · ${location.state.skippedFileCount} PDF${location.state.skippedFileCount === 1 ? "" : "s"} skipped`}
             {location.state.automaticallyLinkedCount > 0 &&
               ` · ${location.state.automaticallyLinkedCount} pair${location.state.automaticallyLinkedCount === 1 ? "" : "s"} linked automatically`}
-            {data.toReview > 0 &&
-              ` · ${data.toReview} to review, ${data.uncategorized} need a category`}
+            {data.uncategorized > 0 &&
+              ` · ${data.uncategorized} need a category`}
+            {attentionCount > 0 && ` · ${attentionCount} need attention`}
           </span>
           {location.state.automaticallyLinkedCount > 0 && (
             <Link to="/transactions?type=transfer&allDates=1">
               Review linked transfers
             </Link>
           )}
-          {data.toReview > 0 && (
+          {data.uncategorized > 0 && (
             <Link className="button primary" to={sortHref}>
               Sort now
             </Link>
@@ -660,17 +655,21 @@ export default function Home({
                 to={
                   item.kind === "sort"
                     ? sortHref
-                    : item.kind === "transfers"
-                      ? "/transactions?transfers=1&allDates=1"
-                      : "/subscriptions"
+                    : item.kind === "attention"
+                      ? "/transactions?review=1&attention=1&allDates=1"
+                      : item.kind === "transfers"
+                        ? "/transactions?transfers=1&allDates=1"
+                        : "/subscriptions"
                 }
               >
                 <span>
                   {item.kind === "sort"
-                    ? `Review ${data.toReview} transaction${data.toReview === 1 ? "" : "s"}`
-                    : item.kind === "transfers"
-                      ? `${coverage.pendingTransfers} transfer${coverage.pendingTransfers === 1 ? "" : "s"} to confirm`
-                      : `${subscriptions.length} recurring charge${subscriptions.length === 1 ? "" : "s"} to review`}
+                    ? `Categorise ${data.uncategorized} transaction${data.uncategorized === 1 ? "" : "s"}`
+                    : item.kind === "attention"
+                      ? `${attentionCount} transaction${attentionCount === 1 ? " needs" : "s need"} attention`
+                      : item.kind === "transfers"
+                        ? `${coverage.pendingTransfers} transfer${coverage.pendingTransfers === 1 ? "" : "s"} to confirm`
+                        : `${subscriptions.length} recurring charge${subscriptions.length === 1 ? "" : "s"} to review`}
                 </span>
                 {item.kind === "sort" ? (
                   <strong>Start</strong>

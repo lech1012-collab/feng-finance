@@ -12,15 +12,15 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-23",
+  date: "2026-10-24",
   points: [
-    "Category averages and standard deviation now use recorded monthly totals, including partial months.",
-    "Missing months remain gaps; incomplete statement coverage is explained without hiding your statistics.",
-    "Change the month or history window to recalculate your recorded spending comparison.",
+    "Already categorised payments no longer need a second manual review.",
+    "Home separates missing categories from refunds, splits and source checks that need a decision.",
+    "Sorting skips completed rule matches and updates as you categorise payments.",
   ],
   pleaseTest: [
-    "Open a category with partial previous months and check its average, standard deviation and difference from average.",
-    "Change between 1, 3, 6 and 12 months and inspect Months used for comparison.",
+    "Check Home after importing or applying rules: only unresolved payments should need attention.",
+    "Categorise a payment and check that it disappears from the sorting queue without another review button.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",

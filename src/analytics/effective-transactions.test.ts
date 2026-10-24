@@ -251,7 +251,7 @@ describe("refund and split reporting projections", () => {
     ).toBeUndefined();
     expect(
       needsReview(transaction({ categoryId: "groceries", isReviewed: false })),
-    ).toBe(true);
+    ).toBe(false);
     expect(
       needsReview(transaction({ categoryId: undefined, isReviewed: true })),
     ).toBe(true);
