@@ -569,7 +569,7 @@ export function MonthReview({
             {reviewCount
               ? `${reviewCount} transaction${reviewCount === 1 ? "" : "s"} still need${reviewCount === 1 ? "s" : ""} review.`
               : coverage.complete
-                ? "All transactions reviewed and accounts verified."
+                ? "No transactions need attention and accounts are verified."
                 : "Complete verified statement coverage is required to close."}
           </p>
         </section>

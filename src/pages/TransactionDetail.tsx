@@ -333,7 +333,9 @@ function Editor({
                       : t.checkLevel === "manual_override"
                         ? "Imported as unverified"
                         : t.checkLevel === "review"
-                          ? "Needs review"
+                          ? t.isReviewed
+                            ? "Source checked manually"
+                            : "Needs review"
                           : "Original import check"
               }
             />

@@ -130,7 +130,9 @@ export async function closeMonth(month: string, currency: string) {
           (row) => row.date >= from && row.date < to && needsReview(row),
         )
       )
-        throw new Error("Review every transaction before closing this month.");
+        throw new Error(
+          "Resolve transactions that need attention before closing this month.",
+        );
       const record: MonthClose = {
         month,
         currency,
@@ -167,7 +169,12 @@ export async function autoCloseEligibleMonths() {
     if (
       closed.has(month) ||
       Date.now() - Date.parse(`${to}T00:00:00Z`) < 60 * 86400000 ||
-      rows.some((r) => r.date >= from && r.date < to && needsReview(r))
+      // Removing redundant category confirmations must not retrospectively
+      // auto-close previously unreviewed history on an app update.
+      rows.some(
+        (r) =>
+          r.date >= from && r.date < to && (needsReview(r) || !r.isReviewed),
+      )
     )
       continue;
     if (

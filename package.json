@@ -1,6 +1,6 @@
 {
   "name": "feng-finance",
-  "version": "2.2.22",
+  "version": "2.2.23",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,7 +19,7 @@
     "format:check": "prettier --check src scripts tests *.json *.ts docs README.md",
     "check:repo": "node scripts/check-repo-hygiene.mjs",
     "check:release": "node scripts/check-release.mjs",
-    "test:hygiene": "node --test scripts/check-repo-hygiene.test.mjs scripts/check-release.test.mjs"
+    "test:hygiene": "node --test scripts/check-repo-hygiene.test.mjs scripts/check-release.test.mjs scripts/check-ci-browser-mirrors.test.mjs"
   },
   "dependencies": {
     "@tesseract.js-data/eng": "^1.0.0",
@@ -32,7 +32,7 @@
     "react-router-dom": "^7.9.4",
     "recharts": "^3.3.0",
     "tesseract.js": "^6.0.1",
-    "zod": "^4.1.11"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.13.0",

@@ -33,7 +33,7 @@ jobs:
         run: |
           # The Azure Ubuntu mirror can stall hosted runners for many minutes.
           # Use the canonical archive; APT signature verification stays enabled.
-          for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources; do
+          for source_file in /etc/apt/sources.list /etc/apt/sources.list.d/*.sources /etc/apt/apt-mirrors*.txt; do
             if [ -f "$source_file" ]; then
               sudo sed -i 's|http://azure.archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g' "$source_file"
             fi
