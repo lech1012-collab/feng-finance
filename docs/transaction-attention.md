@@ -28,6 +28,13 @@ Clicking a refund or split opens its details instead of a category-choice grid.
 Completed rule matches have no warning badge or “Mark reviewed” button, and
 backfilled matches leave the queue immediately without a second approval.
 
+Import completion uses one inline receipt whether or not categorisation remains.
+It preserves skipped/linked counts and has no global success toast that can
+remain visible during the next import. Sequential imports, planning baselines
+and transfer receipts are exercised together. Cold offline tests shut down an
+isolated static origin so WebKit cannot bypass its worker through offline
+emulation; cached launch and lazy-page navigation must still work.
+
 This is a derived UI decision, not a migration or bulk update. Native amounts,
 dates, categories, manual review stamps, rules and source provenance stay intact.
 Explicit monthly closing can proceed once the real decisions and statement

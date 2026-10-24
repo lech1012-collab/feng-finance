@@ -352,18 +352,13 @@ export default function Home({
       {location.state?.backupRestored && (
         <Toast message="Backup restored successfully." />
       )}
-      {location.state?.importedCount !== undefined && data.toReview === 0 && (
-        <Toast
-          message={`Import complete: ${location.state.importedCount} transactions imported.`}
-        />
-      )}
       <div className="toolbar">
         <MonthPicker month={month} onChange={setMonth} />
         <span className="muted">
           {reportingPeriodLabel(month, data.settings, data.transactions)}
         </span>
       </div>
-      {location.state?.importedCount !== undefined && data.toReview > 0 && (
+      {location.state?.importedCount !== undefined && (
         <div className="notice import-result" role="status">
           <span>
             Import complete: {location.state.importedCount} imported

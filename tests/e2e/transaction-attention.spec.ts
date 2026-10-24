@@ -1,5 +1,17 @@
-import { test, expect, type Page } from "./fixtures";
+import { test as base, expect, acknowledgeBeta, type Page } from "./fixtures";
 import { attentionHistoryFixture } from "../../src/tests/attention-history";
+import { startStaticHost, type LocalHost } from "./static-host";
+
+const test = base.extend<{ offlineHost: LocalHost }>({
+  offlineHost: async ({}, use) => {
+    const host = await startStaticHost();
+    try {
+      await use(host);
+    } finally {
+      await host.stop();
+    }
+  },
+});
 
 async function seed(page: Page) {
   await page.clock.setFixedTime(new Date("2026-10-03T12:00:00Z"));
@@ -29,7 +41,7 @@ async function seed(page: Page) {
     attentionHistoryFixture(),
   );
   await page.reload();
-  await page.goto("/#/");
+  await page.goto(new URL(page.url()).origin + "/#/");
 }
 
 async function savedRows(page: Page) {
@@ -54,8 +66,10 @@ async function savedRows(page: Page) {
 
 test("Home sends only uncategorised payments to sorting, skipping 189 already categorised rules", async ({
   page,
-  context,
+  offlineHost,
 }) => {
+  await page.goto(offlineHost.origin + "/#/");
+  await acknowledgeBeta(page);
   await seed(page);
   const before = await savedRows(page);
   const home = page.locator(".home-todos");
@@ -80,18 +94,20 @@ test("Home sends only uncategorised payments to sorting, skipping 189 already ca
     .getByRole("button", { name: "Categorise as Shopping", exact: true })
     .click();
   await expect(board).toHaveCount(0);
-  await page.goto("/#/");
+  await page.goto(offlineHost.origin + "/#/");
   await expect(home.getByRole("link", { name: /Categorise \d/ })).toHaveCount(
     0,
   );
   await expect(
     home.getByRole("link", { name: "3 transactions need attention" }),
   ).toBeVisible();
+  await expect
+    .poll(() => page.evaluate(() => !!navigator.serviceWorker.controller))
+    .toBe(true);
+  // Emulated offline mode bypasses WebKit's service worker for lazy modules.
+  // Stop this test's real origin instead, then prove cold launch and navigation.
+  await offlineHost.stop();
   await page.reload();
-  // WebKit's emulated offline navigation bypasses its service worker. Cold
-  // offline launch is covered by the stopped-origin PWA test; this case checks
-  // that sorting decisions persist and the live queue works without a network.
-  await context.setOffline(true);
   const nav = page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true });
