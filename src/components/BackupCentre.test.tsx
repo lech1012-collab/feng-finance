@@ -61,6 +61,10 @@ it("saves encrypted by default, requires a strong confirmed password and exports
   expect(
     ui.getByRole("switch", { name: /Protect with a password/ }),
   ).toBeChecked();
+  expect(ui.getByText(/it cannot be recovered/)).toBeVisible();
+  fireEvent.click(ui.getByRole("switch", { name: /Protect with a password/ }));
+  expect(ui.getByText(/readable financial data/)).toBeVisible();
+  fireEvent.click(ui.getByRole("switch", { name: /Protect with a password/ }));
   expect(ui.getByRole("button", { name: "Save backup" })).toBeDisabled();
   fireEvent.change(ui.getByLabelText("Backup password", { exact: true }), {
     target: { value: "a strong synthetic password" },

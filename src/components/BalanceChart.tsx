@@ -16,6 +16,7 @@ import { datedBalanceHistory } from "../analytics/balances";
 import { reconciledStatementBalances } from "../analytics/statement-balances";
 import { currencyPrecision, money } from "../domain/money";
 import { ImportButton } from "./ImportPicker";
+import { ContextHelp } from "./ContextHelp";
 const accountColors = [
   "#7ab8ff",
   "#ceabff",
@@ -102,7 +103,28 @@ export function BalanceChart({
   return (
     <section className="card balance-chart">
       <div className="section-heading">
-        <h2>Balance history</h2>
+        <div className="context-help-heading">
+          <h2>Balance history</h2>
+          <ContextHelp
+            title="Balance history explained"
+            label="Balance history explained"
+            tone={
+              data.some((point) => point.total === null) ? "warning" : "help"
+            }
+          >
+            <p>
+              Lines show statement-backed account balances. Gaps indicate
+              missing or unverified history. Daily movement includes transfers.
+            </p>
+            {closingOnly && (
+              <p>
+                Some statements verify only their closing balance. Daily history
+                remains unavailable where dates or the statement period cannot
+                be verified.
+              </p>
+            )}
+          </ContextHelp>
+        </div>
         <span className="muted">
           {period} {period === 1 ? "month" : "months"}
         </span>
@@ -262,13 +284,6 @@ export function BalanceChart({
         ))}
         {hasCashAccount && <span>┄ Net position</span>}
       </div>
-      {closingOnly && (
-        <p className="coverage-note">
-          Some statements verify only their closing balance. Daily history
-          remains unavailable where dates or the statement period cannot be
-          verified.
-        </p>
-      )}
       {segments.some((segment) => segment.status === "No verified balance") && (
         <div className="chart-coverage" aria-label="Missing balance history">
           {segments
@@ -334,12 +349,6 @@ export function BalanceChart({
           </table>
         </details>
       </div>
-      {data.some((d) => d.total === null) && (
-        <p className="coverage-note">
-          Gaps indicate missing or unverified history. Daily movement includes
-          transfers.
-        </p>
-      )}
       {!verified.length && (
         <ImportButton className="button">
           Import statements for a balance history

@@ -139,9 +139,14 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
   await expect(monthly.locator(".hero-comparison")).not.toContainText(
     "vs previous month",
   );
-  await expect(monthly.locator(".month-status")).toContainText(
-    "From imported accounts only",
-  );
+  await expect(monthly.getByText("Partial", { exact: true })).toBeVisible();
+  await monthly.getByRole("button", { name: "This month explained" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "This month explained" }),
+  ).toContainText("From imported accounts only");
+  await page
+    .getByRole("button", { name: "Close This month explained" })
+    .click();
   await expect(
     page
       .getByRole("link", { name: /accounts/i })

@@ -36,6 +36,7 @@ import {
 } from "../analytics/month-review-details";
 import { ListRow } from "./UIPrimitives";
 import { Sheet } from "./Sheet";
+import { ContextHelp } from "./ContextHelp";
 export function MonthReview({
   month,
   currency,
@@ -233,7 +234,24 @@ export function MonthReview({
       </div>
       {step === 0 && (
         <section className="card">
-          <h2>Your month</h2>
+          <div className="context-help-heading">
+            <h2>Your month</h2>
+            <ContextHelp
+              title="Monthly review totals"
+              label="About monthly review totals"
+              tone={coverage.complete ? "help" : "warning"}
+            >
+              <p>
+                Averages use up to three complete, verified months before this
+                review.
+              </p>
+              <p>
+                {coverage.complete
+                  ? "This month has complete coverage."
+                  : "This month is partial or unverified."}
+              </p>
+            </ContextHelp>
+          </div>
           <dl className="totals">
             {(["income", "expenses", "net"] as const).map((field) => (
               <div key={field}>
@@ -261,15 +279,24 @@ export function MonthReview({
           </dl>
           <p className="muted">
             {past.length} of 3 complete months used.{" "}
-            {coverage.complete
-              ? "This month has complete coverage."
-              : "* This month is partial or unverified."}
+            {coverage.complete ? "Complete" : "* Partial or unverified"}
           </p>
         </section>
       )}
       {step === 1 && (
         <section className="card">
-          <h2>What changed</h2>
+          <div className="context-help-heading">
+            <h2>What changed</h2>
+            <ContextHelp
+              title="Monthly comparisons"
+              label="About monthly comparisons"
+            >
+              <p>
+                Spending differences compare this complete month with your
+                average from up to three previous complete months.
+              </p>
+            </ContextHelp>
+          </div>
           {coverage.complete &&
             changes.map((c) => (
               <Link
@@ -383,7 +410,28 @@ export function MonthReview({
       )}
       {step === 2 && (
         <section className="card">
-          <h2>Pots and goals</h2>
+          <div className="context-help-heading">
+            <h2>Pots and goals</h2>
+            <ContextHelp
+              title="Review pot suggestions"
+              label="About review pot suggestions"
+            >
+              <p>
+                Confirmed contributions are already included in each suggestion.
+                Pots earmark cash; they never reduce your balance.
+              </p>
+              {asOf !== planningAsOf && (
+                <p>
+                  This review follows your month-start setting. Planning uses
+                  the calendar month, with suggestions as of{" "}
+                  <time className="date-value" dateTime={planningAsOf}>
+                    {formatUkDate(planningAsOf)}
+                  </time>
+                  .
+                </p>
+              )}
+            </ContextHelp>
+          </div>
           <p className="muted">
             Suggestions as of{" "}
             <time className="date-value" dateTime={asOf}>
@@ -391,20 +439,6 @@ export function MonthReview({
             </time>
             .
           </p>
-          {asOf !== planningAsOf && (
-            <details>
-              <summary>Why Planning may show a different suggestion</summary>
-              <p>
-                This review follows your month-start setting. Planning uses the
-                calendar month, with suggestions as of{" "}
-                <time className="date-value" dateTime={planningAsOf}>
-                  {formatUkDate(planningAsOf)}
-                </time>
-                . Confirmed contributions are already included in each
-                suggestion.
-              </p>
-            </details>
-          )}
           {potSummary.items.map(({ pot: p, progress, sourceDate }) => {
             const existing = p.contributions.find(
               (c) => c.month === month,

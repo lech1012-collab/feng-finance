@@ -32,6 +32,7 @@ import { ImportButton } from "../components/ImportPicker";
 import { monthOffset, monthLabel, formatUkDate } from "../domain/dates";
 import { monthCoverage, verifiedStatements } from "../analytics/coverage";
 import { displayMerchant } from "../domain/presentation";
+import { ContextHelp } from "../components/ContextHelp";
 
 export default function Planning({
   month,
@@ -154,9 +155,6 @@ export default function Planning({
       <div className="page-heading">
         <div>
           <h1>Planning</h1>
-          <p className="muted">
-            Budgets, upcoming payments and your next balance.
-          </p>
         </div>
       </div>
       <div className="planning-period-row">
@@ -241,7 +239,86 @@ export default function Planning({
           >
             <section className="card forecast-card">
               <div className="section-heading">
-                <h2>Projected total balance</h2>
+                <div className="context-help-heading">
+                  <h2>Projected total balance</h2>
+                  <ContextHelp
+                    title="Forecast inputs and assumptions"
+                    label="Forecast inputs and assumptions"
+                  >
+                    <p>
+                      Cash and savings minus card debt; this is an estimate of
+                      your financial position. It does not change imported
+                      balances or reporting totals.
+                    </p>
+                    {forecast.converted && (
+                      <p>Converted using cached exchange rates.</p>
+                    )}
+                    {forecast.rateDates.length > 0 && (
+                      <p>Future exchange rates are assumed unchanged.</p>
+                    )}
+                    {!forecast.reason && end && (
+                      <>
+                        <p>
+                          Starting point:{" "}
+                          {money(forecast.anchor!.total!, currency)} verified on{" "}
+                          <time
+                            className="date-value"
+                            dateTime={forecast.anchor!.date}
+                          >
+                            {formatUkDate(forecast.anchor!.date)}
+                          </time>{" "}
+                          across {data.accounts.length} account
+                          {data.accounts.length === 1 ? "" : "s"}. Movements
+                          since that date use imported transactions and
+                          estimated missing recurring payments. Unobserved
+                          day-to-day spending is estimated from{" "}
+                          {forecast.baselineMonths} complete month
+                          {forecast.baselineMonths === 1 ? "" : "s"}.
+                        </p>
+                        {!forecast.converted && (
+                          <ul>
+                            {data.accounts
+                              .filter((a) => a.tracking !== "manual")
+                              .map((account, index) => (
+                                <li key={account.id}>
+                                  {account.displayName}:{" "}
+                                  {money(
+                                    forecast.anchor!.balances[
+                                      `account${index}`
+                                    ] ?? 0,
+                                    currency,
+                                  )}{" "}
+                                  on{" "}
+                                  <time
+                                    className="date-value"
+                                    dateTime={forecast.anchor!.date}
+                                  >
+                                    {formatUkDate(forecast.anchor!.date)}
+                                  </time>
+                                </li>
+                              ))}
+                          </ul>
+                        )}
+                        <p>
+                          Usual variable spending: approximately{" "}
+                          {money(Math.round(forecast.dailyVariable!), currency)}{" "}
+                          per day. Bills use the last charge; repeating income
+                          uses the lowest of the last three payments. Cancelled
+                          subscriptions and transfers are excluded from future
+                          payments. No repeating income detected means no income
+                          is assumed.
+                        </p>
+                        <p>
+                          The dashed lines change variable spending by 25%; they
+                          are scenarios, not statistical confidence limits. New
+                          purchases, irregular income, rate changes, taxes and
+                          payment delays may change the result. Budgets do not
+                          replace observed spending in this forecast.
+                        </p>
+                      </>
+                    )}
+                  </ContextHelp>
+                </div>
                 <select
                   aria-label="Forecast horizon"
                   value={horizon}
@@ -262,15 +339,11 @@ export default function Planning({
                 <time className="date-value" dateTime={today}>
                   {formatUkDate(today)}
                 </time>{" "}
-                · next {horizon} days.{" "}
-                {forecast.converted
-                  ? "≈ Converted using cached exchange rates. "
-                  : ""}
-                Cash and savings minus card debt; this is an estimate of your
-                financial position.{" "}
+                · next {horizon} days · Estimated
+                {forecast.converted ? " · ≈ Converted" : ""}{" "}
                 {forecast.rateDates.length > 0 && (
                   <>
-                    Rates as of{" "}
+                    · Rates as of{" "}
                     {forecast.rateDates.map((date, index) => (
                       <span key={date}>
                         {index > 0 ? ", " : ""}
@@ -279,7 +352,6 @@ export default function Planning({
                         </time>
                       </span>
                     ))}
-                    . Future rates are assumed unchanged.
                   </>
                 )}
               </p>
@@ -399,77 +471,26 @@ export default function Planning({
                           making spending decisions.
                         </p>
                       )}
-                      <details>
-                        <summary>Forecast inputs and assumptions</summary>
-                        <p>
-                          Starting point:{" "}
-                          {money(forecast.anchor!.total!, currency)} verified on{" "}
-                          <time
-                            className="date-value"
-                            dateTime={forecast.anchor!.date}
-                          >
-                            {formatUkDate(forecast.anchor!.date)}
-                          </time>{" "}
-                          across {data.accounts.length} account
-                          {data.accounts.length === 1 ? "" : "s"}. Movements
-                          since that date use imported transactions and
-                          estimated missing recurring payments. Unobserved
-                          day-to-day spending is estimated from{" "}
-                          {forecast.baselineMonths} complete month
-                          {forecast.baselineMonths === 1 ? "" : "s"}.
-                        </p>
-                        <ul>
-                          {!forecast.converted &&
-                            data.accounts
-                              .filter((a) => a.tracking !== "manual")
-                              .map((account, index) => (
-                                <li key={account.id}>
-                                  {account.displayName}:{" "}
-                                  {money(
-                                    forecast.anchor!.balances[
-                                      `account${index}`
-                                    ] ?? 0,
-                                    currency,
-                                  )}{" "}
-                                  on{" "}
-                                  <time
-                                    className="date-value"
-                                    dateTime={forecast.anchor!.date}
-                                  >
-                                    {formatUkDate(forecast.anchor!.date)}
-                                  </time>
-                                </li>
-                              ))}
-                        </ul>
-                        <p>
-                          Usual variable spending: approximately{" "}
-                          {money(Math.round(forecast.dailyVariable!), currency)}{" "}
-                          per day. Bills use the last charge; repeating income
-                          uses the lowest of the last three payments. Cancelled
-                          subscriptions and transfers are excluded from future
-                          payments. No repeating income detected means no income
-                          is assumed.
-                        </p>
-                        <p>
-                          The dashed lines change variable spending by 25%; they
-                          are scenarios, not statistical confidence limits. New
-                          purchases, irregular income, rate changes, taxes and
-                          payment delays may change the result. Budgets do not
-                          replace observed spending in this forecast.
-                        </p>
-                      </details>
                     </>
                   )}
             </section>
             <section className="card">
               <div className="section-heading">
-                <h2>Upcoming payments</h2>
-                <span className="muted">Next {horizon} days</span>
+                <div className="context-help-heading">
+                  <h2>Upcoming payments</h2>
+                  <ContextHelp
+                    title="Upcoming payment estimates"
+                    label="About upcoming payment estimates"
+                  >
+                    <p>
+                      Expected dates and amounts from repeated imported
+                      transactions. These are estimates, not confirmed bills or
+                      payments.
+                    </p>
+                  </ContextHelp>
+                </div>
+                <span className="muted">Estimated · Next {horizon} days</span>
               </div>
-              <p className="coverage-note">
-                Expected dates and amounts from repeated imported transactions.
-                These are estimates, not confirmed bills or payments.
-              </p>
               {!forecast.upcoming.length ? (
                 <p className="muted">
                   No supported recurring pattern found yet. Import more

@@ -71,6 +71,21 @@ it("undos a review-day change to the exact prior saved preference", async () => 
 it("confirms calendar download in a toast without creating a meaningless Undo or exporting financial text", async () => {
   const download = vi.spyOn(backups, "download").mockImplementation(() => {});
   view();
+  expect(await screen.findByText(/In-app reminders/)).toBeVisible();
+  expect(
+    screen.getByText(/does not remove calendar events already imported/),
+  ).toBeVisible();
+  expect(screen.queryByText(/Calendar files contain no merchant/)).toBeNull();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About Reminders and calendar alerts" }),
+  );
+  expect(
+    await screen.findByText(/Calendar files contain no merchant/),
+  ).toBeVisible();
+  expect(download).not.toHaveBeenCalled();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Reminders and calendar alerts" }),
+  );
   fireEvent.click(
     await screen.findByRole("button", { name: "Export calendar reminders" }),
   );

@@ -128,3 +128,63 @@ it("keeps tag editing in a sheet and automatically saves with local Undo", async
   expect((await db.transactions.get("t1"))?.amount).toBe(-1000);
   expect((await db.transactions.get("t1"))?.description).toBe("WAITROSE");
 });
+
+it("opens accounting and attachment education from nearby help without changing the transaction", async () => {
+  const row = transaction({ categoryId: "groceries" });
+  await db.transactions.put(row);
+  detail();
+  await screen.findByRole("combobox", { name: "Category" });
+  expect(
+    screen.queryByText(/Money in counts as income/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About How this counts" }),
+  );
+  const accounting = await screen.findByRole("dialog", {
+    name: "How this counts",
+  });
+  expect(
+    within(accounting).getByText(/A refund reduces the original spending/),
+  ).toBeVisible();
+  fireEvent.click(
+    within(accounting).getByRole("button", { name: "Close How this counts" }),
+  );
+  expect(await screen.findByText("0 of 5 attachments")).toBeVisible();
+  expect(screen.queryByText(/compressed to 1600/)).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About Transaction attachments" }),
+  );
+  const attachments = await screen.findByRole("dialog", {
+    name: "Transaction attachments",
+  });
+  expect(
+    within(attachments).getByText(/Images are compressed to 1600 pixels/),
+  ).toBeVisible();
+  expect(await db.transactions.get(row.id)).toEqual(row);
+});
+
+it("keeps split education inside the editor without stacking another dialog", async () => {
+  const row = transaction({ categoryId: "groceries" });
+  await db.transactions.put(row);
+  detail();
+  fireEvent.click(await screen.findByRole("button", { name: "Split" }));
+  const editor = await screen.findByRole("dialog", {
+    name: "Split transaction",
+  });
+  expect(
+    within(editor).queryByText(/The original amount and statement balance/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    within(editor).getByRole("button", {
+      name: "About Splitting a transaction",
+    }),
+  );
+  expect(
+    within(editor).getByText(/The original amount and statement balance/),
+  ).toBeVisible();
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(
+    within(editor).getByRole("button", { name: "Save split" }),
+  ).toBeDisabled();
+  expect(await db.transactions.get(row.id)).toEqual(row);
+});

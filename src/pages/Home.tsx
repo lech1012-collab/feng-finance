@@ -10,6 +10,7 @@ import {
   ChevronRight,
 } from "lucide-react";
 import { PositionSummary } from "../components/PositionSummary";
+import { ContextHelp } from "../components/ContextHelp";
 import { Toast } from "../components/Toast";
 import { ImportButton } from "../components/ImportPicker";
 import { MonthPicker } from "../components/common";
@@ -267,6 +268,13 @@ export default function Home({
     data.rates,
     data.recurringSeries,
   );
+  const forecastStatus = forecast.reason?.includes("exchange rates")
+    ? "Rates needed"
+    : forecast.reason?.includes("35 days")
+      ? "Balances over 35 days old"
+      : forecast.reason?.includes("three complete")
+        ? `${forecast.baselineMonths} of 3 complete months`
+        : "Verified balances needed";
   const selectedEnd = new Date(
     Date.parse(`${monthBounds(month)[1]}T12:00:00Z`) - 86400000,
   )
@@ -426,7 +434,6 @@ export default function Home({
                 Dismiss
               </button>
             </div>
-            <p>Protect access and keep a copy of your data.</p>
             <div className="setup-list">
               <Link to="/settings#security">
                 <span>Set app lock</span>
@@ -485,7 +492,43 @@ export default function Home({
 
       <section className="card month-summary">
         <div className="section-heading">
-          <h2>This month</h2>
+          <div className="context-help-heading">
+            <h2>This month</h2>
+            <ContextHelp
+              title="This month explained"
+              label="This month explained"
+              tone={coverage.complete ? "help" : "warning"}
+            >
+              <p>
+                Income, spending and net cash flow use the selected reporting
+                period. Transfers and card repayments are excluded. Refunds are
+                counted in the original purchase months.
+              </p>
+              {!coverage.complete && coverage.hasData && (
+                <p>
+                  From imported accounts only. Asterisks mark incomplete
+                  coverage.
+                </p>
+              )}
+              {coverage.hasUnverifiedStatements && (
+                <p>
+                  Monthly history is not fully verified. Statement dates or
+                  balances prevent a reliable comparison.
+                </p>
+              )}
+              {(!coverage.complete || !previousCoverage.complete) && (
+                <p>
+                  {`Not comparable yet: ${monthName} ${coverage.complete ? "needs a complete previous month" : coverage.hasUnverifiedStatements ? "unverified" : "incomplete"}.`}
+                </p>
+              )}
+              {!!projection.converted && (
+                <p>
+                  ≈ Converted using transaction-date exchange rates. Original
+                  amounts remain in each transaction.
+                </p>
+              )}
+            </ContextHelp>
+          </div>
           <StatusChip tone={coverage.complete ? "complete" : "warning"}>
             {coverage.status}
           </StatusChip>
@@ -536,15 +579,6 @@ export default function Home({
             </strong>
           </Link>
         </div>
-        {!coverage.complete && coverage.hasData && (
-          <p className="month-status">From imported accounts only.</p>
-        )}
-        {coverage.hasUnverifiedStatements && (
-          <p className="coverage-note">
-            Monthly history is not fully verified. Statement dates or balances
-            prevent a reliable comparison.
-          </p>
-        )}
         <p className="hero-comparison">
           {coverage.complete && previousCoverage.complete ? (
             <>
@@ -556,7 +590,7 @@ export default function Home({
               {money(difference, currency, true)} vs previous month
             </>
           ) : (
-            `Not comparable yet: ${monthName} ${coverage.complete ? "needs a complete previous month" : coverage.hasUnverifiedStatements ? "unverified" : "incomplete"}.`
+            "Not comparable yet"
           )}
         </p>
         {!!excluded.count && (
@@ -566,7 +600,7 @@ export default function Home({
               (t) => t.kind === "refund" && t.date >= start && t.date < end,
             ) && (
               <Link to={`/transactions?month=${month}&allDates=0`}>
-                Refunds · counted in original purchase months
+                Refunds
               </Link>
             )}
             {excluded.internal !== 0 && (
@@ -770,14 +804,32 @@ export default function Home({
       {data.pots.length > 0 && (
         <section className="card">
           <div className="section-heading">
-            <h2>Pots and goals</h2>
+            <div className="context-help-heading">
+              <h2>Pots and goals</h2>
+              <ContextHelp
+                title="Pots and goals explained"
+                label="Pots and goals explained"
+                tone={potSummary.partial ? "warning" : "help"}
+              >
+                <p>
+                  Pots earmark cash; they never reduce your account balance.
+                </p>
+                {potSummary.partial && (
+                  <p>
+                    * Some linked balances or exchange rates are unavailable.
+                  </p>
+                )}
+              </ContextHelp>
+            </div>
             <Link to="/planning">Planning</Link>
           </div>
           {potSummary.items.slice(0, 3).map(({ pot, progress, partial }) => (
             <Link className="insight-row" key={pot.id} to="/planning?tab=pots">
               <span>
                 {pot.name}
-                <small>Set aside · included in your cash</small>
+                <small>
+                  Set aside · Included in cash{partial ? " · Partial" : ""}
+                </small>
               </span>
               <strong>
                 {progress.linkedUnavailable
@@ -788,12 +840,6 @@ export default function Home({
               </strong>
             </Link>
           ))}
-          {potSummary.partial && (
-            <p className="coverage-note">
-              * Some linked balances or exchange rates are unavailable. Pots
-              earmark cash; they never reduce your account balance.
-            </p>
-          )}
         </section>
       )}
       <section className="card flow-card">
@@ -836,12 +882,34 @@ export default function Home({
       {forecast.upcoming.length > 0 && (
         <section className="card home-coming-up">
           <div className="section-heading">
-            <h2>Coming up</h2>
+            <div className="context-help-heading">
+              <h2>Coming up</h2>
+              <ContextHelp
+                title="Coming up explained"
+                label="Coming up explained"
+                tone={forecast.reason ? "warning" : "help"}
+              >
+                <p>Next 30 days · estimated from imported payment patterns.</p>
+                <p>
+                  {forecast.reason
+                    ? `Balance forecast unavailable: ${forecast.reason}`
+                    : `Forecast based on ${forecast.baselineMonths} complete imported month${forecast.baselineMonths === 1 ? "" : "s"} and verified balances across ${data.accounts.length} account${data.accounts.length === 1 ? "" : "s"}.`}
+                </p>
+                {forecast.converted && (
+                  <p>
+                    Future payments use cached exchange rates, which may change.
+                  </p>
+                )}
+              </ContextHelp>
+            </div>
             <Link to="/planning">Planning</Link>
           </div>
-          <p className="muted">
-            Next 30 days · estimated from imported payment patterns.
-          </p>
+          <p className="muted">Next 30 days · Estimated</p>
+          {forecast.reason && (
+            <p className="coverage-note">
+              Balance forecast unavailable · {forecastStatus}
+            </p>
+          )}
           {forecast.upcoming.slice(0, 3).map((payment) => (
             <Link
               className="upcoming-row"
@@ -881,23 +949,27 @@ export default function Home({
               </strong>
             </Link>
           ))}
-          <p className="coverage-note">
-            {forecast.reason
-              ? `Balance forecast unavailable: ${forecast.reason}`
-              : `Forecast based on ${forecast.baselineMonths} complete imported month${forecast.baselineMonths === 1 ? "" : "s"} and verified balances across ${data.accounts.length} account${data.accounts.length === 1 ? "" : "s"}.`}
-          </p>
-          {forecast.converted && (
-            <p className="coverage-note">
-              Future payments use cached exchange rates, which may change.
-            </p>
-          )}
         </section>
       )}
 
       {(insight || categories.length > 0) && (
         <section className="card home-insight">
           <div className="section-heading">
-            <h2>Insight</h2>
+            <div className="context-help-heading">
+              <h2>Insight</h2>
+              <ContextHelp
+                title="Insights explained"
+                label="Insights explained"
+              >
+                <p>
+                  {insights.baselineCount < 3
+                    ? `Comparisons start after 3 verified months · ${insights.baselineCount} of 3.`
+                    : !coverage.complete
+                      ? `Month comparisons appear once ${monthName} is complete.`
+                      : "Comparisons use complete verified statement history."}
+                </p>
+              </ContextHelp>
+            </div>
             <Link to="/analysis">Analyse</Link>
           </div>
           {insight ? (
@@ -910,9 +982,9 @@ export default function Home({
               {categories[0].name} is {Math.round(categories[0].percent)}% of{" "}
               {monthName} spending{coverage.complete ? "." : " so far."}{" "}
               {insights.baselineCount < 3
-                ? `Comparisons start after 3 verified months · ${insights.baselineCount} of 3.`
+                ? `${insights.baselineCount} of 3 verified months.`
                 : !coverage.complete
-                  ? `Month comparisons appear once ${monthName} is complete.`
+                  ? "Comparisons pending."
                   : "No significant change detected in your verified history."}
             </p>
           )}

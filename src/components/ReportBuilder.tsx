@@ -1,6 +1,7 @@
 import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
 import { Sheet } from "./Sheet";
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -200,7 +201,28 @@ export function ReportBuilder({
       <SectionCard
         id="report-builder"
         title="Reports"
-        description="Transfers excluded."
+        actions={
+          <ContextHelp
+            title="Report calculations explained"
+            label="Report calculations explained"
+            tone={report.groupBy === "tag" ? "warning" : "help"}
+          >
+            <p>
+              Transfers excluded. Reports use the matching recorded
+              transactions.
+            </p>
+            <p>
+              ≈ marks converted amounts. Export matching transactions to keep
+              their original amounts and currencies.
+            </p>
+            {report.groupBy === "tag" && (
+              <p>
+                A transaction with several tags appears in each tag. Tag totals
+                overlap.
+              </p>
+            )}
+          </ContextHelp>
+        }
       >
         {!!reports.length && (
           <div className="v2-row-actions" aria-label="Saved analysis reports">
@@ -483,10 +505,7 @@ export function ReportBuilder({
           />
         )}
         {report.groupBy === "tag" && (
-          <p className="muted">
-            A transaction with several tags appears in each tag. Tag totals
-            overlap.
-          </p>
+          <p className="muted">Tag totals overlap</p>
         )}
         <div className="report-controls">
           <button
@@ -583,6 +602,18 @@ export function ReportBuilder({
           title="Property income for Self Assessment"
           className="property-tax-card"
           description="Not tax advice."
+          actions={
+            <ContextHelp
+              title="Property tax summary explained"
+              label="Property tax summary explained"
+            >
+              <p>
+                This summary uses the selected UK tax year and the expense
+                categories you choose. Choose allowable expenses for your
+                situation.
+              </p>
+            </ContextHelp>
+          }
         >
           <p
             className="muted report-tax-period"
@@ -649,9 +680,16 @@ export function ReportBuilder({
                 </button>
               }
             >
-              <p className="muted">
-                Choose allowable expenses for your situation.
-              </p>
+              <ContextHelp
+                title="Allowable expenses explained"
+                label="Allowable expenses explained"
+              >
+                <p>Choose allowable expenses for your situation.</p>
+                <p>
+                  Your selections change this summary; transaction categories
+                  stay the same.
+                </p>
+              </ContextHelp>
               <fieldset className="report-allowable-list">
                 <legend className="sr-only">
                   Allowable expense categories

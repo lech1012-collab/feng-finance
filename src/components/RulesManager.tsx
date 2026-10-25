@@ -7,6 +7,7 @@ import { displayRuleMatch } from "../domain/rule-presentation";
 import { ListRow, StatusChip } from "./UIPrimitives";
 import { Sheet, SheetFooter } from "./Sheet";
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { formatUkDate } from "../domain/dates";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -566,7 +567,16 @@ export function RulesManager({
   return (
     <section className="card" id="categorization-rules">
       <div className="v2-filter-header">
-        <h2>Rules</h2>
+        <div className="context-help-heading">
+          <h2>Rules</h2>
+          <ContextHelp title="Categorisation rules">
+            <p>
+              Your manual choices become defaults. Explicit rules run before
+              Auto rules; drag to change the order within each group.
+            </p>
+            <p>Your first categorisation creates a remembered default.</p>
+          </ContextHelp>
+        </div>
         <button
           className="primary"
           onClick={() =>
@@ -590,10 +600,6 @@ export function RulesManager({
           Create rule
         </button>
       </div>
-      <p className="muted">
-        Your manual choices become defaults. Explicit rules run before Auto
-        rules; drag to change the order within each group.
-      </p>
       <div className="v2-row-actions">
         <button
           onClick={async () => {
@@ -781,11 +787,7 @@ export function RulesManager({
           </div>
         </div>
       ))}
-      {!rules.length && (
-        <p className="muted">
-          Your first categorisation creates a remembered default.
-        </p>
-      )}
+      {!rules.length && <p className="muted">No rules yet.</p>}
       {message && (
         <Toast
           id={changeId || message}

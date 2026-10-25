@@ -198,6 +198,19 @@ it("automatically finds a useful range for card snapshots without drawing an inv
   expect(
     screen.queryByRole("button", { name: "12 months" }),
   ).not.toBeInTheDocument();
+  expect(screen.getByText("Statement dates only")).toBeVisible();
+  expect(
+    screen.queryByText(/No daily balance is assumed between them/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Balance trend explained" }),
+  );
+  expect(
+    screen.getByText(/No daily balance is assumed between them/),
+  ).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Balance trend explained" }),
+  );
   fireEvent.click(screen.getByRole("button", { name: "1 month" }));
   expect(screen.getByRole("button", { name: "1 month" })).toHaveAttribute(
     "aria-pressed",

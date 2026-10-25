@@ -1,5 +1,6 @@
 import { reportingPeriodLabel } from "../domain/period";
 import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
+import { ContextHelp } from "../components/ContextHelp";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -109,6 +110,99 @@ export default function CategoryPage({
   const isProperty = id === "property";
   const categoryColor = category?.color ?? "var(--chart-expense)";
   const gapHeight = Math.max(1, ...series.map((point) => point.amount ?? 0));
+  const comparisonHelp = (
+    <>
+      <h3>Average and monthly variation</h3>
+      <p>
+        Average:{" "}
+        {mean === undefined
+          ? "unavailable because no previous month has usable category data"
+          : money(mean, currency)}
+        . Sample standard deviation:{" "}
+        {std === undefined
+          ? `unavailable. Needs at least two recorded previous months; ${stats.baseline.length} currently available`
+          : money(std, currency)}
+        . The average is the total of the included monthly category totals
+        divided by their number. Standard deviation measures how much those
+        totals vary around the average, using n−1.
+      </p>
+      <p>
+        Transfers and the selected month are excluded. Changing the month or
+        history window recalculates both statistics. Partial months count;
+        totals may change when you import more statements. Missing currency
+        conversions cannot be added together.
+      </p>
+      <h3>Reading the chart</h3>
+      <p>
+        Tap a bar or use View values to inspect a month's transactions. The
+        chart shows {window} previous month{window === 1 ? "" : "s"} and the
+        selected month. The dashed line shows the monthly average. The shaded
+        band shows one standard deviation below and above it, describing past
+        variation rather than a budget or prediction.
+      </p>
+      <ul>
+        <li>Faded bars are partial months and still count in the average.</li>
+        <li>Hatched months are missing data and are skipped.</li>
+        <li>
+          A zero counts when recorded explicitly or supported by verified
+          coverage.
+        </li>
+      </ul>
+      <h3>Comparison accounts</h3>
+      <p>
+        {scopedAccounts
+          .map(
+            (account) =>
+              `${account.displayName} (${account.maskedAccountIdentifier})`,
+          )
+          .join(", ") || "None yet"}
+        .{" "}
+        {inferredScope
+          ? "The same category accounts are used in every month."
+          : "With no category history, all statement accounts must support a verified zero."}
+      </p>
+      <section className="category-comparison-months">
+        <h3>
+          Months used for comparison ({stats.baseline.length} of {window})
+        </h3>
+        <ul className="category-comparison-list">
+          {series.slice(0, -1).map((point) => (
+            <li key={point.month}>
+              <strong>{monthLabel(point.month)}</strong>
+              <span>
+                {point.available
+                  ? `Included · ${money(point.amount!, currency)}`
+                  : `Skipped · ${point.unavailableReason}`}
+                {point.available && !point.coverage.complete
+                  ? " · Partial history"
+                  : ""}
+              </span>
+              <small>
+                {formatDateRange(
+                  point.coverage.start,
+                  shiftDate(point.coverage.end, -1),
+                )}
+              </small>
+              {!point.coverage.complete &&
+                point.coverage.reasons.length > 0 && (
+                  <ul
+                    aria-label={`${monthLabel(point.month)} coverage details`}
+                  >
+                    {point.coverage.reasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                )}
+            </li>
+          ))}
+        </ul>
+        <p>
+          {monthLabel(selected)} is the selected month and is excluded from the
+          historical average.
+        </p>
+      </section>
+    </>
+  );
   return (
     <>
       <Link to="/" className="back-link">
@@ -121,19 +215,6 @@ export default function CategoryPage({
       </div>
       <p className="muted">
         {reportingPeriodLabel(selected, data.settings, source!.transactions)}
-      </p>
-      <p className="coverage-note">
-        Comparison accounts:{" "}
-        {scopedAccounts
-          .map(
-            (account) =>
-              `${account.displayName} (${account.maskedAccountIdentifier})`,
-          )
-          .join(", ") || "none yet"}
-        .
-        {inferredScope
-          ? " The same category accounts are used in every month."
-          : " With no category history, all statement accounts must support a verified zero."}
       </p>
       <div className="toolbar">
         <MonthPicker month={selected} onChange={chooseMonth} />
@@ -169,7 +250,15 @@ export default function CategoryPage({
           </div>
         )}
         <div className="metric">
-          <span>Monthly average</span>
+          <div className="context-help-heading">
+            <span>Monthly average</span>
+            <ContextHelp
+              title="Monthly average and variation"
+              label="About monthly averages and variation"
+            >
+              {comparisonHelp}
+            </ContextHelp>
+          </div>
           <strong>
             {mean === undefined ? "Unavailable" : money(mean, currency)}
           </strong>
@@ -231,29 +320,60 @@ export default function CategoryPage({
       </p>
       {coverage.missingRates > 0 && (
         <p className="notice warning" role="status">
-          Some account currencies cannot be converted. Category totals are
-          unavailable until{" "}
-          <Link to="/settings#global-currency">exchange rates are added</Link>.
+          Rates needed.{" "}
+          <Link to="/settings#global-currency">Add exchange rates</Link>.
+          <ContextHelp
+            title="Missing category exchange rates"
+            label="Why category totals are unavailable"
+            tone="warning"
+          >
+            <p>
+              Some account currencies cannot be converted. Category totals are
+              unavailable until exchange rates are added.
+            </p>
+          </ContextHelp>
         </p>
       )}
       {approximate && (
-        <p className="coverage-note">
-          ≈ Converted using transaction-date exchange rates. Original amounts
-          remain in each transaction.
-        </p>
+        <div className="coverage-note context-help-row">
+          <span>≈ Converted</span>
+          <ContextHelp title="Converted category amounts">
+            <p>
+              Converted using transaction-date exchange rates. Original amounts
+              remain in each transaction.
+            </p>
+          </ContextHelp>
+        </div>
       )}
       {(partialBaseline || (stats.current.available && !coverage.complete)) && (
-        <p className="coverage-note" role="status">
-          Based on recorded transactions. Partial months are included in the
-          average; totals may change when you import more statements.
-        </p>
+        <div className="coverage-note context-help-row" role="status">
+          <span>
+            {partialBaseline ? "Partial comparison history" : "Partial month"}
+          </span>
+          <ContextHelp
+            title="Partial category history"
+            label="About partial category history"
+            tone="warning"
+          >
+            <p>
+              Based on recorded transactions. Partial months are included in the
+              average; totals may change when you import more statements.
+            </p>
+          </ContextHelp>
+        </div>
       )}
       {stats.aboveUsual && (
-        <p className="notice warning">
-          {stats.incomeCategory ? "Income" : "Spending"} is above its usual
-          variation: more than one standard deviation above the historical
-          average.
-        </p>
+        <div className="coverage-note context-help-row" role="status">
+          <span>
+            {stats.incomeCategory ? "Income" : "Spending"} above usual variation
+          </span>
+          <ContextHelp title="Above usual variation" tone="warning">
+            <p>
+              {stats.incomeCategory ? "Income" : "Spending"} is more than one
+              standard deviation above the historical average.
+            </p>
+          </ContextHelp>
+        </div>
       )}
       <CategoryAnalysisPicker month={selected} category={id} />
       {isProperty && (
@@ -332,15 +452,15 @@ export default function CategoryPage({
             </span>
           </p>
         )}
-        <h2>{stats.incomeCategory ? "Income" : "Spending"} over time</h2>
-        <p className="muted">
-          Tap a bar or month below to inspect its transactions. {window}{" "}
-          previous month{window === 1 ? "" : "s"} and the selected month are
-          shown.
-          {std !== undefined
-            ? " The dashed line shows the monthly average. The shaded band shows one standard deviation below and above it, describing past variation."
-            : " The average uses recorded monthly totals, including partial months."}
-        </p>
+        <div className="context-help-heading">
+          <h2>{stats.incomeCategory ? "Income" : "Spending"} over time</h2>
+          <ContextHelp
+            title="Category comparison"
+            label="About this category comparison"
+          >
+            {comparisonHelp}
+          </ContextHelp>
+        </div>
         <div
           role="img"
           aria-label={`${name} monthly trend with recorded average and variation`}
@@ -450,71 +570,6 @@ export default function CategoryPage({
             </ComposedChart>
           </ResponsiveContainer>
         </div>
-        <p className="coverage-note">
-          Faded bars are partial months and still count in the average. Hatched
-          months are missing data and are skipped. A zero counts when recorded
-          explicitly or supported by verified coverage.
-        </p>
-        <details className="category-comparison-months">
-          <summary>
-            Months used for comparison ({stats.baseline.length} of {window})
-          </summary>
-          <ul className="category-comparison-list">
-            {series.slice(0, -1).map((point) => (
-              <li key={point.month}>
-                <strong>{monthLabel(point.month)}</strong>
-                <span>
-                  {point.available
-                    ? `Included · ${money(point.amount!, currency)}`
-                    : `Skipped · ${point.unavailableReason}`}
-                  {point.available && !point.coverage.complete
-                    ? " · Partial history"
-                    : ""}
-                </span>
-                <small>
-                  {formatDateRange(
-                    point.coverage.start,
-                    shiftDate(point.coverage.end, -1),
-                  )}
-                </small>
-                {!point.coverage.complete &&
-                  point.coverage.reasons.length > 0 && (
-                    <details>
-                      <summary>Coverage details</summary>
-                      <ul>
-                        {point.coverage.reasons.map((reason) => (
-                          <li key={reason}>{reason}</li>
-                        ))}
-                      </ul>
-                    </details>
-                  )}
-              </li>
-            ))}
-          </ul>
-          <p className="muted">
-            {monthLabel(selected)} is the selected month and is excluded from
-            the historical average.
-          </p>
-        </details>
-        <details>
-          <summary>Average and standard deviation explained</summary>
-          <p>
-            Average:{" "}
-            {mean === undefined
-              ? "unavailable because no previous month has usable category data"
-              : money(mean, currency)}
-            . Sample standard deviation:{" "}
-            {std === undefined
-              ? `unavailable. Needs at least two recorded previous months; ${stats.baseline.length} currently available`
-              : money(std, currency)}
-            . Average = total of the included monthly category totals ÷ number
-            of included months. Sample standard deviation measures their spread
-            using n−1. Partial months count; months without a recorded total or
-            verified zero are skipped. Missing currency conversions cannot be
-            added together. Transfers and the selected month are excluded.
-            Changing the month or history window recalculates both statistics.
-          </p>
-        </details>
         <details>
           <summary>View values</summary>
           <div className="category-months">

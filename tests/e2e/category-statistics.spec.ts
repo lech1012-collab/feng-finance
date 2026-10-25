@@ -57,10 +57,21 @@ test("all-partial recorded history has averages and deviation offline without ch
   );
   await expect(kpis.locator(".metric").nth(3)).toContainText("+£700.00");
   await expect(
-    page.getByRole("status").filter({ hasText: "Partial months are included" }),
+    page.getByRole("status").filter({ hasText: "Partial comparison history" }),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "About partial category history" })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Partial category history" }),
+  ).toContainText("Partial months are included");
+  await page
+    .getByRole("button", { name: "Close Partial category history" })
+    .click();
+  await page
+    .getByRole("button", { name: "About this category comparison" })
+    .click();
   const months = page.locator(".category-comparison-months");
-  await months.locator(":scope > summary").click();
   await expect(
     months
       .locator(".category-comparison-list > li")
@@ -71,6 +82,7 @@ test("all-partial recorded history has averages and deviation offline without ch
       .locator(".category-comparison-list > li")
       .filter({ hasText: "Partial history" }),
   ).toHaveCount(6);
+  await page.getByRole("button", { name: "Close Category comparison" }).click();
   await context.setOffline(true);
   await page.getByRole("button", { name: "3 months", exact: true }).click();
   await expect(kpis.locator(".metric").nth(1)).toContainText("£1,600.00");
@@ -126,17 +138,19 @@ test("category averages use six complete bank months while unrelated card histor
   await expect(page.locator(".category-range .muted")).toHaveText(
     "Monthly variation (standard deviation): £374.17",
   );
-  await expect(page.getByText(/Comparison accounts:/)).toContainText("Current");
-  await expect(page.getByText(/Comparison accounts:/)).not.toContainText(
-    "Travel",
-  );
+  await page
+    .getByRole("button", { name: "About this category comparison" })
+    .click();
+  const comparison = page.getByRole("dialog", { name: "Category comparison" });
+  await expect(comparison).toContainText("Current");
+  await expect(comparison).not.toContainText("Travel");
   const months = page.locator(".category-comparison-months");
-  await months.locator(":scope > summary").click();
   await expect(months.locator(".category-comparison-list > li")).toHaveCount(6);
   await expect(months).toContainText("April 2026");
   await expect(months).toContainText(
     "October 2026 is the selected month and is excluded",
   );
+  await page.getByRole("button", { name: "Close Category comparison" }).click();
   await page.getByText("View values", { exact: true }).click();
   await expect(page.locator(".category-months a")).toHaveCount(7);
   await page
@@ -188,12 +202,13 @@ test("recorded comparisons remain available when another category account has mi
   await expect(page.locator(".category-range .muted")).toHaveText(
     "Monthly variation (standard deviation): £376.82",
   );
+  await page
+    .getByRole("button", { name: "About this category comparison" })
+    .click();
   const months = page.locator(".category-comparison-months");
-  await months.locator(":scope > summary").click();
   const september = months.locator(".category-comparison-list > li").filter({
     hasText: "September 2026",
   });
-  await september.locator("summary").click();
   await expect(september).toContainText("statement dates need verification");
   await expect(months.locator(".category-comparison-list > li")).toHaveCount(6);
   await expect(

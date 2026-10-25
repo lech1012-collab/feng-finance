@@ -161,7 +161,10 @@ it("renames a saved layout and allows direct Undo of deletion", async () => {
   const database = createDatabase();
   await saveLayoutTemplate(template, database);
   render(<ImportLayoutsSettings database={database} />);
-  fireEvent.click(screen.getByText("Import layouts"));
+  expect(screen.queryByText(/Saved column mappings help/)).toBeNull();
+  fireEvent.click(screen.getByRole("button", { name: "About Import layouts" }));
+  expect(await screen.findByText(/Saved column mappings help/)).toBeVisible();
+  fireEvent.click(screen.getByRole("button", { name: "Close Import layouts" }));
   expect(await screen.findByText("Check columns on next import")).toBeTruthy();
   fireEvent.click(
     screen.getByRole("button", {
@@ -187,7 +190,17 @@ it("exports only redacted diagnostics and turning diagnostics off removes retain
   await setImportDiagnosticsEnabled(true, database);
   await database.importDiagnostics.add(diagnostic);
   render(<ImportDiagnosticsSettings database={database} />);
-  fireEvent.click(screen.getByText("Import diagnostics"));
+  expect(screen.getByText(/Keeps statement text and figures/)).toBeVisible();
+  expect(screen.getByText(/Turning this off deletes/)).toBeVisible();
+  expect(screen.queryByText(/migration safety copy may/)).toBeNull();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About Import diagnostics" }),
+  );
+  expect(await screen.findByText(/14-day expiry/)).toBeVisible();
+  expect(await database.importDiagnostics.count()).toBe(1);
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Import diagnostics" }),
+  );
   await screen.findByText("1 of 5 imports retained.");
   fireEvent.click(
     screen.getByRole("button", { name: "Export redacted diagnostics" }),

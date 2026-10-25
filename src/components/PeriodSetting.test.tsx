@@ -37,6 +37,18 @@ it("cancel leaves closed months and period unchanged; confirming and Undo restor
   const confirm = vi.spyOn(window, "confirm").mockReturnValue(false);
   render(<PeriodSetting />);
   const select = await screen.findByLabelText("Starts on");
+  expect(
+    screen.queryByText(/Home, budgets and reviews/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About Your reporting month" }),
+  );
+  expect(await screen.findByText(/Home, budgets and reviews/)).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Your reporting month" }),
+  );
+  expect(select).toHaveValue("calendar");
+  expect(await db.monthCloses.toArray()).toEqual(before);
   fireEvent.change(select, { target: { value: "fixed" } });
   await waitFor(() => expect(confirm).toHaveBeenCalledOnce());
   await waitFor(() => expect(select).not.toBeDisabled());

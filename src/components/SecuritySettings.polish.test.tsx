@@ -28,12 +28,17 @@ it("shows lock status first and asks for masked numeric PINs only in a cancellab
   render(<SecuritySettings />);
   await screen.findByText("App lock is off.");
   expect(
+    screen.getByText("App lock does not encrypt your local database."),
+  ).toBeVisible();
+  expect(
     screen.queryByLabelText("Choose a 6-digit app PIN"),
   ).not.toBeInTheDocument();
   const before = await db.settings.toArray();
   fireEvent.click(screen.getByRole("button", { name: "Set up app lock" }));
   const sheet = await screen.findByRole("dialog", { name: "Set up app lock" });
   const ui = within(sheet);
+  expect(ui.getByText(/does not encrypt stored data/)).toBeVisible();
+  expect(ui.getByText(/There is no PIN recovery/)).toBeVisible();
   const choose = ui.getByLabelText("Choose a 6-digit app PIN");
   expect(choose).toHaveAttribute("type", "password");
   expect(choose).toHaveAttribute("inputmode", "numeric");

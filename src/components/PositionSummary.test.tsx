@@ -1,4 +1,4 @@
-import { render, screen, cleanup } from "@testing-library/react";
+import { render, screen, cleanup, fireEvent } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PositionSummary } from "./PositionSummary";
@@ -77,6 +77,16 @@ it("shows dated card debt but leaves cash and net position unavailable when no c
     "href",
     "/accounts",
   );
+  expect(screen.getByText("Partial or unverified")).toBeVisible();
+  expect(
+    screen.queryByText("Missing or stale balances. Net worth is withheld."),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Your financial position explained" }),
+  );
+  expect(
+    screen.getByText("Missing or stale balances. Net worth is withheld."),
+  ).toBeVisible();
 });
 it("does not attribute an October issue-date balance to September", () => {
   view("2026-09");

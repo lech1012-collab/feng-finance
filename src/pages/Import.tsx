@@ -39,6 +39,7 @@ import type { PdfImportSession } from "../import/pdf-session-types";
 import { FeedbackLink } from "../components/FeedbackPanel";
 import { RELEASE_CONFIGURATION } from "../beta/configuration";
 import { Sheet, SheetVisibilityContext } from "../components/Sheet";
+import { ContextHelp } from "../components/ContextHelp";
 import "./Import.css";
 import {
   appendBatchEntries,
@@ -1015,11 +1016,18 @@ export default function ImportPage({
       >
         <div className="page-heading">
           <div>
-            <h1>
-              {entries.length
-                ? `Review ${entries.length} statement${entries.length === 1 ? "" : "s"}`
-                : "Import statements"}
-            </h1>
+            <div className="context-help-heading">
+              <h1>
+                {entries.length
+                  ? `Review ${entries.length} statement${entries.length === 1 ? "" : "s"}`
+                  : "Import statements"}
+              </h1>
+              {entries.length > 0 && (
+                <ContextHelp title="Statement review">
+                  <p>You can change tabs and return to this review.</p>
+                </ContextHelp>
+              )}
+            </div>
             {entries.length > 0 && (
               <div className="import-change-files">
                 <label
@@ -1046,9 +1054,6 @@ export default function ImportPage({
                 >
                   Discard review
                 </button>
-                <span className="muted">
-                  You can change tabs and return to this review.
-                </span>
                 <span className="muted">
                   {batch.savedCount > 0
                     ? "Saved statements stay saved. Confirm the remaining statements when ready."
@@ -1106,18 +1111,28 @@ export default function ImportPage({
               if (
                 !busy &&
                 target instanceof Element &&
-                !target.closest("input, label, button, a")
+                !target.closest("input, label, button, a, dialog")
               ) {
                 localPicker.current?.click();
               }
             }}
           >
             <Upload size={28} />
-            <h2>Add your statements</h2>
-            <p>
-              Select or drop multiple PDF statements. We’ll check the numbers
-              and highlight anything that needs you.
-            </p>
+            <div className="context-help-heading">
+              <h2>Add your statements</h2>
+              <ContextHelp title="Importing statements">
+                <p>
+                  Select multiple PDF statements, or CSV, OFX, QFX and QIF
+                  exports, with the same file picker. We’ll check the numbers
+                  and highlight anything that needs you.
+                </p>
+                <p>
+                  Digital PDFs work best. Scanned pages are read on this device.
+                  Up to 30 MB and 100 pages per PDF.
+                </p>
+              </ContextHelp>
+            </div>
+            <p>Select or drop your statement files.</p>
             <label
               className={`button primary file-button ${busy ? "disabled" : ""}`}
             >
@@ -1137,17 +1152,6 @@ export default function ImportPage({
                 }}
               />
             </label>
-            <details className="import-other-formats">
-              <summary>Other file formats</summary>
-              <p>
-                CSV, OFX, QFX and QIF exports are also supported. Choose them
-                with the same file picker.
-              </p>
-            </details>
-            <p className="muted">
-              Digital PDFs work best. Scanned pages are read on this device. Up
-              to 30 MB and 100 pages per PDF.
-            </p>
           </section>
         )}
 
@@ -1409,14 +1413,18 @@ export default function ImportPage({
                           return undefined;
                         if (entry.draft?.bankSource) {
                           return (
-                            <details className="generic-parser-details">
-                              <summary>Reading details</summary>
-                              <p>
-                                This statement uses its bank reader. If a date
-                                or amount looks wrong, review the PDF layout to
-                                correct the source reading and check the figures
-                                again.
-                              </p>
+                            <section className="generic-parser-details">
+                              <div className="context-help-heading">
+                                <h3>Reading details</h3>
+                                <ContextHelp title="Statement reading">
+                                  <p>
+                                    This statement uses its bank reader. If a
+                                    date or amount looks wrong, review the PDF
+                                    layout to correct the source reading and
+                                    check the figures again.
+                                  </p>
+                                </ContextHelp>
+                              </div>
                               <button
                                 type="button"
                                 disabled={busy}
@@ -1436,7 +1444,7 @@ export default function ImportPage({
                               >
                                 Review PDF layout
                               </button>
-                            </details>
+                            </section>
                           );
                         }
                         const result = sourceReview(entry);
@@ -1490,13 +1498,19 @@ export default function ImportPage({
                         return entry.draft?.parserFallback ? (
                           <details className="generic-parser-details">
                             <summary>Alternative column reading</summary>
-                            <p>
-                              The bank-specific reader checked this recognised
-                              statement automatically. Column mapping and
-                              source-row corrections are available here if you
-                              need them. Changing the mapping or rows selects
-                              that reading for this import.
-                            </p>
+                            <div className="context-help-heading">
+                              <h3>Column reading</h3>
+                              <ContextHelp title="Alternative column reading">
+                                <p>
+                                  The bank-specific reader checked this
+                                  recognised statement automatically. Column
+                                  mapping and source-row corrections are
+                                  available here if you need them. Changing the
+                                  mapping or rows selects that reading for this
+                                  import.
+                                </p>
+                              </ContextHelp>
+                            </div>
                             {review}
                           </details>
                         ) : (
@@ -1537,10 +1551,15 @@ export default function ImportPage({
                   !sourceReview(entry)?.checks.reconciledExactly)),
           ) && (
             <section className="card" aria-label="Help with a failed import">
-              <p>
-                Having trouble reading a statement? You can share technical
-                details without sharing your figures or PDF.
-              </p>
+              <div className="context-help-heading">
+                <h2>Help with an import</h2>
+                <ContextHelp title="Reporting an import problem">
+                  <p>
+                    You can share technical details without sharing your figures
+                    or PDF.
+                  </p>
+                </ContextHelp>
+              </div>
               <FeedbackLink
                 configuration={RELEASE_CONFIGURATION}
                 diagnostics={diagnostics}

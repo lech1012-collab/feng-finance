@@ -30,6 +30,15 @@ it("offers local Undo for the property-report preference", async () => {
   const toggle = await screen.findByRole("switch", {
     name: "Enable property tax summary",
   });
+  expect(screen.queryByText(/Adds rental income/)).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About Property tax summary" }),
+  );
+  expect(await screen.findByText(/Adds rental income/)).toBeVisible();
+  expect((await db.settings.get("property-tax-report"))?.value).toBe("false");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Property tax summary" }),
+  );
   expect(toggle).not.toBeChecked();
   fireEvent.click(toggle);
   await screen.findByText("Report preference saved.");

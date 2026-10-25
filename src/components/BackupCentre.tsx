@@ -22,6 +22,7 @@ import { formatDateRange, formatUkDate } from "../domain/dates";
 import { localToday } from "../analytics/reminders";
 import { Sheet } from "./Sheet";
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { Eye, EyeOff, Archive } from "lucide-react";
 
 function Password({
@@ -217,11 +218,15 @@ export function BackupCentre({
   const dates = pending?.transactions.map((row) => row.date).sort() ?? [];
   return (
     <section className="card backup-centre" id="backup">
-      <h2>Backup and restore</h2>
-      <p className="muted">
-        A portable copy of your accounts, transactions and rules. Password
-        protection happens on this device.
-      </p>
+      <div className="context-help-heading">
+        <h2>Backup and restore</h2>
+        <ContextHelp title="Backups">
+          <p>
+            A portable copy of your accounts, transactions and rules. Password
+            protection happens on this device.
+          </p>
+        </ContextHelp>
+      </div>
       <p className="backup-status">
         <Archive size={16} aria-hidden="true" />
         <span>

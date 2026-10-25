@@ -2111,7 +2111,15 @@ test("subscription notification centre supports review, cancellation plans and p
   await expect(netflix).toContainText(
     "Latest charge increased by £2.00 (+15%)",
   );
-  await expect(netflix).toContainText("median of the previous three charges");
+  await netflix
+    .getByRole("button", { name: /About charge warnings for/i })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Recurring charge warnings" }),
+  ).toContainText("median of the previous three charges");
+  await page
+    .getByRole("button", { name: "Close Recurring charge warnings" })
+    .click();
   await netflix.locator(".subscription-swipe").scrollIntoViewIfNeeded();
   const box = (await netflix.locator(".subscription-swipe").boundingBox())!;
   await page.mouse.move(box.x + box.width - 25, box.y + 30);
@@ -2259,7 +2267,7 @@ test("category overview, income shares, central Home navigation and page palette
   expect(await palette()).not.toBe(home);
   await page.getByRole("button", { name: "12 months", exact: true }).click();
   await page
-    .getByText("Average and standard deviation explained", { exact: true })
+    .getByRole("button", { name: "About monthly averages and variation" })
     .click();
   await expect(page.getByText(/Sample standard deviation:/)).toBeVisible();
   for (const width of [320, 390, 768]) {
@@ -2270,6 +2278,9 @@ test("category overview, income shares, central Home navigation and page palette
       ),
     ).toBe(true);
   }
+  await page
+    .getByRole("button", { name: "Close Monthly average and variation" })
+    .click();
   await page
     .getByRole("link", { name: "View all transactions", exact: true })
     .click();

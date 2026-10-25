@@ -153,6 +153,19 @@ it("shows Self Assessment results first and keeps allowable-category choices in 
   expect(within(summary).getByText("£500.00")).toBeVisible();
   expect(within(summary).getByText("£1,600.00")).toBeVisible();
   expect(within(tax).getByText("Not tax advice.")).toBeVisible();
+  fireEvent.click(
+    within(tax).getByRole("button", { name: "Property tax summary explained" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Property tax summary explained" }),
+  ).toHaveTextContent(
+    "This summary uses the selected UK tax year and the expense categories you choose.",
+  );
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "Close Property tax summary explained",
+    }),
+  );
   expect(within(tax).queryByRole("checkbox")).not.toBeInTheDocument();
   expect(within(tax).getByRole("group", { name: "Tax year" })).toBeVisible();
   fireEvent.click(

@@ -1,4 +1,5 @@
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -107,13 +108,20 @@ export function TransferReview({
   const unambiguous = new Set(transactions).size === transactions.length;
   return (
     <section className="card transfer-review" aria-label="Transfers to confirm">
-      <h2>
-        Transfers to confirm
-        {data.proposals.length ? ` · ${data.proposals.length}` : ""}
-      </h2>
+      <div className="context-help-heading">
+        <h2>
+          Transfers to confirm
+          {data.proposals.length ? ` · ${data.proposals.length}` : ""}
+        </h2>
+        <ContextHelp title="Confirming transfers">
+          <p>
+            Confirm money moving between your own accounts. Linked transfers
+            move account balances and are excluded from income and spending.
+          </p>
+        </ContextHelp>
+      </div>
       <p className="coverage-note">
-        Confirm money moving between your own accounts. Until confirmed, these
-        rows remain ordinary money in and spending.
+        Unconfirmed pairs still count as income and spending.
       </p>
       <div className="transfer-review-list">
         {data.proposals.map((proposal) => {

@@ -9,6 +9,7 @@ import { AdvancedSearch, queryFromParams } from "../components/AdvancedSearch";
 import { BulkTagPicker } from "../components/TagManager";
 import { SplitRuleOffer } from "../components/SplitRuleOffer";
 import { TransferReview } from "../components/TransferReview";
+import { ContextHelp } from "../components/ContextHelp";
 import {
   needsReview,
   needsCategory,
@@ -1429,10 +1430,19 @@ export default function Transactions({
             tabIndex={0}
             aria-label="Category drop targets"
           >
-            <h2>Categories</h2>
-            <p className="muted">
-              Drag a transaction here. Select several with Shift or ⌘ click.
-            </p>
+            <div className="context-help-heading">
+              <h2>Categories</h2>
+              <ContextHelp title="Categorising transactions">
+                <p>
+                  Drag a transaction here, or select it and choose a category.
+                  Select several with Shift or ⌘ click.
+                </p>
+                <p>
+                  Matching payments in this account and future imports follow
+                  your category choice.
+                </p>
+              </ContextHelp>
+            </div>
             {selectedIds.length > 0 && <p>{selectedIds.length} selected</p>}
             <section
               className="rail-suggestions"
@@ -1446,11 +1456,7 @@ export default function Transactions({
                     ? " · first selected transaction"
                     : ""}
                 </p>
-              ) : (
-                <p className="muted">
-                  Select or drag a transaction to see suggestions.
-                </p>
-              )}
+              ) : null}
               {railSubject &&
                 railSuggestions.map((c) => (
                   <button

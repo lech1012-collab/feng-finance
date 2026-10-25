@@ -41,6 +41,7 @@ import { displayMerchant } from "../domain/presentation";
 import { money } from "../domain/money";
 import { MonthPicker, Metric, PeriodControl } from "../components/common";
 import { CashChart } from "../components/Chart";
+import { ContextHelp } from "../components/ContextHelp";
 import { ListRow } from "../components/UIPrimitives";
 export default function Analysis({
   month,
@@ -355,7 +356,44 @@ export default function Analysis({
           <p className="eyebrow">
             {property ? "RENT, COSTS & CASH FLOW" : "PUT YOUR MONTH IN CONTEXT"}
           </p>
-          <h1>{property ? "Property" : "Analyse"}</h1>
+          <div className="context-help-heading">
+            <h1>{property ? "Property" : "Analyse"}</h1>
+            <ContextHelp
+              title="Analysis coverage explained"
+              label="Analysis coverage explained"
+              tone={complete ? "help" : "warning"}
+            >
+              {property && (
+                <p>
+                  Property cash flow uses rental-income and property-cost
+                  categories. The net amount is money received less recorded
+                  costs.
+                </p>
+              )}
+              <p>
+                Totals use the selected dates and exclude transfers. Income and
+                net cash flow require an imported income source.
+              </p>
+              {approximate && (
+                <p>
+                  ≈ Converted using transaction-date exchange rates. Original
+                  amounts remain in each transaction.
+                </p>
+              )}
+              {!complete && coverage.some((c) => c.hasData) && (
+                <p>
+                  Amounts from imported accounts only; coverage is incomplete.
+                </p>
+              )}
+              {coverage.some((c) => c.hasUnverifiedStatements) && (
+                <p>
+                  Statements with incomplete date or balance verification are
+                  included in these recorded totals. Balances or extracted rows
+                  could not be confirmed; verified comparisons are withheld.
+                </p>
+              )}
+            </ContextHelp>
+          </div>
         </div>
       </div>
       <div className="toolbar">
@@ -387,7 +425,6 @@ export default function Analysis({
         )}
         {scope.valid &&
           ` · ${complete ? "Complete" : coverage.some((c) => c.hasData) ? "Partial or unverified" : "No data"}`}
-        {" · transfers excluded"}
       </p>
       <section className="card metric-strip">
         {hasIncomeSource ? (
@@ -443,24 +480,6 @@ export default function Analysis({
           <Link to="/settings#global-currency">Add exchange rates</Link>.
         </p>
       )}
-      {approximate && (
-        <p className="coverage-note">
-          ≈ Converted using transaction-date exchange rates. Original amounts
-          remain in each transaction.
-        </p>
-      )}
-      {!complete && coverage.some((c) => c.hasData) && (
-        <p className="coverage-note">
-          Amounts from imported accounts only; coverage is incomplete.
-        </p>
-      )}
-      {coverage.some((c) => c.hasUnverifiedStatements) && (
-        <p className="notice warning" role="status">
-          Statements with incomplete date or balance verification are included
-          in these recorded totals. Balances or extracted rows could not be
-          confirmed; verified comparisons are withheld.
-        </p>
-      )}
       {!property && (
         <div className="analysis-shortcuts">
           <CategoryAnalysisPicker month={month} />
@@ -495,13 +514,19 @@ export default function Analysis({
             {scope.months.length} month{scope.months.length === 1 ? "" : "s"}
           </span>
         </div>
-        <CashChart data={series} currency={currency} property={property} />
-        {period === "custom" && fullMonths.length !== scope.months.length && (
-          <p className="coverage-note">
-            Partial bars include only the selected dates, rather than a whole
-            calendar month.
-          </p>
-        )}
+        <CashChart
+          data={series}
+          currency={currency}
+          property={property}
+          helpContent={
+            period === "custom" && fullMonths.length !== scope.months.length ? (
+              <p>
+                Partial bars include only the selected dates, rather than a
+                whole calendar month.
+              </p>
+            ) : undefined
+          }
+        />
       </section>
       <div className="content-grid">
         <section className="card" id="category-spending">
@@ -616,7 +641,31 @@ export default function Analysis({
       {!property && (
         <>
           <section className="card">
-            <h2>Compare with previous period</h2>
+            <div className="context-help-heading">
+              <h2>Compare with previous period</h2>
+              <ContextHelp
+                title="Period comparisons explained"
+                label="Period comparisons explained"
+                tone={comparable ? "help" : "warning"}
+              >
+                <p>
+                  {comparable
+                    ? "Both periods have complete verified coverage."
+                    : "Not comparable yet: both periods need complete verified statement coverage."}
+                </p>
+                <p>
+                  Average monthly spending uses only complete verified months
+                  wholly within the selected dates. Incomplete months are
+                  excluded from the average.
+                </p>
+                {average !== undefined && (
+                  <p>
+                    Monthly average uses {verifiedSeries.length} verified month
+                    {verifiedSeries.length === 1 ? "" : "s"}.
+                  </p>
+                )}
+              </ContextHelp>
+            </div>
             <dl className="totals">
               {comparable && (
                 <>
@@ -640,7 +689,9 @@ export default function Analysis({
               )}
               <div>
                 <dt>
-                  Average monthly spending · verified months in this period
+                  Average monthly spending
+                  {average !== undefined &&
+                    ` · ${verifiedSeries.length} verified month${verifiedSeries.length === 1 ? "" : "s"}`}
                 </dt>
                 <dd>
                   {average !== undefined
@@ -659,26 +710,31 @@ export default function Analysis({
                       shiftDate(scope.previousEnd, -1),
                     )}
                   </span>
-                  ; both periods have complete verified coverage.
                 </>
               ) : (
-                "Not comparable yet: both periods need complete verified statement coverage."
+                "Not comparable yet"
               )}
-              {average !== undefined &&
-                ` Monthly average uses ${verifiedSeries.length} verified month${verifiedSeries.length === 1 ? "" : "s"}.`}
             </p>
           </section>
           <details className="card">
             <summary>Category trends</summary>
-            <p className="muted">
-              Verified periods can be compared; incomplete history stays
-              unavailable.
-            </p>
+            <div className="context-help-heading">
+              <span className="muted">vs previous period</span>
+              <ContextHelp
+                title="Category trends explained"
+                label="Category trends explained"
+              >
+                <p>
+                  Verified periods can be compared; incomplete history stays
+                  unavailable.
+                </p>
+                <p>
+                  Change against the previous period. Open a category for its
+                  monthly plot.
+                </p>
+              </ContextHelp>
+            </div>
             <div className="category-trend-summary">
-              <p className="muted">
-                Change against the previous period. Open a category for its
-                monthly plot.
-              </p>
               <ul className="category-trend-list">
                 {spending.map((category) => (
                   <li key={category.id}>

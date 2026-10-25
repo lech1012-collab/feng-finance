@@ -23,19 +23,23 @@ export function SheetFooter({ children }: { children: ReactNode }) {
 
 /** Native modal focus/inert handling; the content scrolls above a visible footer. */
 export function Sheet({
+  id,
   title,
   children,
   footer,
   onClose,
   closeLabel,
   open = true,
+  dismissOnBackdrop = false,
 }: {
+  id?: string;
   title: string;
   children: ReactNode;
   footer?: ReactNode;
   onClose: () => void;
   closeLabel?: string;
   open?: boolean;
+  dismissOnBackdrop?: boolean;
 }) {
   const visible = useContext(SheetVisibilityContext);
   open = open && visible;
@@ -89,10 +93,22 @@ export function Sheet({
   }, [open]);
   return (
     <dialog
+      id={id}
       ref={ref}
       className="ux-sheet"
       aria-labelledby={titleId}
       aria-modal="true"
+      onClick={(event) => {
+        if (!dismissOnBackdrop || event.target !== event.currentTarget) return;
+        const bounds = event.currentTarget.getBoundingClientRect();
+        if (
+          event.clientX < bounds.left ||
+          event.clientX > bounds.right ||
+          event.clientY < bounds.top ||
+          event.clientY > bounds.bottom
+        )
+          close.current();
+      }}
       onCancel={(event) => {
         event.preventDefault();
         close.current();

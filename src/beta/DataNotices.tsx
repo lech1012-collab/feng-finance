@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ContextHelp } from "../components/ContextHelp";
 import type { Setting } from "../domain/models";
 import {
   needsFirstBackupReminder,
@@ -39,16 +40,25 @@ export function DataNotices({
     }
   };
   return (
-    <section
-      className="notice warning beta-data-notice"
-      aria-label="Save a backup"
-    >
+    <section className="notice beta-data-notice" aria-label="Save a backup">
       <div>
-        <p>
-          {separate
-            ? "Data in this Safari tab is separate from the installed app. Save a backup and restore it in the installed app."
-            : "You imported your first statements a week ago. Save a backup in Files or iCloud Drive to protect your data."}
-        </p>
+        <div className="context-help-heading">
+          <strong>{separate ? "Data is separate here" : "Backup due"}</strong>
+          <ContextHelp
+            title={
+              separate
+                ? "Separate browser and installed-app data"
+                : "Keeping a backup"
+            }
+            tone="warning"
+          >
+            <p>
+              {separate
+                ? "Data in this Safari tab is separate from the installed app. Save a backup and restore it in the installed app."
+                : "You imported your first statements a week ago. Save a backup in Files or iCloud Drive to protect your data."}
+            </p>
+          </ContextHelp>
+        </div>
         {error && <p role="alert">{error}</p>}
       </div>
       <div className="actions">

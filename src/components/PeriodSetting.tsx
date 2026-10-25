@@ -1,4 +1,5 @@
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { SwitchRow } from "./UIPrimitives";
 import { useLiveQuery } from "dexie-react-hooks";
 import { useState } from "react";
@@ -82,7 +83,15 @@ export function PeriodSetting() {
   };
   return (
     <section className="card">
-      <h2>Your month</h2>
+      <div className="context-help-heading">
+        <h2>Your month</h2>
+        <ContextHelp title="Your reporting month">
+          <p>
+            Home, budgets and reviews use the same date range. Payday uses
+            Salary entries, otherwise the last weekday.
+          </p>
+        </ContextHelp>
+      </div>
       <label>
         Starts on
         <select
@@ -122,10 +131,6 @@ export function PeriodSetting() {
         disabled={busy}
         onChange={(enabled) => void saveAutoClose(enabled)}
       />
-      <p className="muted">
-        Home, budgets and reviews use the same date range. Payday uses Salary
-        entries, otherwise the last weekday.
-      </p>
       {notice && (
         <Toast
           id={changeId || notice}

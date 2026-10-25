@@ -160,6 +160,29 @@ function RetainedReview({
     </>
   );
 }
+
+it("opens format help without launching the statement picker or starting an import", async () => {
+  show([]);
+  const picker = screen.getByLabelText("Select statements");
+  const choose = vi.spyOn(picker, "click").mockImplementation(() => {});
+  expect(screen.queryByText(/Digital PDFs work best/)).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About Importing statements" }),
+  );
+  const help = await screen.findByRole("dialog", {
+    name: "Importing statements",
+  });
+  fireEvent.click(within(help).getByText(/Digital PDFs work best/));
+  expect(within(help).getByText(/CSV, OFX, QFX and QIF/)).toBeVisible();
+  fireEvent.click(
+    within(help).getByRole("button", { name: "Close Importing statements" }),
+  );
+  expect(choose).not.toHaveBeenCalled();
+  expect(extractFile).not.toHaveBeenCalled();
+  expect(await db.transactions.count()).toBe(0);
+  choose.mockRestore();
+});
+
 describe("PDF review session lifecycle", () => {
   it("keeps extraction and its source alive across navigation, then resumes without reading files again", async () => {
     const source = extracted();

@@ -18,6 +18,7 @@ import { potsOverview } from "../analytics/planning-v2";
 import { manualCashBalance } from "../analytics/manual-cash";
 import { reportingBalanceHistory } from "../analytics/reporting-balance-history";
 import { BalanceTrend, type BalanceTrendProps } from "./BalanceTrend";
+import { ContextHelp } from "./ContextHelp";
 
 type PositionSummaryProps = BalanceTrendProps & {
   pots: Pot[];
@@ -221,7 +222,35 @@ function PositionSnapshot({
   return (
     <section className="card position-summary">
       <div className="section-heading">
-        <h2>Where you stand</h2>
+        <div className="context-help-heading">
+          <h2>Where you stand</h2>
+          <ContextHelp
+            title="Your financial position explained"
+            label="Your financial position explained"
+            tone={complete ? "help" : "warning"}
+          >
+            <p>
+              Cash includes current and savings balances. Card debt shows the
+              amount owed on imported liability accounts. Net worth combines all
+              included assets and debts.
+            </p>
+            <p>
+              Figures use the latest dated balance available for each account.
+              Asterisks mark missing, stale or unverified balances.
+            </p>
+            {!complete && (
+              <p>Missing or stale balances. Net worth is withheld.</p>
+            )}
+            {setAside !== undefined && setAside > 0 && (
+              <p>Pots set aside part of your cash; they do not reduce it.</p>
+            )}
+            {converted && (
+              <p>
+                ≈ marks balances converted to {currency} for the selected date.
+              </p>
+            )}
+          </ContextHelp>
+        </div>
         <Link to="/accounts">Accounts</Link>
       </div>
       <span
@@ -274,12 +303,6 @@ function PositionSnapshot({
           </strong>
         </Link>
       </div>
-      {!complete && (
-        <p className="coverage-note">
-          * Missing or stale balances. Net worth is withheld.
-        </p>
-      )}
-
       {comparable && (
         <p className="balance-change">
           {comparable

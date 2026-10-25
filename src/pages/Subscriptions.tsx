@@ -1,6 +1,6 @@
-import { useLiveQuery } from "dexie-react-hooks";
 import { recurringReportingTotal } from "../analytics/subscription-summary";
 import { Toast } from "../components/Toast";
+import { ContextHelp } from "../components/ContextHelp";
 import { displayMerchant } from "../domain/presentation";
 import { localToday } from "../analytics/reminders";
 import { sha256 } from "../domain/normalize";
@@ -128,36 +128,77 @@ function SubscriptionCard({
       {s.annual !== undefined && (
         <p>{money(s.annual, s.currency)} / year if this rate continues</p>
       )}
-      {s.afterCancellation && (
-        <p className="notice warning">
-          Charged after you marked this cancelled. Check the merchant’s
-          confirmation and the charge date.
-        </p>
-      )}
-      {s.increase > 0 && (
-        <p className="notice warning">
-          Latest charge increased by {money(s.increase, s.currency)}
-          {s.increasePercent !== undefined
-            ? ` (+${Math.round(s.increasePercent)}%)`
-            : ""}{" "}
-          compared with the median of the previous three charges.
-        </p>
-      )}
-      {s.status === "keep" && s.needsReview && s.increase === 0 && (
-        <p className="notice warning">
-          The latest cost is higher than when you chose to keep this service.
-        </p>
-      )}
-      {s.overlap && (
-        <p className="notice warning">
-          Also charged on another account. Check whether both plans are needed.
-        </p>
-      )}
-      {s.stale && (
-        <p className="muted">
-          No recent charge in imported data. This does not prove cancellation;
-          import newer statements.
-        </p>
+      {(s.afterCancellation ||
+        s.increase > 0 ||
+        (s.status === "keep" && s.needsReview && s.increase === 0) ||
+        s.overlap ||
+        s.stale) && (
+        <div className="context-help-heading">
+          <div className="context-help-row">
+            {s.afterCancellation && (
+              <StatusChip tone="warning">
+                Charged after you marked this cancelled
+              </StatusChip>
+            )}
+            {s.increase > 0 && (
+              <StatusChip tone="warning">
+                Latest charge increased by {money(s.increase, s.currency)}
+                {s.increasePercent !== undefined
+                  ? ` (+${Math.round(s.increasePercent)}%)`
+                  : ""}
+              </StatusChip>
+            )}
+            {s.status === "keep" && s.needsReview && s.increase === 0 && (
+              <StatusChip tone="warning">Cost increased since Keep</StatusChip>
+            )}
+            {(s.overlap || s.stale) && (
+              <StatusChip tone="warning">
+                {[
+                  s.overlap ? "Possible duplicate" : "",
+                  s.stale ? "No recent charge" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </StatusChip>
+            )}
+          </div>
+          <ContextHelp
+            title="Recurring charge warnings"
+            label={`About charge warnings for ${s.merchant}`}
+            tone="warning"
+          >
+            {s.afterCancellation && (
+              <p>
+                A charge was recorded after you marked this cancelled. Check the
+                merchant’s confirmation and the charge date.
+              </p>
+            )}
+            {s.increase > 0 && (
+              <p>
+                The latest charge is compared with the median of the previous
+                three charges.
+              </p>
+            )}
+            {s.status === "keep" && s.needsReview && s.increase === 0 && (
+              <p>
+                The latest cost is higher than when you chose to keep this
+                service.
+              </p>
+            )}
+            {s.overlap && (
+              <p>
+                Also charged on another account. Check whether both plans are
+                needed.
+              </p>
+            )}
+            {s.stale && (
+              <p>
+                No recent charge in imported data. This does not prove
+                cancellation; import newer statements.
+              </p>
+            )}
+          </ContextHelp>
+        </div>
       )}
       <div
         className="subscription-states"
@@ -193,12 +234,23 @@ function SubscriptionCard({
       </div>
       {s.status === "cancel" && (
         <div className="notice">
-          <strong>Finish cancellation with the provider</strong>
+          <div className="context-help-heading">
+            <strong>Finish cancellation with the provider</strong>
+            <ContextHelp
+              title="Cancelling with the provider"
+              label={`Help cancelling ${s.merchant}`}
+            >
+              <p>
+                Open the service’s account or billing settings. For purchases
+                billed through Apple or Google, use that store’s Subscriptions
+                settings.
+              </p>
+            </ContextHelp>
+          </div>
           <p>
-            Open the service’s account or billing settings. For purchases billed
-            through Apple or Google, use that store’s Subscriptions settings.
-            Save the confirmation and end date, then mark “I cancelled” here.
-            Deleting the app does not cancel a subscription.
+            Feng cannot cancel it for you. Save the provider’s confirmation and
+            end date, then mark “I cancelled” here. Deleting the app does not
+            cancel a subscription.
           </p>
         </div>
       )}
@@ -214,10 +266,6 @@ function SubscriptionCard({
           View {s.charges.length} charge{s.charges.length === 1 ? "" : "s"} and
           source evidence
         </summary>
-        <p className="muted">
-          Regular payments are candidates, not proof of a subscription or
-          non-use. Bills and essential services can also recur.
-        </p>
         <div
           className="subscription-evidence-list"
           role="group"
@@ -253,9 +301,6 @@ function SubscriptionCard({
 }
 export default function Subscriptions({ currency }: { currency: string }) {
   const data = useSubscriptions(currency);
-  const helpSeen = useLiveQuery(() =>
-    db.settings.get("subscriptions:helpSeen"),
-  );
   const [message, setMessage] = useState("");
   const [changeId, setChange] = useState(""),
     [error, setError] = useState("");
@@ -321,21 +366,37 @@ export default function Subscriptions({ currency }: { currency: string }) {
   return (
     <>
       <div className="page-heading">
-        <h1>Subscriptions</h1>
+        <div className="context-help-heading">
+          <h1>Subscriptions</h1>
+          <ContextHelp title="Recurring charge detection">
+            <p>
+              Find charges you may have forgotten. Based on up to three years of
+              imported statements. Your data stays on this device.
+            </p>
+            <p>
+              Import consecutive statements to find monthly patterns, or at
+              least two years for annual renewals. Known service names can
+              appear after one charge, clearly marked unconfirmed.
+            </p>
+            <p>
+              Regular payments are candidates, not proof of a subscription or
+              non-use. Bills and essential services can also recur.
+            </p>
+            <p>
+              Alerts update when you import statements; there are no background
+              bank checks or push notifications.
+            </p>
+          </ContextHelp>
+        </div>
       </div>
-      <p className="muted">
-        Find charges you may have forgotten. Based on up to three years of
-        imported statements
-        {data.lastDate && (
-          <>
-            , with transactions through{" "}
-            <time dateTime={data.lastDate} className="date-value">
-              {formatUkDate(data.lastDate)}
-            </time>
-          </>
-        )}
-        . Your data stays on this device.
-      </p>
+      {data.lastDate && (
+        <p className="muted">
+          Transactions through{" "}
+          <time dateTime={data.lastDate} className="date-value">
+            {formatUkDate(data.lastDate)}
+          </time>
+        </p>
+      )}
       <section className="card">
         <div className="planning-v2-kpis">
           <div>
@@ -366,13 +427,20 @@ export default function Subscriptions({ currency }: { currency: string }) {
             <strong>{annualSources.length}</strong>
           </div>
         </div>
-        <h2>{review.length} to review</h2>
-        {!helpSeen && (
-          <p>
-            Swipe a charge left to plan cancellation, right to keep it. You can
-            change its status at any time.
-          </p>
-        )}
+        <div className="context-help-heading">
+          <h2>{review.length} to review</h2>
+          <ContextHelp title="Reviewing recurring charges">
+            <p>
+              Swipe a charge left to plan cancellation, right to keep it. You
+              can also use the status buttons and change your choice at any
+              time.
+            </p>
+            <p>
+              Feng cannot tell whether you use a service. Review the charge
+              history before deciding which services to keep.
+            </p>
+          </ContextHelp>
+        </div>
         {plans.length > 0 && (
           <p>
             <strong>
@@ -399,9 +467,7 @@ export default function Subscriptions({ currency }: { currency: string }) {
           </p>
         )}
         <p className="muted">
-          Feng cannot tell whether you use a service, and cannot cancel it for
-          you. Alerts update when you import statements; there are no background
-          bank checks or push notifications.
+          Cancellation must be completed with the provider.
         </p>
       </section>
       {message && (
@@ -474,11 +540,7 @@ export default function Subscriptions({ currency }: { currency: string }) {
               ? "Nothing in this view"
               : "No recurring charges detected yet"}
           </h2>
-          <p>
-            Import consecutive statements to find monthly patterns, or at least
-            two years for annual renewals. Known service names can appear after
-            one charge, clearly marked unconfirmed.
-          </p>
+          <p>Import statements to find recurring charges.</p>
           <Link to="/import">Import statements</Link>
         </section>
       )}
