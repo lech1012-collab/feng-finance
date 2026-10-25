@@ -49,8 +49,11 @@ test("all-partial recorded history has averages and deviation offline without ch
 }) => {
   const kpis = await seed(page, true);
   await expect(kpis.locator(".metric").nth(1)).toContainText("£1,300.00");
-  await expect(page.locator(".category-range")).toContainText(
-    "Standard deviation: £374.17",
+  await expect(page.locator(".category-range strong")).toHaveText(
+    "Average monthly spending: £1,300.00",
+  );
+  await expect(page.locator(".category-range .muted")).toHaveText(
+    "Monthly variation (standard deviation): £374.17",
   );
   await expect(kpis.locator(".metric").nth(3)).toContainText("+£700.00");
   await expect(
@@ -71,8 +74,11 @@ test("all-partial recorded history has averages and deviation offline without ch
   await context.setOffline(true);
   await page.getByRole("button", { name: "3 months", exact: true }).click();
   await expect(kpis.locator(".metric").nth(1)).toContainText("£1,600.00");
-  await expect(page.locator(".category-range")).toContainText(
-    "Standard deviation: £200.00",
+  await expect(page.locator(".category-range strong")).toHaveText(
+    "Average monthly spending: £1,600.00",
+  );
+  await expect(page.locator(".category-range .muted")).toHaveText(
+    "Monthly variation (standard deviation): £200.00",
   );
   await page.getByRole("button", { name: "1 month", exact: true }).click();
   await expect(kpis.locator(".metric").nth(1)).toContainText("£1,800.00");
@@ -117,8 +123,8 @@ test("category averages use six complete bank months while unrelated card histor
   const kpis = await seed(page);
   await expect(kpis.locator(".metric").nth(1)).toContainText("£1,300.00");
   await expect(kpis).toContainText("6 recorded previous months out of 6");
-  await expect(page.locator(".category-range")).toContainText(
-    "Standard deviation: £374.17",
+  await expect(page.locator(".category-range .muted")).toHaveText(
+    "Monthly variation (standard deviation): £374.17",
   );
   await expect(page.getByText(/Comparison accounts:/)).toContainText("Current");
   await expect(page.getByText(/Comparison accounts:/)).not.toContainText(
@@ -179,8 +185,8 @@ test("recorded comparisons remain available when another category account has mi
   await page.goto("/#/categories/property?month=2026-10");
   await expect(kpis.locator(".metric").nth(1)).toContainText("£1,301.65");
   await expect(kpis).toContainText("6 recorded previous months out of 6");
-  await expect(page.locator(".category-range")).toContainText(
-    "Standard deviation: £376.82",
+  await expect(page.locator(".category-range .muted")).toHaveText(
+    "Monthly variation (standard deviation): £376.82",
   );
   const months = page.locator(".category-comparison-months");
   await months.locator(":scope > summary").click();

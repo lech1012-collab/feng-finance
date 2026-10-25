@@ -321,13 +321,14 @@ export default function CategoryPage({
         {mean !== undefined && std !== undefined && (
           <p className="category-range">
             <strong>
-              Average ± standard deviation:{" "}
-              {money(Math.max(0, mean - std), currency)}–
-              {money(mean + std, currency)}
+              {stats.incomeCategory
+                ? "Average monthly income"
+                : "Average monthly spending"}
+              : {money(mean, currency)}
             </strong>
             <br />
             <span className="muted">
-              Standard deviation: {money(std, currency)}
+              Monthly variation (standard deviation): {money(std, currency)}
             </span>
           </p>
         )}
@@ -337,7 +338,7 @@ export default function CategoryPage({
           previous month{window === 1 ? "" : "s"} and the selected month are
           shown.
           {std !== undefined
-            ? " The shaded band is the recorded average ± one standard deviation, not a budget."
+            ? " The dashed line shows the monthly average. The shaded band shows one standard deviation below and above it, describing past variation."
             : " The average uses recorded monthly totals, including partial months."}
         </p>
         <div
