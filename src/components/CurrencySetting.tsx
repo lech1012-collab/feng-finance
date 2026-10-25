@@ -12,6 +12,7 @@ import { convertMinor } from "../analytics/fx";
 import { Toast } from "./Toast";
 import { Sheet } from "./Sheet";
 import { SwitchRow } from "./UIPrimitives";
+import { ContextHelp } from "./ContextHelp";
 
 export function useGlobalCurrency() {
   const setting = useLiveQuery(() => db.settings.get("currency"), []);
@@ -96,7 +97,19 @@ export function CurrencySetting() {
     .at(-1);
   return (
     <section className="card" id="global-currency">
-      <h2>Currency</h2>
+      <div className="context-help-heading">
+        <h2>Currency</h2>
+        <ContextHelp title="Currency and exchange rates">
+          <p>
+            Totals convert all accounts. Statements and account details keep
+            their original currency.
+          </p>
+          <p>
+            Daily rates come from the European Central Bank. No personal data is
+            sent.
+          </p>
+        </ContextHelp>
+      </div>
       <label htmlFor="reporting-currency">Reporting currency</label>
       <select
         id="reporting-currency"
@@ -117,10 +130,6 @@ export function CurrencySetting() {
           <option key={code}>{code}</option>
         ))}
       </select>
-      <p className="muted">
-        Totals convert all accounts. Statements and account details keep their
-        original currency.
-      </p>
       <SwitchRow
         label="Download daily rates (ECB)"
         checked={requestedEnabled ?? data?.enabled ?? true}
@@ -148,10 +157,8 @@ export function CurrencySetting() {
         }}
       />
       <p className="muted">
-        No personal data is sent.
         {last ? (
           <>
-            {" "}
             Cached rates:{" "}
             <time className="date-value" dateTime={last}>
               {formatUkDate(last)}
@@ -159,7 +166,7 @@ export function CurrencySetting() {
             .
           </>
         ) : (
-          " No rates downloaded yet."
+          "No rates downloaded yet."
         )}
       </p>
       {(requestedEnabled ?? data?.enabled ?? true) && (

@@ -98,7 +98,12 @@ it("uses a status chip for a pot and retains its confirmed contribution and date
   );
   const status = await screen.findByText("On track");
   expect(status.closest(".ui-chip-visual")).not.toBeNull();
-  fireEvent.click(screen.getByText("How this suggestion works"));
+  expect(screen.queryByText(/Calculated as of/)).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", {
+      name: "How this suggestion works for Car insurance",
+    }),
+  );
   expect(screen.getByText(/Calculated as of/)).toHaveTextContent(
     /Calculated as of 14 Oct for the calendar month/,
   );

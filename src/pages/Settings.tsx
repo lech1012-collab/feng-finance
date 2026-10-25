@@ -1,4 +1,5 @@
 import { CategoriesManager } from "../components/CategoriesManager";
+import { ContextHelp } from "../components/ContextHelp";
 import { StatusChip } from "../components/UIPrimitives";
 import { AccountsContent } from "./Accounts";
 import {
@@ -215,7 +216,15 @@ export default function Settings({
       {activeSection === "changes" && <RecentChanges />}
       {activeSection === "reports" && (
         <section className="card">
-          <h2>Reports</h2>
+          <div className="context-help-heading">
+            <h2>Reports</h2>
+            <ContextHelp title="Property tax summary">
+              <p>
+                Adds rental income and selected allowable expenses to Analyse
+                reports.
+              </p>
+            </ContextHelp>
+          </div>
           <SwitchRow
             label="Enable property tax summary"
             checked={data?.taxEnabled ?? false}
@@ -236,10 +245,6 @@ export default function Settings({
               );
             }}
           />
-          <p className="muted">
-            Adds rental income and selected allowable expenses to Analyse
-            reports.
-          </p>
         </section>
       )}
       {activeSection === "reminders" && (
@@ -280,7 +285,6 @@ export default function Settings({
       {activeSection === "export" && (
         <section className="card" id="data-export">
           <h2>Export</h2>
-          <p className="muted">A spreadsheet copy of your transactions.</p>
           <button
             disabled={busy}
             onClick={() =>
@@ -306,8 +310,12 @@ export default function Settings({
       )}
       {activeSection === "statements" && (
         <section className="card">
-          <h2>Statement history</h2>
-          <p className="muted">Original PDFs are not stored.</p>
+          <div className="context-help-heading">
+            <h2>Statement history</h2>
+            <ContextHelp title="Statement history">
+              <p>Original PDFs are not stored.</p>
+            </ContextHelp>
+          </div>
           <div className="statement-history">
             {[
               ...new Set(

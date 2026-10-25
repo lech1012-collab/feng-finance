@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { DeeperInsights } from "./DeeperInsights";
@@ -82,6 +82,15 @@ function show(data: ReturnType<typeof fixture>, months?: string[]) {
 
 it("collapses missing comparison history to one line with its verified sample count", () => {
   const { container } = show(fixture(["2026-08", "2026-09"]));
+  expect(
+    screen.getByText(/Comparisons pending · 1 of 3 verified months/),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(/Comparisons start after 3 verified previous months/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Insight comparisons explained" }),
+  );
   expect(
     screen.getByText(
       /Comparisons start after 3 verified previous months · 1 of 3/,

@@ -72,6 +72,11 @@ Home asks only for missing categories and genuine refund, split or source
 decisions. Already categorised rule matches need no second review. See
 [transaction attention](docs/transaction-attention.md).
 
+Explanations open from nearby question-mark controls. Non-blocking warning
+details open from warning symbols beside concise statuses. Help works offline;
+required decisions, source data and corrective actions stay directly available.
+See the [contextual-help UX review and handoff](docs/contextual-help-ux-plan.md).
+
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.
 Feedback is optional and opens after a privacy warning. It includes technical

@@ -15,6 +15,7 @@ import { localToday } from "../analytics/reminders";
 import { monthCoverage, verifiedStatements } from "../analytics/coverage";
 import { monthLabel } from "../domain/dates";
 import { reportingCoverage } from "../analytics/reporting";
+import { ContextHelp } from "./ContextHelp";
 export function DeeperInsights({
   transactions,
   accounts,
@@ -98,18 +99,52 @@ export function DeeperInsights({
     .sort((a, b) => b.priority - a.priority || b.month.localeCompare(a.month));
   if (!items.length) {
     if (compact) return null;
+    if (result.complete && result.baselineCount >= 3)
+      return (
+        <p className="insight-empty muted">
+          No significant changes in the selected period.
+        </p>
+      );
     return (
-      <p className="insight-empty muted">
-        {result.complete && result.baselineCount >= 3
-          ? "No significant changes in the selected period."
-          : `Comparisons start after 3 verified previous months · ${Math.min(result.baselineCount, 3)} of 3${!result.complete ? " · selected month incomplete" : ""}`}
-      </p>
+      <div className="insight-empty muted context-help-heading">
+        <span>
+          Comparisons pending · {Math.min(result.baselineCount, 3)} of 3
+          verified months
+          {!result.complete ? " · selected month incomplete" : ""}
+        </span>
+        <ContextHelp
+          title="Insight comparisons explained"
+          label="Insight comparisons explained"
+        >
+          <p>
+            {`Comparisons start after 3 verified previous months · ${Math.min(result.baselineCount, 3)} of 3${!result.complete ? " · selected month incomplete" : ""}`}
+          </p>
+        </ContextHelp>
+      </div>
     );
   }
   return (
     <section className="card deeper-insights">
       <div className="section-heading">
-        <h2>What changed?</h2>
+        <div className="context-help-heading">
+          <h2>What changed?</h2>
+          <ContextHelp
+            title="Insight comparisons explained"
+            label="Insight comparisons explained"
+          >
+            <p>
+              Monthly comparisons need complete coverage and 3 verified previous
+              months. Payment checks can appear before that history is complete.
+            </p>
+            {(!result.complete || result.baselineCount < 3) && (
+              <p>
+                Payment checks shown; monthly comparisons need complete coverage
+                and 3 verified previous months (
+                {Math.min(result.baselineCount, 3)} of 3).
+              </p>
+            )}
+          </ContextHelp>
+        </div>
         {compact && <Link to="/analysis">Analyse</Link>}
       </div>
       {items.slice(0, compact ? 3 : 10).map((insight) => (
@@ -127,8 +162,8 @@ export function DeeperInsights({
       ))}
       {(!result.complete || result.baselineCount < 3) && (
         <p className="coverage-note">
-          Payment checks shown; monthly comparisons need complete coverage and 3
-          verified previous months ({Math.min(result.baselineCount, 3)} of 3).
+          {Math.min(result.baselineCount, 3)} of 3 verified previous months
+          {!result.complete ? " · selected month incomplete" : ""}
         </p>
       )}
     </section>

@@ -4,13 +4,20 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { db, initializeDatabase } from "../storage/database";
 import { accounts, transaction } from "../tests/helpers";
 import Planning from "../pages/Planning";
-import { CalendarPanel, PotsPanel, ScenarioPanel } from "./PlanningExtensions";
+import {
+  CalendarPanel,
+  DebtPanel,
+  MonthlyBudgetsPanel,
+  PotsPanel,
+  ScenarioPanel,
+} from "./PlanningExtensions";
 import { savedBill } from "../tests/recurring-fixtures";
 
 it("asks before combining similar recurring names and lets Undo restore the question", async () => {
@@ -157,6 +164,25 @@ it("connects accessible Planning tabs to their own panels and presents no foreca
   expect(
     await screen.findByRole("heading", { name: "What if?" }),
   ).toBeVisible();
+  expect(
+    screen.getByText("A shared verified balance is needed for every account."),
+  ).toBeVisible();
+  expect(
+    screen.getByText(/0 of 1 account with recent verified balances/),
+  ).toBeVisible();
+  expect(screen.getByText(/Missing or stale balances: Current/)).toBeVisible();
+  expect(
+    screen.getByRole("button", { name: "Import recent statements" }),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(/Cash and savings minus card debt/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Forecast inputs and assumptions" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Forecast inputs and assumptions" }),
+  ).toHaveTextContent(/does not change imported balances or reporting totals/);
 });
 it("shows the median-based price change with yearly impact and respects Keep on the next review", async () => {
   const dates = ["2026-06-04", "2026-07-04", "2026-08-04", "2026-09-04"];
@@ -207,7 +233,20 @@ it("saving a new scenario selects it so a second save updates instead of duplica
     </MemoryRouter>,
   );
   await screen.findByRole("heading", { name: "What if?" });
+  expect(
+    screen.queryByText("Preview changes without editing your actual finances."),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About what-if scenarios" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "What-if scenarios" }),
+  ).toHaveTextContent("Scenario values never become actual balances.");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close What-if scenarios" }),
+  );
   fireEvent.click(screen.getByRole("button", { name: "Edit scenario" }));
+  expect(screen.getByText("Save up to five scenarios.")).toBeVisible();
   fireEvent.change(screen.getByRole("textbox", { name: /Amount \(GBP\)/ }), {
     target: { value: "-100" },
   });
@@ -237,4 +276,81 @@ it("saving a new scenario selects it so a second save updates instead of duplica
     expect((await db.scenarios.get(first.id))?.name).toBe("Holiday updated"),
   );
   expect(await db.scenarios.count()).toBe(1);
+});
+
+it("keeps incomplete budget amounts and missing-rate counts visible before opening their explanation", async () => {
+  await db.budgets.put({
+    id: "help-budget",
+    categoryId: "groceries",
+    month: "2026-10",
+    currency: "GBP",
+    amountMinor: 16000,
+    rollover: "none",
+  });
+  await db.transactions.put(
+    transaction({
+      id: "help-missing-rate",
+      date: "2026-10-04",
+      categoryId: "groceries",
+      currency: "EUR",
+      amount: -1000,
+    }),
+  );
+  const before = await db.transactions.toArray();
+  render(
+    <MemoryRouter>
+      <MonthlyBudgetsPanel currency="GBP" month="2026-10" />
+    </MemoryRouter>,
+  );
+  await screen.findByRole("heading", { name: "Monthly budgets" });
+  expect(screen.getByText(/Unverified spending/)).toBeVisible();
+  expect(
+    screen.getByText(/Rates needed for 1 transaction · Partial totals/),
+  ).toBeVisible();
+  expect(screen.getByText("Left: unavailable")).toBeVisible();
+  expect(screen.getByText("£160.00")).toBeVisible();
+  expect(
+    screen.queryByText(/Recorded spending is partial until/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "How budgets work" }));
+  const help = screen.getByRole("dialog", { name: "How budgets work" });
+  expect(help).toHaveTextContent(
+    /Recorded spending is partial until all accounts are imported and verified/,
+  );
+  expect(help).toHaveTextContent(/1 transaction needs exchange rates/);
+  expect(await db.transactions.toArray()).toEqual(before);
+  expect((await db.budgets.get("help-budget"))?.amountMinor).toBe(16000);
+});
+
+it("explains repayment strategies inside the existing sheet without saving its draft or opening another dialog", async () => {
+  const before = await db.settings.toArray();
+  render(
+    <MemoryRouter>
+      <DebtPanel currency="GBP" month="2026-10" />
+    </MemoryRouter>,
+  );
+  fireEvent.click(
+    await screen.findByRole("button", { name: "Edit repayment plan" }),
+  );
+  const sheet = screen.getByRole("dialog", { name: "Repayment plan" });
+  fireEvent.change(
+    within(sheet).getByRole("textbox", { name: "Monthly amount available" }),
+    { target: { value: "451" } },
+  );
+  fireEvent.click(
+    within(sheet).getByRole("button", {
+      name: "About debt repayment strategies",
+    }),
+  );
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(
+    within(sheet).getByRole("region", { name: "Debt repayment strategies" }),
+  ).toHaveTextContent("Avalanche: pay the highest APR first.");
+  expect(
+    within(sheet).getByRole("textbox", { name: "Monthly amount available" }),
+  ).toHaveValue("451");
+  expect(
+    within(sheet).getByRole("button", { name: "Avalanche" }),
+  ).toHaveAttribute("aria-pressed", "true");
+  expect(await db.settings.toArray()).toEqual(before);
 });

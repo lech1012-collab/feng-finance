@@ -289,6 +289,22 @@ it("sorts a counted queue with explanation, keyboard choice, next item and atomi
   const dialog = await screen.findByRole("dialog");
   expect(within(dialog).getByText("1 of 2 to sort")).toBeVisible();
   expect(
+    within(dialog).queryByText(/Matching payments in this account and future/),
+  ).not.toBeInTheDocument();
+  const sortingHelp = within(dialog).getByRole("button", {
+    name: "About Sorting transactions",
+  });
+  fireEvent.click(sortingHelp);
+  expect(
+    within(dialog).getByText(/Matching payments in this account and future/),
+  ).toBeVisible();
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  expect(await db.transactions.bulkGet([first.id, second.id])).toEqual([
+    first,
+    second,
+  ]);
+  fireEvent.click(sortingHelp);
+  expect(
     await within(dialog).findByText(
       /Known merchant match/,
       {},

@@ -2,6 +2,7 @@ import { UKDateInput } from "./UKDateInput";
 import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
 import { reviewDate } from "../analytics/month-review-details";
 import { Sheet, SheetFooter } from "./Sheet";
+import { ContextHelp } from "./ContextHelp";
 import { displayMerchant } from "../domain/presentation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -197,13 +198,21 @@ export function PotsPanel({
     <>
       <section className="card">
         <div className="section-heading">
-          <h2>Pots and goals</h2>
+          <div className="context-help-heading">
+            <h2>Pots and goals</h2>
+            <ContextHelp title="Pots and goals" label="About pots and goals">
+              <p>
+                Earmarks for future costs. Set-aside amounts stay in your
+                account balances.
+              </p>
+              <p>
+                Progress uses the contributions you record, or the balance of a
+                linked savings account.
+              </p>
+            </ContextHelp>
+          </div>
           <button onClick={() => edit(null)}>New pot</button>
         </div>
-        <p className="muted">
-          Earmarks for future costs. Set-aside amounts stay in your account
-          balances.
-        </p>
         {annual.length > 0 && (
           <details>
             <summary>Suggested annual-cost pots</summary>
@@ -333,11 +342,6 @@ export function PotsPanel({
                     ))}
                 </select>
               </label>
-              {!account && (
-                <p className="muted">
-                  Track the contributions you record each month.
-                </p>
-              )}
               {type === "sinking" && (
                 <label>
                   Spending category
@@ -427,30 +431,46 @@ export function PotsPanel({
                 {money(progress.monthlyMinor, p.currency)} a month needed
                 {progress.covered ? " · Covered by pot" : ""}
               </p>
-              <StatusChip
-                tone={
-                  progress.linkedUnavailable || !progress.onTrack
-                    ? "warning"
-                    : "complete"
-                }
-              >
-                {progress.linkedUnavailable
-                  ? "Balance unavailable"
-                  : progress.onTrack
-                    ? "On track"
-                    : `Behind by ${money(progress.behindMinor, p.currency)}`}
-              </StatusChip>
-              <details>
-                <summary>How this suggestion works</summary>
-                <p className="muted">
-                  Calculated as of{" "}
+              <div className="context-help-heading">
+                <StatusChip
+                  tone={
+                    progress.linkedUnavailable || !progress.onTrack
+                      ? "warning"
+                      : "complete"
+                  }
+                >
+                  {progress.linkedUnavailable
+                    ? "Balance unavailable"
+                    : progress.onTrack
+                      ? "On track"
+                      : `Behind by ${money(progress.behindMinor, p.currency)}`}
+                </StatusChip>
+                <small className="muted">
+                  As of{" "}
                   <time className="date-value" dateTime={suggestionDate}>
                     {formatUkDate(suggestionDate)}
-                  </time>{" "}
-                  for the calendar month, including confirmed contributions. A
-                  payday-aligned review uses its own period end.
-                </p>
-              </details>
+                  </time>
+                </small>
+                <ContextHelp
+                  title={`${p.name}: monthly suggestion`}
+                  label={`How this suggestion works for ${p.name}`}
+                >
+                  <p>
+                    Calculated as of{" "}
+                    <time className="date-value" dateTime={suggestionDate}>
+                      {formatUkDate(suggestionDate)}
+                    </time>{" "}
+                    for the calendar month, including confirmed contributions. A
+                    payday-aligned review uses its own period end.
+                  </p>
+                  {info.sharedAccount && (
+                    <p>
+                      This savings balance funds more than one goal; totals
+                      count it once.
+                    </p>
+                  )}
+                </ContextHelp>
+              </div>
               {linked ? (
                 <p className="muted">
                   From {linked.displayName}
@@ -465,9 +485,7 @@ export function PotsPanel({
                       .
                     </>
                   )}
-                  {info.sharedAccount
-                    ? " This savings balance funds more than one goal; totals count it once."
-                    : ""}
+                  {info.sharedAccount ? " Shared savings balance." : ""}
                 </p>
               ) : (
                 <form
@@ -624,17 +642,58 @@ export function MonthlyBudgetsPanel({
   return (
     <section className="card">
       <div className="section-heading">
-        <h2>Monthly budgets</h2>
+        <div className="context-help-heading">
+          <h2>Monthly budgets</h2>
+          <ContextHelp
+            title="How budgets work"
+            label="How budgets work"
+            tone={
+              coverage.status !== "Complete" || projection.missing.length
+                ? "warning"
+                : "help"
+            }
+          >
+            <p>
+              {reportingPeriodLabel(month, data.settings, data.transactions)}.
+              Budget plus carried amount, minus spending, equals what is left.
+            </p>
+            {coverage.status !== "Complete" && (
+              <p>
+                Recorded spending is partial until all accounts are imported and
+                verified.
+              </p>
+            )}
+            {projection.missing.length > 0 && (
+              <p>
+                {projection.missing.length} transaction
+                {projection.missing.length === 1 ? "" : "s"} need
+                {projection.missing.length === 1 ? "s" : ""} exchange rates;
+                totals are partial.
+              </p>
+            )}
+            {projection.converted && <p>≈ Includes currency conversions.</p>}
+          </ContextHelp>
+        </div>
       </div>
-      <p className="muted">
-        {coverage.status !== "Complete"
-          ? "Recorded spending is partial until all accounts are imported and verified."
-          : ""}
-        {projection.missing.length
-          ? ` ${projection.missing.length} transaction${projection.missing.length === 1 ? "" : "s"} need${projection.missing.length === 1 ? "s" : ""} exchange rates; totals are partial.`
-          : ""}
-        {projection.converted ? " ≈ Includes currency conversions." : ""}
-      </p>
+      {(coverage.status !== "Complete" ||
+        projection.missing.length > 0 ||
+        projection.converted) && (
+        <div className="context-help-heading">
+          <span className="coverage-note">
+            {coverage.status !== "Complete"
+              ? coverage.status === "No data"
+                ? "No spending data"
+                : `${coverage.status} spending`
+              : ""}
+            {projection.missing.length
+              ? `${coverage.status !== "Complete" ? " · " : ""}Rates needed for ${projection.missing.length} transaction${projection.missing.length === 1 ? "" : "s"} · Partial totals`
+              : ""}
+            {projection.converted
+              ? `${coverage.status !== "Complete" || projection.missing.length ? " · " : ""}≈ Converted`
+              : ""}
+          </span>
+        </div>
+      )}
       {editingBudget && (
         <Sheet
           title="Monthly budget"
@@ -802,14 +861,25 @@ export function MonthlyBudgetsPanel({
                   </>
                 )}
               </p>
-              <small className="muted">
-                {month < localToday().slice(0, 7)
-                  ? `Ended ${formatUkDate(new Date(Date.parse(`${monthBounds(month)[1]}T12:00:00Z`) - 86400000).toISOString().slice(0, 10))}`
-                  : `${r.daysRemaining} day${r.daysRemaining === 1 ? "" : "s"} remaining`}
-                {r.provisional
-                  ? " · Carry is provisional until previous months are closed"
-                  : ""}
-              </small>
+              <div className="context-help-heading">
+                <small className="muted">
+                  {month < localToday().slice(0, 7)
+                    ? `Ended ${formatUkDate(new Date(Date.parse(`${monthBounds(month)[1]}T12:00:00Z`) - 86400000).toISOString().slice(0, 10))}`
+                    : `${r.daysRemaining} day${r.daysRemaining === 1 ? "" : "s"} remaining`}
+                  {r.provisional ? " · Provisional carry" : ""}
+                </small>
+                {r.provisional && (
+                  <ContextHelp
+                    title="Provisional budget carry"
+                    label={`About provisional carry for ${data.categories.find((c) => c.id === b.categoryId)?.name ?? "this category"}`}
+                    tone="warning"
+                  >
+                    <p>
+                      Carry is provisional until previous months are closed.
+                    </p>
+                  </ContextHelp>
+                )}
+              </div>
             </article>
           );
         })}
@@ -818,13 +888,6 @@ export function MonthlyBudgetsPanel({
       <div className="budget-footer-actions">
         <button onClick={() => setEditingBudget(true)}>Set budget</button>
       </div>
-      <details>
-        <summary>How budgets work</summary>
-        <p>
-          {reportingPeriodLabel(month, data.settings, data.transactions)}.
-          Budget plus carried amount, minus spending, equals what is left.
-        </p>
-      </details>
     </section>
   );
 }
@@ -958,30 +1021,64 @@ export function CalendarPanel({
   return (
     <section className="card">
       <div className="section-heading">
-        <h2>Payments calendar</h2>
+        <div className="context-help-heading">
+          <h2>Payments calendar</h2>
+          <ContextHelp
+            title="Payments calendar"
+            label="About the payments calendar"
+            tone={missingRates ? "warning" : "help"}
+          >
+            <p>
+              Filled: imported payments. Outline: expected payments. Expected
+              amounts are estimates.
+            </p>
+            {items.some((i) => i.currency !== currency) && (
+              <p>
+                ≈ Daily totals use cached reporting-currency conversions;
+                individual payments keep their original currency.
+              </p>
+            )}
+            {missingRates && (
+              <p>
+                Some payments need exchange rates. Daily totals are partial
+                until rates are available.
+              </p>
+            )}
+          </ContextHelp>
+        </div>
         <button disabled={!data.accounts.length} onClick={() => edit()}>
           New recurring payment
         </button>
       </div>
-      <p className="muted">
-        Filled: imported payments. Outline: expected payments. Expected amounts
-        are estimates.{" "}
-        {items.some((i) => i.currency !== currency)
-          ? "≈ Daily totals use cached reporting-currency conversions; individual payments keep their original currency."
-          : ""}
-        {missingRates
-          ? " Some payments need exchange rates. Daily totals are partial until rates are available."
-          : ""}
-      </p>
+      <div className="context-help-heading">
+        <span className="muted">
+          Filled: imported · Outline: estimated
+          {items.some((i) => i.currency !== currency)
+            ? " · ≈ Converted totals"
+            : ""}
+        </span>
+        {missingRates && (
+          <span className="coverage-note">Partial totals · Rates needed</span>
+        )}
+      </div>
       {possibleMatches.length > 0 && (
         <WarningBox
           severity="warning"
           title={`${possibleMatches.length} possible recurring bill match${possibleMatches.length === 1 ? "" : "es"}`}
         >
-          <p>
-            Similar entries remain separate until you confirm they are the same
-            bill. Expected totals may include both.
-          </p>
+          <div className="context-help-heading">
+            <span>Possible duplicates in expected totals</span>
+            <ContextHelp
+              title="Possible recurring bill matches"
+              label="About possible recurring bill matches"
+              tone="warning"
+            >
+              <p>
+                Similar entries remain separate until you confirm they are the
+                same bill. Expected totals may include both.
+              </p>
+            </ContextHelp>
+          </div>
           <button onClick={() => setMatching(possibleMatches[0])}>
             Review possible match
           </button>
@@ -1595,13 +1692,20 @@ export function DebtPanel({
     }
   return (
     <section className="card">
-      <h2>Debt payoff planner</h2>
-      <p className="muted">
-        Monthly interest = balance × APR ÷ 12, rounded to the nearest penny.
-        Estimates assume unchanged rates and no new borrowing. Loans and
-        mortgages are included only after you enter their actual monthly
-        payment.
-      </p>
+      <div className="context-help-heading">
+        <h2>Debt payoff planner</h2>
+        <ContextHelp
+          title="Debt payoff estimates"
+          label="About debt payoff estimates"
+        >
+          <p>
+            Monthly interest = balance × APR ÷ 12, rounded to the nearest penny.
+            Estimates assume unchanged rates and no new borrowing. Loans and
+            mortgages are included only after you enter their actual monthly
+            payment.
+          </p>
+        </ContextHelp>
+      </div>
       {!debtRows.length && (
         <p>Add a credit card, loan or mortgage to plan repayments.</p>
       )}
@@ -1737,6 +1841,13 @@ export function DebtPanel({
                   {formatUkDate(d.sourceDate)}
                 </small>
               )}
+              {!["credit", "credit_card"].includes(d.account.accountType) &&
+                (d.account.minPaymentMinor ?? 0) <= 0 && (
+                  <p className="muted">
+                    Not included · Enter the actual monthly payment to include
+                    this loan.
+                  </p>
+                )}
               {d.full ? (
                 <p className="muted">Paid in full monthly, no plan needed.</p>
               ) : (
@@ -1934,27 +2045,30 @@ export function DebtPanel({
             </label>
             <fieldset>
               <legend>Strategy</legend>
-              <div className="segmented-control">
-                {(["avalanche", "snowball", "custom"] as const).map((v) => (
-                  <button
-                    key={v}
-                    type="button"
-                    aria-pressed={strategy === v}
-                    onClick={() => {
-                      setStrategy(v);
-                    }}
-                  >
-                    {v[0].toUpperCase() + v.slice(1)}
-                  </button>
-                ))}
+              <div className="context-help-row">
+                <div className="segmented-control">
+                  {(["avalanche", "snowball", "custom"] as const).map((v) => (
+                    <button
+                      key={v}
+                      type="button"
+                      aria-pressed={strategy === v}
+                      onClick={() => {
+                        setStrategy(v);
+                      }}
+                    >
+                      {v[0].toUpperCase() + v.slice(1)}
+                    </button>
+                  ))}
+                </div>
+                <ContextHelp
+                  title="Debt repayment strategies"
+                  label="About debt repayment strategies"
+                >
+                  <p>Avalanche: pay the highest APR first.</p>
+                  <p>Snowball: clear the smallest balance first.</p>
+                  <p>Custom: choose which debt to prioritise.</p>
+                </ContextHelp>
               </div>
-              <p className="muted">
-                {strategy === "avalanche"
-                  ? "Pay the highest APR first."
-                  : strategy === "snowball"
-                    ? "Clear the smallest balance first."
-                    : "Choose which debt to prioritise."}
-              </p>
             </fieldset>
             {strategy === "custom" && (
               <div className="full-width">
@@ -2125,12 +2239,18 @@ export function ScenarioPanel({
   return (
     <section className="card">
       <div className="section-heading">
-        <h2>What if?</h2>
+        <div className="context-help-heading">
+          <h2>What if?</h2>
+          <ContextHelp
+            title="What-if scenarios"
+            label="About what-if scenarios"
+          >
+            <p>Preview changes without editing your actual finances.</p>
+            <p>Scenario values never become actual balances.</p>
+          </ContextHelp>
+        </div>
         <button onClick={() => setEditingScenario(true)}>Edit scenario</button>
       </div>
-      <p className="muted">
-        Preview changes without editing your actual finances.
-      </p>
       {changes.length === 0 ? (
         <p>
           No adjustments yet. Edit a scenario to compare it with the baseline.
@@ -2320,10 +2440,7 @@ export function ScenarioPanel({
               ))}
             </select>
           </label>
-          <p className="muted">
-            Save up to five scenarios. Their values never become actual
-            balances.
-          </p>
+          <p className="muted">Save up to five scenarios.</p>
           <form
             id="scenario-adjustment-form"
             className="planning-v2-form"

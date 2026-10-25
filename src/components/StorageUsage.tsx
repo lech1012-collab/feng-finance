@@ -1,4 +1,5 @@
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { useEffect, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
@@ -27,7 +28,29 @@ export function StorageUsage() {
   }, []);
   return (
     <section className="card" id="storage">
-      <h2>Device storage</h2>
+      <div className="context-help-heading">
+        <h2>Device storage</h2>
+        <ContextHelp
+          title="Device storage"
+          tone={usage?.nearlyFull || persistent === false ? "warning" : "help"}
+        >
+          <p>
+            Storage protection reduces the chance that your browser clears Feng
+            when storage runs low. Install Feng and request protection where
+            your browser supports it.
+          </p>
+          <p>
+            Keep a backup in case this device is lost or browser data is
+            cleared.
+          </p>
+          {usage?.nearlyFull && (
+            <p>
+              Export a backup and remove large attachments to avoid failed
+              imports.
+            </p>
+          )}
+        </ContextHelp>
+      </div>
       {usage ? (
         <>
           <p>
@@ -54,8 +77,8 @@ export function StorageUsage() {
           )}
           {usage.nearlyFull && (
             <p className="notice warning" role="alert">
-              Storage is more than 80% full. Export a backup and remove large
-              attachments to avoid failed imports.
+              Storage is more than 80% full.{" "}
+              <a href="#/settings?section=backup&save=1">Save a backup</a>
             </p>
           )}
         </>
@@ -64,8 +87,8 @@ export function StorageUsage() {
       )}
       <p className="muted">
         {persistent
-          ? "Protected. Keep a backup in case this device is lost or browser data is cleared."
-          : "Not protected. Your browser may clear data when storage runs low. Install Feng, request protection and keep a backup."}
+          ? "Storage: protected."
+          : "Storage: not protected. Your browser may clear local data."}
       </p>
       {!persistent && (
         <button

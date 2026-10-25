@@ -173,13 +173,17 @@ it("shows Salary averages and zero deviation despite incomplete unrelated card a
     "Monthly variation (standard deviation): £0.00",
   );
   fireEvent.click(
-    screen.getByText("Months used for comparison (5 of 6)", { exact: true }),
+    screen.getByRole("button", { name: "About this category comparison" }),
   );
   expect(
-    container.querySelector(".category-comparison-list"),
+    screen
+      .getByRole("dialog", { name: "Category comparison" })
+      .querySelector(".category-comparison-list"),
   ).toHaveTextContent("Included · £3,000.00");
   expect(
-    container.querySelector(".category-comparison-list"),
+    screen
+      .getByRole("dialog", { name: "Category comparison" })
+      .querySelector(".category-comparison-list"),
   ).toHaveTextContent("no statement covers this period");
 });
 it("includes unverified recorded months and explains the two-month minimum for sample deviation", () => {
@@ -190,19 +194,24 @@ it("includes unverified recorded months and explains the two-month minimum for s
   fixture(source.accounts, source.transactions, source.statements);
   const { container } = showSalary();
   fireEvent.click(
-    screen.getByText("Months used for comparison (5 of 6)", { exact: true }),
+    screen.getByRole("button", { name: "About this category comparison" }),
   );
   expect(
-    container.querySelector(".category-comparison-list"),
+    screen
+      .getByRole("dialog", { name: "Category comparison" })
+      .querySelector(".category-comparison-list"),
   ).toHaveTextContent("statement dates need verification");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Category comparison" }),
+  );
   fireEvent.click(screen.getByRole("button", { name: "1 month" }));
   // August is the sole previous month, and its dates are unverified.
   expect(
     container.querySelector(".category-kpis .metric:nth-child(2) strong"),
   ).toHaveTextContent("£3,000.00");
   fireEvent.click(
-    screen.getByText("Average and standard deviation explained", {
-      exact: true,
+    screen.getByRole("button", {
+      name: "About monthly averages and variation",
     }),
   );
   expect(
@@ -221,8 +230,8 @@ it("shows an available one-month mean while explaining why sample deviation need
   ).toHaveTextContent("£3,000.00");
   expect(container.querySelector(".category-range")).not.toBeInTheDocument();
   fireEvent.click(
-    screen.getByText("Average and standard deviation explained", {
-      exact: true,
+    screen.getByRole("button", {
+      name: "About monthly averages and variation",
     }),
   );
   expect(
@@ -253,8 +262,17 @@ it("shows the average, zero deviation and difference when all recorded Salary mo
     container.querySelector(".category-kpis .metric:nth-child(4)"),
   ).toHaveTextContent("£0.00");
   expect(screen.getByRole("status")).toHaveTextContent(
-    "Partial months are included",
+    "Partial comparison history",
   );
+  expect(
+    screen.queryByText(/Partial months are included in the/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About partial category history" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Partial category history" }),
+  ).toHaveTextContent("Partial months are included");
   expect(screen.queryByText(/comparison withheld/i)).not.toBeInTheDocument();
 });
 it("warns about mixed unverified imports and plots the same recorded outflow as its KPI", () => {
@@ -288,8 +306,22 @@ it("warns about mixed unverified imports and plots the same recorded outflow as 
       <Analysis month="2026-09" currency="GBP" setMonth={vi.fn()} />
     </MemoryRouter>,
   );
-  expect(screen.getByRole("status")).toHaveTextContent(
+  expect(screen.getByText(/Partial or unverified/)).toBeVisible();
+  expect(
+    screen.queryByText(
+      /Statements with incomplete date or balance verification are included/,
+    ),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Analysis coverage explained" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Analysis coverage explained" }),
+  ).toHaveTextContent(
     "Statements with incomplete date or balance verification are included",
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Analysis coverage explained" }),
   );
   const points = JSON.parse(screen.getByTestId("cash-series").textContent!);
   expect(points.at(-1)).toMatchObject({

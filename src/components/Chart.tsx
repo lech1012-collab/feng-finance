@@ -12,7 +12,8 @@ import {
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { ContextHelp } from "./ContextHelp";
 import { compactMoney, money, currencyPrecision } from "../domain/money";
 import type { MonthCoverage } from "../analytics/coverage";
 
@@ -74,11 +75,13 @@ export function CashChart({
   currency,
   property = false,
   showValues = true,
+  helpContent,
 }: {
   data: CashChartPoint[];
   currency: string;
   property?: boolean;
   showValues?: boolean;
+  helpContent?: ReactNode;
 }) {
   const chartRem = useRootFontSize();
   // Safari can retain an off-screen ResponsiveContainer's previous width after
@@ -313,6 +316,42 @@ export function CashChart({
             </span>
           </>
         )}
+        <ContextHelp
+          title={
+            property
+              ? "Property cash flow chart explained"
+              : "Cash flow chart explained"
+          }
+          label={
+            property
+              ? "Property cash flow chart explained"
+              : "Cash flow chart explained"
+          }
+          tone={
+            data.some((point) => point.coverage && !point.coverage.complete)
+              ? "warning"
+              : "help"
+          }
+        >
+          <p>
+            {property
+              ? "The line shows monthly net property cash flow."
+              : "Bars show income and spending; the line shows net cash flow."}{" "}
+            Transfers are excluded. Gaps indicate missing or unverified
+            statement coverage rather than zero amounts.
+          </p>
+          {data.some((point) => point.coverage?.status === "Partial") && (
+            <p>* Partial month · from imported accounts only.</p>
+          )}
+          {data.some((point) => point.coverage?.hasUnverifiedStatements) && (
+            <p>
+              Statements with incomplete date or balance verification are
+              included in partial months. Comparisons need verified dates and
+              balances.
+            </p>
+          )}
+          {helpContent}
+        </ContextHelp>
       </div>
       {data.some((point) => point.coverage) && (
         <>
@@ -363,18 +402,6 @@ export function CashChart({
           {selectedGap && (
             <p className="chart-coverage-note" role="status">
               {selectedGap}
-            </p>
-          )}
-          {data.some((point) => point.coverage?.status === "Partial") && (
-            <p className="chart-coverage-note">
-              * Partial month · from imported accounts only.
-            </p>
-          )}
-          {data.some((point) => point.coverage?.hasUnverifiedStatements) && (
-            <p className="chart-coverage-note">
-              Statements with incomplete date or balance verification are
-              included in partial months. Comparisons need verified dates and
-              balances.
             </p>
           )}
         </>

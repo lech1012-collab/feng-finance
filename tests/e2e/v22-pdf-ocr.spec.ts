@@ -333,9 +333,8 @@ test("a one-penny digital discrepancy stays unverified until the source amount i
     page.getByRole("button", { name: "Confirm import", exact: true }),
   ).toBeDisabled();
   const options = card.locator(
-    'details.generic-parser-details:has(> summary:text-is("Reading details"))',
+    'section.generic-parser-details:has(h3:text-is("Reading details"))',
   );
-  await options.locator(":scope > summary").click();
   await options
     .getByRole("button", { name: "Review PDF layout", exact: true })
     .click();

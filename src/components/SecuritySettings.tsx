@@ -12,6 +12,7 @@ import {
 import { useAppLock } from "./AppLock";
 import { Sheet } from "./Sheet";
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { StatusChip } from "./UIPrimitives";
 import "../security/security.css";
 
@@ -133,17 +134,19 @@ export function SecuritySettings() {
   return (
     <section className="card" id="security">
       <div className="section-heading">
-        <h2>Security</h2>
+        <div className="context-help-heading">
+          <h2>Security</h2>
+          <ContextHelp title="App lock">
+            <p>App lock protects against casual access to Feng.</p>
+          </ContextHelp>
+        </div>
         {configuration && (
           <StatusChip>
             {configuration.enabled ? "App lock is on." : "App lock is off."}
           </StatusChip>
         )}
       </div>
-      <p className="muted">
-        App lock protects against casual access; it does not encrypt your local
-        database.
-      </p>
+      <p className="muted">App lock does not encrypt your local database.</p>
       {configuration && !configuration.enabled ? (
         <button className="primary" onClick={() => setEdit("enable")}>
           Set up app lock
@@ -285,8 +288,8 @@ export function SecuritySettings() {
                   </select>
                 </label>
                 <p className="muted">
-                  There is no PIN recovery. Keep an encrypted backup before
-                  enabling app lock.
+                  App lock does not encrypt stored data. There is no PIN
+                  recovery. Keep an encrypted backup before enabling app lock.
                 </p>
               </>
             )}

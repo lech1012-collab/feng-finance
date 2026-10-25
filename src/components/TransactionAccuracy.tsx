@@ -1,4 +1,5 @@
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
@@ -443,10 +444,15 @@ function SplitEditor({
   };
   return (
     <div className="accuracy-editor">
-      <p className="coverage-note">
-        Split spending between categories. The original amount and statement
-        balance stay unchanged.
-      </p>
+      <div className="context-help-heading">
+        <h3>Split categories</h3>
+        <ContextHelp title="Splitting a transaction">
+          <p>
+            Split spending between categories. The original amount and statement
+            balance stay unchanged.
+          </p>
+        </ContextHelp>
+      </div>
       {lines.map((line, i) => (
         <fieldset key={i} className="split-line">
           <legend>Line {i + 1}</legend>

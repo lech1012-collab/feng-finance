@@ -7,6 +7,7 @@ import {
 } from "../storage/layout-templates";
 import { undoChange } from "../storage/audit";
 import { formatUkDate } from "../domain/dates";
+import { ContextHelp } from "./ContextHelp";
 import "./import-settings.css";
 
 export function ImportLayoutsSettings({
@@ -47,12 +48,16 @@ export function ImportLayoutsSettings({
     }
   }
   return (
-    <details className="card settings-disclosure" id="import-layouts">
-      <summary>Import layouts</summary>
-      <p className="muted">
-        Saved column mappings help recognise a statement layout. Every import is
-        checked again against the statement balances or totals.
-      </p>
+    <section className="card" id="import-layouts">
+      <div className="context-help-heading">
+        <h2>Import layouts</h2>
+        <ContextHelp title="Import layouts">
+          <p>
+            Saved column mappings help recognise a statement layout. Every
+            import is checked again against the statement balances or totals.
+          </p>
+        </ContextHelp>
+      </div>
       {templates?.map((template) => (
         <div key={template.id} className="import-layout-setting">
           {editing === template.id ? (
@@ -157,6 +162,6 @@ export function ImportLayoutsSettings({
           {error}
         </p>
       )}
-    </details>
+    </section>
   );
 }

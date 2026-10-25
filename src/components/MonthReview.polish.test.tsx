@@ -120,6 +120,19 @@ it("withholds monthly comparisons when transactions lack their source statement"
     (statement) => !statement.id.endsWith("2026-09"),
   );
   show();
+  expect(screen.getByText(/\* Partial or unverified/)).toBeVisible();
+  expect(
+    screen.queryByText("This month is partial or unverified."),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About monthly review totals" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Monthly review totals" }),
+  ).toHaveTextContent("This month is partial or unverified.");
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Monthly review totals" }),
+  );
   fireEvent.click(screen.getByRole("button", { name: "2. What changed" }));
   expect(
     screen.getByText(/Not comparable yet.*September 2026 unverified/),
@@ -128,6 +141,15 @@ it("withholds monthly comparisons when transactions lack their source statement"
     screen.queryByRole("link", { name: /Groceries/ }),
   ).not.toBeInTheDocument();
   expect(screen.queryByText("+50%")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "4. Housekeeping" }));
+  expect(
+    screen.getByRole("button", { name: "Close September" }),
+  ).toBeDisabled();
+  expect(
+    screen.getByText(
+      "Complete verified statement coverage is required to close.",
+    ),
+  ).toBeVisible();
 });
 
 it("explains an actual price rise in the next period instead of moving it into the selected review", () => {
@@ -181,6 +203,9 @@ it("distinguishes the period cutoff and suggested amount from an already confirm
   });
   show();
   fireEvent.click(screen.getByRole("button", { name: "3. Pots and goals" }));
+  expect(
+    screen.queryByText(/calendar month, with suggestions as of/),
+  ).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", { name: /Car insurance.*Contribute/ }),
   );
@@ -194,7 +219,7 @@ it("distinguishes the period cutoff and suggested amount from an already confirm
     screen.getByRole("button", { name: "Close Contribute to Car insurance" }),
   );
   fireEvent.click(
-    screen.getByText("Why Planning may show a different suggestion"),
+    screen.getByRole("button", { name: "About review pot suggestions" }),
   );
   expect(
     screen.getByText(/calendar month, with suggestions as of/),

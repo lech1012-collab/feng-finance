@@ -17,6 +17,7 @@ import { useGlobalCurrency } from "../components/CurrencySetting";
 import { ManualAccountEditor } from "../components/ManualAccountEditor";
 import { Sheet, SheetFooter } from "../components/Sheet";
 import { Toast } from "../components/Toast";
+import { ContextHelp } from "../components/ContextHelp";
 
 export default function Accounts() {
   return (
@@ -58,6 +59,14 @@ export function AccountsContent() {
     changeId: string;
     message: string;
   }>();
+  const editingSnapshot =
+    editing && editing !== "new" && editing.tracking !== "manual" && data
+      ? accountSnapshot(editing, data.statements, today.slice(0, 7), today)
+      : undefined;
+  const editingEvidence =
+    editingSnapshot?.statement && data
+      ? statementBalanceEvidence(editingSnapshot.statement, data.rows, today)
+      : undefined;
   const open = (account?: Account) => {
     setEditing(account ?? "new");
     setName(account?.displayName ?? "");
@@ -140,7 +149,12 @@ export function AccountsContent() {
     <>
       <section className="card">
         <div className="section-heading">
-          <h2>Bank and card accounts</h2>
+          <div className="context-help-heading">
+            <h2>Bank and card accounts</h2>
+            <ContextHelp title="Bank and card accounts">
+              <p>Import a statement to create its account automatically.</p>
+            </ContextHelp>
+          </div>
           <button onClick={() => open()}>Add bank account</button>
         </div>
         {!data ? (
@@ -214,9 +228,6 @@ export function AccountsContent() {
                         "No statement balance"
                       )}
                     </small>
-                    {!wallet && evidence?.reason && (
-                      <small>{evidence.reason}</small>
-                    )}
                   </span>
                   <span className="account-balance">
                     <strong>
@@ -254,6 +265,24 @@ export function AccountsContent() {
             if (!busy) setEditing(undefined);
           }}
         >
+          {editingEvidence?.reason && (
+            <section>
+              <div className="context-help-heading">
+                <h3>
+                  {editingEvidence.status === "unavailable"
+                    ? "Statement balance unavailable"
+                    : "Unverified statement balance"}
+                </h3>
+                <ContextHelp
+                  title="Statement balance evidence"
+                  label={`Why this account balance is ${editingEvidence.status}`}
+                  tone="warning"
+                >
+                  <p>{editingEvidence.reason}</p>
+                </ContextHelp>
+              </div>
+            </section>
+          )}
           <form
             id="account-form"
             className="form-grid"

@@ -5,7 +5,7 @@ import { revealStatement } from "./import-actions";
 const fixture = (name: string) =>
   resolve(`tests/fixtures/known-bank-${name}.pdf`);
 const readingOptionsSelector =
-  'details.generic-parser-details:has(> summary:text-is("Reading details"))';
+  'section.generic-parser-details:has(h3:text-is("Reading details"))';
 
 interface StoredTransaction {
   statementId: string;
@@ -166,7 +166,9 @@ test("recognised digital Barclays, Barclaycard, Amex and Revolut import together
     ).toBeVisible();
     const alternative = card.locator(readingOptionsSelector);
     await expect(alternative).toHaveCount(1);
-    await expect(alternative).not.toHaveAttribute("open");
+    await expect(
+      alternative.getByRole("button", { name: "About Statement reading" }),
+    ).toHaveAttribute("aria-expanded", "false");
     await expect(
       card.getByRole("region", { name: "Statement reading and checks" }),
     ).toHaveCount(0);
@@ -271,7 +273,11 @@ test("an unknown HSBC statement retains the generic source-reading workflow", as
   await expect(
     card.getByRole("heading", { name: "Other", exact: true }),
   ).toBeVisible();
-  await expect(card.locator(readingOptionsSelector)).toHaveCount(1);
+  await expect(
+    card.locator(
+      'details.generic-parser-details:has(> summary:text-is("Reading details"))',
+    ),
+  ).toHaveCount(1);
   const proof = card.getByRole("region", {
     name: "Statement reading and checks",
   });
@@ -311,9 +317,11 @@ test("a known-bank transaction that contradicts printed balances still requires 
   await expect(
     card.getByRole("heading", { name: "Barclays", exact: true }),
   ).toBeVisible();
-  await expect(card.locator(readingOptionsSelector)).not.toHaveAttribute(
-    "open",
-  );
+  await expect(
+    card
+      .locator(readingOptionsSelector)
+      .getByRole("button", { name: "About Statement reading" }),
+  ).toHaveAttribute("aria-expanded", "false");
   await expect(card.locator(".validation")).toContainText("£1.00");
   await expect(
     card.getByRole("region", { name: "Statement reading and checks" }),

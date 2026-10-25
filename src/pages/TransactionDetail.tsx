@@ -31,6 +31,7 @@ import { useGlobalCurrency } from "../components/CurrencySetting";
 import { convertMinor } from "../analytics/fx";
 import { KeyValueRow } from "../components/UIPrimitives";
 import { Sheet } from "../components/Sheet";
+import { ContextHelp } from "../components/ContextHelp";
 import {
   refundCountedMonths,
   refundMonthName,
@@ -354,6 +355,16 @@ function Editor({
         {t.kind !== "split_parent" &&
           !(t.kind === "refund" && t.refundAllocations?.length) && (
             <>
+              <div className="context-help-heading">
+                <h3>Classification</h3>
+                <ContextHelp title="How this counts">
+                  <p>
+                    Money in counts as income; money out counts as spending.
+                    Transfers move account balances and are excluded from cash
+                    flow. A refund reduces the original spending.
+                  </p>
+                </ContextHelp>
+              </div>
               <div className="form-grid">
                 <label>
                   Display name
@@ -474,14 +485,6 @@ function Editor({
                   )}
               </div>
               <p className="coverage-note">Changes save automatically.</p>
-              <details>
-                <summary>How this counts</summary>
-                <p>
-                  Money in counts as income; money out counts as spending.
-                  Transfers move account balances and are excluded from cash
-                  flow. A refund reduces the original spending.
-                </p>
-              </details>
               {error && !tagSheetOpen && (
                 <p role="alert" className="warning-text">
                   {error}
@@ -493,11 +496,15 @@ function Editor({
       <TransferReview transactionIds={[t.id]} />
       {!t.transferPairId && possible.length > 0 && (
         <section className="card">
-          <h2>Link an internal transfer</h2>
-          <p className="muted">
-            Choose the opposite transaction in another account. Linked transfers
-            are excluded from income and expenses.
-          </p>
+          <div className="context-help-heading">
+            <h2>Link an internal transfer</h2>
+            <ContextHelp title="Linking an internal transfer">
+              <p>
+                Choose the opposite transaction in another account. Linked
+                transfers are excluded from income and expenses.
+              </p>
+            </ContextHelp>
+          </div>
           <label>
             Matching transaction
             <select

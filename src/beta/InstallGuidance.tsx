@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Share, Smartphone, Plus } from "lucide-react";
 import type { Setting } from "../domain/models";
+import { ContextHelp } from "../components/ContextHelp";
 import {
   installDismissedSettings,
   installShownSettings,
@@ -99,7 +100,12 @@ export function InstallBanner({
   return (
     <section className="notice install-banner" aria-label="Install Feng">
       <div>
-        <InstallHelp mode={mode} />
+        <div className="context-help-heading">
+          <h2>Install Feng</h2>
+          <ContextHelp title="Installing Feng">
+            <InstallHelp mode={mode} />
+          </ContextHelp>
+        </div>
         {error && <p role="alert">{error}</p>}
       </div>
       <div className="actions">

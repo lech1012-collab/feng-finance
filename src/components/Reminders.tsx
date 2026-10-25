@@ -1,4 +1,5 @@
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { auditedMutation, undoChange } from "../storage/audit";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
@@ -96,7 +97,23 @@ export function Reminders({
   return (
     <section className="card finance-reminders" id="reminders">
       <div className="section-heading">
-        <h2>Reminders</h2>
+        <div className="context-help-heading">
+          <h2>Reminders</h2>
+          {settings && (
+            <ContextHelp title="Reminders and calendar alerts">
+              <p>
+                Reminders appear in Feng; export to your calendar for alerts
+                while it is closed.
+              </p>
+              <p>
+                Calendar files contain no merchant names, amounts or account
+                details. Alerts depend on your calendar app. Re-export to
+                refresh estimated bill dates.
+              </p>
+              <p>Expected bill dates need repeated payments in your history.</p>
+            </ContextHelp>
+          )}
+        </div>
         {!settings && <Link to="/settings#reminders">Manage</Link>}
       </div>
       {settings && (
@@ -123,8 +140,7 @@ export function Reminders({
             </select>
           </label>
           <p className="muted">
-            Reminders appear in Feng; export to your calendar for alerts while
-            it is closed.
+            In-app reminders; export for alerts while Feng is closed.
           </p>
           <button
             disabled={!config.enabled}
@@ -142,15 +158,10 @@ export function Reminders({
           >
             Export calendar reminders
           </button>
-          <details>
-            <summary>Learn more about calendar reminders</summary>
-            <p>
-              Calendar files contain no merchant names, amounts or account
-              details. Alerts depend on your calendar app. Re-export to refresh
-              estimated bill dates; disabling reminders here does not remove
-              calendar events already imported.
-            </p>
-          </details>
+          <p className="muted">
+            Disabling reminders here does not remove calendar events already
+            imported.
+          </p>
         </>
       )}
       {reminders.slice(0, settings ? 20 : 4).map((r) =>
@@ -170,10 +181,7 @@ export function Reminders({
         ),
       )}
       {!reminders.length && settings && (
-        <p className="muted">
-          No reminders due. Expected bill dates need repeated payments in your
-          history.
-        </p>
+        <p className="muted">No reminders due.</p>
       )}
       {!settings && reminders.length > 4 && (
         <Link to="/settings#reminders">

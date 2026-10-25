@@ -106,12 +106,17 @@ async function assertSingleClosingPoint(
   await expect(trend.getByRole("slider")).toHaveCount(0);
   await expect(trend.locator(".balance-periods")).toHaveCount(0);
   await expect(trend.getByText(/Earlier statements will show/)).toBeVisible();
-  await trend.getByText("How this is calculated", { exact: true }).click();
+  await trend.getByRole("button", { name: "Balance trend explained" }).click();
   await expect(
-    trend.getByText(
-      /Card summaries supply balances only on their statement dates/,
-    ),
+    page
+      .getByRole("dialog", { name: "Balance trend explained" })
+      .getByText(
+        /Card summaries supply balances only on their statement dates/,
+      ),
   ).toBeVisible();
+  await page
+    .getByRole("button", { name: "Close Balance trend explained" })
+    .click();
 }
 
 test.beforeEach(async ({ page }) => {
@@ -138,9 +143,16 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   await page.goto("/#/");
   // A reconciled closing sum does not turn inferred transaction coverage into
   // verified monthly coverage, or invent daily balances between purchases.
-  await expect(page.locator(".month-summary")).toContainText(
-    "Monthly history is not fully verified",
-  );
+  await expect(
+    page.locator(".month-summary").getByText("Unverified", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "This month explained" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "This month explained" }),
+  ).toContainText("Monthly history is not fully verified");
+  await page
+    .getByRole("button", { name: "Close This month explained" })
+    .click();
   await assertSingleClosingPoint(page, "4 Oct", "£109.68");
 
   await page.setViewportSize({ width: 375, height: 844 });
@@ -216,9 +228,16 @@ test("Amex dates outside the period preserve reported debt while remaining unver
   await expect(cardAccount).toContainText("As of 5 Oct · Unverified");
   await expect(cardAccount).toContainText("£160.00");
   await page.goto("/#/");
-  await expect(page.locator(".month-summary")).toContainText(
-    "Monthly history is not fully verified",
-  );
+  await expect(
+    page.locator(".month-summary").getByText("Unverified", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "This month explained" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "This month explained" }),
+  ).toContainText("Monthly history is not fully verified");
+  await page
+    .getByRole("button", { name: "Close This month explained" })
+    .click();
   await expect(
     page.locator(".position-history circle[data-verified=true]"),
   ).toHaveCount(0);
@@ -336,14 +355,31 @@ test("a missing stored card row retains the reported balance but removes verifie
     .filter({ hasText: "4444" });
   await expect(reportedCard).toContainText("£109.68");
   await expect(reportedCard).toContainText("Unverified");
-  await expect(reportedCard).toContainText("Stored transactions do not match");
+  await reportedCard.click();
+  await page
+    .getByRole("button", { name: "Why this account balance is unverified" })
+    .click();
+  await expect(
+    page.getByRole("region", { name: "Statement balance evidence" }),
+  ).toContainText("Stored transactions do not match");
+  await page
+    .getByRole("button", { name: "Close Statement balance evidence" })
+    .click();
+  await page.getByRole("button", { name: "Close Edit account" }).click();
   await page.goto("/#/");
   await page
     .getByRole("combobox", { name: "Balance to show", exact: true })
     .selectOption({ label: "Barclaycard · •••• 4444" });
-  await expect(page.locator(".month-summary")).toContainText(
-    "Monthly history is not fully verified",
-  );
+  await expect(
+    page.locator(".month-summary").getByText("Partial", { exact: true }),
+  ).toBeVisible();
+  await page.getByRole("button", { name: "This month explained" }).click();
+  await expect(
+    page.getByRole("dialog", { name: "This month explained" }),
+  ).toContainText("Monthly history is not fully verified");
+  await page
+    .getByRole("button", { name: "Close This month explained" })
+    .click();
   await expect(
     page
       .locator(".position-history circle[data-verified=true] title")

@@ -1,4 +1,5 @@
 import { Toast } from "./Toast";
+import { ContextHelp } from "./ContextHelp";
 import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Attachment } from "../domain/models";
@@ -144,7 +145,15 @@ export function AttachmentManager({
   const count = data.attachments.length;
   return (
     <section className="card" aria-label="Transaction notes and attachments">
-      <h2>Notes and attachments</h2>
+      <div className="context-help-heading">
+        <h2>Notes and attachments</h2>
+        <ContextHelp title="Transaction attachments">
+          <p>
+            Attach images or PDFs to keep receipts with a payment. Images are
+            compressed to 1600 pixels. Files stay on this device.
+          </p>
+        </ContextHelp>
+      </div>
       <div className="security-fields">
         <label htmlFor={`note-${transactionId}`}>
           Private note
@@ -165,8 +174,7 @@ export function AttachmentManager({
         </small>
       </div>
       <p className="muted">
-        {count} of {MAX_ATTACHMENTS} attachments. Images are compressed to 1600
-        pixels. Files stay on this device.
+        {count} of {MAX_ATTACHMENTS} attachments
       </p>
       <input
         tabIndex={-1}

@@ -200,8 +200,14 @@ it("keeps card-only partial income and net unavailable in the accessible values"
   expect(row).toHaveTextContent("−£1,357.90");
   expect(row).not.toHaveTextContent("£0.00");
   expect(
+    screen.queryByText("* Partial month · from imported accounts only."),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Cash flow chart explained" }),
+  );
+  expect(
     screen.getByText("* Partial month · from imported accounts only."),
-  ).toBeInTheDocument();
+  ).toBeVisible();
 });
 
 it("identifies unverified contributions while showing the same partial totals as the dashboard", () => {
@@ -228,8 +234,16 @@ it("identifies unverified contributions while showing the same partial totals as
   expect(row).toHaveTextContent("Partial · verification incomplete");
   expect(row).toHaveTextContent("−£70.00");
   expect(
+    screen.queryByText(
+      "Statements with incomplete date or balance verification are included in partial months. Comparisons need verified dates and balances.",
+    ),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Cash flow chart explained" }),
+  );
+  expect(
     screen.getByText(
       "Statements with incomplete date or balance verification are included in partial months. Comparisons need verified dates and balances.",
     ),
-  ).toBeInTheDocument();
+  ).toBeVisible();
 });

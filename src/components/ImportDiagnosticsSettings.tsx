@@ -9,6 +9,7 @@ import {
 } from "../storage/import-diagnostics";
 import { redactedDiagnosticsText } from "../beta/diagnostics-redaction";
 import { download } from "../storage/backup";
+import { ContextHelp } from "./ContextHelp";
 import "./import-settings.css";
 
 export function ImportDiagnosticsSettings({
@@ -44,12 +45,24 @@ export function ImportDiagnosticsSettings({
     }
   }
   return (
-    <details className="card settings-disclosure" id="import-diagnostics">
-      <summary>Import diagnostics</summary>
+    <section className="card" id="import-diagnostics">
+      <div className="context-help-heading">
+        <h2>Import diagnostics</h2>
+        <ContextHelp title="Import diagnostics">
+          <p>
+            Optional troubleshooting data is excluded from downloadable backups
+            and Undo history. Exported diagnostics remove extracted text and
+            financial values.
+          </p>
+          <p>
+            A migration safety copy may still contain earlier diagnostics until
+            its 14-day expiry.
+          </p>
+        </ContextHelp>
+      </div>
       <p className="muted">
-        Optional troubleshooting data for the last five imports. It contains
-        statement text and figures, stays on this device and is excluded from
-        downloadable backups and Undo history.
+        Keeps statement text and figures from the last five imports on this
+        device.
       </p>
       <label className="check">
         <input
@@ -69,8 +82,7 @@ export function ImportDiagnosticsSettings({
         Keep local import diagnostics
       </label>
       <p className="muted">
-        Turning this off deletes the retained diagnostics. A migration safety
-        copy may still contain their earlier state until its 14-day expiry.
+        Turning this off deletes the retained diagnostics.
       </p>
       {data?.enabled && <p>{data.entries.length} of 5 imports retained.</p>}
       {!!data?.entries.length && (
@@ -111,6 +123,6 @@ export function ImportDiagnosticsSettings({
           {error}
         </p>
       )}
-    </details>
+    </section>
   );
 }

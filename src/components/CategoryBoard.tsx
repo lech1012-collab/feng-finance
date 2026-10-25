@@ -21,6 +21,7 @@ import {
   CARD_REPAYMENT_TARGET,
 } from "../storage/categorize";
 import { TransactionAccuracy } from "./TransactionAccuracy";
+import { ContextHelp } from "./ContextHelp";
 import { TagPicker } from "./TagManager";
 import { authorizeMonthEdit } from "../storage/month-review";
 import { conflictingCategoryRule } from "../categorization/rule-conflict";
@@ -295,7 +296,11 @@ export function CategoryBoard({
     <article
       className={`sorting-card ${dragging || externalDragging ? "is-dragging" : ""}`}
       aria-label={`Drag ${displayMerchant(t)} to a category`}
-      aria-describedby="drag-help"
+      aria-describedby={
+        (selection && selection.length > 1) || others.length
+          ? "category-choice-scope"
+          : undefined
+      }
       style={{
         ...(externalDragging
           ? {
@@ -388,6 +393,31 @@ export function CategoryBoard({
         className="category-options-scroll"
         aria-label="Category choices"
       >
+        <div className="context-help-heading">
+          <h3>Categorising</h3>
+          <ContextHelp title="Sorting transactions">
+            <p>
+              Choose a category, or drag the payment onto one. Matching payments
+              in this account and future imports follow your choice.
+            </p>
+            <p>
+              Keyboard: <kbd>1</kbd>–<kbd>3</kbd> suggestions
+              {onMove && (
+                <>
+                  {" "}
+                  · <kbd>J</kbd>/<kbd>K</kbd> next/previous
+                </>
+              )}
+              {onUndo && (
+                <>
+                  {" "}
+                  · <kbd>⌘Z</kbd> Undo
+                </>
+              )}
+            </p>
+          </ContextHelp>
+        </div>
+        <p className="muted">This account + future imports</p>
         {t.kind === "split_parent" && !t.isReviewed && (
           <div className="notice">
             <p>
@@ -432,30 +462,13 @@ export function CategoryBoard({
             </button>
           </div>
         )}
-        <p className="muted" id="drag-help">
-          Choose a category. Matching payments in this account and future
-          imports follow your choice.
-          {selection && selection.length > 1
-            ? ` ${selection.length} selected transactions.`
-            : others.length
-              ? ` Also applies to ${others.length} matching payment${others.length === 1 ? "" : "s"}.`
-              : ""}
-        </p>
-        <p className="desktop-only keyboard-hints">
-          Keyboard: <kbd>1</kbd>–<kbd>3</kbd> suggestions
-          {onMove && (
-            <>
-              {" "}
-              · <kbd>J</kbd>/<kbd>K</kbd> next/previous
-            </>
-          )}
-          {onUndo && (
-            <>
-              {" "}
-              · <kbd>⌘Z</kbd> Undo
-            </>
-          )}
-        </p>
+        {((selection && selection.length > 1) || others.length > 0) && (
+          <p className="muted" id="category-choice-scope">
+            {selection && selection.length > 1
+              ? `${selection.length} selected transactions.`
+              : `Also applies to ${others.length} matching payment${others.length === 1 ? "" : "s"}.`}
+          </p>
+        )}
         {suggested.length > 0 && (
           <section
             className="suggested-categories"

@@ -292,10 +292,11 @@ test("installed iPhone mode keeps installation metadata and suppresses the Safar
     page.getByRole("region", { name: "Install Feng", exact: true }),
   ).toHaveCount(0);
   await settingsSection(page, "about");
-  await page.getByText("Install help", { exact: true }).click();
+  await page.getByRole("button", { name: "About Installing Feng" }).click();
   await expect(
     page.getByText("Feng is already installed. Open it from your Home Screen."),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Close Installing Feng" }).click();
   const manifest = await page
     .locator("link[rel=manifest]")
     .getAttribute("href");
@@ -348,13 +349,37 @@ test("existing Safari imports warn about separate storage and retain their overd
     name: "Save a backup",
     exact: true,
   });
-  await expect(backupNotice).toContainText(
+  await expect(backupNotice).toContainText("Data is separate here");
+  const previouslySeen = await setting(page, "separateStorageWarningSeen");
+  await backupNotice
+    .getByRole("button", {
+      name: "About Separate browser and installed-app data",
+    })
+    .click();
+  await expect(
+    page.getByRole("dialog", {
+      name: "Separate browser and installed-app data",
+    }),
+  ).toContainText(
     "Data in this Safari tab is separate from the installed app.",
   );
-  await backupNotice.getByRole("button", { name: "I understand" }).click();
-  await expect(backupNotice).toContainText(
-    "You imported your first statements a week ago.",
+  await page
+    .getByRole("button", {
+      name: "Close Separate browser and installed-app data",
+    })
+    .click();
+  expect(await setting(page, "separateStorageWarningSeen")).toBe(
+    previouslySeen,
   );
+  await backupNotice.getByRole("button", { name: "I understand" }).click();
+  await expect(backupNotice).toContainText("Backup due");
+  await backupNotice
+    .getByRole("button", { name: "About Keeping a backup" })
+    .click();
+  await expect(
+    page.getByRole("dialog", { name: "Keeping a backup" }),
+  ).toContainText("You imported your first statements a week ago.");
+  await page.getByRole("button", { name: "Close Keeping a backup" }).click();
   const download = page.waitForEvent("download");
   await backupNotice.getByRole("button", { name: "Save backup" }).click();
   const backupSheet = page.getByRole("dialog", {

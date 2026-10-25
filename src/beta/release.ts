@@ -14,11 +14,13 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-25",
   points: [
-    "Category charts show average monthly spending and monthly variation as separate values.",
-    "The chart explanation describes the average line and variation band in plain language.",
+    "Tap a nearby question mark for explanations, without long sections filling the page.",
+    "Warning symbols open supporting details while important statuses and actions stay beside your figures.",
+    "Contextual help works offline and stays within an editor when one is already open.",
   ],
   pleaseTest: [
-    "Open a category in Analyse and check the average and variation labels on your phone.",
+    "Open the help beside a chart or setting, close it and continue where you left off.",
+    "Check warning details on your phone with larger text.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -26,6 +28,19 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.24",
+    date: "2026-10-25",
+    points: [
+      "Category charts show average monthly spending and monthly variation as separate values.",
+      "The chart explanation describes the average line and variation band in plain language.",
+    ],
+    pleaseTest: [
+      "Open a category in Analyse and check the average and variation labels on your phone.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.23",
     date: "2026-10-24",

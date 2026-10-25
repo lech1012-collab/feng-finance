@@ -4,6 +4,7 @@ import { InstallHelp } from "./InstallGuidance";
 import { WhatsNew } from "./WhatsNew";
 import { CURRENT_RELEASE, type ReleaseNotes } from "./release";
 import { formatLocalDateTime } from "../domain/dates";
+import { ContextHelp } from "../components/ContextHelp";
 
 export interface DesktopInstallControl {
   available: boolean;
@@ -50,54 +51,61 @@ export function AboutLifecycle({
       <p>{release.mainTask}</p>
       <button onClick={() => setWhatsNew(true)}>What's new</button>
       {feedback}
-      <details>
-        <summary>Install help</summary>
-        <InstallHelp mode={mode} />
-        {desktopInstall.available && (
-          <button
-            className="primary"
-            disabled={desktopInstall.busy}
-            onClick={() => void desktopInstall.install()}
-          >
-            Install Feng
-          </button>
-        )}
-        {desktopInstall.error && <p role="alert">{desktopInstall.error}</p>}
-      </details>
-      <details>
-        <summary>Privacy</summary>
-        <h3>Your financial information stays here</h3>
-        <p>
-          Accounts, transactions, balances, categories, rules and settings are
-          stored in this browser's local database. Optional receipts, import
-          layouts and optional diagnostics are stored here too. Original
-          statement PDFs are discarded after import or cancellation. Diagnostics
-          do not retain the PDF.
-        </p>
-        <p>
-          Feng downloads its own app files and, when enabled, public exchange
-          rates from the European Central Bank. PDF reading and OCR happen on
-          your device and work offline after installation.
-        </p>
-        <p>
-          Statements, descriptions, account numbers, balances and transaction
-          history are never sent to the developer. Feng has no analytics,
-          tracking pixels, external AI calls or session recording.
-        </p>
-        <p>
-          Feedback opens only when you choose to send it. Technical context
-          contains the app version and device details, never your financial
-          data. Shared diagnostics replace all extracted text with placeholders.
-        </p>
-        <p>
-          The local database is not encrypted by Feng's app lock. Protect your
-          device with a passcode. Export a backup before changing devices or
-          clearing browser storage.
-        </p>
-        <p>
-          To remove your data, use Settings → Danger zone → Erase everything.
-        </p>
-      </details>
+      <div className="context-help-heading">
+        <h3>Install Feng</h3>
+        <ContextHelp title="Installing Feng">
+          <InstallHelp mode={mode} />
+        </ContextHelp>
+      </div>
+      {desktopInstall.available && (
+        <button
+          className="primary"
+          disabled={desktopInstall.busy}
+          onClick={() => void desktopInstall.install()}
+        >
+          Install Feng
+        </button>
+      )}
+      {desktopInstall.error && <p role="alert">{desktopInstall.error}</p>}
+      <div className="context-help-heading">
+        <h3>Privacy</h3>
+        <ContextHelp title="Privacy">
+          <h3>Your financial information stays here</h3>
+          <p>
+            Accounts, transactions, balances, categories, rules and settings are
+            stored in this browser's local database. Optional receipts, import
+            layouts and optional diagnostics are stored here too. Original
+            statement PDFs are discarded after import or cancellation.
+            Diagnostics do not retain the PDF.
+          </p>
+          <p>
+            Feng downloads its own app files and, when enabled, public exchange
+            rates from the European Central Bank. PDF reading and OCR happen on
+            your device and work offline after installation.
+          </p>
+          <p>
+            Statements, descriptions, account numbers, balances and transaction
+            history are never sent to the developer. Feng has no analytics,
+            tracking pixels, external AI calls or session recording.
+          </p>
+          <p>
+            Feedback opens only when you choose to send it. Technical context
+            contains the app version and device details, never your financial
+            data. Shared diagnostics replace all extracted text with
+            placeholders.
+          </p>
+          <p>
+            Protect your device with a passcode. Export a backup before changing
+            devices or clearing browser storage.
+          </p>
+          <p>
+            To remove your data, use Settings → Danger zone → Erase everything.
+          </p>
+        </ContextHelp>
+      </div>
+      <p className="muted">
+        The local database is not encrypted by Feng's app lock.
+      </p>
       <p role="status">
         {storagePersisted
           ? "Storage: protected"

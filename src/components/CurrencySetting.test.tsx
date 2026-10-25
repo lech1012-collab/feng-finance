@@ -39,6 +39,20 @@ it("undoes reporting currency locally without changing the account currency", as
   const selector = await screen.findByRole("combobox", {
     name: "Reporting currency",
   });
+  const settingsBeforeHelp = await db.settings.toArray();
+  expect(
+    screen.queryByText(/Totals convert all accounts/),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    screen.getByRole("button", { name: "About Currency and exchange rates" }),
+  );
+  expect(await screen.findByText(/Totals convert all accounts/)).toBeVisible();
+  expect(screen.getByText(/No personal data is sent/)).toBeVisible();
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Currency and exchange rates" }),
+  );
+  expect(await db.settings.toArray()).toEqual(settingsBeforeHelp);
+  expect(selector).toHaveValue("GBP");
   fireEvent.change(selector, { target: { value: "EUR" } });
   await screen.findByText("Reporting currency saved.");
   fireEvent.click(screen.getByRole("button", { name: "Undo" }));

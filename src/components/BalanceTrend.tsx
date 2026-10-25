@@ -25,6 +25,7 @@ import {
 import { ImportButton } from "./ImportPicker";
 import { SegmentedControl } from "./UIPrimitives";
 import { useRootFontSize } from "./useRootFontSize";
+import { ContextHelp } from "./ContextHelp";
 import "./BalanceTrend.css";
 
 export interface BalanceTrendProps {
@@ -253,7 +254,58 @@ export function BalanceTrend(props: BalanceTrendProps) {
   return (
     <section className="card balance-trend" aria-labelledby={`${id}-title`}>
       <div className="section-heading">
-        <h2 id={`${id}-title`}>Balance trend</h2>
+        <div className="context-help-heading">
+          <h2 id={`${id}-title`}>Balance trend</h2>
+          <ContextHelp
+            title="Balance trend explained"
+            label="Balance trend explained"
+            tone={
+              summary.latest?.verified === false ||
+              internalGaps.length > 0 ||
+              missingFx
+                ? "warning"
+                : "help"
+            }
+          >
+            <p>
+              Cash balances include current and savings accounts. Net worth
+              subtracts debts from all included assets. Verified bank
+              transactions supply daily balances; missing dates stay empty. Card
+              summaries supply balances only on their statement dates. Manual
+              valuations step between recorded dates. Transfers change account
+              balances without counting as income or spending.
+            </p>
+            {snapshotsOnly && (
+              <p>
+                Statement dates only. No daily balance is assumed between them.
+              </p>
+            )}
+            {hasSnapshots && !snapshotsOnly && !gap && (
+              <p>Some balances are available only on statement dates.</p>
+            )}
+            {gap && !snapshotsOnly && (
+              <p>
+                {internalGaps.length === 1
+                  ? `No verified balance for ${formatDateRange(gap.start, gap.end)}.`
+                  : `${internalGaps.length} gaps in this history.`}{" "}
+                Lines stop at missing dates.
+              </p>
+            )}
+            {converted && (
+              <p>
+                Values are converted to {currency} at each date. Changes can
+                include exchange-rate movements.
+              </p>
+            )}
+            {summary.latest?.verified === false && (
+              <p>
+                This is the reported balance. Check the statement before using
+                it for comparisons.
+              </p>
+            )}
+            <p>Drag to inspect a date, or use the arrow keys, Home or End.</p>
+          </ContextHelp>
+        </div>
         {!showRanges && summary.observations.length >= 2 && (
           <span className="muted">
             {shownPeriod} {shownPeriod === 1 ? "month" : "months"}
@@ -322,9 +374,9 @@ export function BalanceTrend(props: BalanceTrendProps) {
           {missingFx
             ? "An exchange rate is needed to show this balance."
             : scope?.kind === "net"
-              ? "Net worth needs verified balances for every included account on the same date. Choose cash balances or an account to see its history."
+              ? "Net worth needs verified balances for every included account on the same date."
               : scope?.kind === "cash"
-                ? "Cash history needs verified balances for each current and savings account. Choose an account to see its available balances."
+                ? "Cash history needs verified balances for each current and savings account."
                 : "No balance is recorded in this period."}
         </p>
       )}
@@ -508,29 +560,15 @@ export function BalanceTrend(props: BalanceTrendProps) {
               {pointText}
             </strong>
           </div>
-          <p id={`${id}-interaction`} className="balance-trend-hint">
-            Drag to inspect a date.
-            <span className="sr-only">
-              {" "}
-              Keyboard: use the arrow keys, Home or End.
-            </span>
+          <p id={`${id}-interaction`} className="sr-only">
+            Drag to inspect a date. Keyboard: use the arrow keys, Home or End.
           </p>
           {snapshotsOnly && (
-            <p className="balance-trend-note">
-              Statement dates only. No daily balance is assumed between them.
-            </p>
-          )}
-          {hasSnapshots && !snapshotsOnly && !gap && (
-            <p className="balance-trend-note">
-              Some balances are available only on statement dates.
-            </p>
+            <p className="balance-trend-note">Statement dates only</p>
           )}
           {gap && !snapshotsOnly && (
             <p className="balance-trend-note">
-              {internalGaps.length === 1
-                ? `No verified balance for ${formatDateRange(gap.start, gap.end)}.`
-                : `${internalGaps.length} gaps in this history.`}{" "}
-              Lines stop at missing dates.
+              {internalGaps.length} {internalGaps.length === 1 ? "gap" : "gaps"}
             </p>
           )}
         </>
@@ -541,7 +579,7 @@ export function BalanceTrend(props: BalanceTrendProps) {
             ? "Choose a longer range to see earlier balances."
             : summary.latest?.verified
               ? "Earlier statements will show how this balance changed."
-              : "This is the reported balance. Check the statement before using it for comparisons."}
+              : "Comparisons unavailable"}
         </p>
       )}
       {!summary.observations.length && missingFx ? (
@@ -556,23 +594,6 @@ export function BalanceTrend(props: BalanceTrendProps) {
             : "Import missing statement"}
         </ImportButton>
       ) : null}
-      {converted && (
-        <p className="balance-trend-note">
-          Values are converted to {currency} at each date. Changes can include
-          exchange-rate movements.
-        </p>
-      )}
-      <details className="balance-trend-help">
-        <summary>How this is calculated</summary>
-        <p>
-          Cash balances include current and savings accounts. Net worth
-          subtracts debts from all included assets. Verified bank transactions
-          supply daily balances; missing dates stay empty. Card summaries supply
-          balances only on their statement dates. Manual valuations step between
-          recorded dates. Transfers change account balances without counting as
-          income or spending.
-        </p>
-      </details>
     </section>
   );
 }

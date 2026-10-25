@@ -281,6 +281,26 @@ it("keeps Home future payment conversions unknown and shows native amounts rathe
   expect(section).toHaveTextContent("+£3,000.00");
   expect(section).toHaveTextContent("−£12.99");
   expect(section).not.toHaveTextContent("US$0.00");
+  expect(within(section).getByText("Next 30 days · Estimated")).toBeVisible();
+  expect(
+    within(section).getByText("Balance forecast unavailable · Rates needed"),
+  ).toBeVisible();
+  expect(
+    screen.queryByText(
+      /Cached exchange rates are needed for every account currency/,
+    ),
+  ).not.toBeInTheDocument();
+  fireEvent.click(
+    within(section).getByRole("button", { name: "Coming up explained" }),
+  );
+  expect(
+    screen.getByRole("dialog", { name: "Coming up explained" }),
+  ).toHaveTextContent(
+    "Cached exchange rates are needed for every account currency.",
+  );
+  fireEvent.click(
+    screen.getByRole("button", { name: "Close Coming up explained" }),
+  );
   expect(await db.transactions.toArray()).toEqual(originals);
   view.unmount();
 });

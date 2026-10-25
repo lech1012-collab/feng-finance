@@ -91,6 +91,26 @@ describe("beta lifecycle components", () => {
         onSave={save}
       />,
     );
+    expect(screen.getByText("Data is separate here")).toBeVisible();
+    expect(
+      screen.queryByText(/Data in this Safari tab is separate/),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "About Separate browser and installed-app data",
+      }),
+    );
+    expect(
+      screen.getByRole("dialog", {
+        name: "Separate browser and installed-app data",
+      }),
+    ).toHaveTextContent("restore it in the installed app");
+    expect(save).not.toHaveBeenCalled();
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: "Close Separate browser and installed-app data",
+      }),
+    );
     fireEvent.click(screen.getByRole("button", { name: "Save backup" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "existing data is safe",
