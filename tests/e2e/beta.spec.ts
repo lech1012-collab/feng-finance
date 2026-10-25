@@ -292,10 +292,11 @@ test("installed iPhone mode keeps installation metadata and suppresses the Safar
     page.getByRole("region", { name: "Install Feng", exact: true }),
   ).toHaveCount(0);
   await settingsSection(page, "about");
-  await page.getByText("Install help", { exact: true }).click();
+  await page.getByRole("button", { name: "About Installing Feng" }).click();
   await expect(
     page.getByText("Feng is already installed. Open it from your Home Screen."),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Close Installing Feng" }).click();
   const manifest = await page
     .locator("link[rel=manifest]")
     .getAttribute("href");

@@ -310,7 +310,7 @@ test("notes and compressed image/PDF attachments work offline with no financial 
       buffer: Buffer.from(image, "base64"),
     });
   await expect(
-    manager.getByText("1 of 5 attachments.", { exact: false }),
+    manager.getByText("1 of 5 attachments", { exact: true }),
   ).toBeVisible();
   await expect
     .poll(() =>
@@ -332,7 +332,7 @@ test("notes and compressed image/PDF attachments work offline with no financial 
       buffer: Buffer.from("%PDF-1.7\nsynthetic local receipt"),
     });
   await expect(
-    manager.getByText("2 of 5 attachments.", { exact: false }),
+    manager.getByText("2 of 5 attachments", { exact: true }),
   ).toBeVisible();
   expect(requests).toEqual([]);
   for (const width of [320, 390]) {
@@ -346,11 +346,11 @@ test("notes and compressed image/PDF attachments work offline with no financial 
     .getByRole("button", { name: "Remove synthetic-receipt.pdf", exact: true })
     .click();
   await expect(
-    manager.getByText("1 of 5 attachments.", { exact: false }),
+    manager.getByText("1 of 5 attachments", { exact: true }),
   ).toBeVisible();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(
-    manager.getByText("2 of 5 attachments.", { exact: false }),
+    manager.getByText("2 of 5 attachments", { exact: true }),
   ).toBeVisible();
   expect(requests).toEqual([]);
 });

@@ -1572,10 +1572,8 @@ test("UK Amex and Revolut layouts reconcile, preserve dated exceptions and share
       .getByText("1 Sep 2026 to 30 Sep 2026", { exact: true }),
   ).toBeVisible();
   await expect(
-    revolut.locator(
-      '.generic-parser-details:has(> summary:text-is("Reading details"))',
-    ),
-  ).not.toHaveAttribute("open");
+    revolut.getByRole("button", { name: "About Statement reading" }),
+  ).toHaveAttribute("aria-expanded", "false");
   await expect(revolut.locator(".generic-import-review")).toHaveCount(0);
   await expect(
     revolut.getByLabel(/I compared the extracted rows with the source file/),
