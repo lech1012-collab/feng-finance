@@ -12,15 +12,13 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-24",
+  date: "2026-10-25",
   points: [
-    "Already categorised payments no longer need a second manual review.",
-    "Home separates missing categories from refunds, splits and source checks that need a decision.",
-    "Sorting skips completed rule matches and updates as you categorise payments.",
+    "Category charts show average monthly spending and monthly variation as separate values.",
+    "The chart explanation describes the average line and variation band in plain language.",
   ],
   pleaseTest: [
-    "Check Home after importing or applying rules: only unresolved payments should need attention.",
-    "Categorise a payment and check that it disappears from the sorting queue without another review button.",
+    "Open a category in Analyse and check the average and variation labels on your phone.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +26,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.23",
+    date: "2026-10-24",
+    points: [
+      "Already categorised payments no longer need a second manual review.",
+      "Home separates missing categories from refunds, splits and source checks that need a decision.",
+      "Sorting skips completed rule matches and updates as you categorise payments.",
+    ],
+    pleaseTest: [
+      "Check Home after importing or applying rules: only unresolved payments should need attention.",
+      "Categorise a payment and check that it disappears from the sorting queue without another review button.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.10",
     date: "2026-10-19",

@@ -166,8 +166,11 @@ it("shows Salary averages and zero deviation despite incomplete unrelated card a
   );
   expect(average).toHaveTextContent("£3,000.00");
   expect(average).toHaveTextContent("5 recorded previous months out of 6");
-  expect(container.querySelector(".category-range")).toHaveTextContent(
-    "Standard deviation: £0.00",
+  expect(container.querySelector(".category-range strong")).toHaveTextContent(
+    "Average monthly income: £3,000.00",
+  );
+  expect(container.querySelector(".category-range .muted")).toHaveTextContent(
+    "Monthly variation (standard deviation): £0.00",
   );
   fireEvent.click(
     screen.getByText("Months used for comparison (5 of 6)", { exact: true }),
@@ -240,8 +243,11 @@ it("shows the average, zero deviation and difference when all recorded Salary mo
   expect(
     container.querySelector(".category-kpis .metric:nth-child(2)"),
   ).toHaveTextContent("5 recorded previous months out of 6");
-  expect(container.querySelector(".category-range")).toHaveTextContent(
-    "Standard deviation: £0.00",
+  expect(container.querySelector(".category-range strong")).toHaveTextContent(
+    "Average monthly income: £3,000.00",
+  );
+  expect(container.querySelector(".category-range .muted")).toHaveTextContent(
+    "Monthly variation (standard deviation): £0.00",
   );
   expect(
     container.querySelector(".category-kpis .metric:nth-child(4)"),

@@ -38,6 +38,11 @@ The chart shows every baseline month plus the selected month. The dashed line is
 the recorded average; the band is average ± sample standard deviation, bounded
 at zero for display. It is a descriptive band, not a budget or prediction.
 
+From 2.2.24, the chart header shows **Average monthly spending** (or **Average
+monthly income**) and **Monthly variation (standard deviation)** as separate
+values. The chart explanation describes the average line and variation band in
+words. This wording change leaves the underlying calculations unchanged.
+
 ## Confidence and currency
 
 Partial months are included and identified on the chart, in View values and in
