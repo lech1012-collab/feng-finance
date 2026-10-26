@@ -262,3 +262,47 @@ test("category readings reserve space at mobile text sizes and open the selected
   await expect(page.locator(".transaction-row")).toContainText("£1,000.00");
   expect(await savedRows(page)).toEqual(before);
 });
+
+test("cash flow keeps the same month in different years independently selectable", async ({
+  page,
+}) => {
+  await seed(page);
+  const before = await savedRows(page);
+  await page.goto("/#/analysis");
+  await page.getByText("Other periods", { exact: true }).click();
+  await page
+    .getByRole("combobox", { name: "Period", exact: true })
+    .selectOption("custom");
+  await page
+    .getByRole("textbox", { name: "From", exact: true })
+    .fill("01/10/2025");
+  await page
+    .getByRole("textbox", { name: "To", exact: true })
+    .fill("31/10/2026");
+  const inspector = page.getByRole("slider", {
+    name: "Inspect cash flow",
+    exact: true,
+  });
+  await expect(inspector).toHaveAttribute("aria-valuemax", "12");
+  await inspector.scrollIntoViewIfNeeded();
+  const chart = page.locator(".chart").filter({ has: inspector });
+  const readout = chart.getByRole("group", {
+    name: "Selected cash flow values",
+  });
+  const points = await coordinates(inspector);
+  expect(points.xs).toHaveLength(13);
+  expect(
+    points.xs.every(
+      (x, index) =>
+        Number.isFinite(x) && (index === 0 || x > points.xs[index - 1]),
+    ),
+  ).toBe(true);
+  await page.touchscreen.tap(points.xs[0], points.y);
+  await expect(readout).toContainText("October 2025");
+  await expect(readout).toContainText("No statements");
+  await page.touchscreen.tap(points.xs[12], points.y);
+  await expect(readout).toContainText("October 2026");
+  await expect(readout).toContainText("£3,000.00");
+  await expect(chart.locator('rect[data-selected="true"]')).toHaveCount(2);
+  expect(await savedRows(page)).toEqual(before);
+});

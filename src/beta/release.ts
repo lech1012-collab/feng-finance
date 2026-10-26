@@ -16,7 +16,7 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   points: [
     "Cash flow and category values stay above their charts while you tap or drag between months.",
     "A visible selection line and highlighted bars or points show exactly which date you are inspecting.",
-    "Balance readings also sit above the plot, and coverage explanations open from the selected status.",
+    "Long and tax-year cash-flow ranges distinguish repeated months by year, keeping their values and highlights separate.",
   ],
   pleaseTest: [
     "Drag across a chart, release your finger, then swipe vertically to scroll. Check that the reading stays selected and the chart remains visible.",
@@ -27,6 +27,20 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.30",
+    date: "2026-10-26",
+    points: [
+      "Cash flow and category values stay above their charts while you tap or drag between months.",
+      "A visible selection line and highlighted bars or points show exactly which date you are inspecting.",
+      "Balance readings also sit above the plot, and coverage explanations open from the selected status.",
+    ],
+    pleaseTest: [
+      "Drag across a chart, release your finger, then swipe vertically to scroll. Check that the reading stays selected and the chart remains visible.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.29",
     date: "2026-10-26",

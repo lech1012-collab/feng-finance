@@ -106,8 +106,15 @@ export function CashChart({
     point.coverage?.status === "No data" ||
     point.coverage?.status === "Unverified" ||
     (point.income === null && point.expenses === null && point.net === null);
-  const displayed = data.map((point) => ({
+  // A tax year can cover thirteen calendar months. Recharts changes its axis
+  // domain to row indexes when labels repeat, so keep cross-year labels unique.
+  const repeatedLabels =
+    new Set(data.map((point) => point.label)).size < data.length;
+  const displayed = data.map((point, index) => ({
     ...point,
+    label: repeatedLabels
+      ? `${point.label} ${point.month?.slice(0, 4) ?? `(${index + 1})`}`
+      : point.label,
     expenses: point.expenses === null ? null : -Math.abs(point.expenses),
     opacity: point.coverage && !point.coverage.complete ? 0.55 : 1,
   }));
@@ -236,7 +243,7 @@ export function CashChart({
                   </pattern>
                 </defs>
                 <CartesianGrid vertical={false} stroke="var(--line)" />
-                {data.filter(missing).map((point, index) => (
+                {displayed.filter(missing).map((point, index) => (
                   <ReferenceArea
                     key={`${point.month ?? point.label}-${index}`}
                     x1={point.label}
@@ -276,7 +283,9 @@ export function CashChart({
                     fill: "var(--muted)",
                   }}
                   tickFormatter={(label) => {
-                    const point = data.find((item) => item.label === label);
+                    const point = displayed.find(
+                      (item) => item.label === label,
+                    );
                     const short = String(label)
                       .replace(/\bSept\b/g, "Sep")
                       .replace(/^([A-Za-z]{3})[a-z]+/, "$1");
@@ -414,7 +423,7 @@ export function CashChart({
                 </tr>
               </thead>
               <tbody>
-                {data.map((d, i) => (
+                {displayed.map((d, i) => (
                   <tr key={i}>
                     <th>{d.label}</th>
                     {data.some((point) => point.coverage) && (

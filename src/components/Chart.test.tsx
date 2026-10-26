@@ -9,6 +9,7 @@ import {
 import { cloneElement, type ReactElement } from "react";
 import { CashChart } from "./Chart";
 import type { MonthCoverage } from "../analytics/coverage";
+import { monthOffset } from "../domain/dates";
 
 vi.mock("recharts", async (original) => ({
   ...(await original<typeof import("recharts")>()),
@@ -30,6 +31,61 @@ const coverage = (status: MonthCoverage["status"]): MonthCoverage => ({
   verifiedStatements: [],
   missingAccountIds: [],
   incompleteAccountIds: [],
+});
+
+it("keeps repeated months in different years separately selectable and highlights only the selected year", () => {
+  const { container } = render(
+    <CashChart
+      currency="GBP"
+      showValues={false}
+      data={Array.from({ length: 13 }, (_, index) => {
+        const month = monthOffset("2025-10", index);
+        return {
+          month,
+          label: new Date(`${month}-01T12:00:00Z`).toLocaleDateString("en-GB", {
+            month: "short",
+            timeZone: "UTC",
+          }),
+          income: 10000 + index * 100,
+          expenses: 5000,
+          net: 5000 + index * 100,
+          coverage: coverage("Complete"),
+        };
+      })}
+    />,
+  );
+  const positions = container
+    .querySelector("[data-chart-coordinates]")!
+    .getAttribute("data-chart-coordinates")!
+    .split(",");
+  expect(positions).toHaveLength(13);
+  expect(
+    positions.every(
+      (position) => position !== "" && Number.isFinite(Number(position)),
+    ),
+  ).toBe(true);
+  expect(
+    positions.every(
+      (position, index) =>
+        index === 0 || Number(position) > Number(positions[index - 1]),
+    ),
+  ).toBe(true);
+  expect(container.querySelectorAll('rect[data-selected="true"]')).toHaveLength(
+    2,
+  );
+  const inspector = screen.getByRole("slider", { name: "Inspect cash flow" });
+  const readout = screen.getByRole("group", {
+    name: "Selected cash flow values",
+  });
+  fireEvent.keyDown(inspector, { key: "Home" });
+  expect(readout).toHaveTextContent("October 2025");
+  expect(readout).toHaveTextContent("Income£100.00");
+  expect(container.querySelectorAll('rect[data-selected="true"]')).toHaveLength(
+    2,
+  );
+  fireEvent.keyDown(inspector, { key: "End" });
+  expect(readout).toHaveTextContent("October 2026");
+  expect(readout).toHaveTextContent("Income£112.00");
 });
 
 it("reports missing history without zero values and lets a user inspect a hatched gap", () => {
