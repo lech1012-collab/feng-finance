@@ -207,10 +207,9 @@ it("shows the median-based price change with yearly impact and respects Keep on 
   });
   expect(alert).toHaveTextContent("Was £10.99, now £12.49");
   expect(alert).toHaveTextContent("£18.00 more per year");
-  expect(screen.getByRole("link", { name: "Review charge" })).toHaveAttribute(
-    "href",
-    "/subscriptions",
-  );
+  expect(
+    screen.getByRole("link", { name: "Review price changes" }),
+  ).toHaveAttribute("href", "/subscriptions");
   await db.settings.put({
     key: "subscription:test",
     value: JSON.stringify({

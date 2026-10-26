@@ -12,15 +12,15 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-10-25",
+  date: "2026-10-26",
   points: [
-    "Tap a nearby question mark for explanations, without long sections filling the page.",
-    "Warning symbols open supporting details while important statuses and actions stay beside your figures.",
-    "Contextual help works offline and stays within an editor when one is already open.",
+    "Home has one account overview link, with cash and card debt keeping their filtered transaction views.",
+    "Pots, recurring price changes and reminders have one clear action instead of repeated links.",
+    "Home keeps a single monthly import action and a single uncategorised count in its spending card.",
   ],
   pleaseTest: [
-    "Open the help beside a chart or setting, close it and continue where you left off.",
-    "Check warning details on your phone with larger text.",
+    "Tap the account count on Home, then check that Cash and Card debt still open the right transactions.",
+    "Open pots and recurring price changes from their single review links.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +28,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.25",
+    date: "2026-10-25",
+    points: [
+      "Tap a nearby question mark for explanations, without long sections filling the page.",
+      "Warning symbols open supporting details while important statuses and actions stay beside your figures.",
+      "Contextual help works offline and stays within an editor when one is already open.",
+    ],
+    pleaseTest: [
+      "Open the help beside a chart or setting, close it and continue where you left off.",
+      "Check warning details on your phone with larger text.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.24",
     date: "2026-10-25",

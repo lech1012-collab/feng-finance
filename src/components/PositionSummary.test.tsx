@@ -70,13 +70,17 @@ it("shows dated card debt but leaves cash and net position unavailable when no c
   expect(screen.getByRole("link", { name: /Cash/ })).toHaveTextContent(
     "Not imported",
   );
-  expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
+  expect(screen.getByText("Net worth").closest("div")).toHaveTextContent(
     "Unavailable",
   );
   expect(screen.getByRole("link", { name: "1 account ›" })).toHaveAttribute(
     "href",
     "/accounts",
   );
+  expect(document.querySelectorAll('a[href="/accounts"]')).toHaveLength(1);
+  expect(
+    screen.queryByRole("link", { name: /Net worth/ }),
+  ).not.toBeInTheDocument();
   expect(screen.getByText("Partial or unverified")).toBeVisible();
   expect(
     screen.queryByText("Missing or stale balances. Net worth is withheld."),
@@ -93,7 +97,7 @@ it("does not attribute an October issue-date balance to September", () => {
   expect(screen.getByRole("link", { name: /Card debt/ })).toHaveTextContent(
     "Unknown",
   );
-  expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
+  expect(screen.getByText("Net worth").closest("div")).toHaveTextContent(
     "Unavailable",
   );
 });
@@ -130,7 +134,7 @@ it("a removed stored card row invalidates debt and net while keeping the reporte
   expect(screen.getByRole("link", { name: /Card debt/ })).toHaveTextContent(
     "Unknown",
   );
-  expect(screen.getByRole("link", { name: /Net worth/ })).toHaveTextContent(
+  expect(screen.getByText("Net worth").closest("div")).toHaveTextContent(
     "Unavailable",
   );
   expect(screen.getByRole("link", { name: "1 account ›" })).toHaveAttribute(

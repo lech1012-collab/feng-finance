@@ -634,6 +634,7 @@ time {
 }
 .app .month-figures > a,
 .app .position-metrics > a,
+.app .position-metrics > div,
 .app .upcoming-row > span,
 .app .metric {
   gap: 4px;

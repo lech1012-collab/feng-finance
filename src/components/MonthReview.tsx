@@ -342,11 +342,7 @@ export function MonthReview({
           </p>
           <h3>Subscription changes</h3>
           {priceChanges.map((subscription) => (
-            <Link
-              key={subscription.key}
-              className="insight-row"
-              to="/subscriptions"
-            >
+            <div key={subscription.key} className="insight-row">
               <span>
                 <strong>
                   {displayMerchant({
@@ -380,7 +376,7 @@ export function MonthReview({
                   </small>
                 )}
               </span>
-            </Link>
+            </div>
           ))}
           {!priceChanges.length && !nextPriceChanges.length && (
             <p className="muted">

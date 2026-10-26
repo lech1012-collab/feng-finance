@@ -1086,7 +1086,10 @@ export function CalendarPanel({
       )}
       {priceRises.length > 0 && (
         <aside className="notice warning" aria-label="Recurring price changes">
-          <h3>Recurring prices changed</h3>
+          <div className="section-heading">
+            <h3>Recurring prices changed</h3>
+            <Link to="/subscriptions">Review price changes</Link>
+          </div>
           {priceRises.map((s) => (
             <div className="planning-v2-object" key={s.key}>
               <span>
@@ -1103,7 +1106,6 @@ export function CalendarPanel({
                     : ""}
                 </small>
               </span>
-              <Link to="/subscriptions">Review charge</Link>
             </div>
           ))}
         </aside>

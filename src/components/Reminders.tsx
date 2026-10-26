@@ -114,7 +114,13 @@ export function Reminders({
             </ContextHelp>
           )}
         </div>
-        {!settings && <Link to="/settings#reminders">Manage</Link>}
+        {!settings && (
+          <Link to="/settings#reminders">
+            {reminders.length > 4
+              ? `Manage · ${reminders.length - 4} more`
+              : "Manage"}
+          </Link>
+        )}
       </div>
       {settings && (
         <>
@@ -182,12 +188,6 @@ export function Reminders({
       )}
       {!reminders.length && settings && (
         <p className="muted">No reminders due.</p>
-      )}
-      {!settings && reminders.length > 4 && (
-        <Link to="/settings#reminders">
-          {reminders.length - 4} more reminder
-          {reminders.length - 4 === 1 ? "" : "s"}
-        </Link>
       )}
       {notice && (
         <Toast

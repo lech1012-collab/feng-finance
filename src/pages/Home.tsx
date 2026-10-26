@@ -19,7 +19,7 @@ import { db } from "../storage/database";
 import { auditedMutation, undoChange } from "../storage/audit";
 import { SegmentedControl, StatusChip } from "../components/UIPrimitives";
 import { loadDemo } from "../storage/demo";
-import { monthBounds, monthLabel, monthOffset } from "../domain/dates";
+import { monthBounds, monthOffset } from "../domain/dates";
 import { displayDate, displayMerchant } from "../domain/presentation";
 import { cashFlow, categorySpending } from "../analytics/calculations";
 import { verifiedStatements } from "../analytics/coverage";
@@ -316,6 +316,12 @@ export default function Home({
       ).complete,
   );
   const insight = insights.items[0];
+  const insightContent = insight && (
+    <>
+      <strong>{insight.title}</strong>
+      <span>{insight.detail}</span>
+    </>
+  );
   const health = homeDataHealth(data.settings, today);
   const sortHref = "/transactions?uncategorized=1&allDates=1&sort=1";
   const attentionCount = data.toReview - data.uncategorized;
@@ -327,15 +333,6 @@ export default function Home({
     ...(attentionCount > 0 ? [{ kind: "attention", account: undefined }] : []),
     ...(coverage.pendingTransfers > 0
       ? [{ kind: "transfers", account: undefined }]
-      : []),
-    ...(missingAccounts.length
-      ? [
-          {
-            kind: "import",
-            account:
-              missingAccounts.length === 1 ? missingAccounts[0] : undefined,
-          },
-        ]
       : []),
     ...(subscriptions.length
       ? [{ kind: "subscriptions", account: undefined }]
@@ -387,11 +384,6 @@ export default function Home({
           {location.state.automaticallyLinkedCount > 0 && (
             <Link to="/transactions?type=transfer&allDates=1">
               Review linked transfers
-            </Link>
-          )}
-          {data.uncategorized > 0 && (
-            <Link className="button primary" to={sortHref}>
-              Sort now
             </Link>
           )}
         </div>
@@ -654,64 +646,40 @@ export default function Home({
           <div className="section-heading">
             <h2>To do</h2>
           </div>
-          {todo.map((item) =>
-            item.kind === "import" ? (
-              <ImportButton className="home-todo" key="import-accounts">
-                <span>
-                  {item.account ? (
-                    <>
-                      Import {item.account.displayName} for {monthLabel(month)}
-                    </>
-                  ) : (
-                    <>
-                      <strong>
-                        Update {missingAccounts.length} account
-                        {missingAccounts.length === 1 ? "" : "s"}
-                      </strong>
-                      <small>
-                        {missingAccounts.map((a) => a.displayName).join(" · ")}{" "}
-                        · {monthLabel(month)}
-                      </small>
-                    </>
-                  )}
-                </span>
+          {todo.map((item) => (
+            <Link
+              className="home-todo"
+              key={item.kind}
+              to={
+                item.kind === "sort"
+                  ? sortHref
+                  : item.kind === "attention"
+                    ? "/transactions?review=1&attention=1&allDates=1"
+                    : item.kind === "transfers"
+                      ? "/transactions?transfers=1&allDates=1"
+                      : "/subscriptions"
+              }
+            >
+              <span>
+                {item.kind === "sort"
+                  ? `Categorise ${data.uncategorized} transaction${data.uncategorized === 1 ? "" : "s"}`
+                  : item.kind === "attention"
+                    ? `${attentionCount} transaction${attentionCount === 1 ? " needs" : "s need"} attention`
+                    : item.kind === "transfers"
+                      ? `${coverage.pendingTransfers} transfer${coverage.pendingTransfers === 1 ? "" : "s"} to confirm`
+                      : `${subscriptions.length} recurring charge${subscriptions.length === 1 ? "" : "s"} to review`}
+              </span>
+              {item.kind === "sort" ? (
+                <strong>Start</strong>
+              ) : (
                 <ChevronRight size={18} />
-              </ImportButton>
-            ) : (
-              <Link
-                className="home-todo"
-                key={item.kind}
-                to={
-                  item.kind === "sort"
-                    ? sortHref
-                    : item.kind === "attention"
-                      ? "/transactions?review=1&attention=1&allDates=1"
-                      : item.kind === "transfers"
-                        ? "/transactions?transfers=1&allDates=1"
-                        : "/subscriptions"
-                }
-              >
-                <span>
-                  {item.kind === "sort"
-                    ? `Categorise ${data.uncategorized} transaction${data.uncategorized === 1 ? "" : "s"}`
-                    : item.kind === "attention"
-                      ? `${attentionCount} transaction${attentionCount === 1 ? " needs" : "s need"} attention`
-                      : item.kind === "transfers"
-                        ? `${coverage.pendingTransfers} transfer${coverage.pendingTransfers === 1 ? "" : "s"} to confirm`
-                        : `${subscriptions.length} recurring charge${subscriptions.length === 1 ? "" : "s"} to review`}
-                </span>
-                {item.kind === "sort" ? (
-                  <strong>Start</strong>
-                ) : (
-                  <ChevronRight size={18} />
-                )}
-              </Link>
-            ),
-          )}
+              )}
+            </Link>
+          ))}
         </section>
       )}
 
-      {todo.length === 0 && (
+      {todo.length === 0 && missingAccounts.length === 0 && (
         <section className="card home-todos">
           <h2>All sorted</h2>
           <Link to={`/review?month=${month}`} className="button">
@@ -742,48 +710,50 @@ export default function Home({
             },
           ]}
         />
-        {categories.length ? (
-          categories.slice(0, 5).map((category) => (
-            <Link
-              key={category.id}
-              className={`category-row${category.id === "uncategorized" ? " category-uncategorized" : ""}`}
-              to={
-                category.id === "uncategorized"
-                  ? "/transactions?uncategorized=1&allDates=1"
-                  : `/categories/${category.id}?month=${month}`
-              }
-            >
-              <div className="category-meta">
-                <span>{category.name}</span>
-                <strong>
-                  {money(category.amount, currency)}{" "}
-                  <small>
-                    {share === "income"
-                      ? coverage.hasIncomeSource && flow.income > 0
-                        ? `${((category.amount / flow.income) * 100).toFixed(1)}%`
-                        : "Unavailable"
-                      : `${Math.round(category.percent)}%`}
-                  </small>
-                </strong>
-              </div>
-              <div className="bar-track">
-                <div
-                  style={{
-                    width: `${Math.min(100, share === "income" ? (coverage.hasIncomeSource && flow.income > 0 ? (category.amount / flow.income) * 100 : 0) : category.percent)}%`,
-                    background: category.color,
-                  }}
-                />
-              </div>
-            </Link>
-          ))
+        {categories.some((category) => category.id !== "uncategorized") ? (
+          categories
+            .filter((category) => category.id !== "uncategorized")
+            .slice(0, 5)
+            .map((category) => (
+              <Link
+                key={category.id}
+                className="category-row"
+                to={`/categories/${category.id}?month=${month}`}
+              >
+                <div className="category-meta">
+                  <span>{category.name}</span>
+                  <strong>
+                    {money(category.amount, currency)}{" "}
+                    <small>
+                      {share === "income"
+                        ? coverage.hasIncomeSource && flow.income > 0
+                          ? `${((category.amount / flow.income) * 100).toFixed(1)}%`
+                          : "Unavailable"
+                        : `${Math.round(category.percent)}%`}
+                    </small>
+                  </strong>
+                </div>
+                <div className="bar-track">
+                  <div
+                    style={{
+                      width: `${Math.min(100, share === "income" ? (coverage.hasIncomeSource && flow.income > 0 ? (category.amount / flow.income) * 100 : 0) : category.percent)}%`,
+                      background: category.color,
+                    }}
+                  />
+                </div>
+              </Link>
+            ))
         ) : (
           <p className="muted">
-            {coverage.hasData
-              ? "No spending for this month."
-              : "Import statements to see spending."}
+            {categories.length > 0
+              ? "Categorise transactions to see spending by category."
+              : coverage.hasData
+                ? "No spending for this month."
+                : "Import statements to see spending."}
           </p>
         )}
-        {categories.length > 5 && (
+        {categories.filter((category) => category.id !== "uncategorized")
+          .length > 5 && (
           <Link className="review-link" to="/analysis#category-spending">
             All categories <ChevronRight size={16} />
           </Link>
@@ -821,10 +791,10 @@ export default function Home({
                 )}
               </ContextHelp>
             </div>
-            <Link to="/planning">Planning</Link>
+            <Link to="/planning?tab=pots">View pots</Link>
           </div>
           {potSummary.items.slice(0, 3).map(({ pot, progress, partial }) => (
-            <Link className="insight-row" key={pot.id} to="/planning?tab=pots">
+            <div className="insight-row" key={pot.id}>
               <span>
                 {pot.name}
                 <small>
@@ -838,7 +808,7 @@ export default function Home({
                 / {money(pot.targetMinor, pot.currency)}
                 {partial ? "*" : ""}
               </strong>
-            </Link>
+            </div>
           ))}
         </section>
       )}
@@ -902,7 +872,7 @@ export default function Home({
                 )}
               </ContextHelp>
             </div>
-            <Link to="/planning">Planning</Link>
+            <Link to="/planning?tab=forecast">View forecast</Link>
           </div>
           <p className="muted">Next 30 days · Estimated</p>
           {forecast.reason && (
@@ -970,13 +940,15 @@ export default function Home({
                 </p>
               </ContextHelp>
             </div>
-            <Link to="/analysis">Analyse</Link>
           </div>
           {insight ? (
-            <Link className="financial-insight" to={insight.href}>
-              <strong>{insight.title}</strong>
-              <span>{insight.detail}</span>
-            </Link>
+            insight.href === "/subscriptions" && subscriptions.length > 0 ? (
+              <div className="financial-insight">{insightContent}</div>
+            ) : (
+              <Link className="financial-insight" to={insight.href}>
+                {insightContent}
+              </Link>
+            )
           ) : (
             <p>
               {categories[0].name} is {Math.round(categories[0].percent)}% of{" "}

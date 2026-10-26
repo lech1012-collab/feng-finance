@@ -251,7 +251,6 @@ function PositionSnapshot({
             )}
           </ContextHelp>
         </div>
-        <Link to="/accounts">Accounts</Link>
       </div>
       <span
         className={`coverage-chip ${complete ? "coverage-complete" : "coverage-partial"}`}
@@ -288,7 +287,7 @@ function PositionSnapshot({
               : `${converted ? "≈ " : ""}${money(cardDebt, currency)}${cards.every((i) => i.reliable) ? "" : "*"}`}
           </strong>
         </Link>
-        <Link to={"/accounts"}>
+        <div className="position-net-worth">
           <span>Net worth</span>
           <strong
             className={
@@ -301,7 +300,7 @@ function PositionSnapshot({
               ? "Unavailable"
               : `${converted ? "≈ " : ""}${money(total, currency)}${complete ? "" : "*"}`}
           </strong>
-        </Link>
+        </div>
       </div>
       {comparable && (
         <p className="balance-change">
