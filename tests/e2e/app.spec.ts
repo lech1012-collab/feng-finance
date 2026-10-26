@@ -2435,10 +2435,11 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   await expect(
     page.getByRole("heading", { name: "Your accounts", exact: true }),
   ).toHaveCount(0);
-  await page
-    .locator(".category-row")
-    .filter({ hasText: "Uncategorised" })
-    .click();
+  const uncategorisedShortcut = page.locator(
+    '.categories-card a[href="#/transactions?uncategorized=1&allDates=1"]',
+  );
+  await expect(uncategorisedShortcut).toHaveCount(1);
+  await uncategorisedShortcut.click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
