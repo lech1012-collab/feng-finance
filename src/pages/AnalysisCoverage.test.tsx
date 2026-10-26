@@ -211,7 +211,7 @@ it("includes unverified recorded months and explains the two-month minimum for s
   ).toHaveTextContent("£3,000.00");
   fireEvent.click(
     screen.getByRole("button", {
-      name: "About monthly averages and variation",
+      name: "About this category comparison",
     }),
   );
   expect(
@@ -231,7 +231,7 @@ it("shows an available one-month mean while explaining why sample deviation need
   expect(container.querySelector(".category-range")).not.toBeInTheDocument();
   fireEvent.click(
     screen.getByRole("button", {
-      name: "About monthly averages and variation",
+      name: "About this category comparison",
     }),
   );
   expect(

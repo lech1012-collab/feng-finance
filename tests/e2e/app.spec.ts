@@ -2265,7 +2265,7 @@ test("category overview, income shares, central Home navigation and page palette
   expect(await palette()).not.toBe(home);
   await page.getByRole("button", { name: "12 months", exact: true }).click();
   await page
-    .getByRole("button", { name: "About monthly averages and variation" })
+    .getByRole("button", { name: "About this category comparison" })
     .click();
   await expect(page.getByText(/Sample standard deviation:/)).toBeVisible();
   for (const width of [320, 390, 768]) {
@@ -2276,9 +2276,7 @@ test("category overview, income shares, central Home navigation and page palette
       ),
     ).toBe(true);
   }
-  await page
-    .getByRole("button", { name: "Close Monthly average and variation" })
-    .click();
+  await page.getByRole("button", { name: "Close Category comparison" }).click();
   await page
     .getByRole("link", { name: "View all transactions", exact: true })
     .click();

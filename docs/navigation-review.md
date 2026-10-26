@@ -20,6 +20,9 @@ navigation, source evidence and accessible chart values serve separate needs.
 | Monthly review / Changes     | Keeps one Review subscription changes action; individual price-change summaries no longer repeat the same destination.                                                                                        |
 | Reminder summary             | One Manage link includes the hidden reminder count; removes the second “more reminders” link.                                                                                                                 |
 
+Category analysis also keeps one comparison-help symbol beside Monthly average.
+The repeated symbol opening identical help beside the trend is removed.
+
 ## Page and component audit
 
 Reviewed 38 rendered routes using fictitious demo data, plus conditional actions
