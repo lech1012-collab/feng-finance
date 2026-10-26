@@ -63,8 +63,15 @@ it("reports missing history without zero values and lets a user inspect a hatche
   expect(rows[2]).toHaveTextContent("Complete");
   expect(within(rows[2]).getAllByText("£0.00")).toHaveLength(3);
   expect(container.querySelectorAll("rect[data-series]")).toHaveLength(0);
-  fireEvent.click(screen.getByRole("button", { name: "Aug: No statements" }));
-  expect(screen.getByRole("status")).toHaveTextContent("Aug: No statements");
+  fireEvent.keyDown(screen.getByRole("slider", { name: "Inspect cash flow" }), {
+    key: "Home",
+  });
+  const reading = screen.getByRole("group", {
+    name: "Selected cash flow values",
+  });
+  expect(reading).toHaveTextContent("August 2026");
+  expect(reading).toHaveTextContent("No statements");
+  expect(reading).not.toHaveTextContent("£0.00");
 });
 
 it("renders positive SVG dimensions with spending below zero and income above it", () => {
@@ -203,7 +210,7 @@ it("keeps card-only partial income and net unavailable in the accessible values"
     screen.queryByText("* Partial month · from imported accounts only."),
   ).not.toBeInTheDocument();
   fireEvent.click(
-    screen.getByRole("button", { name: "Cash flow chart explained" }),
+    screen.getByRole("button", { name: /Cash flow chart explained$/ }),
   );
   expect(
     screen.getByText("* Partial month · from imported accounts only."),
@@ -239,11 +246,61 @@ it("identifies unverified contributions while showing the same partial totals as
     ),
   ).not.toBeInTheDocument();
   fireEvent.click(
-    screen.getByRole("button", { name: "Cash flow chart explained" }),
+    screen.getByRole("button", { name: /Cash flow chart explained$/ }),
   );
   expect(
     screen.getByText(
       "Statements with incomplete date or balance verification are included in partial months. Comparisons need verified dates and balances.",
     ),
   ).toBeVisible();
+});
+
+it("keeps signed readings above an unobscured chart while keyboard selection moves and persists", () => {
+  const { container } = render(
+    <CashChart
+      currency="GBP"
+      showValues={false}
+      data={[
+        {
+          month: "2026-08",
+          label: "Aug",
+          income: 10000,
+          expenses: 12000,
+          net: -2000,
+          coverage: coverage("Complete"),
+        },
+        {
+          month: "2026-09",
+          label: "Sep",
+          income: 0,
+          expenses: 5000,
+          net: -5000,
+          coverage: coverage("Partial"),
+        },
+      ]}
+    />,
+  );
+  const inspector = screen.getByRole("slider", { name: "Inspect cash flow" });
+  const readout = screen.getByRole("group", {
+    name: "Selected cash flow values",
+  });
+  expect(
+    readout.compareDocumentPosition(inspector) &
+      Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  fireEvent.keyDown(inspector, { key: "Home" });
+  expect(inspector).toHaveAttribute(
+    "aria-valuetext",
+    expect.stringContaining("August 2026"),
+  );
+  expect(readout).toHaveTextContent("Spending−£120.00");
+  expect(readout).toHaveTextContent("Net−£20.00");
+  fireEvent.keyDown(inspector, { key: "ArrowRight" });
+  expect(readout).toHaveTextContent("September 2026");
+  expect(readout).toHaveTextContent("Income£0.00");
+  expect(readout).toHaveTextContent("Net−£50.00");
+  fireEvent.pointerLeave(inspector);
+  expect(readout).toHaveTextContent("September 2026");
+  expect(container.querySelector(".recharts-tooltip-wrapper")).toBeNull();
+  expect(container.querySelector(".chart-selection-marker")).not.toBeNull();
 });

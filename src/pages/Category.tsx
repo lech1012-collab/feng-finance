@@ -1,6 +1,11 @@
 import { reportingPeriodLabel } from "../domain/period";
 import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
 import { ContextHelp } from "../components/ContextHelp";
+import {
+  ChartInspector,
+  ChartSelectionMarker,
+  type ChartReading,
+} from "../components/ChartInspector";
 import { useState } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -10,7 +15,6 @@ import {
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
   ReferenceArea,
   ReferenceLine,
   Cell,
@@ -110,6 +114,30 @@ export default function CategoryPage({
   const isProperty = id === "property";
   const categoryColor = category?.color ?? "var(--chart-expense)";
   const gapHeight = Math.max(1, ...series.map((point) => point.amount ?? 0));
+  const chartReadings: ChartReading[] = series.map((point) => ({
+    key: point.month,
+    label: monthLabel(point.month),
+    status: point.coverage.status,
+    to: transactionUrl(point.month),
+    values: [
+      {
+        label: stats.incomeCategory ? "Income" : "Spending",
+        text:
+          point.amount === null ? "Unavailable" : money(point.amount, currency),
+        raw: point.amount,
+        mark: false,
+      },
+      {
+        label: "Of income",
+        text:
+          !point.incomeCoverage.hasIncomeSource ||
+          point.incomeCoverage.missingRates > 0 ||
+          point.incomePercent === undefined
+            ? "Unavailable"
+            : `${point.incomePercent.toFixed(1)}%`,
+      },
+    ],
+  }));
   const comparisonHelp = (
     <>
       <h3>Average and monthly variation</h3>
@@ -134,11 +162,12 @@ export default function CategoryPage({
       </p>
       <h3>Reading the chart</h3>
       <p>
-        Tap a bar or use View values to inspect a month's transactions. The
-        chart shows {window} previous month{window === 1 ? "" : "s"} and the
-        selected month. The dashed line shows the monthly average. The shaded
-        band shows one standard deviation below and above it, describing past
-        variation rather than a budget or prediction.
+        Tap or drag across the chart to inspect a month. Tap the month in the
+        readout above, or use View values, to open its transactions. The chart
+        shows {window} previous month{window === 1 ? "" : "s"} and the selected
+        month. The dashed line shows the monthly average. The shaded band shows
+        one standard deviation below and above it, describing past variation
+        rather than a budget or prediction.
       </p>
       <ul>
         <li>Faded bars are partial months and still count in the average.</li>
@@ -453,115 +482,133 @@ export default function CategoryPage({
           </p>
         )}
         <h2>{stats.incomeCategory ? "Income" : "Spending"} over time</h2>
-        <div
-          role="img"
-          aria-label={`${name} monthly trend with recorded average and variation`}
+        <ChartInspector
+          readings={chartReadings}
+          label={`${name} monthly trend`}
+          readoutLabel="Selected category values"
+          help={{
+            title: "Selected month coverage",
+            content: (reading) => {
+              const point = series.find((item) => item.month === reading.key);
+              return (
+                <>
+                  <p>
+                    {reading.label}: {reading.status}.
+                  </p>
+                  {point?.unavailableReason && <p>{point.unavailableReason}</p>}
+                  {!!point?.coverage.reasons.length && (
+                    <ul>
+                      {point.coverage.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  )}
+                  <p>
+                    Figures use recorded transactions for this month. Partial
+                    totals may change when more statements are imported. Income
+                    share uses this month's recorded income.
+                  </p>
+                </>
+              );
+            },
+          }}
         >
-          <ResponsiveContainer width="100%" height={260}>
-            <ComposedChart
-              data={series.map((point) => ({
-                ...point,
-                gap: point.amount === null ? gapHeight : null,
-              }))}
-              margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
+          {(selectedIndex) => (
+            <div
+              role="img"
+              aria-label={`${name} monthly trend with recorded average and variation`}
             >
-              <defs>
-                <pattern
-                  id="category-no-statements"
-                  width="8"
-                  height="8"
-                  patternUnits="userSpaceOnUse"
+              <ResponsiveContainer width="100%" height={260}>
+                <ComposedChart
+                  accessibilityLayer={false}
+                  data={series.map((point) => ({
+                    ...point,
+                    gap: point.amount === null ? gapHeight : null,
+                  }))}
+                  margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
                 >
-                  <path
-                    d="M-2 2L2-2M0 8L8 0M6 10L10 6"
-                    stroke="var(--muted)"
-                    strokeWidth="1"
-                    opacity=".45"
+                  <defs>
+                    <pattern
+                      id="category-no-statements"
+                      width="8"
+                      height="8"
+                      patternUnits="userSpaceOnUse"
+                    >
+                      <path
+                        d="M-2 2L2-2M0 8L8 0M6 10L10 6"
+                        stroke="var(--muted)"
+                        strokeWidth="1"
+                        opacity=".45"
+                      />
+                    </pattern>
+                  </defs>
+                  <XAxis
+                    dataKey="month"
+                    tickFormatter={(m) => monthLabel(String(m)).slice(0, 3)}
+                    tick={{
+                      fill: "var(--muted)",
+                      fontSize: chartTickFontSize(chartRem),
+                    }}
+                    interval="preserveStartEnd"
+                    minTickGap={12}
                   />
-                </pattern>
-              </defs>
-              <XAxis
-                dataKey="month"
-                tickFormatter={(m) => monthLabel(String(m)).slice(0, 3)}
-                tick={{
-                  fill: "var(--muted)",
-                  fontSize: chartTickFontSize(chartRem),
-                }}
-                interval="preserveStartEnd"
-                minTickGap={12}
-              />
-              <YAxis
-                width={Math.max(60, Math.round(chartRem * 3.75))}
-                tickFormatter={(v) => compactMoney(Number(v), currency)}
-                tick={{
-                  fill: "var(--muted)",
-                  fontSize: chartTickFontSize(chartRem),
-                }}
-              />
-              <Tooltip
-                labelFormatter={(label) => monthLabel(String(label))}
-                formatter={(v, label, entry) =>
-                  label === "No statements"
-                    ? [
-                        String(
-                          entry.payload?.unavailableReason ??
-                            "No recorded category data",
-                        ),
-                        "",
-                      ]
-                    : money(Number(v), currency)
-                }
-                contentStyle={{
-                  background: "var(--surface)",
-                  border: "1px solid var(--line)",
-                  color: "var(--ink)",
-                }}
-              />
-              {stats.mean !== undefined && stats.std !== undefined && (
-                <ReferenceArea
-                  y1={Math.max(0, stats.mean - stats.std)}
-                  y2={stats.mean + stats.std}
-                  fill={categoryColor}
-                  fillOpacity={0.12}
-                  ifOverflow="extendDomain"
-                />
-              )}
-              {stats.mean !== undefined && (
-                <ReferenceLine
-                  y={stats.mean}
-                  stroke="var(--muted)"
-                  strokeDasharray="5 4"
-                  ifOverflow="extendDomain"
-                />
-              )}
-              <Bar
-                name="No statements"
-                dataKey="gap"
-                fill="url(#category-no-statements)"
-                maxBarSize={28}
-                isAnimationActive={false}
-              />
-              <Bar
-                name={stats.incomeCategory ? "Income" : "Spending"}
-                dataKey="amount"
-                fill={categoryColor}
-                maxBarSize={28}
-                isAnimationActive={false}
-                onClick={(_data, index) => {
-                  const point = series[index];
-                  if (point) location.hash = transactionUrl(point.month);
-                }}
-              >
-                {series.map((point) => (
-                  <Cell
-                    key={point.month}
-                    fillOpacity={point.coverage.complete ? 1 : 0.55}
+                  <YAxis
+                    width={Math.max(60, Math.round(chartRem * 3.75))}
+                    tickFormatter={(v) => compactMoney(Number(v), currency)}
+                    tick={{
+                      fill: "var(--muted)",
+                      fontSize: chartTickFontSize(chartRem),
+                    }}
                   />
-                ))}
-              </Bar>
-            </ComposedChart>
-          </ResponsiveContainer>
-        </div>
+                  {stats.mean !== undefined && stats.std !== undefined && (
+                    <ReferenceArea
+                      y1={Math.max(0, stats.mean - stats.std)}
+                      y2={stats.mean + stats.std}
+                      fill={categoryColor}
+                      fillOpacity={0.12}
+                      ifOverflow="extendDomain"
+                    />
+                  )}
+                  {stats.mean !== undefined && (
+                    <ReferenceLine
+                      y={stats.mean}
+                      stroke="var(--muted)"
+                      strokeDasharray="5 4"
+                      ifOverflow="extendDomain"
+                    />
+                  )}
+                  <Bar
+                    name="No statements"
+                    dataKey="gap"
+                    fill="url(#category-no-statements)"
+                    maxBarSize={28}
+                    isAnimationActive={false}
+                  />
+                  <Bar
+                    name={stats.incomeCategory ? "Income" : "Spending"}
+                    dataKey="amount"
+                    fill={categoryColor}
+                    maxBarSize={28}
+                    isAnimationActive={false}
+                  >
+                    {series.map((point, index) => (
+                      <Cell
+                        key={point.month}
+                        fillOpacity={point.coverage.complete ? 1 : 0.55}
+                        stroke={index === selectedIndex ? "var(--ink)" : "none"}
+                        strokeWidth={1.5}
+                      />
+                    ))}
+                  </Bar>
+                  <ChartSelectionMarker
+                    readings={chartReadings}
+                    index={selectedIndex}
+                  />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+        </ChartInspector>
         <details>
           <summary>View values</summary>
           <div className="category-months">

@@ -75,7 +75,8 @@ decisions. Already categorised rule matches need no second review. See
 Explanations open from nearby question-mark controls. Non-blocking warning
 details open from warning symbols beside concise statuses. Help works offline;
 required decisions, source data and corrective actions stay directly available.
-See the [contextual-help UX review and handoff](docs/contextual-help-ux-plan.md).
+See the [contextual-help UX review and handoff](docs/contextual-help-ux-plan.md)
+and the [chart inspection interaction](docs/chart-inspection-ux.md).
 The [navigation review](docs/navigation-review.md) records the removal of duplicate
 actions and the distinct drilldowns kept on each page.
 

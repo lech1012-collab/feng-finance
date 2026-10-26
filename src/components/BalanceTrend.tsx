@@ -26,6 +26,11 @@ import { ImportButton } from "./ImportPicker";
 import { SegmentedControl } from "./UIPrimitives";
 import { useRootFontSize } from "./useRootFontSize";
 import { ContextHelp } from "./ContextHelp";
+import {
+  ChartReadout,
+  useChartInteraction,
+  type ChartReading,
+} from "./ChartInspector";
 import "./BalanceTrend.css";
 
 export interface BalanceTrendProps {
@@ -156,8 +161,7 @@ export function BalanceTrend(props: BalanceTrendProps) {
           points.findLastIndex((p) => p.value !== null),
         );
   const inspected = points[selectedIndex];
-  const plot = useRef<HTMLDivElement>(null),
-    dragging = useRef(false);
+  const plot = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(300);
   const font = useRootFontSize(),
     height = Math.max(204, font * 12);
@@ -231,7 +235,7 @@ export function BalanceTrend(props: BalanceTrendProps) {
       gap.end < summary.latest.date,
   );
   const gap = internalGaps[0];
-  const choosePoint = (clientX: number) => {
+  const indexAt = (clientX: number) => {
     const bounds = plot.current?.getBoundingClientRect();
     if (!bounds) return;
     const fraction = Math.max(
@@ -241,70 +245,102 @@ export function BalanceTrend(props: BalanceTrendProps) {
         (clientX - bounds.left - gutter) / Math.max(1, right - gutter),
       ),
     );
-    setInspection({
-      context: inspectionContext,
-      index: Math.round(fraction * (points.length - 1)),
-    });
+    return Math.round(fraction * (points.length - 1));
   };
+  const interaction = useChartInteraction({
+    count: points.length,
+    index: selectedIndex,
+    select: (index) => setInspection({ context: inspectionContext, index }),
+    indexAt,
+  });
+  const readings: ChartReading[] = points.map((point) => ({
+    key: point.date,
+    label: dateLabel(point.date),
+    status:
+      point.value === null
+        ? "No data"
+        : point.verified
+          ? "Verified"
+          : "Unverified",
+    values: [
+      {
+        label: debt ? "Card position" : scopeName,
+        text:
+          point.value === null
+            ? "No verified balance"
+            : `${converted ? "≈ " : ""}${valueLabel(point.value, currency, debt)}`,
+      },
+    ],
+  }));
   const pointText = inspected
     ? inspected.value === null
       ? "No verified balance"
       : `${valueLabel(inspected.value, currency, debt)}${inspected.verified ? "" : " · Reported, unverified"}`
     : "No verified balance";
+  const trendHelp = (
+    <>
+      {summary.observations.length >= 2 && inspected && (
+        <p>
+          {dateLabel(inspected.date)}: {pointText}.
+        </p>
+      )}
+      <p>
+        Cash balances include current and savings accounts. Net worth subtracts
+        debts from all included assets. Verified bank transactions supply daily
+        balances; missing dates stay empty. Card summaries supply balances only
+        on their statement dates. Manual valuations step between recorded dates.
+        Transfers change account balances without counting as income or
+        spending.
+      </p>
+      {snapshotsOnly && (
+        <p>Statement dates only. No daily balance is assumed between them.</p>
+      )}
+      {hasSnapshots && !snapshotsOnly && !gap && (
+        <p>Some balances are available only on statement dates.</p>
+      )}
+      {gap && !snapshotsOnly && (
+        <p>
+          {internalGaps.length === 1
+            ? `No verified balance for ${formatDateRange(gap.start, gap.end)}.`
+            : `${internalGaps.length} gaps in this history.`}{" "}
+          Lines stop at missing dates.
+        </p>
+      )}
+      {converted && (
+        <p>
+          Values are converted to {currency} at each date. Changes can include
+          exchange-rate movements.
+        </p>
+      )}
+      {summary.latest?.verified === false && (
+        <p>
+          This is the reported balance. Check the statement before using it for
+          comparisons.
+        </p>
+      )}
+      <p>Drag to inspect a date, or use the arrow keys, Home or End.</p>
+    </>
+  );
   return (
     <section className="card balance-trend" aria-labelledby={`${id}-title`}>
       <div className="section-heading">
         <div className="context-help-heading">
           <h2 id={`${id}-title`}>Balance trend</h2>
-          <ContextHelp
-            title="Balance trend explained"
-            label="Balance trend explained"
-            tone={
-              summary.latest?.verified === false ||
-              internalGaps.length > 0 ||
-              missingFx
-                ? "warning"
-                : "help"
-            }
-          >
-            <p>
-              Cash balances include current and savings accounts. Net worth
-              subtracts debts from all included assets. Verified bank
-              transactions supply daily balances; missing dates stay empty. Card
-              summaries supply balances only on their statement dates. Manual
-              valuations step between recorded dates. Transfers change account
-              balances without counting as income or spending.
-            </p>
-            {snapshotsOnly && (
-              <p>
-                Statement dates only. No daily balance is assumed between them.
-              </p>
-            )}
-            {hasSnapshots && !snapshotsOnly && !gap && (
-              <p>Some balances are available only on statement dates.</p>
-            )}
-            {gap && !snapshotsOnly && (
-              <p>
-                {internalGaps.length === 1
-                  ? `No verified balance for ${formatDateRange(gap.start, gap.end)}.`
-                  : `${internalGaps.length} gaps in this history.`}{" "}
-                Lines stop at missing dates.
-              </p>
-            )}
-            {converted && (
-              <p>
-                Values are converted to {currency} at each date. Changes can
-                include exchange-rate movements.
-              </p>
-            )}
-            {summary.latest?.verified === false && (
-              <p>
-                This is the reported balance. Check the statement before using
-                it for comparisons.
-              </p>
-            )}
-            <p>Drag to inspect a date, or use the arrow keys, Home or End.</p>
-          </ContextHelp>
+          {summary.observations.length < 2 && (
+            <ContextHelp
+              title="Balance trend explained"
+              label="Balance trend explained"
+              tone={
+                summary.latest?.verified === false ||
+                internalGaps.length > 0 ||
+                missingFx
+                  ? "warning"
+                  : "help"
+              }
+            >
+              {trendHelp}
+            </ContextHelp>
+          )}
         </div>
         {!showRanges && summary.observations.length >= 2 && (
           <span className="muted">
@@ -395,6 +431,16 @@ export function BalanceTrend(props: BalanceTrendProps) {
       )}
       {summary.observations.length >= 2 && (
         <>
+          <ChartReadout
+            readings={readings}
+            index={selectedIndex}
+            label="Selected balance values"
+            className="balance-trend-readout"
+            help={{
+              title: "Balance trend explained",
+              content: () => trendHelp,
+            }}
+          />
           <div
             ref={plot}
             className="balance-trend-plot"
@@ -406,36 +452,7 @@ export function BalanceTrend(props: BalanceTrendProps) {
             aria-valuenow={selectedIndex}
             aria-valuetext={`${inspected ? dateLabel(inspected.date) : ""}: ${pointText}`}
             aria-describedby={`${id}-interaction`}
-            onKeyDown={(e) => {
-              const index =
-                e.key === "Home"
-                  ? 0
-                  : e.key === "End"
-                    ? points.length - 1
-                    : e.key === "ArrowLeft" || e.key === "ArrowDown"
-                      ? Math.max(0, selectedIndex - 1)
-                      : e.key === "ArrowRight" || e.key === "ArrowUp"
-                        ? Math.min(points.length - 1, selectedIndex + 1)
-                        : undefined;
-              if (index !== undefined) {
-                e.preventDefault();
-                setInspection({ context: inspectionContext, index });
-              }
-            }}
-            onPointerDown={(e) => {
-              dragging.current = true;
-              e.currentTarget.setPointerCapture?.(e.pointerId);
-              choosePoint(e.clientX);
-            }}
-            onPointerMove={(e) => {
-              if (dragging.current) choosePoint(e.clientX);
-            }}
-            onPointerUp={() => {
-              dragging.current = false;
-            }}
-            onPointerCancel={() => {
-              dragging.current = false;
-            }}
+            {...interaction}
           >
             <svg
               className="position-history"
@@ -518,8 +535,12 @@ export function BalanceTrend(props: BalanceTrendProps) {
                     </circle>
                   ))}
               </g>
-              {inspection?.context === inspectionContext && inspected && (
-                <g aria-hidden="true">
+              {inspected && (
+                <g
+                  className="chart-selection-marker"
+                  data-selected-key={inspected.date}
+                  aria-hidden="true"
+                >
                   <line
                     x1={x(inspected.date)}
                     x2={x(inspected.date)}
@@ -550,15 +571,6 @@ export function BalanceTrend(props: BalanceTrendProps) {
                 </text>
               ))}
             </svg>
-          </div>
-          <div className="balance-trend-readout" aria-live="off">
-            <time dateTime={inspected?.date}>
-              {inspected && dateLabel(inspected.date)}
-            </time>
-            <strong>
-              {converted && inspected?.value !== null ? "≈ " : ""}
-              {pointText}
-            </strong>
           </div>
           <p id={`${id}-interaction`} className="sr-only">
             Drag to inspect a date. Keyboard: use the arrow keys, Home or End.
