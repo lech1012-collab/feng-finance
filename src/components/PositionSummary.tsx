@@ -222,41 +222,35 @@ function PositionSnapshot({
   return (
     <section className="card position-summary">
       <div className="section-heading">
-        <div className="context-help-heading">
-          <h2>Where you stand</h2>
-          <ContextHelp
-            title="Your financial position explained"
-            label="Your financial position explained"
-            tone={complete ? "help" : "warning"}
-          >
+        <h2>Where you stand</h2>
+        <ContextHelp
+          title="Your financial position explained"
+          label="Your financial position explained"
+          tone={complete ? "help" : "warning"}
+          triggerText={complete ? "Verified balances" : "Partial or unverified"}
+        >
+          <p>
+            Cash includes current and savings balances. Card debt shows the
+            amount owed on imported liability accounts. Net worth combines all
+            included assets and debts.
+          </p>
+          <p>
+            Figures use the latest dated balance available for each account.
+            Asterisks mark missing, stale or unverified balances.
+          </p>
+          {!complete && (
+            <p>Missing or stale balances. Net worth is withheld.</p>
+          )}
+          {setAside !== undefined && setAside > 0 && (
+            <p>Pots set aside part of your cash; they do not reduce it.</p>
+          )}
+          {converted && (
             <p>
-              Cash includes current and savings balances. Card debt shows the
-              amount owed on imported liability accounts. Net worth combines all
-              included assets and debts.
+              ≈ marks balances converted to {currency} for the selected date.
             </p>
-            <p>
-              Figures use the latest dated balance available for each account.
-              Asterisks mark missing, stale or unverified balances.
-            </p>
-            {!complete && (
-              <p>Missing or stale balances. Net worth is withheld.</p>
-            )}
-            {setAside !== undefined && setAside > 0 && (
-              <p>Pots set aside part of your cash; they do not reduce it.</p>
-            )}
-            {converted && (
-              <p>
-                ≈ marks balances converted to {currency} for the selected date.
-              </p>
-            )}
-          </ContextHelp>
-        </div>
+          )}
+        </ContextHelp>
       </div>
-      <span
-        className={`coverage-chip ${complete ? "coverage-complete" : "coverage-partial"}`}
-      >
-        {complete ? "Verified balances" : "Partial or unverified"}
-      </span>
       <div className="position-metrics">
         <Link to="/transactions?allDates=1&accountScope=cash">
           <span>Cash</span>

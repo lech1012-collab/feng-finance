@@ -64,3 +64,7 @@ explanation, replacing the separate warning/help icon. The status remains
 visible, has a 44 px minimum touch target, supports keyboard activation and
 returns focus when the explanation closes. Financial figures, coverage checks
 and comparison rules are unchanged.
+
+The Where you stand card follows the same pattern: Partial or unverified and
+Verified balances open its existing position explanation. It no longer repeats
+the same information through a separate warning/help icon.

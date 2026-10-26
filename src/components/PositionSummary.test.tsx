@@ -86,7 +86,9 @@ it("shows dated card debt but leaves cash and net position unavailable when no c
     screen.queryByText("Missing or stale balances. Net worth is withheld."),
   ).not.toBeInTheDocument();
   fireEvent.click(
-    screen.getByRole("button", { name: "Your financial position explained" }),
+    screen.getByRole("button", {
+      name: "Partial or unverified: Your financial position explained",
+    }),
   );
   expect(
     screen.getByText("Missing or stale balances. Net worth is withheld."),

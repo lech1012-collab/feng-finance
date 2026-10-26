@@ -14,7 +14,7 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-26",
   points: [
-    "Tap the status on Home’s This month card for coverage details; the separate warning icon is removed.",
+    "Home’s financial cards open their explanations from the visible status, without a separate warning icon.",
   ],
   pleaseTest: [
     "Tap Partial on Home, close the explanation and check that your figures stay unchanged.",

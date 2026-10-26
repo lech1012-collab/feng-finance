@@ -106,9 +106,9 @@ async function seedPartialAccounts(page: Page) {
   );
   await page.reload();
   await page.getByLabel("Selected month").fill("2026-09");
-  await expect(page.locator(".position-summary .coverage-chip")).toContainText(
-    "Partial or unverified",
-  );
+  await expect(
+    page.locator(".position-summary .context-help-status-trigger"),
+  ).toContainText("Partial or unverified");
 }
 
 test("UX trust: partial card imports show debt, unknown cash/income and no invented net", async ({
