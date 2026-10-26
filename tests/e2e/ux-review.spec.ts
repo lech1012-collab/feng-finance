@@ -182,6 +182,7 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
         trigger.evaluate((button) => getComputedStyle(button).outlineStyle),
       )
       .toBe("none");
+    await expect(trigger).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
   }
   await expect(
     page

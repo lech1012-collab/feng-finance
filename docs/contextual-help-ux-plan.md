@@ -336,3 +336,6 @@ the app. Keyboard input immediately restores the normal focus styles. Text-entry
 fields keep their editing indicator, and selected states and warning borders are
 unchanged. The tracker captures events even inside shortcut-isolating editors;
 it stores no preference or financial data.
+
+Help controls keep a transparent outer background so sticky hover after a tap
+does not resemble an additional ring around the icon or badge.

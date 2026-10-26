@@ -41,7 +41,7 @@ button.context-help-trigger {
 }
 button.context-help-trigger:hover {
   color: var(--ink);
-  background: var(--surface-raised, var(--surface));
+  background: transparent;
 }
 button.context-help-trigger:focus-visible,
 button.context-help-status-trigger:focus-visible {
@@ -53,6 +53,9 @@ button.context-help-status-trigger {
   border-radius: 999px;
   cursor: pointer;
   touch-action: manipulation;
+}
+button.context-help-status-trigger:hover {
+  background: transparent;
 }
 .context-help-status-trigger .ui-chip-visual {
   max-inline-size: 100%;
