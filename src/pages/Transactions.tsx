@@ -24,7 +24,14 @@ import {
 } from "../analytics/refund-impact";
 import { markTransactionsReviewed } from "../storage/accuracy";
 import { undoChange } from "../storage/audit";
-import { useState, useMemo, useRef, useEffect, type MouseEvent } from "react";
+import {
+  useState,
+  useMemo,
+  useRef,
+  useEffect,
+  type MouseEvent,
+  type CSSProperties,
+} from "react";
 import { financialType } from "../domain/transaction-type";
 import {
   matchesTransactionCategory,
@@ -1342,30 +1349,21 @@ export default function Transactions({
                   </StatusChip>
                 )}
                 {t.kind !== "split_parent" && t.kind !== "refund" && (
-                  <StatusChip
-                    tone={
-                      !(
-                        t.categoryId ||
-                        t.subcategoryId ||
-                        financialType(t) === "transfer"
-                      )
-                        ? "warning"
-                        : "neutral"
-                    }
-                    className={`transaction-status ${financialType(t) === "transfer" ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
-                  >
-                    <span
-                      className="category-dot"
-                      style={{
-                        backgroundColor:
+                  <span
+                    className={`transaction-status activity-category-label ${financialType(t) === "transfer" ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+                    style={
+                      {
+                        "--activity-label-color":
                           financialType(t) === "transfer"
                             ? "var(--chart-transfer)"
-                            : t.categoryId
-                              ? categoryColor(t.categoryId)
-                              : "transparent",
-                      }}
-                      aria-hidden="true"
-                    />
+                            : t.categoryId || t.subcategoryId
+                              ? categoryColor(
+                                  (t.categoryId ?? t.subcategoryId)!,
+                                )
+                              : "var(--warning-ink, #ffd179)",
+                      } as CSSProperties
+                    }
+                  >
                     {financialType(t) === "transfer"
                       ? "Transfer"
                       : t.categoryId || t.subcategoryId
@@ -1373,7 +1371,7 @@ export default function Transactions({
                             (c) => c.id === (t.categoryId ?? t.subcategoryId),
                           )?.name ?? "Category unavailable")
                         : "Needs category"}
-                  </StatusChip>
+                  </span>
                 )}
                 {t.categorySource && (
                   <small className="transaction-origin">
