@@ -1,0 +1,22 @@
+/* A restored pointer focus is not a persistent selection. Text-entry fields
+   keep their normal editing indicator; keyboard focus styles stay unchanged. */
+:root[data-focus-modality="pointer"]
+  :focus-visible:not(
+    input,
+    textarea,
+    select,
+    [contenteditable],
+    [role="textbox"]
+  ) {
+  outline: 0;
+}
+:root[data-focus-modality="pointer"]
+  :is(
+    input[type="checkbox"],
+    input[type="radio"],
+    input[type="file"],
+    .file-button,
+    .tag-chip-target
+  ):focus-within {
+  outline: 0;
+}

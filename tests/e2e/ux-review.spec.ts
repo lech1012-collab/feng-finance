@@ -113,6 +113,7 @@ async function seedPartialAccounts(page: Page) {
 
 test("UX trust: partial card imports show debt, unknown cash/income and no invented net", async ({
   page,
+  isMobile,
 }) => {
   await seedPartialAccounts(page);
   const position = page.locator(".position-metrics");
@@ -154,10 +155,35 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
   await expect(
     page.getByRole("dialog", { name: "This month explained" }),
   ).toContainText("From imported accounts only");
-  await page
-    .getByRole("button", { name: "Close This month explained" })
-    .click();
+  await page.keyboard.press("Escape");
   await expect(coverageDetails).toBeFocused();
+  expect(
+    await coverageDetails.evaluate((button) =>
+      parseFloat(getComputedStyle(button).outlineWidth),
+    ),
+  ).toBeGreaterThan(0);
+  for (const [trigger, title] of [
+    [coverageDetails, "This month explained"],
+    [
+      page.getByRole("button", {
+        name: "Partial or unverified: Your financial position explained",
+      }),
+      "Your financial position explained",
+    ],
+  ] as const) {
+    if (isMobile) await trigger.tap();
+    else await trigger.click();
+    const close = page.getByRole("button", { name: `Close ${title}` });
+    if (isMobile) await close.tap();
+    else await close.click();
+    await expect(trigger).toBeFocused();
+    await expect
+      .poll(() =>
+        trigger.evaluate((button) => getComputedStyle(button).outlineStyle),
+      )
+      .toBe("none");
+    await expect(trigger).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  }
   await expect(
     page
       .getByRole("link", { name: /accounts/i })
