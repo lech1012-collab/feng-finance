@@ -14,13 +14,11 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-26",
   points: [
-    "Home has one account overview link, with cash and card debt keeping their filtered transaction views.",
-    "Pots, recurring price changes and reminders have one clear action instead of repeated links.",
-    "Home keeps a single monthly import action and a single uncategorised count in its spending card.",
+    "Activity category names use their category colour as plain text, without a dot or surrounding pill.",
+    "Category labels wrap on small screens and keep readable contrast in light mode.",
   ],
   pleaseTest: [
-    "Tap the account count on Home, then check that Cash and Card debt still open the right transactions.",
-    "Open pots and recurring price changes from their single review links.",
+    "Check category labels in Activity on your phone and switch between light and dark appearance.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -28,6 +26,21 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.26",
+    date: "2026-10-26",
+    points: [
+      "Home has one account overview link, with cash and card debt keeping their filtered transaction views.",
+      "Pots, recurring price changes and reminders have one clear action instead of repeated links.",
+      "Home keeps a single monthly import action and a single uncategorised count in its spending card.",
+    ],
+    pleaseTest: [
+      "Tap the account count on Home, then check that Cash and Card debt still open the right transactions.",
+      "Open pots and recurring price changes from their single review links.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.25",
     date: "2026-10-25",

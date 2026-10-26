@@ -476,6 +476,22 @@ time {
   max-width: 100%;
   white-space: normal;
 }
+.app .transaction-description .activity-category-label {
+  display: inline;
+  border: 0;
+  border-radius: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--activity-label-color);
+  font-weight: 600;
+  white-space: normal;
+}
+:root[data-theme="light"]
+  .app
+  .transaction-description
+  .activity-category-label {
+  color: color-mix(in srgb, var(--activity-label-color) 50%, #101217);
+}
 .app .calendar-grid {
   min-width: max(356px, calc(19.25rem + 48px));
 }
