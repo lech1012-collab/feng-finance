@@ -1,5 +1,4 @@
 import { chartTickFontSize, useRootFontSize } from "./useRootFontSize";
-import { StatusChip } from "./UIPrimitives";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -7,14 +6,18 @@ import {
   Line,
   XAxis,
   YAxis,
-  Tooltip,
   CartesianGrid,
   ReferenceLine,
   ReferenceArea,
 } from "recharts";
 import { useEffect, useId, useState, type ReactNode } from "react";
-import { ContextHelp } from "./ContextHelp";
-import { compactMoney, money, currencyPrecision } from "../domain/money";
+import { compactMoney, money } from "../domain/money";
+import { monthLabel } from "../domain/dates";
+import {
+  ChartInspector,
+  ChartSelectionMarker,
+  type ChartReading,
+} from "./ChartInspector";
 import type { MonthCoverage } from "../analytics/coverage";
 
 export interface CashChartPoint {
@@ -34,13 +37,15 @@ function CashBar({
   height,
   payload,
   series,
+  selectedLabel,
 }: {
   x?: number;
   y?: number;
   width?: number;
   height?: number;
-  payload?: { opacity?: number };
+  payload?: { opacity?: number; label?: string };
   series: "income" | "expenses";
+  selectedLabel?: string;
 }) {
   if (
     typeof x !== "number" ||
@@ -57,6 +62,7 @@ function CashBar({
   return (
     <rect
       data-series={series}
+      data-selected={payload?.label === selectedLabel}
       x={width < 0 ? x + width : x}
       y={height < 0 ? y + height : y}
       width={Math.abs(width)}
@@ -66,6 +72,8 @@ function CashBar({
       }
       rx={3}
       opacity={payload?.opacity ?? 1}
+      stroke={payload?.label === selectedLabel ? "var(--ink)" : "none"}
+      strokeWidth={1.5}
     />
   );
 }
@@ -94,8 +102,6 @@ export function CashChart({
     return () => window.removeEventListener("resize", resize);
   }, []);
   const hatchId = `missing-${useId().replaceAll(":", "")}`;
-  const [selectedGap, setSelectedGap] = useState<string>();
-  const factor = 10 ** currencyPrecision(currency);
   const missing = (point: CashChartPoint) =>
     point.coverage?.status === "No data" ||
     point.coverage?.status === "Unverified" ||
@@ -113,190 +119,257 @@ export function CashChart({
           ? "No statements"
           : "Not imported"
       : money(amount, currency);
+  const readings: ChartReading[] = displayed.map((point) => ({
+    key: point.month ?? point.label,
+    x: point.label,
+    label: point.month
+      ? monthLabel(point.month)
+      : point.label.replace("Sept", "Sep"),
+    status: point.coverage?.status,
+    values: property
+      ? [
+          {
+            label: "Property net",
+            text: value(point.property, point),
+            raw: point.property,
+            color: "var(--chart-income)",
+          },
+        ]
+      : [
+          {
+            label: "Income",
+            text: value(point.income, point),
+            raw: point.income,
+            mark: false,
+            color: "var(--chart-income)",
+          },
+          {
+            label: "Spending",
+            text: value(point.expenses, point),
+            raw: point.expenses,
+            mark: false,
+            color: "var(--chart-expense)",
+          },
+          {
+            label: "Net",
+            text: value(point.net, point),
+            raw: point.net,
+            color: "var(--chart-net)",
+          },
+        ],
+  }));
   return (
     <div className="chart">
-      <div
-        role="img"
-        aria-label={
-          property
-            ? "Monthly property net cash flow chart"
-            : "Monthly income, expense and net cash flow chart"
-        }
+      <ChartInspector
+        readings={readings}
+        label={property ? "Property cash flow" : "Cash flow"}
+        help={{
+          title: property
+            ? "Property cash flow chart explained"
+            : "Cash flow chart explained",
+          content: (reading) => (
+            <>
+              <p>
+                {reading.label}: {reading.status ?? "Coverage unavailable"}.
+              </p>
+              <p>
+                {property
+                  ? "The line shows monthly net property cash flow."
+                  : "Bars show income and spending; the line shows net cash flow."}{" "}
+                Transfers are excluded. Gaps indicate missing or unverified
+                statement coverage rather than zero amounts.
+              </p>
+              {data.some((point) => point.coverage?.status === "Partial") && (
+                <p>* Partial month · from imported accounts only.</p>
+              )}
+              {data.some(
+                (point) => point.coverage?.hasUnverifiedStatements,
+              ) && (
+                <p>
+                  Statements with incomplete date or balance verification are
+                  included in partial months. Comparisons need verified dates
+                  and balances.
+                </p>
+              )}
+              {helpContent}
+
+              <p>
+                Tap or drag horizontally to select a month. The values stay
+                above the chart; the vertical line marks your selection. Swipe
+                vertically to scroll.
+              </p>
+            </>
+          ),
+        }}
       >
-        <ResponsiveContainer key={viewportWidth} width="100%" height={210}>
-          <ComposedChart
-            data={displayed}
-            margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
+        {(selectedIndex) => (
+          <div
+            role="img"
+            aria-label={
+              property
+                ? "Monthly property net cash flow chart"
+                : "Monthly income, expense and net cash flow chart"
+            }
           >
-            <defs>
-              <pattern
-                id={hatchId}
-                width="8"
-                height="8"
-                patternUnits="userSpaceOnUse"
-                patternTransform="rotate(45)"
+            <ResponsiveContainer key={viewportWidth} width="100%" height={210}>
+              <ComposedChart
+                data={displayed}
+                accessibilityLayer={false}
+                margin={{ top: 12, right: 8, left: 0, bottom: 0 }}
               >
-                <line
-                  x1="0"
-                  y1="0"
-                  x2="0"
-                  y2="8"
-                  stroke="var(--muted)"
-                  strokeWidth="1"
-                />
-              </pattern>
-            </defs>
-            <CartesianGrid vertical={false} stroke="var(--line)" />
-            {data.filter(missing).map((point, index) => (
-              <ReferenceArea
-                key={`${point.month ?? point.label}-${index}`}
-                x1={point.label.replace("Sept", "Sep")}
-                x2={point.label.replace("Sept", "Sep")}
-                fill={`url(#${hatchId})`}
-                fillOpacity={0.25}
-                stroke="none"
-                shape={(props) => {
-                  const supplied = Number(props.width) || 0;
-                  const width =
-                    supplied ||
-                    Math.min(44, Math.max(12, 240 / Math.max(data.length, 1)));
-                  return (
-                    <rect
-                      x={Number(props.x) - (supplied ? 0 : width / 2)}
-                      y={props.y}
-                      width={width}
-                      height={props.height}
-                      fill={`url(#${hatchId})`}
-                      fillOpacity={0.25}
+                <defs>
+                  <pattern
+                    id={hatchId}
+                    width="8"
+                    height="8"
+                    patternUnits="userSpaceOnUse"
+                    patternTransform="rotate(45)"
+                  >
+                    <line
+                      x1="0"
+                      y1="0"
+                      x2="0"
+                      y2="8"
+                      stroke="var(--muted)"
+                      strokeWidth="1"
                     />
-                  );
-                }}
-              />
-            ))}
-            <XAxis
-              dataKey="label"
-              interval="preserveStartEnd"
-              minTickGap={12}
-              tickLine={false}
-              axisLine={false}
-              tick={{
-                fontSize: chartTickFontSize(chartRem),
-                fill: "var(--muted)",
-              }}
-              tickFormatter={(label) => {
-                const point = data.find((item) => item.label === label);
-                const short = String(label)
-                  .replace(/\bSept\b/g, "Sep")
-                  .replace(/^([A-Za-z]{3})[a-z]+/, "$1");
-                return `${short}${point?.coverage?.status === "Partial" ? "*" : ""}`;
-              }}
-            />
-            <YAxis
-              width={Math.max(60, Math.round(chartRem * 3.75))}
-              tickLine={false}
-              axisLine={false}
-              tick={{
-                fontSize: chartTickFontSize(chartRem),
-                fill: "var(--muted)",
-              }}
-              tickFormatter={(v) => {
-                return compactMoney(Number(v), currency);
-              }}
-            />
-            <Tooltip
-              filterNull={false}
-              content={({ active, label }) => {
-                const point = displayed.find((item) => item.label === label);
-                if (!active || !point) return null;
-                return (
-                  <div className="chart-tooltip">
-                    <strong>
-                      {point.label.replace("Sept", "Sep")}
-                      {point.coverage ? ` · ${point.coverage.status}` : ""}
-                    </strong>
-                    {missing(point) ? (
-                      <p>
-                        {point.coverage?.status === "Unverified"
-                          ? "Unverified statements"
-                          : "No statements"}
-                      </p>
-                    ) : property ? (
-                      <p>Property net: {value(point.property, point)}</p>
-                    ) : (
-                      <>
-                        <p>Income: {value(point.income, point)}</p>
-                        <p>Spending: {value(point.expenses, point)}</p>
-                        <p>Net: {value(point.net, point)}</p>
-                      </>
-                    )}
-                    {point.coverage?.status === "Partial" && (
-                      <small>
-                        {point.coverage.hasUnverifiedStatements
-                          ? "Includes statements with incomplete date or balance verification; comparisons are withheld."
-                          : "From imported accounts only"}
-                      </small>
-                    )}
-                  </div>
-                );
-              }}
-            />
-            <ReferenceLine
-              y={0}
-              stroke="var(--muted)"
-              ifOverflow="extendDomain"
-            />
-            {property ? (
-              <Line
-                isAnimationActive={false}
-                name="Property net"
-                dataKey="property"
-                stroke="var(--chart-income)"
-                strokeWidth={2}
-                dot={
-                  data.filter((point) => point.property != null).length < 3
-                    ? { r: 3 }
-                    : false
-                }
-                connectNulls={false}
-              />
-            ) : (
-              <>
-                <Bar
-                  isAnimationActive={false}
-                  name="Income"
-                  dataKey="income"
-                  fill="var(--chart-income)"
-                  radius={[3, 3, 0, 0]}
-                  maxBarSize={16}
-                  shape={(props) => <CashBar {...props} series="income" />}
+                  </pattern>
+                </defs>
+                <CartesianGrid vertical={false} stroke="var(--line)" />
+                {data.filter(missing).map((point, index) => (
+                  <ReferenceArea
+                    key={`${point.month ?? point.label}-${index}`}
+                    x1={point.label}
+                    x2={point.label}
+                    fill={`url(#${hatchId})`}
+                    fillOpacity={0.25}
+                    stroke="none"
+                    shape={(props) => {
+                      const supplied = Number(props.width) || 0;
+                      const width =
+                        supplied ||
+                        Math.min(
+                          44,
+                          Math.max(12, 240 / Math.max(data.length, 1)),
+                        );
+                      return (
+                        <rect
+                          x={Number(props.x) - (supplied ? 0 : width / 2)}
+                          y={props.y}
+                          width={width}
+                          height={props.height}
+                          fill={`url(#${hatchId})`}
+                          fillOpacity={0.25}
+                        />
+                      );
+                    }}
+                  />
+                ))}
+                <XAxis
+                  dataKey="label"
+                  interval="preserveStartEnd"
+                  minTickGap={12}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
+                  tickFormatter={(label) => {
+                    const point = data.find((item) => item.label === label);
+                    const short = String(label)
+                      .replace(/\bSept\b/g, "Sep")
+                      .replace(/^([A-Za-z]{3})[a-z]+/, "$1");
+                    return `${short}${point?.coverage?.status === "Partial" ? "*" : ""}`;
+                  }}
                 />
-                <Bar
-                  isAnimationActive={false}
-                  name="Expenses"
-                  dataKey="expenses"
-                  fill="var(--chart-expense)"
-                  radius={[0, 0, 3, 3]}
-                  maxBarSize={16}
-                  shape={(props) => <CashBar {...props} series="expenses" />}
+                <YAxis
+                  width={Math.max(60, Math.round(chartRem * 3.75))}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{
+                    fontSize: chartTickFontSize(chartRem),
+                    fill: "var(--muted)",
+                  }}
+                  tickFormatter={(v) => {
+                    return compactMoney(Number(v), currency);
+                  }}
                 />
-                <Line
-                  isAnimationActive={false}
-                  name="Net cash flow"
-                  dataKey="net"
-                  stroke="var(--chart-net)"
-                  strokeWidth={2}
-                  dot={
-                    data.filter((point) => point.net !== null).length < 3
-                      ? { r: 3 }
-                      : false
-                  }
-                  connectNulls={false}
+                <ReferenceLine
+                  y={0}
+                  stroke="var(--muted)"
+                  ifOverflow="extendDomain"
                 />
-              </>
-            )}
-          </ComposedChart>
-        </ResponsiveContainer>
-      </div>
+                {property ? (
+                  <Line
+                    isAnimationActive={false}
+                    name="Property net"
+                    dataKey="property"
+                    stroke="var(--chart-income)"
+                    strokeWidth={2}
+                    dot={
+                      data.filter((point) => point.property != null).length < 3
+                        ? { r: 3 }
+                        : false
+                    }
+                    connectNulls={false}
+                  />
+                ) : (
+                  <>
+                    <Bar
+                      isAnimationActive={false}
+                      name="Income"
+                      dataKey="income"
+                      fill="var(--chart-income)"
+                      radius={[3, 3, 0, 0]}
+                      maxBarSize={16}
+                      shape={(props) => (
+                        <CashBar
+                          {...props}
+                          series="income"
+                          selectedLabel={displayed[selectedIndex]?.label}
+                        />
+                      )}
+                    />
+                    <Bar
+                      isAnimationActive={false}
+                      name="Expenses"
+                      dataKey="expenses"
+                      fill="var(--chart-expense)"
+                      radius={[0, 0, 3, 3]}
+                      maxBarSize={16}
+                      shape={(props) => (
+                        <CashBar
+                          {...props}
+                          series="expenses"
+                          selectedLabel={displayed[selectedIndex]?.label}
+                        />
+                      )}
+                    />
+                    <Line
+                      isAnimationActive={false}
+                      name="Net cash flow"
+                      dataKey="net"
+                      stroke="var(--chart-net)"
+                      strokeWidth={2}
+                      dot={
+                        data.filter((point) => point.net !== null).length < 3
+                          ? { r: 3 }
+                          : false
+                      }
+                      connectNulls={false}
+                    />
+                  </>
+                )}
+                <ChartSelectionMarker
+                  readings={readings}
+                  index={selectedIndex}
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </ChartInspector>
       <div className="chart-legend">
         {property ? (
           <span>Property net cash flow</span>
@@ -316,96 +389,7 @@ export function CashChart({
             </span>
           </>
         )}
-        <ContextHelp
-          title={
-            property
-              ? "Property cash flow chart explained"
-              : "Cash flow chart explained"
-          }
-          label={
-            property
-              ? "Property cash flow chart explained"
-              : "Cash flow chart explained"
-          }
-          tone={
-            data.some((point) => point.coverage && !point.coverage.complete)
-              ? "warning"
-              : "help"
-          }
-        >
-          <p>
-            {property
-              ? "The line shows monthly net property cash flow."
-              : "Bars show income and spending; the line shows net cash flow."}{" "}
-            Transfers are excluded. Gaps indicate missing or unverified
-            statement coverage rather than zero amounts.
-          </p>
-          {data.some((point) => point.coverage?.status === "Partial") && (
-            <p>* Partial month · from imported accounts only.</p>
-          )}
-          {data.some((point) => point.coverage?.hasUnverifiedStatements) && (
-            <p>
-              Statements with incomplete date or balance verification are
-              included in partial months. Comparisons need verified dates and
-              balances.
-            </p>
-          )}
-          {helpContent}
-        </ContextHelp>
       </div>
-      {data.some((point) => point.coverage) && (
-        <>
-          <div
-            className="chart-coverage"
-            role="group"
-            aria-label="Monthly statement coverage"
-          >
-            {data.map((point, index) =>
-              missing(point) ? (
-                <StatusChip
-                  tone="warning"
-                  className="chart-month-gap"
-                  key={index}
-                  ariaLabel={`${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`}
-                  onClick={() =>
-                    setSelectedGap(
-                      `${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Unverified" ? "Unverified statements" : "No statements"}`,
-                    )
-                  }
-                >
-                  {point.label.replace("Sept", "Sep")}
-                </StatusChip>
-              ) : (
-                <StatusChip
-                  key={index}
-                  ariaLabel={`${point.label.replace("Sept", "Sep")}: ${point.coverage?.status ?? "Imported statements"}`}
-                  tone={
-                    point.coverage?.status === "Partial" ? "warning" : "neutral"
-                  }
-                  onClick={() =>
-                    setSelectedGap(
-                      `${point.label.replace("Sept", "Sep")}: ${point.coverage?.status === "Partial" ? "Partial month, from imported accounts only." : point.coverage?.status === "Complete" ? "Complete statement coverage." : "Coverage unavailable."}`,
-                    )
-                  }
-                  className={
-                    point.coverage?.status === "Partial"
-                      ? "chart-month-partial"
-                      : ""
-                  }
-                >
-                  {point.label.replace("Sept", "Sep")}
-                  {point.coverage?.status === "Partial" ? "*" : ""}
-                </StatusChip>
-              ),
-            )}
-          </div>
-          {selectedGap && (
-            <p className="chart-coverage-note" role="status">
-              {selectedGap}
-            </p>
-          )}
-        </>
-      )}
       {showValues && (
         <details className="chart-data">
           <summary>View chart values</summary>

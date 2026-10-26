@@ -203,7 +203,7 @@ it("automatically finds a useful range for card snapshots without drawing an inv
     screen.queryByText(/No daily balance is assumed between them/),
   ).not.toBeInTheDocument();
   fireEvent.click(
-    screen.getByRole("button", { name: "Balance trend explained" }),
+    screen.getByRole("button", { name: /Balance trend explained$/ }),
   );
   expect(
     screen.getByText(/No daily balance is assumed between them/),

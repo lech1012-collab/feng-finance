@@ -230,12 +230,15 @@ test("UX trust: missing months are accessible gaps instead of zero-valued cash f
 }) => {
   await seedPartialAccounts(page);
   const homeFlow = page.locator(".flow-card");
-  const missing = homeFlow.getByRole("button", {
-    name: "Apr: No statements",
-    exact: true,
+  const inspector = homeFlow.getByRole("slider", { name: "Inspect cash flow" });
+  await inspector.focus();
+  await inspector.press("Home");
+  const reading = homeFlow.getByRole("group", {
+    name: "Selected cash flow values",
   });
-  await missing.click();
-  await expect(homeFlow.getByRole("status")).toHaveText("Apr: No statements");
+  await expect(reading).toContainText("April 2026");
+  await expect(reading).toContainText("No statements");
+  await expect(reading).not.toContainText("£0.00");
   await expect(homeFlow.locator('svg pattern[id^="missing-"]')).toHaveCount(1);
   await page.goto("/#/analysis");
   await page

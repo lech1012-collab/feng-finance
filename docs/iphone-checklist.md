@@ -109,3 +109,19 @@ The seven browser setups and the screenshots in `FINAL-POLISH-REPORT.md` are aut
 - [ ] Verify the real keyboard and home indicator do not hide the final date field, transaction row, toast Undo or sheet footer.
 - [ ] Compare a small iPhone, a large iPhone and a desktop; record any chart, light-theme or 200%-text issue.
 - [ ] Review a recurring same-bill/separate-bills choice and Undo without changing original imported amounts.
+
+## Chart inspection
+
+- On Home, tap a month in Cash flow and drag horizontally. The readout stays
+  above the plot, with a visible vertical selection line and highlighted bars.
+- Lift your finger and move away: the selected month remains visible.
+- Start a vertical swipe over the plot: the page scrolls and the selected month
+  stays unchanged. Check diagonal swipes and pinch zoom in iPhone Safari.
+- Tap Partial in the readout, close its explanation and resume inspection.
+- In a category, inspect several months and tap the month above the plot to
+  open its transactions. Verify income share and missing-data wording.
+- Inspect a balance date, including a gap. Its value stays above the chart;
+  missing or unverified dates do not become zero or joined line segments.
+- Repeat in light/dark appearance, portrait/landscape and enlarged text.
+- With an external keyboard or VoiceOver, verify the named adjustable chart,
+  arrow keys, Home/End and access to the values table/source links.

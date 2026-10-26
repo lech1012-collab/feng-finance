@@ -14,11 +14,12 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-26",
   points: [
-    "Closing a popup after a tap or click no longer leaves a focus ring around its button.",
-    "Keyboard navigation keeps visible focus indicators, and text fields keep their editing indicator.",
+    "Cash flow and category values stay above their charts while you tap or drag between months.",
+    "A visible selection line and highlighted bars or points show exactly which date you are inspecting.",
+    "Balance readings also sit above the plot, and coverage explanations open from the selected status.",
   ],
   pleaseTest: [
-    "Tap Partial or a question mark, close its explanation and check that no extra outline remains.",
+    "Drag across a chart, release your finger, then swipe vertically to scroll. Check that the reading stays selected and the chart remains visible.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -26,6 +27,19 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.29",
+    date: "2026-10-26",
+    points: [
+      "Closing a popup after a tap or click no longer leaves a focus ring around its button.",
+      "Keyboard navigation keeps visible focus indicators, and text fields keep their editing indicator.",
+    ],
+    pleaseTest: [
+      "Tap Partial or a question mark, close its explanation and check that no extra outline remains.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.28",
     date: "2026-10-26",

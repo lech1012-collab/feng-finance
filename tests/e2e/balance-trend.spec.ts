@@ -63,7 +63,10 @@ test("cash trend remains useful beside isolated card balances and supports direc
   );
   await inspector.press("End");
   await expect(card.locator(".balance-trend-readout")).toContainText(
-    "4 Oct 2026No verified balance",
+    "4 Oct 2026",
+  );
+  await expect(card.locator(".balance-trend-readout dd")).toContainText(
+    "No verified balance",
   );
   const bounds = await inspector.boundingBox();
   await page.touchscreen.tap(
@@ -77,7 +80,7 @@ test("cash trend remains useful beside isolated card balances and supports direc
     await inspector.evaluate(
       (element) => getComputedStyle(element).touchAction,
     ),
-  ).toBe("pan-y");
+  ).toBe("pan-y pinch-zoom");
   await card.getByRole("button", { name: "3 months", exact: true }).click();
   await expect(
     card.getByRole("button", { name: "3 months", exact: true }),
