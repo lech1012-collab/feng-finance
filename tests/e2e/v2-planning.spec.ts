@@ -61,9 +61,9 @@ test("manual assets, earmarked pots, debt plans and scenarios keep actual bank r
     "Account valuation saved",
   );
   await page.goto("/#/");
-  await expect(
-    page.locator(".position-metrics > a").filter({ hasText: /^Net worth/ }),
-  ).toContainText("£105,126.00");
+  await expect(page.locator(".position-net-worth")).toContainText(
+    "£105,126.00",
+  );
   await expect(cash).toContainText("£5,126.00");
   await expect(page.locator(".month-net")).toContainText("+£4,126.00");
 

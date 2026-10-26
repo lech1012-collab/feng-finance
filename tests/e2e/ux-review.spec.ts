@@ -125,9 +125,12 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
   await expect(
     position.locator("a").filter({ hasText: /^Card debt/ }),
   ).not.toContainText("−£");
+  await expect(position.locator(".position-net-worth")).toContainText(
+    "Unavailable",
+  );
   await expect(
-    position.locator("a").filter({ hasText: /^Net worth/ }),
-  ).toContainText("Unavailable");
+    page.locator('.position-summary a[href="#/accounts"]'),
+  ).toHaveCount(1);
   const monthly = page.locator(".month-summary");
   await expect(monthly.locator(".month-income")).toContainText(
     "No income source imported",

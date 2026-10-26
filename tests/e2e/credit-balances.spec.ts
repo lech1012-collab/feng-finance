@@ -77,7 +77,7 @@ async function importStatement(page: Page, name: string) {
 }
 
 function positionMetric(page: Page, label: string) {
-  return page.locator(".position-metrics > a").filter({
+  return page.locator(".position-metrics > *").filter({
     has: page.locator("span").filter({ hasText: new RegExp(`^${label}$`) }),
   });
 }
@@ -160,7 +160,7 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
     document.documentElement.style.fontSize = "200%";
   });
   const overlappingText = await page
-    .locator(".position-metrics > a")
+    .locator(".position-metrics > *")
     .evaluateAll((columns) =>
       columns.flatMap((column) => {
         const bounds = column.getBoundingClientRect();

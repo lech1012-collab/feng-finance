@@ -76,6 +76,8 @@ Explanations open from nearby question-mark controls. Non-blocking warning
 details open from warning symbols beside concise statuses. Help works offline;
 required decisions, source data and corrective actions stay directly available.
 See the [contextual-help UX review and handoff](docs/contextual-help-ux-plan.md).
+The [navigation review](docs/navigation-review.md) records the removal of duplicate
+actions and the distinct drilldowns kept on each page.
 
 Records belong to the browser or installed app where they were imported. The
 developer cannot see or recover them. Save backups outside that browser/device.

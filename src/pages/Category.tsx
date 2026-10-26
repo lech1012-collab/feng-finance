@@ -253,8 +253,8 @@ export default function CategoryPage({
           <div className="context-help-heading">
             <span>Monthly average</span>
             <ContextHelp
-              title="Monthly average and variation"
-              label="About monthly averages and variation"
+              title="Category comparison"
+              label="About this category comparison"
             >
               {comparisonHelp}
             </ContextHelp>
@@ -452,15 +452,7 @@ export default function CategoryPage({
             </span>
           </p>
         )}
-        <div className="context-help-heading">
-          <h2>{stats.incomeCategory ? "Income" : "Spending"} over time</h2>
-          <ContextHelp
-            title="Category comparison"
-            label="About this category comparison"
-          >
-            {comparisonHelp}
-          </ContextHelp>
-        </div>
+        <h2>{stats.incomeCategory ? "Income" : "Spending"} over time</h2>
         <div
           role="img"
           aria-label={`${name} monthly trend with recorded average and variation`}
