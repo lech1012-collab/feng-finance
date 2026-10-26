@@ -215,12 +215,15 @@ test("category readings reserve space at mobile text sizes and open the selected
     await inspector.scrollIntoViewIfNeeded();
     await inspector.focus();
     await inspector.press("Home");
-    const top = (await inspector.boundingBox())!.y;
+    // WebKit may scroll an enlarged, focused slider into view after a key.
+    // Measure layout in document coordinates so native viewport scrolling is
+    // not mistaken for a readout changing the plot's position in the page.
+    const documentTop = () =>
+      inspector.evaluate((plot) => plot.getBoundingClientRect().top + scrollY);
+    const top = await documentTop();
     for (let index = 1; index < 7; index++) {
       await inspector.press("ArrowRight");
-      expect(
-        Math.abs((await inspector.boundingBox())!.y - top),
-      ).toBeLessThanOrEqual(1);
+      expect(Math.abs((await documentTop()) - top)).toBeLessThanOrEqual(1);
     }
     await expect
       .poll(() =>
@@ -233,6 +236,21 @@ test("category readings reserve space at mobile text sizes and open the selected
     await expect(readout).toContainText("£2,000.00");
     await expect(readout).toContainText("66.7%");
     await expect(chart.locator(".recharts-tooltip-wrapper")).toHaveCount(0);
+
+    // A pointer drag must also keep the plot fixed within the viewport. This
+    // catches real movement beneath the finger at every width/text size.
+    await inspector.scrollIntoViewIfNeeded();
+    const pointerTop = (await inspector.boundingBox())!.y;
+    const points = await coordinates(inspector);
+    await page.mouse.move(points.xs[0], points.y);
+    await page.mouse.down();
+    await page.mouse.move(points.xs[4], points.y, { steps: 8 });
+    await page.mouse.up();
+    expect(
+      Math.abs((await inspector.boundingBox())!.y - pointerTop),
+    ).toBeLessThanOrEqual(1);
+    expect(Math.abs((await documentTop()) - top)).toBeLessThanOrEqual(1);
+    await expect(readout).toHaveAttribute("data-selected-key", "2026-08");
   }
   await inspector.press("Home");
   await inspector.press("ArrowRight");
