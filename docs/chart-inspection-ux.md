@@ -1,4 +1,4 @@
-# Chart inspection — 2.2.30
+# Chart inspection — 2.2.30–2.2.31
 
 The former cash-flow tooltip put several values and a long verification warning
 on top of the plot. On an iPhone it hid both the data and the position selected
@@ -43,3 +43,7 @@ states, selection persistence, marker placement, native Chromium touch scrolling
 WebKit taps/drag handling, readout stability at enlarged text sizes, category
 source navigation, accessibility and unchanged financial records. Real iPhone
 Safari/VoiceOver checks remain in the [manual checklist](iphone-checklist.md).
+
+Cross-year and tax-year cash-flow ranges add the year when month names repeat.
+The chart axis, selection marker, coverage gaps, selected bars and values table
+use these distinct labels, while the underlying amounts and month keys stay unchanged.
