@@ -70,6 +70,7 @@ async function savedRows(page: Page) {
 test("comparison explanations and warnings open on demand offline, with readable mobile layouts and unchanged figures", async ({
   page,
   context,
+  isMobile,
 }) => {
   const data = categoryHistoryFixture();
   for (const statement of data.statements)
@@ -133,6 +134,24 @@ test("comparison explanations and warnings open on demand offline, with readable
   await page.keyboard.press("Escape");
   await expect(help).toHaveCount(0);
   await expect(trigger).toBeFocused();
+  expect(
+    await trigger.evaluate((button) =>
+      parseFloat(getComputedStyle(button).outlineWidth),
+    ),
+  ).toBeGreaterThan(0);
+  if (isMobile) await trigger.tap();
+  else await trigger.click();
+  const closeHelp = page.getByRole("button", {
+    name: "Close Category comparison",
+  });
+  if (isMobile) await closeHelp.tap();
+  else await closeHelp.click();
+  await expect(trigger).toBeFocused();
+  await expect
+    .poll(() =>
+      trigger.evaluate((button) => getComputedStyle(button).outlineStyle),
+    )
+    .toBe("none");
   await page
     .getByRole("button", { name: "About partial category history" })
     .click();

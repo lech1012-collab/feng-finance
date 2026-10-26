@@ -14,10 +14,11 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-26",
   points: [
-    "Home’s financial cards open their explanations from the visible status, without a separate warning icon.",
+    "Closing a popup after a tap or click no longer leaves a focus ring around its button.",
+    "Keyboard navigation keeps visible focus indicators, and text fields keep their editing indicator.",
   ],
   pleaseTest: [
-    "Tap Partial on Home, close the explanation and check that your figures stay unchanged.",
+    "Tap Partial or a question mark, close its explanation and check that no extra outline remains.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -25,6 +26,18 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.28",
+    date: "2026-10-26",
+    points: [
+      "Home’s financial cards open their explanations from the visible status, without a separate warning icon.",
+    ],
+    pleaseTest: [
+      "Tap Partial on Home, close the explanation and check that your figures stay unchanged.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.27",
     date: "2026-10-26",

@@ -325,3 +325,14 @@ financial records. Existing chart/statistics and mobile financial safeguards
 remain regression-tested. Full repository verification runs in CI before
 deployment. No physical iPhone or VoiceOver session is claimed; use the
 [manual device checklist](iphone-checklist.md) for those checks.
+
+## Pointer focus after closing a popup
+
+Keep the opener focused when a popup closes so keyboard and assistive-technology
+users keep their place. Safari can nevertheless paint a focus ring after a tap
+because the native dialog moved focus programmatically. A shared, in-memory
+input-modality tracker suppresses control outlines after pointer input throughout
+the app. Keyboard input immediately restores the normal focus styles. Text-entry
+fields keep their editing indicator, and selected states and warning borders are
+unchanged. The tracker captures events even inside shortcut-isolating editors;
+it stores no preference or financial data.

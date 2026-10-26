@@ -1,8 +1,13 @@
 import { createRoot } from "react-dom/client";
 import App from "./App";
+import { trackFocusModality } from "./components/focus-modality";
 import "./styles.css";
 import "./ux-review.css";
 import "./final-polish.css";
+import "./focus-modality.css";
+
+const stopTrackingFocusModality = trackFocusModality(document);
+import.meta.hot?.dispose(stopTrackingFocusModality);
 try {
   const preference =
     localStorage.getItem("feng-theme-preference") ??
