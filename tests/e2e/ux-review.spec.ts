@@ -106,9 +106,9 @@ async function seedPartialAccounts(page: Page) {
   );
   await page.reload();
   await page.getByLabel("Selected month").fill("2026-09");
-  await expect(page.locator(".position-summary .coverage-chip")).toContainText(
-    "Partial or unverified",
-  );
+  await expect(
+    page.locator(".position-summary .context-help-status-trigger"),
+  ).toContainText("Partial or unverified");
 }
 
 test("UX trust: partial card imports show debt, unknown cash/income and no invented net", async ({
@@ -143,13 +143,21 @@ test("UX trust: partial card imports show debt, unknown cash/income and no inven
     "vs previous month",
   );
   await expect(monthly.getByText("Partial", { exact: true })).toBeVisible();
-  await monthly.getByRole("button", { name: "This month explained" }).click();
+  const coverageDetails = monthly.getByRole("button", {
+    name: "Partial: This month explained",
+  });
+  await expect(coverageDetails).toHaveText("Partial");
+  await expect(monthly.locator(".section-heading button")).toHaveCount(1);
+  await expect(coverageDetails.locator("svg")).toHaveCount(0);
+  await coverageDetails.focus();
+  await page.keyboard.press("Enter");
   await expect(
     page.getByRole("dialog", { name: "This month explained" }),
   ).toContainText("From imported accounts only");
   await page
     .getByRole("button", { name: "Close This month explained" })
     .click();
+  await expect(coverageDetails).toBeFocused();
   await expect(
     page
       .getByRole("link", { name: /accounts/i })

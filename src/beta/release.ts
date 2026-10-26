@@ -14,11 +14,10 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-10-26",
   points: [
-    "Activity category names use their category colour as plain text, without a dot or surrounding pill.",
-    "Category labels wrap on small screens and keep readable contrast in light mode.",
+    "Home’s financial cards open their explanations from the visible status, without a separate warning icon.",
   ],
   pleaseTest: [
-    "Check category labels in Activity on your phone and switch between light and dark appearance.",
+    "Tap Partial on Home, close the explanation and check that your figures stay unchanged.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -26,6 +25,19 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.27",
+    date: "2026-10-26",
+    points: [
+      "Activity category names use their category colour as plain text, without a dot or surrounding pill.",
+      "Category labels wrap on small screens and keep readable contrast in light mode.",
+    ],
+    pleaseTest: [
+      "Check category labels in Activity on your phone and switch between light and dark appearance.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.26",
     date: "2026-10-26",

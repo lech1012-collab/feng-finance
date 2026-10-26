@@ -17,7 +17,7 @@ import { MonthPicker } from "../components/common";
 import { CashChart } from "../components/Chart";
 import { db } from "../storage/database";
 import { auditedMutation, undoChange } from "../storage/audit";
-import { SegmentedControl, StatusChip } from "../components/UIPrimitives";
+import { SegmentedControl } from "../components/UIPrimitives";
 import { loadDemo } from "../storage/demo";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { displayDate, displayMerchant } from "../domain/presentation";
@@ -484,46 +484,41 @@ export default function Home({
 
       <section className="card month-summary">
         <div className="section-heading">
-          <div className="context-help-heading">
-            <h2>This month</h2>
-            <ContextHelp
-              title="This month explained"
-              label="This month explained"
-              tone={coverage.complete ? "help" : "warning"}
-            >
+          <h2>This month</h2>
+          <ContextHelp
+            title="This month explained"
+            label="This month explained"
+            tone={coverage.complete ? "help" : "warning"}
+            triggerText={coverage.status}
+          >
+            <p>
+              Income, spending and net cash flow use the selected reporting
+              period. Transfers and card repayments are excluded. Refunds are
+              counted in the original purchase months.
+            </p>
+            {!coverage.complete && coverage.hasData && (
               <p>
-                Income, spending and net cash flow use the selected reporting
-                period. Transfers and card repayments are excluded. Refunds are
-                counted in the original purchase months.
+                From imported accounts only. Asterisks mark incomplete coverage.
               </p>
-              {!coverage.complete && coverage.hasData && (
-                <p>
-                  From imported accounts only. Asterisks mark incomplete
-                  coverage.
-                </p>
-              )}
-              {coverage.hasUnverifiedStatements && (
-                <p>
-                  Monthly history is not fully verified. Statement dates or
-                  balances prevent a reliable comparison.
-                </p>
-              )}
-              {(!coverage.complete || !previousCoverage.complete) && (
-                <p>
-                  {`Not comparable yet: ${monthName} ${coverage.complete ? "needs a complete previous month" : coverage.hasUnverifiedStatements ? "unverified" : "incomplete"}.`}
-                </p>
-              )}
-              {!!projection.converted && (
-                <p>
-                  ≈ Converted using transaction-date exchange rates. Original
-                  amounts remain in each transaction.
-                </p>
-              )}
-            </ContextHelp>
-          </div>
-          <StatusChip tone={coverage.complete ? "complete" : "warning"}>
-            {coverage.status}
-          </StatusChip>
+            )}
+            {coverage.hasUnverifiedStatements && (
+              <p>
+                Monthly history is not fully verified. Statement dates or
+                balances prevent a reliable comparison.
+              </p>
+            )}
+            {(!coverage.complete || !previousCoverage.complete) && (
+              <p>
+                {`Not comparable yet: ${monthName} ${coverage.complete ? "needs a complete previous month" : coverage.hasUnverifiedStatements ? "unverified" : "incomplete"}.`}
+              </p>
+            )}
+            {!!projection.converted && (
+              <p>
+                ≈ Converted using transaction-date exchange rates. Original
+                amounts remain in each transaction.
+              </p>
+            )}
+          </ContextHelp>
         </div>
         <div className="month-figures">
           <Link to={flowHref("income")} className="month-income">

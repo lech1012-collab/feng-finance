@@ -43,9 +43,24 @@ button.context-help-trigger:hover {
   color: var(--ink);
   background: var(--surface-raised, var(--surface));
 }
-button.context-help-trigger:focus-visible {
+button.context-help-trigger:focus-visible,
+button.context-help-status-trigger:focus-visible {
   outline: 3px solid var(--accent);
   outline-offset: 2px;
+}
+button.context-help-status-trigger {
+  max-inline-size: 100%;
+  border-radius: 999px;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+.context-help-status-trigger .ui-chip-visual {
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+button.context-help-status-trigger:hover .ui-chip-visual {
+  background: var(--surface-raised, var(--surface));
 }
 button.context-help-trigger--warning {
   color: var(--warning, var(--ink));

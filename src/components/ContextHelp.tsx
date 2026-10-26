@@ -9,6 +9,7 @@ import {
 import { createPortal } from "react-dom";
 import { CircleHelp, TriangleAlert } from "lucide-react";
 import { Sheet } from "./Sheet";
+import "./ui-primitives.css";
 import "./context-help.css";
 
 function containModalFocus(event: KeyboardEvent<HTMLDivElement>) {
@@ -43,12 +44,15 @@ export function ContextHelp({
   title,
   label = `About ${title}`,
   tone = "help",
+  triggerText,
   children,
   className = "",
 }: {
   title: string;
   label?: string;
   tone?: "help" | "warning";
+  /** A visible status replaces the help icon, keeping a single entry point. */
+  triggerText?: string;
   children: ReactNode;
   className?: string;
 }) {
@@ -112,8 +116,8 @@ export function ContextHelp({
       <button
         ref={trigger}
         type="button"
-        className={`context-help-trigger context-help-trigger--${tone} ${className}`.trim()}
-        aria-label={label}
+        className={`${triggerText ? "ui-chip-target context-help-status-trigger" : `context-help-trigger context-help-trigger--${tone}`} ${className}`.trim()}
+        aria-label={triggerText ? `${triggerText}: ${label}` : label}
         aria-haspopup={inlineHost ? undefined : "dialog"}
         aria-expanded={open}
         aria-controls={id}
@@ -126,7 +130,15 @@ export function ContextHelp({
           setOpen((value) => !value);
         }}
       >
-        <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+        {triggerText ? (
+          <span
+            className={`ui-chip-visual ui-chip-visual--${tone === "warning" ? "warning" : "complete"}`}
+          >
+            {triggerText}
+          </span>
+        ) : (
+          <Icon size={20} strokeWidth={1.8} aria-hidden="true" />
+        )}
       </button>
       {open &&
         (inlineHost
