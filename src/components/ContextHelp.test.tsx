@@ -65,20 +65,23 @@ it("keeps optional explanations off the page and returns focus after closing hel
   expect(trigger).toHaveFocus();
 });
 
-it("keeps warning details available through a named warning control", () => {
+it("opens warning details from the visible status without a separate warning icon", () => {
   render(
     <ContextHelp
       title="Partial history"
       tone="warning"
       label="Why spending is partial"
+      triggerText="Partial"
     >
       <p>More statements may change this total.</p>
     </ContextHelp>,
   );
   const trigger = screen.getByRole("button", {
-    name: "Why spending is partial",
+    name: "Partial: Why spending is partial",
   });
-  expect(trigger).toHaveClass("context-help-trigger--warning");
+  expect(trigger).toHaveTextContent("Partial");
+  expect(screen.getAllByRole("button")).toHaveLength(1);
+  expect(trigger.querySelector("svg")).toBeNull();
   fireEvent.click(trigger);
   expect(screen.getByRole("dialog", { name: "Partial history" })).toBeVisible();
   expect(screen.getByText(/More statements/)).toBeVisible();

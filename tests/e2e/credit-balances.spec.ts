@@ -146,7 +146,7 @@ test("Barclaycard issue-date balance is debt, persists, and never becomes a Sept
   await expect(
     page.locator(".month-summary").getByText("Unverified", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "This month explained" }).click();
+  await page.getByRole("button", { name: /: This month explained$/ }).click();
   await expect(
     page.getByRole("dialog", { name: "This month explained" }),
   ).toContainText("Monthly history is not fully verified");
@@ -231,7 +231,7 @@ test("Amex dates outside the period preserve reported debt while remaining unver
   await expect(
     page.locator(".month-summary").getByText("Unverified", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "This month explained" }).click();
+  await page.getByRole("button", { name: /: This month explained$/ }).click();
   await expect(
     page.getByRole("dialog", { name: "This month explained" }),
   ).toContainText("Monthly history is not fully verified");
@@ -373,7 +373,7 @@ test("a missing stored card row retains the reported balance but removes verifie
   await expect(
     page.locator(".month-summary").getByText("Partial", { exact: true }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "This month explained" }).click();
+  await page.getByRole("button", { name: /: This month explained$/ }).click();
   await expect(
     page.getByRole("dialog", { name: "This month explained" }),
   ).toContainText("Monthly history is not fully verified");

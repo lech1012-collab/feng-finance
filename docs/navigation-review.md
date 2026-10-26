@@ -55,3 +55,12 @@ Settings section.
 
 This is a presentation change. No transaction amounts, calculations, parser
 rules, IndexedDB schema or stored financial records change.
+
+## Coverage status on Home
+
+The This month card uses its visible status (Partial, Unverified, Complete or
+No data) as the single help control. It opens the existing coverage
+explanation, replacing the separate warning/help icon. The status remains
+visible, has a 44 px minimum touch target, supports keyboard activation and
+returns focus when the explanation closes. Financial figures, coverage checks
+and comparison rules are unchanged.
