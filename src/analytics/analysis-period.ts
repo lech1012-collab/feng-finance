@@ -1,5 +1,9 @@
 import type { Setting, Transaction } from "../domain/models";
-import { reportingPeriod, readPeriodStart } from "../domain/period";
+import {
+  reportingPeriod,
+  readPeriodStart,
+  periodMonth,
+} from "../domain/period";
 import { monthBounds, monthOffset } from "../domain/dates";
 
 export const shiftDate = (date: string, days: number) =>
@@ -7,15 +11,23 @@ export const shiftDate = (date: string, days: number) =>
     .toISOString()
     .slice(0, 10);
 
-export function monthsInRange(start: string, end: string) {
+export function monthsInRange(
+  start: string,
+  end: string,
+  settings: Setting[] = [],
+  transactions: Transaction[] = [],
+) {
   if (!start || !end || start >= end) return [];
+  const aligned = readPeriodStart(settings).mode !== "calendar";
+  const first = aligned
+    ? periodMonth(start, settings, transactions)
+    : start.slice(0, 7);
+  const lastDate = shiftDate(end, -1);
+  const last = aligned
+    ? periodMonth(lastDate, settings, transactions)
+    : lastDate.slice(0, 7);
   const months: string[] = [];
-  for (
-    let month = start.slice(0, 7);
-    `${month}-01` < end;
-    month = monthOffset(month, 1)
-  )
-    months.push(month);
+  for (let m = first; m <= last; m = monthOffset(m, 1)) months.push(m);
   return months;
 }
 
@@ -58,7 +70,7 @@ export function analysisPeriod(
       ? Array.from({ length: Number(period) }, (_, i) =>
           monthOffset(month, i - Number(period) + 1),
         )
-      : monthsInRange(start, end);
+      : monthsInRange(start, end, settings, transactions);
   const days = months.length
     ? (Date.parse(end) - Date.parse(start)) / 86400000
     : 0;

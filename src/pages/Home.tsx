@@ -21,6 +21,7 @@ import { SegmentedControl } from "../components/UIPrimitives";
 import { loadDemo } from "../storage/demo";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { displayDate, displayMerchant } from "../domain/presentation";
+import { financialType } from "../domain/transaction-type";
 import { cashFlow, categorySpending } from "../analytics/calculations";
 import { verifiedStatements } from "../analytics/coverage";
 import {
@@ -37,6 +38,7 @@ import { accountSnapshot } from "../analytics/balances";
 import {
   effectiveTransactions,
   needsReview,
+  isRefund,
   needsCategory,
 } from "../analytics/effective-transactions";
 import { projectedReportingTransactions } from "../analytics/fx";
@@ -243,6 +245,13 @@ export default function Home({
     currency,
   );
   const difference = flow.net - previous.net;
+  const missingCategoryRate = projection.missing.some(
+    (t) =>
+      t.date >= start &&
+      t.date < end &&
+      financialType(t) !== "transfer" &&
+      (t.amount < 0 || (share === "income" && t.amount > 0)),
+  );
   const categories = categorySpending(current, data.categories, currency);
   const excluded = excludedReportingFlows(
     data.transactions,
@@ -324,6 +333,9 @@ export default function Home({
   );
   const health = homeDataHealth(data.settings, today);
   const sortHref = "/transactions?uncategorized=1&allDates=1&sort=1";
+  const hasRefunds = data.transactions.some(
+    (t) => !t.parentId && isRefund(t) && t.date >= start && t.date < end,
+  );
   const attentionCount = data.toReview - data.uncategorized;
   const missingAccounts = data.accounts.filter((a) =>
     coverage.incompleteAccountIds.includes(a.id),
@@ -580,13 +592,11 @@ export default function Home({
             "Not comparable yet"
           )}
         </p>
-        {!!excluded.count && (
+        {(excluded.count > 0 || hasRefunds) && (
           <div className="not-counted">
             <span>Not counted:</span>
-            {data.transactions.some(
-              (t) => t.kind === "refund" && t.date >= start && t.date < end,
-            ) && (
-              <Link to={`/transactions?month=${month}&allDates=0`}>
+            {hasRefunds && (
+              <Link to={`/transactions?month=${month}&kind=refund&allDates=0`}>
                 Refunds
               </Link>
             )}
@@ -651,7 +661,7 @@ export default function Home({
                   : item.kind === "attention"
                     ? "/transactions?review=1&attention=1&allDates=1"
                     : item.kind === "transfers"
-                      ? "/transactions?transfers=1&allDates=1"
+                      ? `/transactions?transfers=1&month=${month}&allDates=0`
                       : "/subscriptions"
               }
             >
@@ -677,7 +687,11 @@ export default function Home({
       {todo.length === 0 && missingAccounts.length === 0 && (
         <section className="card home-todos">
           <h2>All sorted</h2>
-          <Link to={`/review?month=${month}`} className="button">
+          <Link
+            to={`/review?month=${month}`}
+            state={{ returnTo: "/" }}
+            className="button"
+          >
             Review month
           </Link>
         </section>
@@ -705,7 +719,15 @@ export default function Home({
             },
           ]}
         />
-        {categories.some((category) => category.id !== "uncategorized") ? (
+        {missingCategoryRate ? (
+          <p role="status">
+            Add exchange rates to see category totals and shares for this
+            period.{" "}
+            <Link to="/settings?section=currency#global-currency">
+              Review exchange rates
+            </Link>
+          </p>
+        ) : categories.some((category) => category.id !== "uncategorized") ? (
           categories
             .filter((category) => category.id !== "uncategorized")
             .slice(0, 5)
@@ -747,12 +769,16 @@ export default function Home({
                 : "Import statements to see spending."}
           </p>
         )}
-        {categories.filter((category) => category.id !== "uncategorized")
-          .length > 5 && (
-          <Link className="review-link" to="/analysis#category-spending">
-            All categories <ChevronRight size={16} />
-          </Link>
-        )}
+        {!missingCategoryRate &&
+          categories.filter((category) => category.id !== "uncategorized")
+            .length > 5 && (
+            <Link
+              className="review-link"
+              to={`/analysis?period=1&month=${month}#category-spending`}
+            >
+              All categories <ChevronRight size={16} />
+            </Link>
+          )}
         {data.uncategorized > 0 && (
           <Link
             className="review-link"

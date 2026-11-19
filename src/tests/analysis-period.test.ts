@@ -47,3 +47,22 @@ describe("shared analysis date scope", () => {
     ).toBe(false);
   });
 });
+
+it("uses the reporting month that contains each end of a custom range", () => {
+  const settings = [
+    { key: "period:start", value: JSON.stringify({ mode: "fixed", day: 25 }) },
+  ];
+  expect(
+    analysisPeriod("2026-09", "custom", "2026-09-24", "2026-09-25", settings)
+      .months,
+  ).toEqual(["2026-09", "2026-10"]);
+  expect(monthsInRange("2026-09-25", "2026-09-30", settings)).toEqual([
+    "2026-10",
+  ]);
+});
+
+it("falls back to the active month when a saved link has a malformed month", async () => {
+  const { requestedMonth } = await import("../domain/dates");
+  expect(requestedMonth("2026-13", "2026-02")).toBe("2026-02");
+  expect(requestedMonth("2026-01", "2026-02")).toBe("2026-01");
+});

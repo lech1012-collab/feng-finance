@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { accounts, transaction } from "../tests/helpers";
-import { excludedFlows, homeDataHealth, transferKind } from "./home-summary";
+import {
+  excludedReportingFlows,
+  excludedFlows,
+  homeDataHealth,
+  transferKind,
+} from "./home-summary";
 
 const moved = (id: string, accountId: string, amount: number, pair?: string) =>
   transaction({
@@ -125,4 +130,24 @@ describe("Home backup and statement review health", () => {
       ).warning,
     ).toBe(false);
   });
+});
+
+it("identifies a credit-card payment when the receiving statement starts next month", () => {
+  const outgoing = { ...moved("out", "a1", -5000, "pair"), date: "2026-09-30" };
+  const incoming = { ...moved("in", "a3", 5000, "pair"), date: "2026-10-01" };
+  for (const month of ["2026-09", "2026-10"]) {
+    const result = excludedReportingFlows(
+      [outgoing, incoming],
+      accounts,
+      month,
+      "GBP",
+      [],
+    );
+    expect(result).toMatchObject({
+      internal: 0,
+      card: 5000,
+      count: 1,
+      originals: [{ currency: "GBP", internal: 0, card: 5000 }],
+    });
+  }
 });

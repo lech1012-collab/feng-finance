@@ -1,11 +1,12 @@
 import { recurringReportingTotal } from "../analytics/subscription-summary";
+import { ImportButton } from "../components/ImportPicker";
 import { Toast } from "../components/Toast";
 import { ContextHelp } from "../components/ContextHelp";
 import { displayMerchant } from "../domain/presentation";
 import { localToday } from "../analytics/reminders";
 import { sha256 } from "../domain/normalize";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useSubscriptions } from "../components/SubscriptionNotice";
 import { useSwipe } from "../components/useSwipe";
 import {
@@ -37,6 +38,7 @@ function SubscriptionCard({
   account: string;
   onReviewed: (message: string, changeId: string) => void;
 }) {
+  const location = useLocation();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   async function save(status: SubscriptionStatus) {
@@ -277,6 +279,7 @@ function SubscriptionCard({
             .map((t) => (
               <ListRow
                 className="recurring-charge-row"
+                state={{ returnTo: location.pathname + location.search }}
                 to={`/transactions/${t.id}`}
                 key={t.id}
                 title={displayMerchant(t)}
@@ -304,9 +307,15 @@ export default function Subscriptions({ currency }: { currency: string }) {
   const [message, setMessage] = useState("");
   const [changeId, setChange] = useState(""),
     [error, setError] = useState("");
-  const [view, setView] = useState("review");
-  const [group, setGroup] = useState("subscriptions");
-  const [sort, setSort] = useState("review");
+  const [params, setParams] = useSearchParams();
+  const group = params.get("group") ?? "all";
+  const view = params.get("view") ?? "review";
+  const sort = params.get("sort") ?? "review";
+  const setFilters = (changes: Record<string, string>) => {
+    const next = new URLSearchParams(params);
+    for (const [key, value] of Object.entries(changes)) next.set(key, value);
+    setParams(next, { replace: true });
+  };
   if (!data) return <p role="status">Checking recurring charges…</p>;
   const isBill = (s: Subscription) =>
     s.charges.some((t) =>
@@ -314,8 +323,8 @@ export default function Subscriptions({ currency }: { currency: string }) {
         t.categoryId ?? "",
       ),
     );
-  const groupItems = data.items.filter((s) =>
-    group === "bills" ? isBill(s) : !isBill(s),
+  const groupItems = data.items.filter(
+    (s) => group === "all" || (group === "bills" ? isBill(s) : !isBill(s)),
   );
   const review = groupItems.filter((s) => s.needsReview);
   const plans = groupItems.filter(
@@ -346,12 +355,11 @@ export default function Subscriptions({ currency }: { currency: string }) {
     view === "all"
       ? groupItems
       : view === "cancel"
-        ? data.items.filter(
+        ? groupItems.filter(
             (s) => s.status === "cancel" || s.status === "cancelled",
           )
         : review
   )
-    .filter((s) => (group === "bills" ? isBill(s) : !isBill(s)))
     .slice()
     .sort((a, b) =>
       sort === "yearly"
@@ -486,16 +494,26 @@ export default function Subscriptions({ currency }: { currency: string }) {
         />
       )}
       {error && <p role="alert">{error}</p>}
-      <div className="segmented-control" aria-label="Recurring payment type">
+      <div
+        className="segmented-control"
+        role="group"
+        aria-label="Recurring payment type"
+      >
+        <button
+          aria-pressed={group === "all"}
+          onClick={() => setFilters({ group: "all" })}
+        >
+          All charges
+        </button>
         <button
           aria-pressed={group === "subscriptions"}
-          onClick={() => setGroup("subscriptions")}
+          onClick={() => setFilters({ group: "subscriptions" })}
         >
           Subscriptions
         </button>
         <button
           aria-pressed={group === "bills"}
-          onClick={() => setGroup("bills")}
+          onClick={() => setFilters({ group: "bills" })}
         >
           Bills
         </button>
@@ -513,7 +531,7 @@ export default function Subscriptions({ currency }: { currency: string }) {
           <button
             key={value}
             aria-pressed={view === value}
-            onClick={() => setView(value)}
+            onClick={() => setFilters({ view: value })}
           >
             {label}
           </button>
@@ -524,7 +542,7 @@ export default function Subscriptions({ currency }: { currency: string }) {
         <select
           aria-label="Sort recurring charges"
           value={sort}
-          onChange={(e) => setSort(e.target.value)}
+          onChange={(e) => setFilters({ sort: e.target.value })}
         >
           <option value="review">Needs review first</option>
           <option value="yearly" aria-label="Yearly cost: highest first">
@@ -540,8 +558,17 @@ export default function Subscriptions({ currency }: { currency: string }) {
               ? "Nothing in this view"
               : "No recurring charges detected yet"}
           </h2>
-          <p>Import statements to find recurring charges.</p>
-          <Link to="/import">Import statements</Link>
+          {data.items.length ? (
+            <button
+              onClick={() => {
+                setFilters({ group: "all", view: "all" });
+              }}
+            >
+              View all detected charges
+            </button>
+          ) : (
+            <ImportButton>Import statements</ImportButton>
+          )}
         </section>
       )}
       <div className="subscription-list">

@@ -135,6 +135,9 @@ test("attention explains the remaining decisions and rule-categorised details re
     .click();
   await expect(page.getByRole("dialog")).toHaveCount(0);
   await expect(page.locator(".transaction-row")).toHaveCount(3);
+  await expect(page.getByRole("button", { name: "Start sorting" })).toHaveCount(
+    0,
+  );
   await expect(page.locator(".transaction-list")).not.toContainText(
     "Example Market",
   );

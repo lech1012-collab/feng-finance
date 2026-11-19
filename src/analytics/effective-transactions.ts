@@ -2,6 +2,13 @@ import type { Transaction } from "../domain/models";
 import { normalizeMerchant } from "../domain/normalize";
 import { safeSum } from "../domain/money";
 
+export function isRefund(transaction: Transaction) {
+  return (
+    transaction.kind === "refund" ||
+    (transaction.amount > 0 && transaction.categoryId === "refund")
+  );
+}
+
 /** Exact proportional allocation; floating point is never used for money. */
 export function allocateMinor(total: number, weights: number[]): number[] {
   if (
@@ -113,8 +120,7 @@ export function effectiveTransactions(
   }
   return transactions.flatMap((transaction) => {
     if (
-      transaction.kind === "refund" ||
-      (transaction.amount > 0 && transaction.categoryId === "refund") ||
+      isRefund(transaction) ||
       transaction.kind === "split_parent" ||
       children.has(transaction.id)
     )
@@ -223,10 +229,7 @@ export function transactionReviewReason(
   if (transaction.parentId) return;
   if (transaction.checkLevel === "review" && !transaction.isReviewed)
     return "source";
-  if (
-    transaction.kind === "refund" ||
-    (transaction.amount > 0 && transaction.categoryId === "refund")
-  )
+  if (isRefund(transaction))
     return transaction.refundAllocations?.length ? undefined : "refund";
   if (transaction.kind === "split_parent")
     return transaction.isReviewed ? undefined : "split";

@@ -244,6 +244,17 @@ on the source statement.
 
 ## Screens and planning
 
+Home and category drilldowns use the reporting dates configured in Settings.
+Activity shows the matching original records, including transactions posted in
+a different calendar month. Selecting Refunds shows refund receipts for those
+dates. A transfer review includes a match when either side falls in the period.
+Home's recurring-charge review opens with both bills and subscriptions visible.
+
+In Activity, sorting handles missing categories. Open a labelled source, refund
+or split exception to resolve it. Bulk selection follows the visible payments
+when filters change. Manual cash balances use the opening amount and recorded
+movements through the selected month.
+
 - **Home:** dated cash/card debt/net-worth position, monthly income/spending/net,
   prioritised To do items, category spending, pots, cash-flow history, upcoming
   payments and data health. Figures distinguish complete, partial, unverified

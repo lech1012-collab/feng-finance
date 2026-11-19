@@ -100,6 +100,7 @@ export function ListRow({
   amount,
   icon,
   to,
+  state,
   onClick,
   className = "",
 }: {
@@ -108,6 +109,7 @@ export function ListRow({
   amount?: ReactNode;
   icon?: ReactNode;
   to?: string;
+  state?: { returnTo: string };
   onClick?: () => void;
   className?: string;
 }) {
@@ -138,7 +140,7 @@ export function ListRow({
     </>
   );
   return to ? (
-    <Link to={to} className={rowClass} data-list-row>
+    <Link to={to} state={state} className={rowClass} data-list-row>
       {content}
     </Link>
   ) : onClick ? (

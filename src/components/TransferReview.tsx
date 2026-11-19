@@ -17,8 +17,10 @@ import "./accuracy.css";
 export function TransferReview({
   transactionIds,
   onChanged,
+  showEmpty = false,
 }: {
   transactionIds?: string[];
+  showEmpty?: boolean;
   onChanged?: () => void | Promise<void>;
 }) {
   const data = useLiveQuery(async () => {
@@ -88,7 +90,8 @@ export function TransferReview({
       setBusy(false);
     }
   };
-  if (!data || (!data.proposals.length && !receipt)) return null;
+  if (!data)
+    return showEmpty ? <p role="status">Checking for matches…</p> : null;
   const toast = receipt && (
     <Toast
       id={receipt.changeId}
@@ -100,7 +103,15 @@ export function TransferReview({
       }}
     />
   );
-  if (!data.proposals.length) return toast;
+  if (!data.proposals.length)
+    return (
+      <>
+        {toast}
+        {showEmpty && (
+          <p role="status">No transfers left to confirm for these dates.</p>
+        )}
+      </>
+    );
   const transactions = data.proposals.flatMap((proposal) => [
     proposal.debitTxId,
     proposal.creditTxId,

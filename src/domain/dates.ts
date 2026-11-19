@@ -54,6 +54,11 @@ export function parseDate(raw: string, referenceEnd?: string) {
   }
   throw new Error("Unsupported date format.");
 }
+export function requestedMonth(value: string | null, fallback: string) {
+  return value && /^(?:19|20|21)\d{2}-(0[1-9]|1[0-2])$/.test(value)
+    ? value
+    : fallback;
+}
 export function monthOffset(month: string, offset: number) {
   const [y, m] = month.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1 + offset, 1)).toISOString().slice(0, 7);

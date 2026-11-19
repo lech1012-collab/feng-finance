@@ -13,6 +13,7 @@ import { ContextHelp } from "../components/ContextHelp";
 import {
   needsReview,
   needsCategory,
+  isRefund,
   transactionReviewReason,
   effectiveTransactions,
 } from "../analytics/effective-transactions";
@@ -60,8 +61,12 @@ import {
   type CategoryReceipt,
 } from "../storage/categorize";
 import { db } from "../storage/database";
-import { monthBounds } from "../domain/dates";
+import { monthBounds, requestedMonth } from "../domain/dates";
+import { reportingPeriod } from "../domain/period";
+import { shiftDate } from "../analytics/analysis-period";
 import { money, parseMoney } from "../domain/money";
+import { manualCashBalance } from "../analytics/manual-cash";
+import { localToday } from "../analytics/reminders";
 import { accountSnapshot } from "../analytics/balances";
 import { statementBalanceEvidence } from "../analytics/statement-balances";
 import {
@@ -94,7 +99,7 @@ export default function Transactions({
   const [reviewChangeId, setReviewChangeId] = useState("");
   const [reviewError, setReviewError] = useState("");
   const [sorting, setSorting] = useState<Transaction>();
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [selection, setSelectedIds] = useState<string[]>([]);
   const selectionAnchor = useRef<string | undefined>(undefined);
   const [queueIds, setQueueIds] = useState<string[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
@@ -131,8 +136,10 @@ export default function Transactions({
   const [receipt, setReceipt] = useState<CategoryReceipt>();
   const [undoBusy, setUndoBusy] = useState(false);
   const [undoError, setUndoError] = useState("");
-  const selectedMonth = params.get("month") ?? month;
-  const bounds = monthBounds(selectedMonth);
+  const selectedMonth = requestedMonth(params.get("month"), month);
+  const refundsOnly = params.get("kind") === "refund";
+  const transferFilter = params.get("transferKind");
+  const transferQueue = params.get("transfers") === "1";
   const [allDates, setAllDates] = useState(
     params.get("allDates") === "1" ||
       (!params.has("allDates") &&
@@ -140,15 +147,15 @@ export default function Transactions({
           params.has("uncategorized") ||
           params.get("category") === "uncategorized")),
   );
-  const [from, setFrom] = useState(
+  const [customFrom, setFrom] = useState<string | undefined>(
     /^\d{4}-\d{2}-\d{2}$/.test(params.get("from") ?? "")
       ? params.get("from")!
-      : bounds[0],
+      : undefined,
   );
-  const [to, setTo] = useState(
+  const [customTo, setTo] = useState<string | undefined>(
     /^\d{4}-\d{2}-\d{2}$/.test(params.get("to") ?? "")
       ? params.get("to")!
-      : new Date(Date.parse(bounds[1]) - 86400000).toISOString().slice(0, 10),
+      : undefined,
   );
   const [search, setSearch] = useState(params.get("search") ?? "");
   const [account, setAccount] = useState(params.get("account") ?? "");
@@ -180,6 +187,13 @@ export default function Transactions({
         ),
       )
     ).flat();
+    const [settings, periodRows] = await Promise.all([
+      db.settings.toArray(),
+      db.transactions.where("categoryId").equals("salary").toArray(),
+    ]);
+    const [start, end] = reportingPeriod(selectedMonth, settings, periodRows);
+    const from = customFrom ?? start;
+    const to = customTo ?? shiftDate(end, -1);
     const items = params.get("flow")
       ? await db.transactions.toArray()
       : allDates || (from && to && from <= to)
@@ -194,6 +208,44 @@ export default function Transactions({
             .reverse()
             .toArray()
         : [];
+    const pairIds = new Set(
+      items.flatMap((t) => (t.transferPairId ? [t.transferPairId] : [])),
+    );
+    const cardAccounts = accounts.filter(
+      (a) => a.accountType === "credit" || a.accountType === "credit_card",
+    );
+    const transferCounterparts =
+      transferFilter && pairIds.size
+        ? await db.transactions
+            .where("accountId")
+            .anyOf(cardAccounts.map((a) => a.id))
+            .filter((t) => !!t.transferPairId && pairIds.has(t.transferPairId))
+            .toArray()
+        : [];
+    const manualAccounts = accounts.filter(
+      (a) =>
+        a.tracking === "manual" &&
+        ["current", "savings"].includes(a.accountType),
+    );
+    const manualBalances = new Map<
+      string,
+      ReturnType<typeof manualCashBalance>
+    >();
+    if (manualAccounts.length) {
+      const asOf = [
+        localToday(),
+        shiftDate(monthBounds(selectedMonth)[1], -1),
+      ].sort()[0];
+      const [valuations, manualRows] = await Promise.all([
+        db.valuations.toArray(),
+        db.transactions.where("source").equals("manual").toArray(),
+      ]);
+      for (const a of manualAccounts)
+        manualBalances.set(
+          a.id,
+          manualCashBalance(a, valuations, manualRows, asOf),
+        );
+    }
     const refundIds = [
       ...new Set(
         items.flatMap((row) =>
@@ -209,11 +261,12 @@ export default function Transactions({
     return {
       items,
       refundOriginals,
-      periodRows: await db.transactions
-        .where("categoryId")
-        .equals("salary")
-        .toArray(),
-      settings: await db.settings.toArray(),
+      periodRows,
+      settings,
+      from,
+      to,
+      transferCounterparts,
+      manualBalances,
       accounts,
       categories: await db.categories.toArray(),
       rules: await db.rules.toArray(),
@@ -229,7 +282,16 @@ export default function Transactions({
       tags: await db.tags.toArray(),
       rates: await db.fxRates.toArray(),
     };
-  }, [from, to, currency, allDates, selectedMonth, params.get("flow")]);
+  }, [
+    customFrom,
+    customTo,
+    allDates,
+    selectedMonth,
+    params.get("flow"),
+    transferFilter,
+  ]);
+  const from = customFrom ?? data?.from ?? "";
+  const to = customTo ?? data?.to ?? "";
   const queueRecords = useLiveQuery(
     () =>
       db.transaction("r", db.transactions, async () => ({
@@ -286,6 +348,7 @@ export default function Transactions({
     return data.items.filter(
       (t) =>
         !t.parentId &&
+        (!refundsOnly || isRefund(t)) &&
         (!sourceIds || sourceIds.has(t.id)) &&
         (!params.get("accountScope") ||
           data.accounts.some(
@@ -302,7 +365,7 @@ export default function Transactions({
             .includes(search.toLowerCase())) &&
         (!account || t.accountId === account) &&
         (!params.get("transferKind") ||
-          transferKind(t, data.accounts, data.items) ===
+          transferKind(t, data.accounts, data.transferCounterparts) ===
             (params.get("transferKind") === "card-payment"
               ? "card"
               : params.get("transferKind"))) &&
@@ -314,6 +377,7 @@ export default function Transactions({
     search,
     account,
     queryIds,
+    refundsOnly,
     min,
     max,
     currency,
@@ -354,6 +418,21 @@ export default function Transactions({
       property,
     ],
   );
+  const visibleIds = useMemo(
+    () => new Set(filtered.slice(0, (page + 1) * 60).map((t) => t.id)),
+    [filtered, page],
+  );
+  const selectedIds = useMemo(
+    () => selection.filter((id) => visibleIds.has(id)),
+    [selection, visibleIds],
+  );
+  useEffect(() => {
+    if (selection.length !== selectedIds.length) setSelectedIds(selectedIds);
+    if (selectionAnchor.current && !visibleIds.has(selectionAnchor.current))
+      selectionAnchor.current = undefined;
+  }, [selection, selectedIds, visibleIds]);
+  const toSort =
+    toReview || uncategorized ? filtered.filter(needsCategory) : [];
   const reset = () => setPage(0);
   const beginSort = (
     t: Transaction,
@@ -464,7 +543,9 @@ export default function Transactions({
     setRailBusy(true);
     setRailError("");
     try {
-      const chosen = ids.map((id) => data.items.find((t) => t.id === id));
+      const chosen = ids.map((id) =>
+        visibleIds.has(id) ? data.items.find((t) => t.id === id) : undefined,
+      );
       if (chosen.some((t) => !t))
         throw new Error(
           "A selected transaction is no longer shown. Select it again.",
@@ -737,7 +818,8 @@ export default function Transactions({
       ? JSON.stringify(activeQuery.conditions)
       : (params.get("conditions") ?? ""),
     queryMatch: activeQuery?.match ?? params.get("queryMatch") ?? "",
-    transferKind: params.get("transferKind") ?? "",
+    kind: refundsOnly ? "refund" : "",
+    transferKind: transferFilter ?? "",
     flow: params.get("flow") ?? "",
     accountScope: params.get("accountScope") ?? "",
     reporting: params.get("reporting") ?? "",
@@ -754,6 +836,30 @@ export default function Transactions({
     if (filter === "income") return type === "income" && !category && !property;
     return category === filter && !type && !property;
   };
+  if (transferQueue)
+    return (
+      <>
+        <Link className="back-link" to="/">
+          Home
+        </Link>
+        <div className="page-heading">
+          <h1>Transfer review</h1>
+        </div>
+        {data ? (
+          <>
+            <p className="filter-context">
+              {allDates ? "All imported dates" : displayDateRange(from, to)}
+            </p>
+            <TransferReview
+              transactionIds={data.items.map((t) => t.id)}
+              showEmpty
+            />
+          </>
+        ) : (
+          <p role="status">Loading transfers…</p>
+        )}
+      </>
+    );
   const feedback = (
     <>
       {receipt && (
@@ -788,13 +894,12 @@ export default function Transactions({
             : "Loading transactions…"}
         </span>
       </div>
-      {(toReview || uncategorized) && filtered.length > 0 && (
+      {toSort.length > 0 && (
         <div className="sorting-queue">
           <span>
-            {filtered.length} transaction{filtered.length === 1 ? "" : "s"} to
-            sort
+            {toSort.length} transaction{toSort.length === 1 ? "" : "s"} to sort
           </span>
-          <button className="primary" onClick={() => beginSort(filtered[0])}>
+          <button className="primary" onClick={() => beginSort(toSort[0])}>
             Start sorting
           </button>
         </div>
@@ -820,19 +925,19 @@ export default function Transactions({
             const evidence = snapshot.statement
               ? data.balanceEvidence[snapshot.statement.id]
               : undefined;
-            const reported = Number.isSafeInteger(snapshot.balance);
+            const wallet = data.manualBalances?.get(a.id);
+            const balance = wallet ? wallet.valueMinor : snapshot.balance;
+            const date = wallet ? wallet.date : snapshot.asOfDate;
+            const reported = balance !== undefined;
             const card = ["credit", "credit_card"].includes(a.accountType);
             const value = reported
-              ? money(
-                  card ? Math.abs(snapshot.balance!) : snapshot.balance!,
-                  a.currency,
-                )
+              ? money(card ? Math.abs(balance) : balance, a.currency)
               : "Unknown";
             const kind =
               card && reported
-                ? snapshot.balance! < 0
+                ? balance < 0
                   ? " debt"
-                  : snapshot.balance! > 0
+                  : balance > 0
                     ? " credit"
                     : " balance"
                 : "";
@@ -851,7 +956,7 @@ export default function Transactions({
                     {displayAccountName(a) || `${a.institution} account`}
                   </strong>
                   <small>
-                    {`${value}${kind}${snapshot.asOfDate ? ` · ${displayDate(snapshot.asOfDate)}` : " · No statement"}${reported && evidence?.status !== "reconciled" ? " · Reported · Unverified" : reported && !snapshot.current ? " · Older statement" : ""}`}
+                    {`${value}${kind}${date ? ` · ${displayDate(date)}` : wallet ? " · No opening balance" : " · No statement"}${wallet ? " · Manual" : reported && evidence?.status !== "reconciled" ? " · Reported · Unverified" : reported && !snapshot.current ? " · Older statement" : ""}`}
                   </small>
                 </span>
               </button>
@@ -861,7 +966,7 @@ export default function Transactions({
       )}
       <div className="transaction-tools">
         <ManualTransactionEditor />
-        <Link className="button" to="/accounts">
+        <Link className="button" to="/accounts" state={{ returnTo }}>
           Accounts
         </Link>
         <Link className="button" to="/settings?section=tags">
@@ -981,6 +1086,7 @@ export default function Transactions({
         </div>
         <p className="filter-context">
           {allDates ? "All imported dates" : displayDateRange(from, to)}
+          {refundsOnly && " · Refunds"}
           {toReview && exceptionsOnly
             ? " · Refunds, splits and source checks"
             : ""}

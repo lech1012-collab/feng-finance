@@ -1,6 +1,6 @@
 import { UKDateInput } from "../components/UKDateInput";
 import { merchantExpenses } from "../analytics/merchant-expenses";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useLocation } from "react-router-dom";
 import { ReportBuilder } from "../components/ReportBuilder";
 import { TagAnalysis } from "../components/TagAnalysis";
 import { projectedReportingTransactions } from "../analytics/fx";
@@ -17,6 +17,7 @@ import { Link } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
 import {
+  requestedMonth,
   monthBounds,
   monthOffset,
   monthLabel,
@@ -44,7 +45,7 @@ import { CashChart } from "../components/Chart";
 import { ContextHelp } from "../components/ContextHelp";
 import { ListRow } from "../components/UIPrimitives";
 export default function Analysis({
-  month,
+  month: activeMonth,
   setMonth,
   currency,
   property = false,
@@ -54,9 +55,41 @@ export default function Analysis({
   currency: string;
   property?: boolean;
 }) {
-  const [params] = useSearchParams();
+  const location = useLocation();
+  const origin = {
+    returnTo: location.pathname + location.search + location.hash,
+  };
+  const [params, setParams] = useSearchParams();
+  const month = requestedMonth(params.get("month"), activeMonth);
+  const chooseMonth = (value: string) => {
+    setMonth(value);
+    if (params.has("month")) {
+      const next = new URLSearchParams(params);
+      next.set("month", value);
+      setParams(next, { replace: true });
+    }
+  };
   const view = params.get("view");
-  const [period, setPeriod] = useState(property ? "ytd" : "6");
+  const requestedPeriod = params.get("period") ?? "";
+  const period = [
+    "1",
+    "3",
+    "6",
+    "12",
+    "ytd",
+    "annual",
+    "tax",
+    "custom",
+  ].includes(requestedPeriod)
+    ? requestedPeriod
+    : property
+      ? "ytd"
+      : "6";
+  const setPeriod = (value: string) => {
+    const next = new URLSearchParams(params);
+    next.set("period", value);
+    setParams(next, { replace: true });
+  };
   const [customFrom, setCustomFrom] = useState(monthBounds(month)[0]);
   const [customTo, setCustomTo] = useState(
     shiftDate(monthBounds(month)[1], -1),
@@ -148,6 +181,8 @@ export default function Analysis({
       );
     return {
       ...covered,
+      rangeStart,
+      rangeEnd,
       hasData,
       hasUnverifiedStatements,
       verifiedStatements: verified,
@@ -184,6 +219,8 @@ export default function Analysis({
   const previousCoverage = monthsInRange(
     scope.previousStart,
     scope.previousEnd,
+    data.settings,
+    source!.transactions,
   ).map((m) =>
     reportingCoverage(
       data.accounts,
@@ -397,7 +434,7 @@ export default function Analysis({
         </div>
       </div>
       <div className="toolbar">
-        <MonthPicker month={month} onChange={setMonth} />
+        <MonthPicker month={month} onChange={chooseMonth} />
         <PeriodControl value={period} onChange={setPeriod} />
       </div>
       {period === "custom" && (
@@ -483,7 +520,7 @@ export default function Analysis({
       {!property && (
         <div className="analysis-shortcuts">
           <CategoryAnalysisPicker month={month} />
-          <Link to={`/review?month=${month}`} className="button">
+          <Link to={`/review?month=${month}`} state={origin} className="button">
             Review month
           </Link>
         </div>
@@ -537,6 +574,7 @@ export default function Analysis({
                 <div key={c.id}>
                   <dt>
                     <Link
+                      state={origin}
                       to={
                         c.id === "uncategorized"
                           ? "/transactions?uncategorized=1&allDates=1"
@@ -580,6 +618,7 @@ export default function Analysis({
               <Link
                 key={c.id}
                 className="category-row"
+                state={origin}
                 to={
                   c.id === "uncategorized"
                     ? "/transactions?uncategorized=1&allDates=1"
@@ -739,6 +778,7 @@ export default function Analysis({
                 {spending.map((category) => (
                   <li key={category.id}>
                     <ListRow
+                      state={origin}
                       title={category.name}
                       key={category.id}
                       to={
@@ -785,14 +825,17 @@ export default function Analysis({
                         {scope.months.map((m, index) => (
                           <td key={m}>
                             <Link
-                              to={`/transactions?category=${c.id}&month=${m}`}
+                              to={`/transactions?category=${encodeURIComponent(c.id)}&month=${m}&allDates=0&from=${coverage[index].rangeStart}&to=${shiftDate(coverage[index].rangeEnd, -1)}`}
                             >
                               {series[index]?.expenses === null
                                 ? "No verified statements"
                                 : money(
                                     categorySpending(
-                                      selectedItems.filter((t) =>
-                                        t.date.startsWith(m),
+                                      selectedItems.filter(
+                                        (t) =>
+                                          t.date >=
+                                            coverage[index].rangeStart &&
+                                          t.date < coverage[index].rangeEnd,
                                       ),
                                       data.categories,
                                       currency,

@@ -75,6 +75,8 @@ import { AppHeader, DemoChip } from "./components/UIPrimitives";
 import { localToday } from "./analytics/reminders";
 import "./beta/beta.css";
 import { loadDemo, deleteDemo } from "./storage/demo";
+import { periodMonth } from "./domain/period";
+import { requestedMonth } from "./domain/dates";
 import { useSearchParams } from "react-router-dom";
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Category = lazy(() => import("./pages/Category"));
@@ -88,7 +90,10 @@ let applyUpdate: (reload?: boolean) => Promise<void>;
 function ReviewRoute({ month, currency }: { month: string; currency: string }) {
   const [params] = useSearchParams();
   return (
-    <MonthReview month={params.get("month") ?? month} currency={currency} />
+    <MonthReview
+      month={requestedMonth(params.get("month"), month)}
+      currency={currency}
+    />
   );
 }
 function Shell() {
@@ -124,23 +129,30 @@ function Shell() {
   }, [pendingImportCount, selectedFiles.length]);
   const [month, setMonth] = useState(localToday().slice(0, 7));
   const [monthChosen, setMonthChosen] = useState(false);
-  const latestDate = useLiveQuery(async () => {
+  const latestMonth = useLiveQuery(async () => {
     const today = localToday();
     const [latestTransaction, statements] = await Promise.all([
-      db.transactions.orderBy("date").last(),
+      db.transactions.where("date").belowOrEqual(today).last(),
       db.statements.toArray(),
     ]);
-    return [
+    const latestDate = [
       ...(latestTransaction ? [latestTransaction.date] : []),
       ...statements.map(statementBalanceDate),
     ]
       .filter((date) => date <= today)
       .sort()
       .at(-1);
+    if (!latestDate || latestDate !== latestTransaction?.date)
+      return latestDate?.slice(0, 7);
+    return periodMonth(
+      latestDate,
+      await db.settings.toArray(),
+      await db.transactions.where("categoryId").equals("salary").toArray(),
+    );
   }, []);
   useEffect(() => {
-    if (!monthChosen && latestDate) setMonth(latestDate.slice(0, 7));
-  }, [latestDate, monthChosen]);
+    if (!monthChosen && latestMonth) setMonth(latestMonth);
+  }, [latestMonth, monthChosen]);
   const chooseMonth = (value: string) => {
     setMonth(value);
     setMonthChosen(true);
@@ -384,7 +396,12 @@ function Shell() {
     // import workspace. Put focus on the visible page after leaving review.
     if (leavingImport)
       document.getElementById("main")?.focus({ preventScroll: true });
-    const targetId = decodeURIComponent(location.hash.slice(1));
+    let targetId: string;
+    try {
+      targetId = decodeURIComponent(location.hash.slice(1));
+    } catch {
+      return;
+    }
     if (!targetId) return;
     const reveal = () => {
       const target = document.getElementById(targetId);
