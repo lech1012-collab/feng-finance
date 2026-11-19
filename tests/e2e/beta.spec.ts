@@ -1,4 +1,4 @@
-import { settingsSection } from "./flows";
+import { readBackupDownload, settingsSection } from "./flows";
 import { test as base, expect, type Page } from "@playwright/test";
 import { acknowledgeBeta } from "./fixtures";
 import { startStaticHost, type LocalHost } from "./static-host";
@@ -392,9 +392,14 @@ test("existing Safari imports warn about separate storage and retain their overd
   await backupSheet
     .getByRole("button", { name: "Save backup", exact: true })
     .click();
-  expect((await download).suggestedFilename()).toMatch(
-    /^Feng \d{1,2}-[A-Za-z]{3}-\d{4}\.json$/,
+  const saved = await readBackupDownload(
+    await download,
+    "Feng 11-Oct-2026.json",
   );
+  expect(saved.exportedAt.slice(0, 10)).toBe("2026-10-11");
+  expect(saved.transactions.map((row) => row.id)).toEqual([
+    "beta-real-payment",
+  ]);
   await expect(backupNotice).toHaveCount(0);
   await page.goto("/#/");
   await page.reload();

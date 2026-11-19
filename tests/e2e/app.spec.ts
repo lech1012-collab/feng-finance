@@ -8,6 +8,7 @@ import {
 import {
   selectPeriod,
   saveReadableBackup,
+  readBackupDownload,
   settingsSection,
   loadDemoUi,
 } from "./flows";
@@ -1319,8 +1320,12 @@ test("offline launch, local PDF import, backup and no financial upload", async (
   await gotoRoute(page, "/settings");
   const event = page.waitForEvent("download");
   await saveReadableBackup(page);
-  expect((await event).suggestedFilename()).toMatch(
-    /^Feng \d{1,2}-[A-Za-z]{3}-\d{4}\.json$/,
+  const backup = await readBackupDownload(await event, "Feng 8-Nov-2026.json");
+  expect(backup.exportedAt.slice(0, 10)).toBe("2026-11-08");
+  expect(backup.statements).toHaveLength(1);
+  expect(backup.transactions).toHaveLength(10);
+  expect(backup.transactions).toContainEqual(
+    expect.objectContaining({ amount: -8245, currency: "GBP" }),
   );
   expect(unexpected).toEqual([]);
 });

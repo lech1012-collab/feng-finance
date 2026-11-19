@@ -1,3 +1,6 @@
+import { readFile } from "node:fs/promises";
+import type { Download } from "@playwright/test";
+import type { Backup } from "../../src/domain/models";
 import { expect, type Page } from "./fixtures";
 
 /** Actual UI steps for the grouped Settings and the unified backup wizard. */
@@ -65,4 +68,16 @@ export async function selectPeriod(page: Page, period: string) {
       .getByRole("combobox", { name: "Period", exact: true })
       .selectOption(period);
   }
+}
+
+export async function readBackupDownload(file: Download, datedName: string) {
+  // WebKit on some platforms replaces spaces in suggested download names.
+  expect([datedName, datedName.replace("Feng ", "Feng_")]).toContain(
+    file.suggestedFilename(),
+  );
+  const path = await file.path();
+  if (!path) throw new Error("The backup was not saved.");
+  const backup = JSON.parse(await readFile(path, "utf8")) as Backup;
+  expect(backup).toMatchObject({ format: "feng-finance", version: 1 });
+  return backup;
 }
