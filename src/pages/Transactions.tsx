@@ -1285,7 +1285,9 @@ export default function Transactions({
           />
         )}
       </Sheet>
-      <TransferReview />
+      {data && (
+        <TransferReview transactionIds={filtered.map((row) => row.id)} />
+      )}
       <details className="transaction-menu">
         <summary>More transaction actions</summary>
         <div className="actions" ref={setActionsTarget}>

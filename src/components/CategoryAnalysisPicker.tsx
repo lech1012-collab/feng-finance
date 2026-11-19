@@ -1,3 +1,4 @@
+import { returnTarget } from "../navigation/return-target";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -13,6 +14,10 @@ export function CategoryAnalysisPicker({
   const origin = category
     ? location.state
     : { returnTo: location.pathname + location.search + location.hash };
+  const back = returnTarget(origin?.returnTo, "/analysis");
+  const allCategories = /^\/analysis(?:[?#]|$)/.test(back.to)
+    ? back.to
+    : "/analysis";
   const categories = useLiveQuery(
     () => db.categories.filter((c) => !c.archived && !c.parentId).toArray(),
     [],
@@ -27,7 +32,7 @@ export function CategoryAnalysisPicker({
           navigate(
             e.target.value
               ? `/categories/${e.target.value}?month=${month}`
-              : "/analysis",
+              : allCategories,
             { state: e.target.value ? origin : undefined },
           )
         }

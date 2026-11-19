@@ -147,6 +147,11 @@ test("filtering a selection removes hidden payments and Accounts returns to the 
     .locator(".transaction-tools")
     .getByRole("link", { name: "Accounts" })
     .click();
+  await expect(
+    page
+      .getByRole("navigation", { name: "Main navigation" })
+      .getByRole("link", { name: "Transactions", exact: true }),
+  ).toHaveAttribute("aria-current", "page");
   await page.locator("a.back-link").click();
   await expect(page.locator("#transaction-search")).toHaveValue("Second");
   await expect(page.locator(".transaction-list")).toContainText(
@@ -216,6 +221,11 @@ test("Home transfer review follows both sides of the period boundary and preserv
   await page.goto("/#/transactions?transfers=1&month=2026-08");
   await expect(queue).toContainText("Match 2");
   await expect(queue).not.toContainText("Match 0");
+  await page.goto("/#/transactions?month=2026-08&kind=refund");
+  await expect(page.locator(".count-chip")).toHaveText("0 results");
+  await expect(
+    page.getByRole("region", { name: "Transfers to confirm" }),
+  ).toHaveCount(0);
 });
 
 test("foreign spending without a rate never appears as zero and empty subscriptions open the picker", async ({
@@ -272,6 +282,16 @@ test("returning from a purchase restores the category, selected month and origin
   await expect(page).toHaveURL(/analysis\?period=3/);
   await expect(
     page.getByRole("button", { name: "3 months", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.goto("/#/review?month=2026-09&step=2");
+  const steps = page.getByRole("group", { name: "Monthly review steps" });
+  await expect(
+    steps.getByRole("button", { name: /What changed/ }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await steps.getByRole("button", { name: /Pots and goals/ }).click();
+  await page.reload();
+  await expect(
+    steps.getByRole("button", { name: /Pots and goals/ }),
   ).toHaveAttribute("aria-pressed", "true");
 });
 

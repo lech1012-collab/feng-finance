@@ -2,8 +2,14 @@ export type Section =
   "home" | "import" | "transactions" | "analysis" | "planning" | "settings";
 
 /** One source of truth for the page palette and the selected navigation tab. */
-export function sectionForPath(pathname: string): Section {
+export function sectionForPath(pathname: string, origin?: unknown): Section {
   const root = pathname.split("/")[1];
+  if (
+    root === "accounts" &&
+    typeof origin === "string" &&
+    /^\/transactions(?:[?#]|$)/.test(origin)
+  )
+    return "transactions";
   if (root === "transactions") return "transactions";
   if (root === "import") return "import";
   if (root === "settings") return "settings";

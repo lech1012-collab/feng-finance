@@ -98,6 +98,10 @@ function ReviewRoute({ month, currency }: { month: string; currency: string }) {
 }
 function Shell() {
   const location = useLocation();
+  const activeSection = sectionForPath(
+    location.pathname,
+    location.state?.returnTo,
+  );
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
   const mobileNavigation = useRef<HTMLElement>(null);
@@ -298,7 +302,7 @@ function Shell() {
       const observer = new MutationObserver(() => {
         if (focusSearch()) observer.disconnect();
       });
-      observer.observe(document.getElementById("main")!, {
+      observer.observe(document.getElementById("main") ?? document.body, {
         childList: true,
         subtree: true,
       });
@@ -414,7 +418,7 @@ function Shell() {
     const observer = new MutationObserver(() => {
       if (reveal()) observer.disconnect();
     });
-    observer.observe(document.getElementById("main")!, {
+    observer.observe(document.getElementById("main") ?? document.body, {
       childList: true,
       subtree: true,
     });
@@ -453,7 +457,7 @@ function Shell() {
   };
   return (
     <ImportPickerContext.Provider value={openImport}>
-      <div className="app" data-page={sectionForPath(location.pathname)}>
+      <div className="app" data-page={activeSection}>
         <input
           ref={fileInput}
           className="sr-only"
@@ -498,11 +502,7 @@ function Shell() {
           <button
             className="primary sidebar-import"
             onClick={openImport}
-            aria-current={
-              sectionForPath(location.pathname) === "import"
-                ? "page"
-                : undefined
-            }
+            aria-current={activeSection === "import" ? "page" : undefined}
           >
             <Plus size={20} />
             {pendingImportCount
@@ -518,9 +518,7 @@ function Shell() {
               ["/settings", "Settings", SettingsIcon],
             ].map(([path, label, Icon]) => {
               const I = Icon as typeof HomeIcon;
-              const active =
-                sectionForPath(location.pathname) ===
-                sectionForPath(String(path));
+              const active = activeSection === sectionForPath(String(path));
               return (
                 <Link
                   key={String(path)}
@@ -561,9 +559,7 @@ function Shell() {
             ["/planning", "Planning", CalendarClock],
           ].map(([path, label, Icon]) => {
             const I = Icon as typeof HomeIcon;
-            const active =
-              sectionForPath(location.pathname) ===
-              sectionForPath(String(path));
+            const active = activeSection === sectionForPath(String(path));
             return (
               <Link
                 key={String(path)}

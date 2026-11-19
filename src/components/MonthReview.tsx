@@ -2,7 +2,7 @@ import { Toast } from "./Toast";
 import { SuggestedRules } from "./SuggestedRules";
 import { useState } from "react";
 import { returnTarget } from "../navigation/return-target";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
 import { closeMonth, reopenMonths } from "../storage/month-review";
@@ -62,7 +62,14 @@ export function MonthReview({
     }),
     [month],
   );
-  const [step, setStep] = useState(0);
+  const [params, setParams] = useSearchParams();
+  const page = params.get("step") ?? "";
+  const step = /^[1-4]$/.test(page) ? Number(page) - 1 : 0;
+  const setStep = (nextStep: number) => {
+    const next = new URLSearchParams(params);
+    next.set("step", String(nextStep + 1));
+    setParams(next, { replace: true, state: location.state });
+  };
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
