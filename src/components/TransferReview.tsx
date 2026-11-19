@@ -17,20 +17,22 @@ import "./accuracy.css";
 export function TransferReview({
   transactionIds,
   onChanged,
+  showEmpty = false,
 }: {
   transactionIds?: string[];
+  showEmpty?: boolean;
   onChanged?: () => void | Promise<void>;
 }) {
+  const scopeKey = JSON.stringify(transactionIds);
   const data = useLiveQuery(async () => {
     const proposals = await db.transferProposals
       .where("status")
       .equals("pending")
       .toArray();
+    const ids = transactionIds && new Set(transactionIds);
     const visible = proposals.filter(
       (proposal) =>
-        !transactionIds ||
-        transactionIds.includes(proposal.debitTxId) ||
-        transactionIds.includes(proposal.creditTxId),
+        !ids || ids.has(proposal.debitTxId) || ids.has(proposal.creditTxId),
     );
     const transactions = new Map(
       (
@@ -47,6 +49,7 @@ export function TransferReview({
         .map((row) => [row.id, row]),
     );
     return {
+      scopeKey,
       proposals: visible.filter(
         (proposal) =>
           transactions.has(proposal.debitTxId) &&
@@ -55,7 +58,7 @@ export function TransferReview({
       transactions,
       accounts: await db.accounts.toArray(),
     };
-  }, [transactionIds?.join("|")]);
+  }, [scopeKey]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [receipt, setReceipt] = useState<{ changeId: string; label: string }>();
@@ -88,7 +91,8 @@ export function TransferReview({
       setBusy(false);
     }
   };
-  if (!data || (!data.proposals.length && !receipt)) return null;
+  if (!data || data.scopeKey !== scopeKey)
+    return showEmpty ? <p role="status">Checking for matches…</p> : null;
   const toast = receipt && (
     <Toast
       id={receipt.changeId}
@@ -100,7 +104,15 @@ export function TransferReview({
       }}
     />
   );
-  if (!data.proposals.length) return toast;
+  if (!data.proposals.length)
+    return (
+      <>
+        {toast}
+        {showEmpty && (
+          <p role="status">No transfers left to confirm for these dates.</p>
+        )}
+      </>
+    );
   const transactions = data.proposals.flatMap((proposal) => [
     proposal.debitTxId,
     proposal.creditTxId,

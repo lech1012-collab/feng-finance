@@ -53,6 +53,7 @@ it("traps content in a native modal and returns focus to the invoking object", (
   expect(document.body.style.overflow).toBe("hidden");
   fireEvent.click(screen.getByRole("button", { name: "Close Edit account" }));
   expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  expect(document.querySelector("[aria-modal=true]")).toBeNull();
   expect(opener).toHaveFocus();
   expect(document.body.style.overflow).toBe("");
 });

@@ -7,7 +7,13 @@ import {
   type ChartReading,
 } from "../components/ChartInspector";
 import { useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { returnTarget } from "../navigation/return-target";
+import {
+  Link,
+  useParams,
+  useSearchParams,
+  useLocation,
+} from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import {
   ResponsiveContainer,
@@ -21,7 +27,12 @@ import {
 } from "recharts";
 import { db } from "../storage/database";
 import { categoryReport } from "../analytics/category-report";
-import { monthLabel, formatUkDate, formatDateRange } from "../domain/dates";
+import {
+  requestedMonth,
+  monthLabel,
+  formatUkDate,
+  formatDateRange,
+} from "../domain/dates";
 import { localToday } from "../analytics/reminders";
 import { shiftDate } from "../analytics/analysis-period";
 import { displayMerchant } from "../domain/presentation";
@@ -42,12 +53,14 @@ export default function CategoryPage({
 }) {
   const { id = "uncategorized" } = useParams();
   const chartRem = useRootFontSize();
-  const [params] = useSearchParams();
-  const [selected, setSelected] = useState(
-    /^\d{4}-(0[1-9]|1[0-2])$/.test(params.get("month") ?? "")
-      ? params.get("month")!
-      : month,
-  );
+  const location = useLocation();
+  const back = returnTarget(location.state?.returnTo, "/");
+  const origin = {
+    returnTo: location.pathname + location.search,
+    parentReturnTo: back.to,
+  };
+  const [params, setParams] = useSearchParams();
+  const selected = requestedMonth(params.get("month"), month);
   const [window, setWindow] = useState(6);
   const source = useLiveQuery(
     async () => ({
@@ -105,7 +118,9 @@ export default function CategoryPage({
   const transactionUrl = (m: string) =>
     `/transactions?category=${encodeURIComponent(id)}&month=${m}`;
   const chooseMonth = (m: string) => {
-    setSelected(m);
+    const next = new URLSearchParams(params);
+    next.set("month", m);
+    setParams(next, { replace: true, state: location.state });
     setMonth(m);
   };
   const mean = stats.mean === undefined ? undefined : Math.round(stats.mean);
@@ -234,8 +249,12 @@ export default function CategoryPage({
   );
   return (
     <>
-      <Link to="/" className="back-link">
-        ← Home
+      <Link
+        to={back.to}
+        state={{ returnTo: location.state?.parentReturnTo }}
+        className="back-link"
+      >
+        ← {back.label}
       </Link>
       <div className="page-heading">
         <div>
@@ -646,6 +665,7 @@ export default function CategoryPage({
               <Link
                 key={c.id}
                 className="subscription-evidence"
+                state={origin}
                 to={`/categories/${c.id}?month=${selected}`}
               >
                 <span>{c.name}</span>
@@ -661,6 +681,7 @@ export default function CategoryPage({
                   <Link
                     key={c.id}
                     className="subscription-evidence"
+                    state={origin}
                     to={`/categories/${c.id}?month=${selected}`}
                   >
                     <span>{c.name}</span>
@@ -685,6 +706,7 @@ export default function CategoryPage({
               <Link
                 className="subscription-evidence"
                 key={t.id}
+                state={origin}
                 to={`/transactions/${t.id}`}
               >
                 <span>

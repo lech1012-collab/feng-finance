@@ -24,6 +24,7 @@ import { ImportStatementReview } from "../components/ImportStatementReview";
 import { validatePeriod } from "../parsers/period";
 import { id, transactionKey } from "../domain/normalize";
 import type { ImportDraft } from "../domain/models";
+import { periodMonth } from "../domain/period";
 import { statementBalanceDate } from "../analytics/statement-balances";
 import { CsvMappingPanel } from "../components/CsvMappingPanel";
 import { STATEMENT_FILE_ACCEPT, type CsvMapping } from "../import/formats";
@@ -938,17 +939,18 @@ export default function ImportPage({
             (outcome) =>
               statementBalanceDate(outcome.draft.statement) === latest,
           )!.draft.statement.currency;
-        onImported(latest.slice(0, 7), currency);
+        const month = importedRows.some((t) => t.date === latest)
+          ? periodMonth(
+              latest,
+              await db.settings.toArray(),
+              await db.transactions
+                .where("categoryId")
+                .equals("salary")
+                .toArray(),
+            )
+          : latest.slice(0, 7);
+        onImported(month, currency);
       }
-      const toSort = await db.transactions
-        .filter(
-          (t) =>
-            !t.isDemo &&
-            !t.categoryId &&
-            !t.isTransfer &&
-            t.type !== "transfer",
-        )
-        .count();
       const importedIds = new Set(importedRows.map((row) => row.id));
       const automaticallyLinkedCount = await db.transferLinks
         .filter(
@@ -976,7 +978,6 @@ export default function ImportPage({
           excludedCount: excluded,
           skippedFileCount,
           updatedStatementCount: updatedStatements.length,
-          sortCount: toSort,
           automaticallyLinkedCount,
         },
       });

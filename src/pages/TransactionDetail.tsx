@@ -2,6 +2,7 @@ import { displayAccountName } from "../domain/presentation";
 import { Toast } from "../components/Toast";
 import { undoChange } from "../storage/audit";
 import { useEffect, useRef, useState } from "react";
+import { returnTarget } from "../navigation/return-target";
 import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
@@ -127,11 +128,8 @@ function Editor({
       : convertMinor(t.amount, t.currency, reportingCurrency, t.date, rates);
   const navigate = useNavigate();
   const location = useLocation();
-  const returnTo =
-    typeof location.state?.returnTo === "string" &&
-    /^\/transactions(?:\?|$)/.test(location.state.returnTo)
-      ? location.state.returnTo
-      : "/transactions";
+  const back = returnTarget(location.state?.returnTo);
+  const backState = { returnTo: location.state?.parentReturnTo };
   const [merchant, setMerchant] = useState(displayMerchant(t));
   const [category, setCategory] = useState(t.categoryId ?? "");
   const [subcategory, setSubcategory] = useState(t.subcategoryId ?? "");
@@ -217,8 +215,8 @@ function Editor({
   };
   return (
     <>
-      <Link className="back-link" to={returnTo}>
-        ‹ Transactions
+      <Link className="back-link" to={back.to} state={backState}>
+        ‹ {back.label}
       </Link>
       <section className="card detail-card">
         <p className="eyebrow">
@@ -531,7 +529,7 @@ function Editor({
                 if (!(await authorizeMonthEdit(other ? [t, other] : [t])))
                   return;
                 await linkTransfers(t.id, pair);
-                navigate(returnTo);
+                navigate(back.to, { state: backState });
               } catch (e) {
                 setError(
                   e instanceof Error ? e.message : "Transfer link failed.",

@@ -2,7 +2,8 @@ import { displayAccountName, displayAccountType } from "../domain/presentation";
 import { ChevronRight } from "lucide-react";
 import { manualCashBalance } from "../analytics/manual-cash";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { returnTarget } from "../navigation/return-target";
+import { Link, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import type { Account, Institution } from "../domain/models";
 import { db } from "../storage/database";
@@ -20,10 +21,11 @@ import { Toast } from "../components/Toast";
 import { ContextHelp } from "../components/ContextHelp";
 
 export default function Accounts() {
+  const back = returnTarget(useLocation().state?.returnTo, "/");
   return (
     <>
-      <Link className="back-link" to="/">
-        ‹ Home
+      <Link className="back-link" to={back.to}>
+        ‹ {back.label}
       </Link>
       <h1>Accounts</h1>
       <AccountsContent />

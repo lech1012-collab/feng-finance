@@ -45,6 +45,7 @@ export function excludedFlows(
   month: string,
   currency: string,
   range?: [string, string],
+  ledger = transactions,
 ) {
   const groups = new Map<string, Transaction[]>();
   for (const transaction of transactions) {
@@ -68,7 +69,7 @@ export function excludedFlows(
   for (const rows of groups.values()) {
     // An outgoing row is the payment; the receiving row is the same movement.
     const payment = rows.find((row) => row.amount < 0) ?? rows[0];
-    const kind = transferKind(payment, accounts, transactions);
+    const kind = transferKind(payment, accounts, ledger);
     (kind === "card" ? card : internal).push(Math.abs(payment.amount));
   }
   return { internal: safeSum(internal), card: safeSum(card) };
@@ -131,6 +132,7 @@ export function excludedReportingFlows(
     month,
     currency,
     range,
+    transactions,
   );
   const missing = new Set(
     rows
@@ -142,7 +144,7 @@ export function excludedReportingFlows(
   const originals = [...new Set(rows.map((row) => row.currency))].map(
     (native) => ({
       currency: native,
-      ...excludedFlows(rows, accounts, month, native, range),
+      ...excludedFlows(rows, accounts, month, native, range, transactions),
     }),
   );
   return {

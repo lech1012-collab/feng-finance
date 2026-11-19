@@ -97,7 +97,7 @@ export function Sheet({
       ref={ref}
       className="ux-sheet"
       aria-labelledby={titleId}
-      aria-modal="true"
+      aria-modal={open || undefined}
       onClick={(event) => {
         if (!dismissOnBackdrop || event.target !== event.currentTarget) return;
         const bounds = event.currentTarget.getBoundingClientRect();

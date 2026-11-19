@@ -6,7 +6,7 @@ import {
   waitFor,
   within,
 } from "@testing-library/react";
-import { afterEach, beforeEach, expect, it } from "vitest";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { MemoryRouter } from "react-router-dom";
 import { db, initializeDatabase } from "../storage/database";
 import { accounts, transaction } from "../tests/helpers";
@@ -68,6 +68,8 @@ it("asks before combining similar recurring names and lets Undo restore the ques
 });
 
 beforeEach(async () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(new Date("2026-10-03T12:00:00Z"));
   await db.delete();
   await db.open();
   await initializeDatabase();
@@ -75,6 +77,7 @@ beforeEach(async () => {
 });
 afterEach(async () => {
   cleanup();
+  vi.useRealTimers();
   await db.delete();
 });
 it("creates a £540 irregular-cost pot, confirms October's £90 contribution and provides Undo", async () => {

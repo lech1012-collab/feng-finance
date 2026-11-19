@@ -1,7 +1,8 @@
 import { Toast } from "./Toast";
 import { SuggestedRules } from "./SuggestedRules";
 import { useState } from "react";
-import { Link } from "react-router-dom";
+import { returnTarget } from "../navigation/return-target";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { db } from "../storage/database";
 import { closeMonth, reopenMonths } from "../storage/month-review";
@@ -44,6 +45,8 @@ export function MonthReview({
   month: string;
   currency: string;
 }) {
+  const location = useLocation();
+  const closeTo = returnTarget(location.state?.returnTo, "/analysis").to;
   const data = useLiveQuery(
     async () => ({
       rows: await db.transactions.toArray(),
@@ -59,7 +62,14 @@ export function MonthReview({
     }),
     [month],
   );
-  const [step, setStep] = useState(0);
+  const [params, setParams] = useSearchParams();
+  const page = params.get("step") ?? "";
+  const step = /^[1-4]$/.test(page) ? Number(page) - 1 : 0;
+  const setStep = (nextStep: number) => {
+    const next = new URLSearchParams(params);
+    next.set("step", String(nextStep + 1));
+    setParams(next, { replace: true, state: location.state });
+  };
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
@@ -204,7 +214,7 @@ export function MonthReview({
     <div className="month-review-page">
       <div className="page-heading">
         <h1>Review {monthLabel(month)}</h1>
-        <Link to="/analysis" className="icon-button" aria-label="Close review">
+        <Link to={closeTo} className="icon-button" aria-label="Close review">
           <span aria-hidden="true">×</span>
         </Link>
       </div>
@@ -302,6 +312,10 @@ export function MonthReview({
               <Link
                 key={c.id}
                 className="insight-row"
+                state={{
+                  returnTo: location.pathname + location.search,
+                  parentReturnTo: closeTo,
+                }}
                 to={`/categories/${c.id}?month=${month}`}
               >
                 <span>

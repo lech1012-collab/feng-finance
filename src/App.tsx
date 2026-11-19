@@ -75,6 +75,8 @@ import { AppHeader, DemoChip } from "./components/UIPrimitives";
 import { localToday } from "./analytics/reminders";
 import "./beta/beta.css";
 import { loadDemo, deleteDemo } from "./storage/demo";
+import { periodMonth } from "./domain/period";
+import { requestedMonth } from "./domain/dates";
 import { useSearchParams } from "react-router-dom";
 const Subscriptions = lazy(() => import("./pages/Subscriptions"));
 const Category = lazy(() => import("./pages/Category"));
@@ -88,11 +90,18 @@ let applyUpdate: (reload?: boolean) => Promise<void>;
 function ReviewRoute({ month, currency }: { month: string; currency: string }) {
   const [params] = useSearchParams();
   return (
-    <MonthReview month={params.get("month") ?? month} currency={currency} />
+    <MonthReview
+      month={requestedMonth(params.get("month"), month)}
+      currency={currency}
+    />
   );
 }
 function Shell() {
   const location = useLocation();
+  const activeSection = sectionForPath(
+    location.pathname,
+    location.state?.returnTo,
+  );
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
   const mobileNavigation = useRef<HTMLElement>(null);
@@ -124,23 +133,30 @@ function Shell() {
   }, [pendingImportCount, selectedFiles.length]);
   const [month, setMonth] = useState(localToday().slice(0, 7));
   const [monthChosen, setMonthChosen] = useState(false);
-  const latestDate = useLiveQuery(async () => {
+  const latestMonth = useLiveQuery(async () => {
     const today = localToday();
     const [latestTransaction, statements] = await Promise.all([
-      db.transactions.orderBy("date").last(),
+      db.transactions.where("date").belowOrEqual(today).last(),
       db.statements.toArray(),
     ]);
-    return [
+    const latestDate = [
       ...(latestTransaction ? [latestTransaction.date] : []),
       ...statements.map(statementBalanceDate),
     ]
       .filter((date) => date <= today)
       .sort()
       .at(-1);
+    if (!latestDate || latestDate !== latestTransaction?.date)
+      return latestDate?.slice(0, 7);
+    return periodMonth(
+      latestDate,
+      await db.settings.toArray(),
+      await db.transactions.where("categoryId").equals("salary").toArray(),
+    );
   }, []);
   useEffect(() => {
-    if (!monthChosen && latestDate) setMonth(latestDate.slice(0, 7));
-  }, [latestDate, monthChosen]);
+    if (!monthChosen && latestMonth) setMonth(latestMonth);
+  }, [latestMonth, monthChosen]);
   const chooseMonth = (value: string) => {
     setMonth(value);
     setMonthChosen(true);
@@ -286,7 +302,7 @@ function Shell() {
       const observer = new MutationObserver(() => {
         if (focusSearch()) observer.disconnect();
       });
-      observer.observe(document.getElementById("main")!, {
+      observer.observe(document.getElementById("main") ?? document.body, {
         childList: true,
         subtree: true,
       });
@@ -384,7 +400,12 @@ function Shell() {
     // import workspace. Put focus on the visible page after leaving review.
     if (leavingImport)
       document.getElementById("main")?.focus({ preventScroll: true });
-    const targetId = decodeURIComponent(location.hash.slice(1));
+    let targetId: string;
+    try {
+      targetId = decodeURIComponent(location.hash.slice(1));
+    } catch {
+      return;
+    }
     if (!targetId) return;
     const reveal = () => {
       const target = document.getElementById(targetId);
@@ -397,7 +418,7 @@ function Shell() {
     const observer = new MutationObserver(() => {
       if (reveal()) observer.disconnect();
     });
-    observer.observe(document.getElementById("main")!, {
+    observer.observe(document.getElementById("main") ?? document.body, {
       childList: true,
       subtree: true,
     });
@@ -436,7 +457,7 @@ function Shell() {
   };
   return (
     <ImportPickerContext.Provider value={openImport}>
-      <div className="app" data-page={sectionForPath(location.pathname)}>
+      <div className="app" data-page={activeSection}>
         <input
           ref={fileInput}
           className="sr-only"
@@ -481,11 +502,7 @@ function Shell() {
           <button
             className="primary sidebar-import"
             onClick={openImport}
-            aria-current={
-              sectionForPath(location.pathname) === "import"
-                ? "page"
-                : undefined
-            }
+            aria-current={activeSection === "import" ? "page" : undefined}
           >
             <Plus size={20} />
             {pendingImportCount
@@ -501,9 +518,7 @@ function Shell() {
               ["/settings", "Settings", SettingsIcon],
             ].map(([path, label, Icon]) => {
               const I = Icon as typeof HomeIcon;
-              const active =
-                sectionForPath(location.pathname) ===
-                sectionForPath(String(path));
+              const active = activeSection === sectionForPath(String(path));
               return (
                 <Link
                   key={String(path)}
@@ -544,9 +559,7 @@ function Shell() {
             ["/planning", "Planning", CalendarClock],
           ].map(([path, label, Icon]) => {
             const I = Icon as typeof HomeIcon;
-            const active =
-              sectionForPath(location.pathname) ===
-              sectionForPath(String(path));
+            const active = activeSection === sectionForPath(String(path));
             return (
               <Link
                 key={String(path)}
@@ -721,7 +734,10 @@ function Shell() {
                     </button>
                   </div>
                 )}
-                <Suspense fallback={<p role="status">Loading…</p>}>
+                <Suspense
+                  key={location.pathname}
+                  fallback={<p role="status">Loading…</p>}
+                >
                   <Routes>
                     <Route path="/accounts" element={<Accounts />} />
                     <Route
