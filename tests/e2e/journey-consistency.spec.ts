@@ -255,44 +255,73 @@ test("foreign spending without a rate never appears as zero and empty subscripti
   await expect(page.locator(".transaction-row")).toHaveCount(1);
 });
 
-test("returning from a purchase restores the category, selected month and originating analysis range", async ({
-  page,
-}) => {
-  await seed(page, {
-    accounts: [accounts[0]],
-    transactions: [
-      purchase("Garden market", "2026-09-03"),
-      purchase("Park market", "2026-10-02"),
-    ],
+test.describe("first visit to a category", () => {
+  // A controlled first load lets us inspect the route while its code is in flight.
+  test.use({ serviceWorkers: "block" });
+  test("returning from a purchase restores the category, selected month and originating analysis range", async ({
+    page,
+  }) => {
+    await seed(page, {
+      accounts: [accounts[0]],
+      transactions: [
+        purchase("Garden market", "2026-09-03"),
+        purchase("Park market", "2026-10-02"),
+      ],
+    });
+    await page.goto("/#/analysis?period=3");
+    let allowLoad!: () => void;
+    const resume = new Promise<void>((resolve) => {
+      allowLoad = resolve;
+    });
+    let received!: () => void;
+    const requested = new Promise<void>((resolve) => {
+      received = resolve;
+    });
+    await page.route(/\/assets\/Category-[^/]+\.js$/, async (route) => {
+      received();
+      await resume;
+      await route.continue();
+    });
+    try {
+      await page
+        .getByRole("combobox", { name: "Category analysis" })
+        .selectOption("groceries");
+      await requested;
+      await expect(
+        page.getByRole("main").getByRole("button", { name: "Previous month" }),
+      ).toHaveCount(0);
+    } finally {
+      allowLoad();
+    }
+    await expect(
+      page.getByRole("heading", { name: "Groceries", exact: true }),
+    ).toBeVisible();
+
+    await page.getByRole("button", { name: "Previous month" }).click();
+    await page
+      .locator("a.subscription-evidence")
+      .filter({ hasText: /Garden market/i })
+      .click();
+    await page.getByRole("link", { name: /Category overview/ }).click();
+    await expect(page.locator(".month-picker input[type=month]")).toHaveValue(
+      "2026-09",
+    );
+    await page.locator("a.back-link").click();
+    await expect(page).toHaveURL(/analysis\?period=3/);
+    await expect(
+      page.getByRole("button", { name: "3 months", exact: true }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await page.goto("/#/review?month=2026-09&step=2");
+    const steps = page.getByRole("group", { name: "Monthly review steps" });
+    await expect(
+      steps.getByRole("button", { name: /What changed/ }),
+    ).toHaveAttribute("aria-pressed", "true");
+    await steps.getByRole("button", { name: /Pots and goals/ }).click();
+    await page.reload();
+    await expect(
+      steps.getByRole("button", { name: /Pots and goals/ }),
+    ).toHaveAttribute("aria-pressed", "true");
   });
-  await page.goto("/#/analysis?period=3");
-  await page
-    .getByRole("combobox", { name: "Category analysis" })
-    .selectOption("groceries");
-  await page.getByRole("button", { name: "Previous month" }).click();
-  await page
-    .locator("a.subscription-evidence")
-    .filter({ hasText: /Garden market/i })
-    .click();
-  await page.getByRole("link", { name: /Category overview/ }).click();
-  await expect(page.locator(".month-picker input[type=month]")).toHaveValue(
-    "2026-09",
-  );
-  await page.locator("a.back-link").click();
-  await expect(page).toHaveURL(/analysis\?period=3/);
-  await expect(
-    page.getByRole("button", { name: "3 months", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await page.goto("/#/review?month=2026-09&step=2");
-  const steps = page.getByRole("group", { name: "Monthly review steps" });
-  await expect(
-    steps.getByRole("button", { name: /What changed/ }),
-  ).toHaveAttribute("aria-pressed", "true");
-  await steps.getByRole("button", { name: /Pots and goals/ }).click();
-  await page.reload();
-  await expect(
-    steps.getByRole("button", { name: /Pots and goals/ }),
-  ).toHaveAttribute("aria-pressed", "true");
 });
 
 test("a bill in the Home review count opens in the queue and evidence returns to the chosen view", async ({

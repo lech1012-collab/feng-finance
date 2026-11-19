@@ -734,7 +734,10 @@ function Shell() {
                     </button>
                   </div>
                 )}
-                <Suspense fallback={<p role="status">Loading…</p>}>
+                <Suspense
+                  key={location.pathname}
+                  fallback={<p role="status">Loading…</p>}
+                >
                   <Routes>
                     <Route path="/accounts" element={<Accounts />} />
                     <Route
