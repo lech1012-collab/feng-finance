@@ -111,7 +111,7 @@ test("Home sends only uncategorised payments to sorting, skipping 189 already ca
   const nav = page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true });
-  await nav.getByRole("link", { name: "Transactions", exact: true }).click();
+  await nav.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
