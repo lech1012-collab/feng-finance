@@ -65,7 +65,7 @@ test("four PDFs survive navigation during reading and review, including category
     .setInputFiles(
       ["barclays-current", "barclaycard", "amex", "revolut"].map(fixture),
     );
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
@@ -74,7 +74,7 @@ test("four PDFs survive navigation during reading and review, including category
   page.on("filechooser", () => {
     choosers++;
   });
-  await page.getByRole("link", { name: "Import", exact: true }).click();
+  await page.getByRole("link", { name: "Import (4)", exact: true }).click();
   await expect(page.locator(".import-statement-card")).toHaveCount(4);
   const current = statement(page, "known-bank-barclaycard.pdf");
   await expand(current);
@@ -88,11 +88,11 @@ test("four PDFs survive navigation during reading and review, including category
   await row
     .getByRole("combobox", { name: "Category", exact: true })
     .selectOption("shopping");
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Import", exact: true }).click();
+  await page.getByRole("link", { name: "Import (4)", exact: true }).click();
   await expect(
     row.getByRole("combobox", { name: "Category", exact: true }),
   ).toHaveValue("shopping");
@@ -132,7 +132,7 @@ test("the visible native amount opens one real editor, preserves typed input acr
   page,
 }) => {
   test.setTimeout(150000);
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
   await expect(
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
@@ -161,7 +161,7 @@ test("the visible native amount opens one real editor, preserves typed input acr
     page.getByRole("heading", { name: "Transactions", exact: true }),
   ).toBeVisible();
   await expect(editor).not.toBeVisible();
-  await page.getByRole("link", { name: "Import", exact: true }).click();
+  await page.getByRole("link", { name: "Import (1)", exact: true }).click();
   await expect(editor).toBeVisible();
   await expect(input).toHaveValue("80.");
   await input.tap();
@@ -373,7 +373,7 @@ test("discard is explicit, cancel keeps the batch, and confirmed discard never d
   await expect(page.locator(".import-statement-card")).toHaveCount(0);
   expect(await records(page, "transactions")).toEqual(originalTransactions);
   expect(await records(page, "statements")).toEqual(originalStatements);
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
   const chooser = page.waitForEvent("filechooser");
   await page.getByRole("link", { name: "Import", exact: true }).click();
   await (await chooser).setFiles([]);

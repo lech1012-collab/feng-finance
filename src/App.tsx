@@ -551,20 +551,26 @@ function Shell() {
           className="mobile-navigation"
           aria-label="Main navigation"
         >
-          {[
-            ["/import", "Import", Plus],
-            ["/transactions", "Transactions", List],
-            ["/", "Home", HomeIcon],
-            ["/analysis", "Analyse", ChartNoAxesCombined],
-            ["/planning", "Planning", CalendarClock],
-          ].map(([path, label, Icon]) => {
-            const I = Icon as typeof HomeIcon;
-            const active = activeSection === sectionForPath(String(path));
+          {(
+            [
+              [
+                "/import",
+                pendingImportCount
+                  ? `Import (${pendingImportCount})`
+                  : "Import",
+                Plus,
+              ],
+              ["/transactions", "Activity", List],
+              ["/", "Home", HomeIcon],
+              ["/analysis", "Analyse", ChartNoAxesCombined],
+              ["/planning", "Planning", CalendarClock],
+            ] as const
+          ).map(([path, label, Icon]) => {
+            const active = activeSection === sectionForPath(path);
             return (
               <Link
-                key={String(path)}
-                to={String(path)}
-                aria-label={String(label)}
+                key={path}
+                to={path}
                 className={active ? "active" : undefined}
                 aria-current={active ? "page" : undefined}
                 onClick={
@@ -583,14 +589,8 @@ function Shell() {
                     : undefined
                 }
               >
-                <I size={21} />
-                <span>
-                  {label === "Transactions"
-                    ? "Activity"
-                    : label === "Import" && pendingImportCount
-                      ? `Import (${pendingImportCount})`
-                      : String(label)}
-                </span>
+                <Icon size={21} aria-hidden="true" />
+                <span>{label}</span>
               </Link>
             );
           })}

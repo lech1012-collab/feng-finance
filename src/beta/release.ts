@@ -12,14 +12,12 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-11-19",
+  date: "2026-11-20",
   points: [
-    "Category charts, refund links and transfer reviews open the records for the reporting period you selected.",
-    "Sorting and bulk editing follow the transactions visible in Activity. Manual cash accounts show their dated balances.",
-    "Home identifies missing exchange rates before showing category shares.",
+    "On mobile, Activity and the pending Import count now have the same names on screen and in assistive technology.",
   ],
   pleaseTest: [
-    "Open a category in a payday-based month and check its transactions. In Activity, select a payment and filter it out before making a bulk edit.",
+    "Select two statements, open Activity, then use the Import (2) tab to resume the review.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -27,6 +25,20 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.32",
+    date: "2026-11-19",
+    points: [
+      "Category charts, refund links and transfer reviews open the records for the reporting period you selected.",
+      "Sorting and bulk editing follow the transactions visible in Activity. Manual cash accounts show their dated balances.",
+      "Home identifies missing exchange rates before showing category shares.",
+    ],
+    pleaseTest: [
+      "Open a category in a payday-based month and check its transactions. In Activity, select a payment and filter it out before making a bulk edit.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.31",
     date: "2026-10-26",

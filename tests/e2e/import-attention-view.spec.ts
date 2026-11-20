@@ -111,12 +111,12 @@ test("21 PDFs default to two exceptions; filtering never excludes hidden ready s
   await page.screenshot({ path: testInfo.outputPath("all-21-files.png") });
   await attention.click();
   await expect(page.locator(".import-statement-card:visible")).toHaveCount(2);
-  await page.getByRole("link", { name: "Transactions", exact: true }).click();
+  await page.getByRole("link", { name: "Activity", exact: true }).click();
   let pickerOpened = false;
   page.on("filechooser", () => {
     pickerOpened = true;
   });
-  await page.getByRole("link", { name: "Import", exact: true }).click();
+  await page.getByRole("link", { name: "Import (21)", exact: true }).click();
   expect(pickerOpened).toBe(false);
   await expect(attention).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".import-statement-card:visible")).toHaveCount(2);

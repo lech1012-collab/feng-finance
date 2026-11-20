@@ -1050,7 +1050,7 @@ test("Barclaycard issue date, two reading columns and repayment exclusion", asyn
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
-    .getByRole("link", { name: "Transactions", exact: true })
+    .getByRole("link", { name: "Activity", exact: true })
     .click();
   await expect(page.getByRole("link", { name: /\+£900\.00/ })).toContainText(
     "Transfer",
@@ -1431,7 +1431,7 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
   await page
     .getByRole("navigation", { name: "Main navigation" })
     .filter({ visible: true })
-    .getByRole("link", { name: "Transactions", exact: true })
+    .getByRole("link", { name: "Activity", exact: true })
     .click();
   const quick = page.getByRole("group", {
     name: "Transaction category filters",
@@ -2355,6 +2355,9 @@ test("navigation consistently selects the owning section for every route", async
       await expect(nav.locator('[aria-current="page"]')).toHaveCount(0);
     } else {
       await expect(nav.locator('[aria-current="page"]')).toHaveText(label);
+      await expect(nav.locator('[aria-current="page"]')).toHaveAccessibleName(
+        label,
+      );
       await expect(nav.locator(".active")).toHaveCount(1);
     }
     await expect(page.locator(".app")).toHaveAttribute("data-page", palette);
