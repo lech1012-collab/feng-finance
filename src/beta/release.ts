@@ -14,12 +14,11 @@ export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
   date: "2026-11-21",
   points: [
-    "Tap the monthly coverage badge on Home to see which accounts and dates need attention.",
-    "Statement reminders follow your bank and card accounts across display currencies. Manual wallets stay out of the reminder list.",
-    "Record the date your subscription cancellation takes effect to spot later charges and open the payment.",
+    "Home brings balances and monthly cash flow into focus, with a new glass navigation dock on iPhone.",
+    "Navigation and sheets follow your theme, contrast and transparency preferences.",
   ],
   pleaseTest: [
-    "Check a partial month on Home. Record a cancellation date for a recurring charge and inspect any payment after that date.",
+    "Move between Home, Activity and Import, open a coverage badge, and try the same journey in light and dark appearance.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -27,6 +26,20 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.34",
+    date: "2026-11-21",
+    points: [
+      "Tap the monthly coverage badge on Home to see which accounts and dates need attention.",
+      "Statement reminders follow your bank and card accounts across display currencies. Manual wallets stay out of the reminder list.",
+      "Record the date your subscription cancellation takes effect to spot later charges and open the payment.",
+    ],
+    pleaseTest: [
+      "Check a partial month on Home. Record a cancellation date for a recurring charge and inspect any payment after that date.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.33",
     date: "2026-11-20",

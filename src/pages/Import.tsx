@@ -1118,7 +1118,16 @@ export default function ImportPage({
               }
             }}
           >
-            <Upload size={28} />
+            <div className="statement-art" aria-hidden="true">
+              <span className="statement-art-sheet">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="statement-art-arrow">
+                <Upload size={21} />
+              </span>
+            </div>
             <div className="context-help-heading">
               <h2>Add your statements</h2>
               <ContextHelp title="Importing statements">

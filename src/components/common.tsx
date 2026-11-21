@@ -138,6 +138,7 @@ export function Empty({
 }
 export function Metric({
   label,
+  tone,
   value,
   currency,
   approximate = false,
@@ -145,6 +146,7 @@ export function Metric({
   unavailable,
 }: {
   label: string;
+  tone?: "income" | "spending" | "net";
   value: number;
   currency: string;
   approximate?: boolean;
@@ -152,7 +154,7 @@ export function Metric({
   unavailable?: string;
 }) {
   return (
-    <div className="metric">
+    <div className="metric" data-tone={unavailable ? undefined : tone}>
       <span>{label}</span>
       <strong>
         {unavailable ? (

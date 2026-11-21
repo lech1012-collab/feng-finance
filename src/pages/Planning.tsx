@@ -3,6 +3,7 @@ import {
   useRootFontSize,
 } from "../components/useRootFontSize";
 import { useState } from "react";
+import { revealSelectedControl } from "../components/revealSelectedControl";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link, useSearchParams } from "react-router-dom";
 import {
@@ -174,6 +175,7 @@ export default function Planning({
             id={`planning-tab-${value}`}
             aria-controls={`planning-panel-${value}`}
             role="tab"
+            ref={tab === value ? revealSelectedControl : undefined}
             aria-selected={tab === value}
             tabIndex={tab === value ? 0 : -1}
             key={value}
@@ -187,7 +189,9 @@ export default function Planning({
                     tabs.length
                 ];
               setParams({ tab: next });
-              document.getElementById(`planning-tab-${next}`)?.focus();
+              document
+                .getElementById(`planning-tab-${next}`)
+                ?.focus({ preventScroll: true });
             }}
           >
             {value[0].toUpperCase() + value.slice(1)}

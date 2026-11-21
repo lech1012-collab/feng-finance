@@ -26,7 +26,7 @@ export function ThemeSync() {
       }
       document
         .querySelector('meta[name="theme-color"]')
-        ?.setAttribute("content", theme === "dark" ? "#101217" : "#f3f4f6");
+        ?.setAttribute("content", theme === "dark" ? "#101624" : "#eff3fa");
     };
     apply();
     if (preference === "system") media?.addEventListener("change", apply);

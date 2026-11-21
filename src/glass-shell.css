@@ -1,0 +1,293 @@
+/* The atmosphere stays at the top of the document, even on long ledgers. */
+.app[data-page] {
+  --shell-edge: color-mix(in srgb, var(--ink) 12%, transparent);
+  --shell-highlight: rgb(255 255 255 / 10%);
+  --shell-shadow: rgb(0 4 14 / 27%);
+  --shell-selection: color-mix(in srgb, var(--accent) 11%, var(--surface));
+  --shell-tint: color-mix(in srgb, var(--accent) 12%, transparent);
+  background-color: var(--canvas);
+  background-image:
+    radial-gradient(ellipse at 84% 0%, var(--shell-tint), transparent 62%),
+    radial-gradient(ellipse at 5% 7%, rgb(104 142 173 / 8%), transparent 50%);
+  background-size:
+    100% 39rem,
+    100% 31rem;
+  background-repeat: no-repeat;
+}
+
+:root[data-theme="light"] .app[data-page] {
+  --shell-highlight: rgb(255 255 255 / 88%);
+  --shell-shadow: rgb(26 44 70 / 10%);
+  --shell-tint: color-mix(in srgb, var(--accent) 8%, transparent);
+}
+
+.app .brand {
+  color: var(--ink);
+  gap: 11px;
+  font-weight: 690;
+  line-height: 1.1;
+}
+
+.app .brand-icon {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: block;
+  flex: none;
+  border-radius: 10px;
+  background: #12213f;
+  box-shadow:
+    0 0 0 1px var(--shell-edge),
+    0 3px 8px var(--shell-shadow);
+}
+
+.app .brand-finance {
+  margin-top: 4px;
+  font-weight: 550;
+  letter-spacing: 0.045em;
+  color: var(--muted);
+}
+
+.app .sidebar,
+.app .mobile-header,
+.app .mobile-navigation::before {
+  background-color: var(--surface);
+  border-color: var(--shell-edge);
+}
+
+@supports (
+  (backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))
+) {
+  .app .sidebar,
+  .app .mobile-header,
+  .app .mobile-navigation::before {
+    background-color: color-mix(in srgb, var(--surface) 83%, transparent);
+    -webkit-backdrop-filter: saturate(145%) blur(22px);
+    backdrop-filter: saturate(145%) blur(22px);
+  }
+}
+
+@media (min-width: 761px) {
+  .app .sidebar {
+    inset: 12px auto 12px 12px;
+    width: 178px;
+    padding: 24px 12px 12px;
+    border: 1px solid var(--shell-edge);
+    border-radius: 22px;
+    box-shadow:
+      inset 0 1px var(--shell-highlight),
+      0 8px 24px var(--shell-shadow);
+    overflow-y: auto;
+  }
+
+  .app .sidebar > .brand {
+    min-height: 44px;
+    padding-inline: 6px;
+    align-self: flex-start;
+    font-size: 1.375rem;
+  }
+
+  .app .sidebar > .ui-demo-chip {
+    margin: 4px 0 0 6px;
+  }
+
+  .app .sidebar .sidebar-import {
+    flex: none;
+    margin-top: 22px;
+    padding: 10px 8px;
+    border-radius: 13px;
+    white-space: normal;
+  }
+
+  .app .sidebar nav {
+    gap: 4px;
+    margin-top: 23px;
+    padding-top: 14px;
+    border-top: 1px solid var(--shell-edge);
+  }
+
+  .app .sidebar nav a {
+    min-height: 46px;
+    padding: 9px 10px;
+    border: 1px solid transparent;
+    border-radius: 12px;
+    gap: 11px;
+    color: var(--muted);
+    font-weight: 540;
+    overflow-wrap: anywhere;
+  }
+
+  .app .sidebar nav a:hover {
+    background: var(--raised);
+    color: var(--ink);
+  }
+
+  .app .sidebar nav a.active {
+    color: var(--accent);
+    background: var(--shell-selection);
+    border-color: var(--shell-edge);
+    box-shadow:
+      inset 0 1px var(--shell-highlight),
+      0 2px 5px var(--shell-shadow);
+    font-weight: 650;
+  }
+}
+
+@media (min-width: 900px) {
+  .app .sidebar {
+    width: 226px;
+    inset-inline-start: 14px;
+    padding: 26px 15px 15px;
+  }
+}
+
+@media (max-width: 760px) {
+  .app .mobile-header {
+    padding: max(8px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right)) 8px
+      max(16px, env(safe-area-inset-left));
+    border-bottom: 1px solid var(--shell-edge);
+    box-shadow: inset 0 1px var(--shell-highlight);
+  }
+
+  .app .mobile-header .ui-app-header-main {
+    container: header-brand / inline-size;
+  }
+
+  .app .mobile-header .brand {
+    width: fit-content;
+    gap: 8px;
+    font-size: 1.0625rem;
+    letter-spacing: -0.04em;
+  }
+
+  .app .mobile-header .brand-icon {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+  }
+
+  .app .mobile-header .mobile-settings {
+    color: var(--ink);
+    background: var(--raised);
+    border: 1px solid var(--shell-edge);
+    border-radius: 50%;
+    box-shadow: inset 0 1px var(--shell-highlight);
+  }
+
+  .app .mobile-settings[aria-current="page"] {
+    color: var(--accent);
+    background: var(--shell-selection);
+  }
+
+  /* Padding keeps the safe-area gap in the measured height used by sticky actions. */
+  .app .mobile-navigation {
+    --dock-gap: max(8px, env(safe-area-inset-bottom));
+    isolation: isolate;
+    inset: auto max(8px, env(safe-area-inset-right)) 0
+      max(8px, env(safe-area-inset-left));
+    max-width: 31rem;
+    margin-inline: auto;
+    padding: 5px 5px calc(5px + var(--dock-gap));
+    gap: 2px;
+    background: transparent;
+    border: 0;
+    pointer-events: none;
+  }
+
+  .app .mobile-navigation::before {
+    content: "";
+    position: absolute;
+    inset: 0 0 var(--dock-gap);
+    z-index: -1;
+    border: 1px solid var(--shell-edge);
+    border-radius: 26px;
+    box-shadow:
+      inset 0 1px var(--shell-highlight),
+      0 4px 20px var(--shell-shadow);
+    pointer-events: auto;
+  }
+
+  .app .mobile-navigation > a {
+    pointer-events: auto;
+    padding: 4px 1px;
+    min-height: 52px;
+    gap: 3px;
+    border: 1px solid transparent;
+    border-radius: 21px;
+    line-height: 1.15;
+    font-weight: 550;
+    color: var(--muted);
+  }
+
+  .app .mobile-navigation > a.active {
+    color: var(--accent);
+    background: var(--shell-selection);
+    border-color: var(--shell-edge);
+    box-shadow:
+      inset 0 1px var(--shell-highlight),
+      0 1px 4px var(--shell-shadow);
+    font-weight: 650;
+  }
+
+  .app .mobile-navigation > a svg {
+    width: 21px;
+    height: 21px;
+    stroke-width: 1.8px;
+  }
+
+  .app .mobile-navigation > a.active svg {
+    stroke-width: 2.2px;
+  }
+
+  .app .mobile-navigation > a > span {
+    display: block;
+    white-space: normal;
+  }
+}
+
+@container navitem (max-width: 4.2em) {
+  .app .mobile-navigation > a > span {
+    display: none;
+  }
+}
+
+@container header-brand (max-width: 5.5rem) {
+  .app .mobile-header .brand > span {
+    display: none;
+  }
+}
+
+@container header-brand (min-width: 9rem) {
+  .app .mobile-header .brand-finance {
+    display: inline;
+    font-size: inherit;
+    letter-spacing: inherit;
+    font-weight: 500;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce),
+  (prefers-contrast: more),
+  (forced-colors: active) {
+  .app[data-page] {
+    background-image: none;
+  }
+
+  .app .sidebar,
+  .app .mobile-header,
+  .app .mobile-navigation::before {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .app .sidebar nav a.active,
+  .app .mobile-navigation > a.active,
+  .app .mobile-settings[aria-current="page"] {
+    border: 2px solid Highlight;
+  }
+}

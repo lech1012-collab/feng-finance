@@ -1,0 +1,114 @@
+/* Chrome can sample the canvas. Financial content always has an opaque surface. */
+:root {
+  --canvas: #101624;
+  --surface: #1a2334;
+  --raised: #242f44;
+  --ink: #f2f5fc;
+  --muted: #b3bfd2;
+  --line: #3d4a60;
+  --glass-chrome: rgb(29 39 58 / 85%);
+  --glass-rim: rgb(201 218 253 / 22%);
+  --panel-edge: #344156;
+  --panel-sheen: rgb(225 237 255 / 6%);
+  --panel-shadow: 0 6px 18px rgb(2 7 18 / 16%);
+  --control-shadow: 0 2px 5px rgb(2 7 18 / 18%);
+}
+:root[data-theme="light"] {
+  --canvas: #eff3fa;
+  --surface: #fcfdff;
+  --raised: #edf2f9;
+  --ink: #17243a;
+  --muted: #506078;
+  --line: #cbd5e3;
+  --glass-chrome: rgb(247 250 255 / 84%);
+  --glass-rim: rgb(255 255 255 / 90%);
+  --panel-edge: #d7e0ec;
+  --panel-sheen: #fff;
+  --panel-shadow: 0 5px 18px rgb(31 55 88 / 6%);
+  --control-shadow: 0 2px 5px rgb(31 55 88 / 9%);
+}
+:root[data-theme] .app[data-page] {
+  --surface: inherit;
+  --raised: inherit;
+}
+.app main .card {
+  border-radius: 20px;
+  border-color: var(--panel-edge);
+  box-shadow:
+    inset 0 1px var(--panel-sheen),
+    var(--panel-shadow);
+}
+.app .page-heading h1 {
+  font-size: clamp(1.375rem, 1.12rem + 3.1vw, 2.625rem);
+  overflow-wrap: anywhere;
+  line-height: 1.1;
+  letter-spacing: -0.04em;
+}
+.app .card h2 {
+  line-height: 1.24;
+  letter-spacing: -0.025em;
+}
+.app button.primary:enabled,
+.app a.button.primary {
+  border-radius: 16px;
+  box-shadow:
+    inset 0 1px rgb(255 255 255 / 27%),
+    var(--control-shadow);
+}
+.app .segmented-control.ui-segmented-control {
+  gap: 2px;
+  padding: 2px 3px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 15px;
+  background: var(--raised);
+}
+.app .segmented-control.ui-segmented-control > button {
+  border-radius: 12px;
+  padding: 2px;
+}
+.app .segmented-control.ui-segmented-control .ui-segment-visual {
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  color: var(--muted);
+}
+.app
+  .segmented-control.ui-segmented-control
+  button[aria-pressed="true"]
+  .ui-segment-visual {
+  background: var(--surface);
+  color: var(--ink);
+  border-color: var(--panel-edge);
+  box-shadow:
+    inset 0 1px var(--panel-sheen),
+    var(--control-shadow);
+}
+/* Selected segments retain a visible boundary when effects are reduced. */
+@media (prefers-contrast: more) {
+  :root[data-theme] {
+    --panel-edge: var(--muted);
+  }
+  .app main .card {
+    box-shadow: none;
+  }
+  .app
+    .segmented-control.ui-segmented-control
+    button[aria-pressed="true"]
+    .ui-segment-visual {
+    border-color: currentColor;
+  }
+}
+@media (forced-colors: active) {
+  .app main .card {
+    border-color: CanvasText;
+    box-shadow: none;
+  }
+  .app
+    .segmented-control.ui-segmented-control
+    button[aria-pressed="true"]
+    .ui-segment-visual {
+    color: HighlightText;
+    background: Highlight;
+    border-color: Highlight;
+  }
+}

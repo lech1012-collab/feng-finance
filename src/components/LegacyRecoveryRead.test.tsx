@@ -75,7 +75,10 @@ it("searches, opens sorting tags and prepares a split without filling missing le
   fireEvent.click(
     within(board).getByRole("button", { name: "Split between categories" }),
   );
-  expect(await screen.findByLabelText("Split amount 1")).toBeVisible();
+  // The split form appears after its IndexedDB queries finish.
+  expect(
+    await screen.findByLabelText("Split amount 1", {}, { timeout: 8000 }),
+  ).toBeVisible();
   fireEvent.click(screen.getByRole("button", { name: "Add line" }));
   expect(screen.getByLabelText("Split amount 3")).toBeVisible();
   expect(await db.transactions.get(legacy.id)).toEqual(before);

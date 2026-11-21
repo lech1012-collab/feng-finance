@@ -488,10 +488,12 @@ function Shell() {
           Skip to content
         </a>
         <aside className="sidebar">
-          <NavLink className="brand" to="/">
-            <span className="brand-icon">
-              F<span>·</span>
-            </span>
+          <NavLink className="brand" to="/" aria-label="Feng Finance">
+            <img
+              className="brand-icon"
+              src={`${import.meta.env.BASE_URL}favicon.svg`}
+              alt=""
+            />
             <span>
               Feng<span className="brand-finance">Finance</span>
             </span>
@@ -571,6 +573,7 @@ function Shell() {
               <Link
                 key={path}
                 to={path}
+                aria-label={label}
                 className={active ? "active" : undefined}
                 aria-current={active ? "page" : undefined}
                 onClick={
@@ -644,10 +647,12 @@ function Shell() {
               </>
             }
           >
-            <NavLink className="brand" to="/">
-              <span className="brand-icon">
-                F<span>·</span>
-              </span>
+            <NavLink className="brand" to="/" aria-label="Feng Finance">
+              <img
+                className="brand-icon"
+                src={`${import.meta.env.BASE_URL}favicon.svg`}
+                alt=""
+              />
               <span>
                 Feng<span className="brand-finance"> Finance</span>
               </span>

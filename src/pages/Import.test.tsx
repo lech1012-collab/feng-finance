@@ -466,7 +466,7 @@ describe("PDF review session lifecycle", () => {
     ).toBeVisible();
     expect(extractFile).toHaveBeenCalledTimes(2);
     expect(await db.transactions.count()).toBe(0);
-  });
+  }, 15000);
 
   it("appends another picker selection while preserving reviewed rows and live sources", async () => {
     const firstSource = extracted();

@@ -1,0 +1,225 @@
+/* Keep the glass on the window. Editors, evidence and scrollable content keep
+   their own surfaces and the native dialog continues to own focus and scrolling. */
+dialog[class],
+.ux-toast,
+.context-help-inline {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--glass-rim, var(--line));
+  box-shadow:
+    inset 0 1px 0 var(--glass-rim, var(--line)),
+    var(--panel-shadow, 0 16px 48px rgb(12 20 40 / 18%));
+}
+
+dialog[class]::backdrop {
+  background: rgb(16 27 50 / 34%);
+  -webkit-backdrop-filter: none;
+  backdrop-filter: none;
+}
+
+@supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px)))
+  and (color: color-mix(in srgb, red, blue)) {
+  dialog[class],
+  .ux-toast {
+    --overlay-light: color-mix(in srgb, var(--accent) 7%, transparent);
+    background:
+      linear-gradient(145deg, var(--overlay-light), transparent 32%),
+      var(--glass-chrome, color-mix(in srgb, var(--surface) 94%, transparent));
+    -webkit-backdrop-filter: blur(24px) saturate(124%);
+    backdrop-filter: blur(24px) saturate(124%);
+  }
+}
+
+:where(:root[data-theme="dark"]) dialog[class]::backdrop {
+  background: rgb(4 9 19 / 55%);
+}
+
+dialog.ux-sheet {
+  border-radius: 26px 26px 0 0;
+}
+
+.ux-sheet .sheet-grab {
+  width: 38px;
+  height: 4px;
+  margin-top: 9px;
+  background: var(--muted);
+}
+
+.ux-sheet .sheet-heading {
+  padding: 12px max(16px, env(safe-area-inset-right)) 12px
+    max(16px, env(safe-area-inset-left));
+  border-bottom: 1px solid var(--line);
+}
+
+.ux-sheet .sheet-content {
+  padding-top: 16px;
+  padding-inline: max(16px, env(safe-area-inset-left))
+    max(16px, env(safe-area-inset-right));
+  padding-bottom: max(
+    16px,
+    env(safe-area-inset-bottom),
+    calc(var(--feng-toast-clearance, 0px) + 16px)
+  );
+  scroll-padding-block: 12px;
+}
+
+.ux-sheet .sheet-footer {
+  background: var(--surface);
+  padding-inline: max(16px, env(safe-area-inset-left))
+    max(16px, env(safe-area-inset-right));
+  gap: 8px;
+}
+
+.ux-sheet .sheet-footer:empty {
+  display: none;
+}
+
+.ux-sheet .sheet-heading h2,
+.category-dialog .category-dialog-heading h2,
+.accuracy-dialog > header h2,
+.beta-whats-new h2 {
+  color: var(--ink);
+  font-size: 1.25rem;
+  line-height: 1.22;
+  letter-spacing: -0.033em;
+  font-weight: 650;
+}
+
+.ux-sheet .sheet-heading h2,
+.accuracy-dialog > header h2 {
+  margin: 0;
+}
+
+.sheet-heading button.icon-button,
+.context-help-inline .context-help-heading button,
+.ux-toast button.icon-button,
+.category-dialog .category-dialog-heading button,
+.accuracy-dialog > header button {
+  min-height: 44px;
+  min-width: 44px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--ink);
+  line-height: 1;
+}
+
+.sheet-heading button.icon-button,
+.ux-toast button.icon-button,
+.context-help-inline .context-help-heading button.icon-button {
+  height: 44px;
+  width: 44px;
+  padding: 0;
+  font-size: 1.35rem;
+  font-weight: 400;
+}
+
+.context-help-content {
+  color: var(--ink);
+  font-size: 0.9375rem;
+}
+
+.context-help-content p:last-child,
+.context-help-content ul:last-child,
+.context-help-content ol:last-child {
+  margin-block-end: 0;
+}
+
+.context-help-content.context-help-inline {
+  background: var(--raised);
+  border-radius: 18px;
+  box-shadow: inset 0 1px 0 var(--glass-rim, var(--line));
+}
+
+.context-help-inline > .context-help-heading {
+  margin-bottom: 10px;
+}
+
+dialog.beta-whats-new {
+  border-radius: 26px;
+  overscroll-behavior: contain;
+}
+
+.beta-whats-new .beta-notice-content {
+  padding: clamp(20px, 5vw, 36px);
+}
+
+.beta-whats-new .primary {
+  border-radius: 15px;
+}
+
+.ux-toast {
+  border-radius: 20px;
+  padding: 5px 6px 5px 16px;
+  line-height: 1.4;
+  font-weight: 550;
+}
+
+.ux-toast > button:not(.icon-button) {
+  min-height: 44px;
+  padding-inline: 14px;
+  border-radius: 999px;
+  color: var(--accent);
+}
+
+@media (min-width: 900px) {
+  /* The keyboard inset and visual viewport height are measured by Sheet. */
+  dialog.ux-sheet {
+    inset: auto max(12px, env(safe-area-inset-right))
+      calc(12px + var(--keyboard-inset, 0px)) auto;
+    width: min(460px, calc(100vw - 24px));
+    height: calc(var(--sheet-height, 100dvh) - 24px);
+    border-radius: 22px;
+  }
+  .ux-sheet .sheet-heading {
+    padding: 16px 20px;
+  }
+  .ux-sheet .sheet-content,
+  .ux-sheet .sheet-footer {
+    padding-inline: 20px;
+  }
+  dialog.category-dialog {
+    inset: 12px max(12px, env(safe-area-inset-right)) auto auto;
+    border-radius: 22px;
+    max-height: calc(100dvh - 24px);
+  }
+}
+
+@media (min-width: 1100px) {
+  dialog.accuracy-dialog {
+    inset: 12px max(12px, env(safe-area-inset-right)) auto auto;
+    height: calc(100dvh - 24px);
+    border-radius: 22px;
+  }
+}
+
+@media (prefers-reduced-transparency: reduce),
+  (prefers-contrast: more),
+  (forced-colors: active) {
+  dialog[class],
+  .ux-toast,
+  .context-help-content.context-help-inline {
+    background: var(--surface);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    box-shadow: none;
+    border-color: var(--line);
+  }
+  :root dialog[class]::backdrop {
+    background: var(--canvas);
+  }
+}
+
+@media (forced-colors: active) {
+  dialog[class],
+  .ux-toast,
+  .context-help-content.context-help-inline,
+  :root dialog[class]::backdrop {
+    color: CanvasText;
+    background: Canvas;
+    border-color: CanvasText;
+  }
+  .ux-sheet .sheet-grab {
+    background: CanvasText;
+  }
+}

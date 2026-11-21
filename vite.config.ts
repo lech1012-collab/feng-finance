@@ -68,8 +68,8 @@ export default defineConfig(({ mode }) => {
           name: "Feng",
           short_name: "Feng",
           description: "Private personal cash flow, on your device.",
-          theme_color: "#101217",
-          background_color: "#101217",
+          theme_color: "#101624",
+          background_color: "#101624",
           display: "standalone",
           start_url: ".",
           scope: ".",
@@ -91,7 +91,7 @@ export default defineConfig(({ mode }) => {
         },
         workbox: {
           globPatterns: [
-            "**/*.{js,mjs,css,html,svg,png,wasm,gz,bcmap,pfb,ttf}",
+            "**/*.{js,mjs,css,html,svg,png,webp,wasm,gz,bcmap,pfb,ttf}",
           ],
           maximumFileSizeToCacheInBytes: 16000000,
           navigateFallback: "index.html",

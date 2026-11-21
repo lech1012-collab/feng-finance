@@ -1,5 +1,6 @@
 import { useId, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import { revealSelectedControl } from "./revealSelectedControl";
 import "./ui-primitives.css";
 
 /** Shared chrome keeps status and action controls out of the page's data area. */
@@ -271,6 +272,11 @@ export function SegmentedControl<T extends string | number>({
         <button
           key={String(option.value)}
           type="button"
+          ref={
+            String(value) === String(option.value)
+              ? revealSelectedControl
+              : undefined
+          }
           aria-pressed={String(value) === String(option.value)}
           aria-label={option.ariaLabel}
           disabled={option.disabled}

@@ -242,6 +242,10 @@ statement counts, balances and reconciliation use the original parent once.
 Unsplit restores one transaction. No child can be mistaken for another movement
 on the source statement.
 
+## Appearance and accessibility
+
+Feng uses glass for navigation and sheets. Balances, charts and transaction rows have an opaque reading surface. Settings → Appearance selects System, Light or Dark. The app uses solid navigation and sheet backgrounds when the browser reports Reduce Transparency or increased contrast. The navigation dock accommodates the iPhone safe area, and desktop navigation keeps Settings at the foot of the sidebar. Interface artwork ships with the app and is cached for offline use. The choice of surfaces follows [Apple’s guidance on materials](https://developer.apple.com/design/human-interface-guidelines/materials).
+
 ## Screens and planning
 
 Home and category drilldowns use the reporting dates configured in Settings.

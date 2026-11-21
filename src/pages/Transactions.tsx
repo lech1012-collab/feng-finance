@@ -26,6 +26,7 @@ import {
 import { markTransactionsReviewed } from "../storage/accuracy";
 import { undoChange } from "../storage/audit";
 import {
+  Fragment,
   useState,
   useMemo,
   useRef,
@@ -44,7 +45,14 @@ import {
 } from "../domain/transaction-filters";
 import { useSearchParams } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import { Search, SlidersHorizontal } from "lucide-react";
+import {
+  CalendarDays,
+  Layers,
+  Search,
+  SlidersHorizontal,
+  Tags,
+  WalletCards,
+} from "lucide-react";
 import { CategoryBoard } from "../components/CategoryBoard";
 import { SwipeTransaction } from "../components/SwipeTransaction";
 import type { Transaction, Rule } from "../domain/models";
@@ -918,7 +926,10 @@ export default function Transactions({
               reset();
             }}
           >
-            <span className="account-chip-visual">All accounts</span>
+            <span className="account-chip-visual">
+              <Layers aria-hidden="true" size={17} />
+              All accounts
+            </span>
           </button>
           {data.accounts.map((a) => {
             const snapshot = accountSnapshot(a, data.statements, selectedMonth);
@@ -945,6 +956,7 @@ export default function Transactions({
               <button
                 key={a.id}
                 className="account-filter-chip"
+                data-institution={a.institution}
                 aria-pressed={account === a.id}
                 onClick={() => {
                   setAccount(account === a.id ? "" : a.id);
@@ -967,9 +979,11 @@ export default function Transactions({
       <div className="transaction-tools">
         <ManualTransactionEditor />
         <Link className="button" to="/accounts" state={{ returnTo }}>
+          <WalletCards size={16} aria-hidden="true" />
           Accounts
         </Link>
         <Link className="button" to="/settings?section=tags">
+          <Tags size={16} aria-hidden="true" />
           Tags
         </Link>
       </div>
@@ -1085,6 +1099,7 @@ export default function Transactions({
           ))}
         </div>
         <p className="filter-context">
+          <CalendarDays size={15} aria-hidden="true" />
           {allDates ? "All imported dates" : displayDateRange(from, to)}
           {refundsOnly && " · Refunds"}
           {toReview && exceptionsOnly
@@ -1401,112 +1416,117 @@ export default function Transactions({
       )}
       <div className="transactions-workspace">
         <section className="card transaction-list">
-          {items.map((t) => (
-            <SwipeTransaction
-              key={t.id}
-              transaction={t}
-              accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : t.kind === "split_parent" ? "Split payment" : t.kind === "refund" ? "Refund" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId) ? displayAccountName(data.accounts.find((a) => a.id === t.accountId)!) : "Account"}, ${money(t.amount, t.currency, true)}`}
-              returnTo={returnTo}
-              selected={selectedIds.includes(t.id)}
-              onSelect={(event) => selectRow(t, event)}
-              suggestion={
-                data
-                  ? categorySuggestions(t, data.categories, data.rules, [])[0]
-                  : undefined
-              }
-              onQuickCategorize={(categoryId) =>
-                void applyToSelection([t.id], categoryId)
-              }
-              onCategorize={() => beginSort(t)}
-              onDragCategorize={(start) => beginSort(t, start)}
-            >
-              <div className="transaction-description">
-                <strong>{displayMerchant(t)}</strong>
-                {needsReview(t) && !needsCategory(t) && (
-                  <StatusChip className="review-status" tone="warning">
-                    {transactionReviewReason(t) === "source"
-                      ? "Check source"
-                      : transactionReviewReason(t) === "split"
-                        ? "Confirm split"
-                        : "Link refund"}
-                  </StatusChip>
-                )}
-                {t.kind === "split_parent" && (
-                  <StatusChip className="transaction-status">
-                    Split ·{" "}
-                    {data?.items.filter((child) => child.parentId === t.id)
-                      .length ?? 0}{" "}
-                    lines
-                  </StatusChip>
-                )}
-                {t.kind === "refund" && (
-                  <StatusChip className="transaction-status">
-                    Refund
-                    {t.refundAllocations?.length
-                      ? ` · counted in ${
-                          refundCountedMonths(
-                            t,
-                            data?.refundOriginals ?? [],
-                            data?.settings ?? [],
-                            data?.periodRows ?? [],
-                          )
-                            .map((month) => refundMonthName(month, true))
-                            .join(", ") || "original purchase month"
-                        }`
-                      : " · link a purchase"}
-                  </StatusChip>
-                )}
-                {t.kind !== "split_parent" && t.kind !== "refund" && (
-                  <span
-                    className={`transaction-status activity-category-label ${financialType(t) === "transfer" ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
-                    style={
-                      {
-                        "--activity-label-color":
-                          financialType(t) === "transfer"
-                            ? "var(--chart-transfer)"
-                            : t.categoryId || t.subcategoryId
-                              ? categoryColor(
-                                  (t.categoryId ?? t.subcategoryId)!,
-                                )
-                              : "var(--warning-ink, #ffd179)",
-                      } as CSSProperties
-                    }
-                  >
-                    {financialType(t) === "transfer"
-                      ? "Transfer"
-                      : t.categoryId || t.subcategoryId
-                        ? (data?.categories.find(
-                            (c) => c.id === (t.categoryId ?? t.subcategoryId),
-                          )?.name ?? "Category unavailable")
-                        : "Needs category"}
-                  </span>
-                )}
-                {t.categorySource && (
-                  <small className="transaction-origin">
-                    {t.categorySource === "manual" ? "Set by you" : "Rule"}
-                  </small>
-                )}
-                <span>
-                  {displayDate(t.date)} ·{" "}
-                  {data?.accounts.find((a) => a.id === t.accountId)
-                    ? displayAccountName(
-                        data.accounts.find((a) => a.id === t.accountId)!,
-                      )
-                    : "Account"}
-                </span>
-              </div>
-              <strong
-                className={
-                  t.amount > 0 && financialType(t) !== "transfer"
-                    ? "positive"
-                    : financialType(t) === "transfer"
-                      ? "transfer-amount"
-                      : "spending-amount"
+          {items.map((t, index) => (
+            <Fragment key={t.id}>
+              {items[index - 1]?.date !== t.date && (
+                <h2 className="ledger-day">
+                  <time dateTime={t.date}>{displayDate(t.date)}</time>
+                </h2>
+              )}
+              <SwipeTransaction
+                transaction={t}
+                accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : t.kind === "split_parent" ? "Split payment" : t.kind === "refund" ? "Refund" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId) ? displayAccountName(data.accounts.find((a) => a.id === t.accountId)!) : "Account"}, ${money(t.amount, t.currency, true)}`}
+                returnTo={returnTo}
+                selected={selectedIds.includes(t.id)}
+                onSelect={(event) => selectRow(t, event)}
+                suggestion={
+                  data
+                    ? categorySuggestions(t, data.categories, data.rules, [])[0]
+                    : undefined
                 }
+                onQuickCategorize={(categoryId) =>
+                  void applyToSelection([t.id], categoryId)
+                }
+                onCategorize={() => beginSort(t)}
+                onDragCategorize={(start) => beginSort(t, start)}
               >
-                {money(t.amount, t.currency, true)}
-              </strong>
-            </SwipeTransaction>
+                <div className="transaction-description">
+                  <strong>{displayMerchant(t)}</strong>
+                  {needsReview(t) && !needsCategory(t) && (
+                    <StatusChip className="review-status" tone="warning">
+                      {transactionReviewReason(t) === "source"
+                        ? "Check source"
+                        : transactionReviewReason(t) === "split"
+                          ? "Confirm split"
+                          : "Link refund"}
+                    </StatusChip>
+                  )}
+                  {t.kind === "split_parent" && (
+                    <StatusChip className="transaction-status">
+                      Split ·{" "}
+                      {data?.items.filter((child) => child.parentId === t.id)
+                        .length ?? 0}{" "}
+                      lines
+                    </StatusChip>
+                  )}
+                  {t.kind === "refund" && (
+                    <StatusChip className="transaction-status">
+                      Refund
+                      {t.refundAllocations?.length
+                        ? ` · counted in ${
+                            refundCountedMonths(
+                              t,
+                              data?.refundOriginals ?? [],
+                              data?.settings ?? [],
+                              data?.periodRows ?? [],
+                            )
+                              .map((month) => refundMonthName(month, true))
+                              .join(", ") || "original purchase month"
+                          }`
+                        : " · link a purchase"}
+                    </StatusChip>
+                  )}
+                  {t.kind !== "split_parent" && t.kind !== "refund" && (
+                    <span
+                      className={`transaction-status activity-category-label ${financialType(t) === "transfer" ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+                      style={
+                        {
+                          "--activity-label-color":
+                            financialType(t) === "transfer"
+                              ? "var(--chart-transfer)"
+                              : t.categoryId || t.subcategoryId
+                                ? categoryColor(
+                                    (t.categoryId ?? t.subcategoryId)!,
+                                  )
+                                : "var(--warning-ink, #ffd179)",
+                        } as CSSProperties
+                      }
+                    >
+                      {financialType(t) === "transfer"
+                        ? "Transfer"
+                        : t.categoryId || t.subcategoryId
+                          ? (data?.categories.find(
+                              (c) => c.id === (t.categoryId ?? t.subcategoryId),
+                            )?.name ?? "Category unavailable")
+                          : "Needs category"}
+                    </span>
+                  )}
+                  {t.categorySource && (
+                    <small className="transaction-origin">
+                      {t.categorySource === "manual" ? "Set by you" : "Rule"}
+                    </small>
+                  )}
+                  <span className="ledger-account">
+                    {data?.accounts.find((a) => a.id === t.accountId)
+                      ? displayAccountName(
+                          data.accounts.find((a) => a.id === t.accountId)!,
+                        )
+                      : "Account"}
+                  </span>
+                </div>
+                <strong
+                  className={
+                    t.amount > 0 && financialType(t) !== "transfer"
+                      ? "positive"
+                      : financialType(t) === "transfer"
+                        ? "transfer-amount"
+                        : "spending-amount"
+                  }
+                >
+                  {money(t.amount, t.currency, true)}
+                </strong>
+              </SwipeTransaction>
+            </Fragment>
           ))}
           {data && !items.length && (
             <div className="empty">

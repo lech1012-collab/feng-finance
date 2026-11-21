@@ -5,7 +5,9 @@ import {
   ArrowUpRight,
   ArrowDownRight,
   Upload,
-  Wallet,
+  ArrowRight,
+  Activity,
+  ArrowDownLeft,
   ShoppingBag,
   ChevronRight,
 } from "lucide-react";
@@ -182,21 +184,25 @@ export default function Home({
         {location.state?.backupRestored && (
           <Toast message="Backup restored successfully." />
         )}
-        <section className="welcome card">
-          <Wallet size={30} />
-          <h2>Your finances, in one place.</h2>
-          <p>
-            Import statements to see your financial position. Everything stays
-            on this device.
-          </p>
-          <div className="actions">
-            <ImportButton className="button primary">
-              Import your first statement
-            </ImportButton>
-            <button onClick={() => void loadDemo()}>
-              Try fictitious demo data
-            </button>
+        <section className="welcome card home-welcome">
+          <div className="home-welcome-copy">
+            <h2>Your finances, in one place.</h2>
+            <p>
+              Import statements to see your financial position. Everything stays
+              on this device.
+            </p>
+            <div className="actions">
+              <ImportButton className="button primary">
+                <Upload aria-hidden="true" size={17} />
+                Import your first statement
+              </ImportButton>
+              <button onClick={() => void loadDemo()}>
+                Try fictitious demo data
+                <ArrowRight aria-hidden="true" size={16} />
+              </button>
+            </div>
           </div>
+          <div className="home-welcome-art" aria-hidden="true" />
         </section>
       </>
     );
@@ -365,7 +371,7 @@ export default function Home({
   );
 
   return (
-    <>
+    <div className="home-dashboard">
       <div className="page-heading">
         <h1>Home</h1>
         {coverage.incompleteAccountIds.length > 0 && (
@@ -552,8 +558,32 @@ export default function Home({
           </ContextHelp>
         </div>
         <div className="month-figures">
+          <Link to={flowHref("net")} className="month-net">
+            <span>
+              <Activity aria-hidden="true" size={16} />
+              Net cash flow
+            </span>
+            <strong
+              className={
+                coverage.hasIncomeSource &&
+                coverage.hasData &&
+                !coverage.missingRates
+                  ? undefined
+                  : "metric-unavailable"
+              }
+            >
+              {coverage.hasIncomeSource && coverage.hasData
+                ? coverage.missingRates
+                  ? "n/a"
+                  : `${money(flow.net, currency, true, projection.converted)}${coverage.complete ? "" : "*"}`
+                : "n/a"}
+            </strong>
+          </Link>
           <Link to={flowHref("income")} className="month-income">
-            <span>Income</span>
+            <span>
+              <ArrowDownLeft aria-hidden="true" size={15} />
+              Income
+            </span>
             {coverage.hasIncomeSource ? (
               <strong
                 className={
@@ -571,7 +601,10 @@ export default function Home({
             )}
           </Link>
           <Link to={flowHref("spending")} className="month-spending">
-            <span>Spending</span>
+            <span>
+              <ArrowUpRight aria-hidden="true" size={15} />
+              Spending
+            </span>
             <strong
               className={
                 !coverage.hasData || coverage.missingRates
@@ -584,16 +617,6 @@ export default function Home({
                   ? "Rates needed"
                   : `${projection.converted ? "≈ " : ""}${money(flow.expenses, currency)}${coverage.complete ? "" : "*"}`
                 : "Not imported"}
-            </strong>
-          </Link>
-          <Link to={flowHref("net")} className="month-net">
-            <span>Net cash flow</span>
-            <strong>
-              {coverage.hasIncomeSource && coverage.hasData
-                ? coverage.missingRates
-                  ? "n/a"
-                  : `${money(flow.net, currency, true, projection.converted)}${coverage.complete ? "" : "*"}`
-                : "n/a"}
             </strong>
           </Link>
         </div>
@@ -1042,6 +1065,6 @@ export default function Home({
           )}
         </p>
       </section>
-    </>
+    </div>
   );
 }

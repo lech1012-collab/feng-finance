@@ -1,0 +1,574 @@
+/* Account identities carry the same colour through the account picker and ledger. */
+.app [data-institution] {
+  --institution: var(--accent);
+}
+.app [data-institution="Barclays"] {
+  --institution: #568cdf;
+}
+.app [data-institution="American Express"] {
+  --institution: #bb79b4;
+}
+.app [data-institution="Revolut"] {
+  --institution: #9a7dde;
+}
+
+.app[data-page="transactions"] .account-filter-chips {
+  align-items: stretch;
+  gap: 8px;
+  padding: 3px 3px 9px;
+  margin: -3px -3px 6px;
+  scroll-snap-type: x proximity;
+  scrollbar-width: thin;
+  scrollbar-color: var(--line) transparent;
+}
+.app[data-page="transactions"] .account-filter-chip {
+  border-radius: 15px;
+  max-width: min(19rem, 84%);
+  scroll-snap-align: start;
+}
+.app[data-page="transactions"] .account-filter-chip > .account-chip-visual {
+  display: flex;
+  height: 100%;
+  width: 100%;
+  min-height: 48px;
+  padding: 9px 13px;
+  gap: 3px;
+  border-radius: inherit;
+  text-align: start;
+  color: var(--ink);
+  white-space: normal;
+  background: var(--surface);
+  line-height: 1.45;
+}
+.app[data-page="transactions"] .account-chip-visual strong {
+  font-size: 0.875rem;
+  font-weight: 690;
+  color: var(--ink);
+}
+.app[data-page="transactions"]
+  .account-filter-chip[data-institution]
+  strong::before {
+  content: "";
+  display: inline-block;
+  width: 0.55em;
+  height: 0.55em;
+  background: var(--institution);
+  border-radius: 50%;
+  vertical-align: 0.06em;
+  margin-inline-end: 0.48em;
+}
+.app[data-page="transactions"]
+  .account-filter-chip:first-child
+  .account-chip-visual {
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  font-weight: 650;
+}
+.app[data-page="transactions"]
+  .account-filter-chip[aria-pressed="true"]
+  .account-chip-visual {
+  color: var(--accent);
+  border-color: color-mix(in srgb, var(--accent) 65%, var(--line));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+.app[data-page="transactions"] .account-filter-chip[aria-pressed="true"] small {
+  color: var(--muted);
+}
+.app[data-page="transactions"] .account-chip-visual small {
+  font-variant-numeric: tabular-nums;
+}
+.app[data-page="transactions"] .transaction-tools {
+  align-items: stretch;
+  margin-block: 4px 16px;
+  gap: 5px 8px;
+}
+.app[data-page="transactions"] .transaction-tools .button,
+.app[data-page="transactions"] .manual-entry > button {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 0.8125rem;
+  font-weight: 630;
+}
+.app[data-page="transactions"] .transaction-tools .button {
+  color: var(--accent);
+  border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.app[data-page="transactions"] .manual-entry > button {
+  color: var(--ink);
+  border-color: var(--line);
+  background: var(--surface);
+}
+.app[data-page="transactions"] .filters {
+  padding: clamp(12px, 2vw, 20px);
+}
+.app[data-page="transactions"] .filters .search-input {
+  padding-inline-start: 12px;
+  color: var(--muted);
+  background: var(--raised);
+  border-color: var(--line);
+  border-radius: 14px;
+}
+.app[data-page="transactions"] .filters .search-input input {
+  background: transparent;
+  box-shadow: none;
+}
+.app[data-page="transactions"] .category-filter-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-height: none;
+  margin-top: 10px;
+  overflow: visible;
+  padding: 0;
+}
+.app[data-page="transactions"] .category-filter-buttons button {
+  /* Keep each screen-reader count inside its horizontally scrollable button. */
+  position: relative;
+  min-height: 44px;
+  padding: 7px 11px;
+  font-size: 0.8125rem;
+  border-radius: 12px;
+  background: var(--raised);
+}
+.app[data-page="transactions"]
+  .category-filter-buttons
+  button[aria-pressed="true"] {
+  color: var(--accent);
+  border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+.app[data-page="transactions"]
+  .category-filter-buttons
+  button
+  > span[aria-hidden] {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.app[data-page="transactions"] .filters .filter-context {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 12px 0 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+.app[data-page="transactions"] .filter-context svg {
+  flex: none;
+}
+.app[data-page="transactions"] .transaction-menu {
+  margin-block: 4px 8px;
+}
+.app[data-page="transactions"] .transaction-menu > summary {
+  justify-content: flex-start;
+  gap: 9px;
+  padding-inline: 1px;
+  font-size: 0.875rem;
+  font-weight: 620;
+  color: var(--muted);
+}
+.app[data-page="transactions"] .transaction-menu > summary::before {
+  content: "";
+  height: 6px;
+  width: 6px;
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(-45deg);
+}
+.app[data-page="transactions"] .transaction-menu[open] > summary::before {
+  transform: rotate(45deg);
+}
+.app[data-page="transactions"] .transaction-list {
+  overflow: clip;
+  padding: 0;
+  background: var(--surface);
+}
+.app .transaction-list .ledger-day {
+  padding: 10px clamp(12px, 2vw, 22px);
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  background: var(--raised);
+  border-block: 1px solid var(--line);
+}
+.app .transaction-list .ledger-day:first-child {
+  border-top: 0;
+}
+.app .transaction-list .swipe-transaction {
+  padding-inline: clamp(12px, 2vw, 22px);
+}
+.app .transaction-list .swipe-transaction .transaction-row {
+  min-height: 72px;
+  gap: 5px 12px;
+  align-items: baseline;
+  padding: 12px 0;
+  background: var(--surface);
+}
+.app .transaction-list .transaction-row .transaction-description {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  flex: 1 1 7.7rem;
+  min-width: min(7.7rem, 100%);
+  gap: 3px 7px;
+}
+.app .transaction-list .transaction-description > strong {
+  flex-basis: 100%;
+  font-size: 0.9375rem;
+  line-height: 1.35;
+  color: var(--ink);
+  font-weight: 660;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.app .transaction-list .transaction-description > .ledger-account,
+.app .transaction-list .transaction-description > .transaction-origin {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.app .transaction-list .transaction-description > .ledger-account {
+  flex-basis: 100%;
+}
+.app .transaction-list .transaction-description .activity-category-label {
+  margin: 0;
+  font-size: 0.8125rem;
+}
+.app .transaction-list .transaction-row > strong {
+  margin-inline-start: auto;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+}
+.app .transaction-list .transaction-row > .spending-amount {
+  color: var(--ink);
+}
+.app .transaction-list .empty {
+  padding: 28px 16px;
+}
+.app .transactions-workspace .category-rail {
+  background: var(--surface);
+}
+.app .transactions-workspace .category-rail .rail-suggestions {
+  min-height: 0;
+  padding-block-end: 10px;
+  border-bottom: 1px solid var(--line);
+}
+@container (max-width: 23rem) {
+  .app .filters .category-filter-buttons {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+    padding: 3px;
+    margin-inline: -3px;
+  }
+  .app .filters .category-filter-buttons > button {
+    flex: none;
+  }
+}
+@media (min-width: 1100px) {
+  .app .transaction-list .transaction-row .drag-handle {
+    align-self: center;
+    min-width: 18px;
+  }
+  .app .transaction-list .transaction-row {
+    align-items: center;
+  }
+  .app .transaction-list .row-hover-actions button {
+    font-size: 0.8125rem;
+  }
+}
+
+/* A statement sheet and upload glyph make the empty picker legible from a distance. */
+.app .import-workspace .ui-stepper {
+  margin-bottom: 16px;
+  padding: 4px 2px;
+  gap: clamp(5px, 1.6vw, 18px);
+}
+.app .import-workspace .ui-stepper > li {
+  min-width: 0;
+  gap: 7px;
+  font-weight: 600;
+}
+.app .import-workspace .ui-stepper > li[aria-current="step"] {
+  color: var(--accent);
+}
+.app .import-workspace .upload-card {
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 8px;
+  position: relative;
+  isolation: isolate;
+  padding: clamp(36px, 6vw, 76px) clamp(16px, 4vw, 48px);
+  text-align: center;
+  min-height: 18rem;
+  cursor: pointer;
+  border: 1px solid var(--glass-rim, var(--line));
+  background: var(--surface);
+}
+.app .import-workspace .upload-card::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 9px;
+  border-radius: max(8px, calc(var(--radius, 20px) - 6px));
+  border: 1px dashed color-mix(in srgb, var(--accent) 45%, var(--line));
+  background: radial-gradient(
+    ellipse at 50% 0,
+    color-mix(in srgb, var(--accent) 8%, transparent),
+    transparent 72%
+  );
+  pointer-events: none;
+}
+.app .import-workspace .upload-card .context-help-heading {
+  justify-content: center;
+}
+.app .import-workspace .upload-card h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(1.25rem, 2.8vw, 1.625rem);
+  letter-spacing: -0.035em;
+}
+.app .import-workspace .upload-card > p {
+  color: var(--muted);
+  margin: 0;
+  line-height: 1.5;
+}
+.app .import-workspace .upload-card .file-button {
+  margin-top: 9px;
+  min-width: min(100%, 11rem);
+}
+.statement-art {
+  position: relative;
+  width: 84px;
+  height: 80px;
+  margin-bottom: 4px;
+  pointer-events: none;
+  color: var(--accent);
+}
+.statement-art::before,
+.statement-art-sheet {
+  position: absolute;
+  inset: 9px 24px 12px 12px;
+  border-radius: 9px;
+  border: 1px solid color-mix(in srgb, var(--accent) 49%, var(--line));
+}
+.statement-art::before {
+  content: "";
+  background: color-mix(in srgb, var(--accent) 21%, var(--surface));
+  transform: rotate(-16deg) translate(-4px, 2px);
+}
+.statement-art-sheet {
+  display: grid;
+  align-content: center;
+  gap: 5px;
+  padding: 9px;
+  background: linear-gradient(
+    145deg,
+    var(--surface),
+    color-mix(in srgb, var(--accent) 10%, var(--surface))
+  );
+  transform: rotate(7deg);
+}
+.statement-art-sheet i {
+  height: 3px;
+  width: 100%;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--accent) 70%, var(--surface));
+}
+.statement-art-sheet i:first-child {
+  width: 38%;
+  height: 5px;
+  margin-bottom: 4px;
+}
+.statement-art-sheet i:last-child {
+  width: 64%;
+}
+.statement-art-arrow {
+  position: absolute;
+  inset: auto 6px 3px auto;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 2px solid var(--surface);
+  border-radius: 11px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.app
+  .import-workspace
+  :is(.import-processing-list, .import-batch-summary, .import-statement-card) {
+  background: var(--surface);
+}
+.app .import-workspace .import-view-filter > button[aria-pressed="true"] {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface));
+}
+
+/* Settings sections follow their reading and tab order at every width. */
+.app .settings-menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 21rem), 1fr));
+  align-items: start;
+  gap: clamp(14px, 2vw, 24px);
+}
+.app .settings-menu > .ui-section-card {
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  box-shadow: none;
+  border: 0;
+}
+.app .settings-menu .ui-section-card-heading {
+  margin: 0 0 7px;
+  padding-inline: 12px;
+}
+.app .settings-menu .ui-section-card-heading h2 {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.02em;
+  margin: 0;
+}
+.app .settings-menu .ui-section-card-content {
+  border: 1px solid var(--line);
+  border-radius: var(--radius, 18px);
+  box-shadow: inset 0 1px var(--glass-rim, transparent);
+  background: var(--surface);
+  padding-inline: 12px;
+}
+.app .settings-menu a {
+  --setting-tone: var(--accent);
+  justify-content: start;
+  padding: 8px 0;
+  gap: 11px;
+  min-height: 52px;
+  color: var(--ink);
+  font-weight: 570;
+  line-height: 1.35;
+}
+.app .settings-menu a[data-setting="appearance"],
+.app .settings-menu a[data-setting="categories"],
+.app .settings-menu a[data-setting="rules"] {
+  --setting-tone: #9777ce;
+}
+.app .settings-menu a[data-setting="currency"],
+.app .settings-menu a[data-setting="reports"],
+.app .settings-menu a[data-setting="reminders"] {
+  --setting-tone: #ba8448;
+}
+.app .settings-menu a[data-setting="imports"],
+.app .settings-menu a[data-setting="diagnostics"],
+.app .settings-menu a[data-setting="statements"] {
+  --setting-tone: #cb806f;
+}
+.app .settings-menu a.settings-danger-link {
+  color: var(--blocking);
+  --setting-tone: var(--blocking);
+}
+.app .settings-menu .setting-symbol,
+.app .account-overview-row .account-symbol {
+  display: grid;
+  place-items: center;
+  flex: none;
+  height: 32px;
+  width: 32px;
+  border-radius: 10px;
+  background: color-mix(
+    in srgb,
+    var(--setting-tone, var(--institution)) 14%,
+    var(--surface)
+  );
+  color: color-mix(
+    in srgb,
+    var(--setting-tone, var(--institution)) 70%,
+    var(--ink)
+  );
+}
+.app .settings-menu a > svg:last-child {
+  margin-inline-start: auto;
+  flex: none;
+  color: var(--muted);
+}
+.app .settings-menu a > span:nth-child(2) {
+  overflow-wrap: anywhere;
+}
+.app .bank-accounts-card .section-heading {
+  margin-bottom: 8px;
+}
+.app .bank-accounts-card .account-overview-list {
+  margin-top: 8px;
+}
+.app .bank-accounts-card .account-overview-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding-block: 15px;
+  gap: 8px 12px;
+}
+.app .bank-accounts-card .account-overview-row > .account-identity {
+  display: flex;
+  align-items: start;
+  gap: 10px;
+  width: auto;
+  min-width: min(100%, 10rem);
+  flex: 1 1 10rem;
+}
+.app .account-overview-row .account-symbol {
+  width: 36px;
+  height: 36px;
+  border-radius: 12px;
+}
+.app .account-overview-row .account-info {
+  min-width: 0;
+}
+.app .account-overview-row .account-info > strong {
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+.app .account-overview-row .account-info small {
+  margin: 3px 0 0;
+  font-size: 0.8125rem;
+  font-weight: 450;
+  line-height: 1.4;
+}
+.app .bank-accounts-card .account-overview-row > .account-balance {
+  width: auto;
+  max-width: 100%;
+  margin-inline-start: auto;
+  text-align: end;
+  font-variant-numeric: tabular-nums;
+}
+.app .bank-accounts-card .account-balance > strong {
+  font-size: 1.0625rem;
+  color: var(--ink);
+  letter-spacing: -0.025em;
+}
+.app .bank-accounts-card .account-overview-row > svg {
+  color: var(--muted);
+  flex: none;
+}
+@media (hover: hover) {
+  .app .settings-menu a:hover,
+  .app .transaction-tools .button:hover {
+    color: var(--accent);
+  }
+  .app .import-workspace .upload-card:hover::before {
+    border-color: var(--accent);
+  }
+}

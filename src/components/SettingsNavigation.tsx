@@ -1,5 +1,26 @@
 import { Link } from "react-router-dom";
-import { ChevronRight } from "lucide-react";
+import {
+  ArchiveRestore,
+  ArrowLeftRight,
+  Bell,
+  CalendarDays,
+  ChartNoAxesColumn,
+  ChevronRight,
+  CircleHelp,
+  Coins,
+  Download,
+  FileClock,
+  Files,
+  FolderOpen,
+  History,
+  ListFilter,
+  LockKeyhole,
+  Palette,
+  ScanText,
+  Database,
+  TriangleAlert,
+  FlaskConical,
+} from "lucide-react";
 import { SectionCard } from "./UIPrimitives";
 
 export const settingsTitles: Record<string, string> = {
@@ -40,6 +61,27 @@ const groups = [
   ["Demo data", ["demo"]],
   ["Danger zone", ["danger"]],
 ] as const;
+const sectionIcons = {
+  appearance: Palette,
+  currency: Coins,
+  period: CalendarDays,
+  reports: ChartNoAxesColumn,
+  transfers: ArrowLeftRight,
+  categories: FolderOpen,
+  rules: ListFilter,
+  imports: Files,
+  statements: FileClock,
+  diagnostics: ScanText,
+  reminders: Bell,
+  security: LockKeyhole,
+  storage: Database,
+  backup: ArchiveRestore,
+  export: Download,
+  changes: History,
+  about: CircleHelp,
+  demo: FlaskConical,
+  danger: TriangleAlert,
+};
 export const settingsSectionsForHash: Record<string, string> = {
   backup: "backup",
   security: "security",
@@ -70,19 +112,26 @@ export function SettingsNavigation() {
       {groups.map(([name, sections]) => (
         <SectionCard title={name} key={name}>
           <ul>
-            {sections.map((section) => (
-              <li key={section}>
-                <Link
-                  className={
-                    section === "danger" ? "settings-danger-link" : undefined
-                  }
-                  to={`/settings?section=${section}`}
-                >
-                  <span>{settingsTitles[section]}</span>
-                  <ChevronRight size={16} aria-hidden="true" />
-                </Link>
-              </li>
-            ))}
+            {sections.map((section) => {
+              const Icon = sectionIcons[section];
+              return (
+                <li key={section}>
+                  <Link
+                    className={
+                      section === "danger" ? "settings-danger-link" : undefined
+                    }
+                    to={`/settings?section=${section}`}
+                    data-setting={section}
+                  >
+                    <span className="setting-symbol" aria-hidden="true">
+                      <Icon size={18} />
+                    </span>
+                    <span>{settingsTitles[section]}</span>
+                    <ChevronRight size={16} aria-hidden="true" />
+                  </Link>
+                </li>
+              );
+            })}
           </ul>
         </SectionCard>
       ))}

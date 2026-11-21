@@ -1,5 +1,5 @@
 import { displayAccountName, displayAccountType } from "../domain/presentation";
-import { ChevronRight } from "lucide-react";
+import { ChevronRight, CreditCard, Landmark, Wallet } from "lucide-react";
 import { manualCashBalance } from "../analytics/manual-cash";
 import { useState } from "react";
 import { returnTarget } from "../navigation/return-target";
@@ -149,7 +149,7 @@ export function AccountsContent() {
   };
   return (
     <>
-      <section className="card">
+      <section className="card bank-accounts-card">
         <div className="section-heading">
           <div className="context-help-heading">
             <h2>Bank and card accounts</h2>
@@ -194,42 +194,56 @@ export function AccountsContent() {
               const card = ["credit", "credit_card"].includes(
                 account.accountType,
               );
+              const AccountIcon = card
+                ? CreditCard
+                : wallet
+                  ? Wallet
+                  : Landmark;
               return (
                 <button
                   className="account-overview-row"
+                  data-institution={account.institution}
                   key={account.id}
                   onClick={() => open(account)}
                 >
-                  <span>
-                    <strong>{displayAccountName(account)}</strong>
-                    <small>
-                      {account.tracking === "manual"
-                        ? "Manual"
-                        : account.institution}{" "}
-                      · {account.maskedAccountIdentifier}
-                    </small>
-                    <small>
-                      {displayAccountType(account.accountType)} ·{" "}
-                      {account.currency}
-                    </small>
-                    <small>
-                      {displayedDate ? (
-                        <>
-                          As of{" "}
-                          <time className="date-value" dateTime={displayedDate}>
-                            {formatUkDate(displayedDate)}
-                          </time>{" "}
-                          ·{" "}
-                          {wallet
-                            ? "Manual cash balance"
-                            : evidence?.status === "reconciled"
-                              ? "Verified"
-                              : "Unverified"}
-                        </>
-                      ) : (
-                        "No statement balance"
-                      )}
-                    </small>
+                  <span className="account-identity">
+                    <span className="account-symbol" aria-hidden="true">
+                      <AccountIcon size={20} />
+                    </span>
+                    <span className="account-info">
+                      <strong>{displayAccountName(account)}</strong>
+                      <small>
+                        {account.tracking === "manual"
+                          ? "Manual"
+                          : account.institution}{" "}
+                        · {account.maskedAccountIdentifier}
+                      </small>
+                      <small>
+                        {displayAccountType(account.accountType)} ·{" "}
+                        {account.currency}
+                      </small>
+                      <small>
+                        {displayedDate ? (
+                          <>
+                            As of{" "}
+                            <time
+                              className="date-value"
+                              dateTime={displayedDate}
+                            >
+                              {formatUkDate(displayedDate)}
+                            </time>{" "}
+                            ·{" "}
+                            {wallet
+                              ? "Manual cash balance"
+                              : evidence?.status === "reconciled"
+                                ? "Verified"
+                                : "Unverified"}
+                          </>
+                        ) : (
+                          "No statement balance"
+                        )}
+                      </small>
+                    </span>
                   </span>
                   <span className="account-balance">
                     <strong>

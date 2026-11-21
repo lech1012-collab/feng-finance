@@ -1,0 +1,106 @@
+.app[data-page="planning"] .planning-v2-tabs {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: 3px;
+  gap: 2px;
+  border: 1px solid var(--panel-edge);
+  border-radius: 17px;
+  background: var(--raised);
+}
+.app[data-page="planning"] .planning-v2-tabs button {
+  min-height: 44px;
+  border-radius: 13px;
+  padding-inline: 13px;
+}
+.app[data-page="planning"] .planning-v2-tabs [aria-selected="false"] {
+  color: var(--muted);
+  border-color: transparent;
+}
+.app[data-page="planning"] .planning-v2-tabs [aria-selected="true"] {
+  color: var(--ink);
+  background: var(--surface);
+  border-color: var(--panel-edge);
+  box-shadow:
+    inset 0 1px var(--panel-sheen),
+    var(--control-shadow);
+}
+.app[data-page="analysis"] :is(.metric-strip, .category-kpis).card {
+  border-top-color: color-mix(in srgb, var(--accent) 44%, var(--panel-edge));
+}
+.app[data-page="analysis"] :is(.metric-strip, .category-kpis) .metric,
+.app[data-page="planning"] .planning-kpis > div {
+  text-align: start;
+  align-items: start;
+  min-width: 0;
+}
+.app[data-page="analysis"] :is(.metric-strip, .category-kpis) .metric strong,
+.app[data-page="planning"] .planning-kpis strong {
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+.app[data-page="analysis"] .bar-track {
+  border-radius: 99px;
+}
+.app[data-page="analysis"] .category-trend .category-range {
+  border-inline-start: 3px solid var(--accent);
+  padding-inline-start: 12px;
+}
+@media (forced-colors: active) {
+  .app[data-page="planning"] .planning-v2-tabs [aria-selected="true"] {
+    color: HighlightText;
+    border-color: Highlight;
+    background: Highlight;
+  }
+}
+.app .analysis-period-controls {
+  margin-bottom: 4px;
+}
+.app .analysis-period-controls .other-periods {
+  margin: 0;
+  padding: 0;
+}
+.app .analysis-period-controls .other-periods summary {
+  align-content: center;
+  min-height: 44px;
+}
+.app .analysis-period-description {
+  margin: 4px 0 12px;
+}
+.app[data-page="analysis"] .metric-strip {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 16px 12px;
+}
+.app .metric-strip [data-tone="income"] .amount {
+  color: var(--chart-income);
+}
+.app .metric-strip [data-tone="spending"] .amount {
+  color: var(--chart-expense);
+}
+.app .metric-strip [data-tone="net"] .amount {
+  color: var(--chart-net);
+}
+@media (min-width: 1000px) {
+  .app[data-page="analysis"] main,
+  .app[data-page="planning"] main {
+    max-width: 72rem;
+    padding-inline: clamp(28px, 3vw, 52px);
+  }
+}
+
+/* A wide currency symbol or a large text preference can use the full KPI column. */
+@container (max-width: 18rem) {
+  .app[data-page="analysis"] :is(.metric-strip, .category-kpis) .metric strong {
+    max-inline-size: 100%;
+    font-size: 1rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+  .app[data-page="analysis"]
+    :is(.metric-strip, .category-kpis)
+    .metric
+    .amount {
+    white-space: inherit;
+    overflow-wrap: inherit;
+  }
+}

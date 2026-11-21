@@ -390,9 +390,6 @@ export default function Analysis({
       )}
       <div className="page-heading">
         <div>
-          <p className="eyebrow">
-            {property ? "RENT, COSTS & CASH FLOW" : "PUT YOUR MONTH IN CONTEXT"}
-          </p>
           <div className="context-help-heading">
             <h1>{property ? "Property" : "Analyse"}</h1>
             <ContextHelp
@@ -433,7 +430,7 @@ export default function Analysis({
           </div>
         </div>
       </div>
-      <div className="toolbar">
+      <div className="toolbar analysis-period-controls">
         <MonthPicker month={month} onChange={chooseMonth} />
         <PeriodControl value={period} onChange={setPeriod} />
       </div>
@@ -452,7 +449,7 @@ export default function Analysis({
           </label>
         </div>
       )}
-      <p className="muted">
+      <p className="muted analysis-period-description">
         {scope.valid ? (
           <span className="date-value">
             {formatDateRange(start, shiftDate(end, -1))}
@@ -466,6 +463,7 @@ export default function Analysis({
       <section className="card metric-strip">
         {hasIncomeSource ? (
           <Metric
+            tone="income"
             label={property ? "Rental income" : "Income"}
             value={flow.income}
             currency={currency}
@@ -481,6 +479,7 @@ export default function Analysis({
         )}
         {coverage.some((c) => c.hasData) ? (
           <Metric
+            tone="spending"
             label={property ? "Property costs" : "Expenses"}
             value={flow.expenses}
             currency={currency}
@@ -496,6 +495,7 @@ export default function Analysis({
         )}
         {hasIncomeSource ? (
           <Metric
+            tone="net"
             label={property ? "Net property cash flow" : "Net cash flow"}
             value={flow.net}
             currency={currency}

@@ -4,6 +4,12 @@ import { trackFocusModality } from "./components/focus-modality";
 import "./styles.css";
 import "./ux-review.css";
 import "./final-polish.css";
+import "./materials.css";
+import "./glass-shell.css";
+import "./components/glass-overlays.css";
+import "./pages/workspace-glass.css";
+import "./pages/insights-glass.css";
+import "./pages/home-glass.css";
 import "./focus-modality.css";
 
 const stopTrackingFocusModality = trackFocusModality(document);

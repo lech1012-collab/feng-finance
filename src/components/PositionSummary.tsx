@@ -1,6 +1,7 @@
 import { localToday } from "../analytics/reminders";
 import { Link } from "react-router-dom";
 import { useMemo } from "react";
+import { CreditCard, Wallet } from "lucide-react";
 import type { Pot, Transaction } from "../domain/models";
 import {
   statementBalanceEvidence,
@@ -219,6 +220,92 @@ function PositionSnapshot({
         : undefined;
   const comparable =
     complete && total !== undefined && priorSum !== undefined && priorSum !== 0;
+  const primary =
+    complete && total !== undefined
+      ? "worth"
+      : cash !== undefined
+        ? "cash"
+        : cards.length && cardDebt !== undefined
+          ? "debt"
+          : "worth";
+  const metrics = {
+    worth: (
+      <div
+        key="worth"
+        className={
+          primary === "worth"
+            ? "position-net-worth position-primary"
+            : "position-net-worth"
+        }
+      >
+        <div className="position-reading">
+          <span>Net worth</span>
+          <strong
+            className={
+              total === undefined || !complete
+                ? "metric-unavailable"
+                : undefined
+            }
+          >
+            {total === undefined || !complete
+              ? "Unavailable"
+              : `${converted ? "≈ " : ""}${money(total, currency)}${complete ? "" : "*"}`}
+          </strong>
+        </div>
+      </div>
+    ),
+    cash: (
+      <Link
+        key="cash"
+        className={primary === "cash" ? "position-primary" : undefined}
+        to="/transactions?allDates=1&accountScope=cash"
+      >
+        <div className="position-reading">
+          <span>
+            <Wallet aria-hidden="true" size={15} />
+            Cash
+          </span>
+          <strong
+            className={cash === undefined ? "metric-unavailable" : undefined}
+          >
+            {cash === undefined
+              ? "Not imported"
+              : `${converted ? "≈ " : ""}${money(cash, currency)}${cashItems.every((i) => i.reliable) ? "" : "*"}`}
+          </strong>
+          {setAside !== undefined && setAside > 0 && (
+            <small>
+              Set aside {potSummary.converted ? "≈ " : ""}
+              {money(setAside, currency)}
+              {potSummary.partial ? "*" : ""} · included in cash
+            </small>
+          )}
+        </div>
+      </Link>
+    ),
+    debt: (
+      <Link
+        key="debt"
+        className={primary === "debt" ? "position-primary" : undefined}
+        to="/transactions?allDates=1&accountScope=debt"
+      >
+        <div className="position-reading">
+          <span>
+            <CreditCard aria-hidden="true" size={15} />
+            Card debt
+          </span>
+          <strong
+            className={
+              cardDebt === undefined ? "metric-unavailable" : undefined
+            }
+          >
+            {cardDebt === undefined
+              ? "Unknown"
+              : `${converted ? "≈ " : ""}${money(cardDebt, currency)}${cards.every((i) => i.reliable) ? "" : "*"}`}
+          </strong>
+        </div>
+      </Link>
+    ),
+  };
   return (
     <section className="card position-summary">
       <div className="section-heading">
@@ -252,49 +339,10 @@ function PositionSnapshot({
         </ContextHelp>
       </div>
       <div className="position-metrics">
-        <Link to="/transactions?allDates=1&accountScope=cash">
-          <span>Cash</span>
-          <strong
-            className={cash === undefined ? "metric-unavailable" : undefined}
-          >
-            {cash === undefined
-              ? "Not imported"
-              : `${converted ? "≈ " : ""}${money(cash, currency)}${cashItems.every((i) => i.reliable) ? "" : "*"}`}
-          </strong>
-          {setAside !== undefined && setAside > 0 && (
-            <small>
-              Set aside {potSummary.converted ? "≈ " : ""}
-              {money(setAside, currency)}
-              {potSummary.partial ? "*" : ""} · included in cash
-            </small>
-          )}
-        </Link>
-        <Link to="/transactions?allDates=1&accountScope=debt">
-          <span>Card debt</span>
-          <strong
-            className={
-              cardDebt === undefined ? "metric-unavailable" : undefined
-            }
-          >
-            {cardDebt === undefined
-              ? "Unknown"
-              : `${converted ? "≈ " : ""}${money(cardDebt, currency)}${cards.every((i) => i.reliable) ? "" : "*"}`}
-          </strong>
-        </Link>
-        <div className="position-net-worth">
-          <span>Net worth</span>
-          <strong
-            className={
-              total === undefined || !complete
-                ? "metric-unavailable"
-                : undefined
-            }
-          >
-            {total === undefined || !complete
-              ? "Unavailable"
-              : `${converted ? "≈ " : ""}${money(total, currency)}${complete ? "" : "*"}`}
-          </strong>
-        </div>
+        {metrics[primary]}
+        {primary !== "cash" && metrics.cash}
+        {primary !== "debt" && metrics.debt}
+        {primary !== "worth" && metrics.worth}
       </div>
       {comparable && (
         <p className="balance-change">
@@ -303,20 +351,22 @@ function PositionSnapshot({
             : "No comparable verified balances for this range"}
         </p>
       )}
-      {items.some((i) => i.observed) && (
-        <p className="coverage-note">
-          Dated balances ·{" "}
-          {formatUkDate(
-            items
-              .flatMap((i) => (i.observed ? [i.observed] : []))
-              .sort()
-              .at(-1)!,
-          )}
-        </p>
-      )}
-      <Link className="accounts-overview-link" to="/accounts">
-        {items.length} {items.length === 1 ? "account" : "accounts"} ›
-      </Link>
+      <div className="position-footer">
+        {items.some((i) => i.observed) && (
+          <p className="coverage-note">
+            Dated balances ·{" "}
+            {formatUkDate(
+              items
+                .flatMap((i) => (i.observed ? [i.observed] : []))
+                .sort()
+                .at(-1)!,
+            )}
+          </p>
+        )}
+        <Link className="accounts-overview-link" to="/accounts">
+          {items.length} {items.length === 1 ? "account" : "accounts"} ›
+        </Link>
+      </div>
     </section>
   );
 }

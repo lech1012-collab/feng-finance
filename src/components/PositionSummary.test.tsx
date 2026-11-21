@@ -63,10 +63,12 @@ const view = (month: string, historyOnly = false) =>
     </MemoryRouter>,
   );
 it("shows dated card debt but leaves cash and net position unavailable when no cash source exists", () => {
-  view("2026-10");
-  expect(screen.getByRole("link", { name: /Card debt/ })).toHaveTextContent(
-    "£109.68",
-  );
+  const rendered = view("2026-10");
+  const debt = screen.getByRole("link", { name: /Card debt/ });
+  expect(
+    rendered.container.querySelector(".position-metrics")?.firstElementChild,
+  ).toBe(debt);
+  expect(debt).toHaveTextContent("£109.68");
   expect(screen.getByRole("link", { name: /Cash/ })).toHaveTextContent(
     "Not imported",
   );
