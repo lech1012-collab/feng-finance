@@ -90,6 +90,7 @@ export default function Settings({
       : settingsSectionsForHash[location.hash.slice(1)]);
   const activeSection =
     section && settingsTitles[section] ? section : undefined;
+  const returnHome = !!initialSection || location.state?.returnTo === "/";
   const requestedRule = searchParams.get("rule");
   const data = useLiveQuery(
     async () => ({
@@ -113,6 +114,12 @@ export default function Settings({
     }),
     [],
   );
+  const requestedStatement = data?.statements.find(
+    (s) => s.id === searchParams.get("statement"),
+  );
+  const openStatementMonth = (
+    requestedStatement ?? data?.statements[0]
+  )?.statementPeriodEnd.slice(0, 7);
   const [notice, setNotice] = useState("");
   const [noticeChangeId, setNoticeChangeId] = useState("");
   const [error, setError] = useState("");
@@ -176,11 +183,8 @@ export default function Settings({
       <div className="page-heading">
         <div>
           {activeSection && (
-            <Link
-              className="settings-back"
-              to={initialSection ? "/" : "/settings"}
-            >
-              {initialSection ? "‹ Home" : "‹ Settings"}
+            <Link className="settings-back" to={returnHome ? "/" : "/settings"}>
+              {returnHome ? "‹ Home" : "‹ Settings"}
             </Link>
           )}
           <h1>{activeSection ? settingsTitles[activeSection] : "Settings"}</h1>
@@ -323,12 +327,7 @@ export default function Settings({
                   [],
               ),
             ].map((month) => (
-              <details
-                key={month}
-                open={
-                  month === data?.statements[0]?.statementPeriodEnd.slice(0, 7)
-                }
-              >
+              <details key={month} open={month === openStatementMonth}>
                 <summary>
                   {new Date(`${month}-01T12:00:00Z`).toLocaleDateString(
                     "en-GB",
@@ -338,7 +337,11 @@ export default function Settings({
                 {data?.statements
                   .filter((s) => s.statementPeriodEnd.startsWith(month))
                   .map((s) => (
-                    <details key={s.id}>
+                    <details
+                      key={s.id}
+                      id={`statement-${s.id}`}
+                      open={requestedStatement?.id === s.id}
+                    >
                       <summary>
                         {s.institution} ·{" "}
                         {data.accounts.find((a) => a.id === s.accountId)
@@ -347,19 +350,25 @@ export default function Settings({
                         {s.transactionCount === 1 ? "" : "s"} ·{" "}
                         <StatusChip
                           tone={
-                            s.validationStatus === "reconciled"
+                            s.validationStatus === "reconciled" &&
+                            !s.validationOverride
                               ? "complete"
                               : "warning"
                           }
                         >
-                          {s.validationStatus === "reconciled"
-                            ? "Reconciled"
-                            : "Unverified"}
+                          {s.validationStatus === "reconciled" &&
+                          !s.validationOverride
+                            ? "Reconciled at import"
+                            : "Unverified at import"}
                         </StatusChip>
                       </summary>
                       <dl className="totals">
                         <div>
-                          <dt>Statement dates</dt>
+                          <dt>
+                            {s.periodSource === "transaction-coverage"
+                              ? "Dates inferred from transactions"
+                              : "Statement dates"}
+                          </dt>
                           <dd>
                             {formatDateRange(
                               s.statementPeriodStart,
@@ -376,7 +385,7 @@ export default function Settings({
                           </dd>
                         </div>
                         <div>
-                          <dt>Difference</dt>
+                          <dt>Balance difference at import</dt>
                           <dd>
                             {s.validationDifference === undefined
                               ? "Unavailable"

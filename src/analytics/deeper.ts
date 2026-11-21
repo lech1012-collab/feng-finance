@@ -7,12 +7,12 @@ import type {
   Statement,
   Transaction,
 } from "../domain/models";
-import { monthOffset } from "../domain/dates";
+import { formatUkDate, monthOffset } from "../domain/dates";
 import { money, currencyPrecision } from "../domain/money";
 import { normalizeMerchant } from "../domain/normalize";
 import { cashFlow } from "./calculations";
 import { completeMonth } from "./category";
-import { detectSubscriptions, readReview } from "./subscriptions";
+import { detectSubscriptions } from "./subscriptions";
 
 export interface FinancialInsight {
   id: string;
@@ -38,8 +38,9 @@ export function deeperInsights(
   currency: string,
   today: string,
   isComplete?: (month: string) => boolean,
+  nativeLedger?: Transaction[],
 ) {
-  const periodRows = transactions;
+  const periodRows = nativeLedger ?? transactions;
   transactions = effectiveTransactions(transactions);
   const scopedAccounts = accounts.filter((a) => a.currency === currency);
   const eligible = transactions.filter(
@@ -171,38 +172,42 @@ export function deeperInsights(
       });
   }
   const seen = new Set<string>();
-  const reviews = new Map(
-    settings.map((setting) => {
-      const review = readReview(setting.value);
-      return [review?.groupKey, review] as const;
-    }),
+  // Reviews identify the merchant and account in the original billing currency.
+  const billingCurrencies = nativeLedger
+    ? [...new Set(nativeLedger.map((t) => t.currency))]
+    : [currency];
+  const subscriptions = billingCurrencies.flatMap((code) =>
+    detectSubscriptions(periodRows, settings, code, today),
   );
-  for (const s of detectSubscriptions(eligible, settings, currency, today)) {
+  const [start, end] = reportingPeriod(month, settings, periodRows);
+  for (const s of subscriptions) {
     if (s.status === "ignore") continue;
     if (s.increase && s.charges.at(-1)!.date.startsWith(month))
       insights.push({
         id: `rise-${s.key}`,
         title: `${s.merchant}: recurring price increase`,
-        detail: `The latest charge rose by ${money(s.increase, currency)} to ${money(s.amount, currency)}. At the observed ${s.cadence} cadence, review whether this service is still needed.`,
+        detail: `The latest charge rose by ${money(s.increase, s.currency)} to ${money(s.amount, s.currency)}. At the observed ${s.cadence} cadence, review whether this service is still needed.`,
         href: "/subscriptions",
         priority: 100,
       });
-    const cancellationDate = reviews.get(s.key)?.date;
-    if (
-      s.afterCancellation &&
-      cancellationDate &&
-      s.charges.some(
-        (charge) =>
-          charge.date.startsWith(month) && charge.date > cancellationDate,
-      )
-    )
-      insights.push({
-        id: `cancel-${s.key}`,
-        title: "Charge after a cancellation was recorded",
-        detail: `${s.merchant} has a payment after your recorded cancellation date. Check with the provider.`,
-        href: "/subscriptions",
-        priority: 110,
-      });
+    const endDate = s.cancellationEffectiveDate;
+    if (endDate) {
+      const laterCharge = s.charges
+        .filter(
+          (charge) =>
+            charge.date > endDate && charge.date >= start && charge.date < end,
+        )
+        .at(-1);
+      if (laterCharge) {
+        insights.push({
+          id: `cancel-${s.key}-${laterCharge.id}`,
+          title: "Charge after cancellation",
+          detail: `${s.merchant} charged ${money(-laterCharge.amount, s.currency)} on ${formatUkDate(laterCharge.date)}. Your cancellation took effect on ${formatUkDate(endDate)}. Check the payment with the provider.`,
+          href: `/transactions/${laterCharge.id}`,
+          priority: 110,
+        });
+      }
+    }
     if (
       s.overlap &&
       !seen.has(s.merchant) &&

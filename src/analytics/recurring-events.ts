@@ -1,5 +1,8 @@
 import type { RecurringSeries, Setting, Transaction } from "../domain/models";
-import { recurringDecisions } from "./recurring-identity";
+import {
+  recurringDecisions,
+  withSubscriptionEndDates,
+} from "./recurring-identity";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { normalizeMerchant } from "../domain/normalize";
 import type { PlannedPayment } from "./planning";
@@ -59,9 +62,14 @@ export function confirmedPaymentEvents(
   end: string,
   observed: Transaction[],
   settings: Setting[] = [],
+  linkEvidence: Transaction[] = observed,
 ): PlannedPayment[] {
   const events: PlannedPayment[] = [];
-  for (const s of series.filter((s) => s.status !== "ignored")) {
+  for (const s of withSubscriptionEndDates(
+    series,
+    settings,
+    linkEvidence,
+  ).filter((s) => s.status !== "ignored")) {
     for (let i = 0; i < 400; i++) {
       const date = recurringDate(s.nextDue, s.cadence, i);
       if (date > end || (s.endDate && date > s.endDate)) break;

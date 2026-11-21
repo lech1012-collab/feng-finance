@@ -5,7 +5,7 @@ import {
   reminderCalendar,
 } from "./reminders";
 import { accounts, transaction } from "../tests/helpers";
-import type { Statement } from "../domain/models";
+import type { Account, Statement } from "../domain/models";
 const config = { enabled: true, day: 5 };
 const bills = ["2026-07-10", "2026-08-10", "2026-09-10"].map((date, i) =>
   transaction({
@@ -46,6 +46,31 @@ it("reminds about missing statements only on or after the chosen day", () => {
       day: 5,
     }),
   ).toEqual([]);
+});
+it("checks each statement account in its native currency, including legacy accounts", () => {
+  const scopedAccounts: Account[] = [
+    accounts[0],
+    { ...accounts[1], currency: "EUR", tracking: "statement" },
+    { ...accounts[0], id: "wallet", tracking: "manual" },
+    { ...accounts[1], id: "demo", isDemo: true },
+  ];
+  const statements = [
+    { accountId: "a1", currency: "GBP", statementPeriodEnd: "2026-08-31" },
+    { accountId: "a1", currency: "EUR", statementPeriodEnd: "2026-09-30" },
+    { accountId: "a2", currency: "EUR", statementPeriodEnd: "2026-09-30" },
+  ] as Statement[];
+  for (const currency of ["GBP", "EUR", "USD"]) {
+    const reminders = financeReminders(
+      scopedAccounts,
+      statements,
+      [],
+      currency,
+      "2026-10-05",
+      config,
+    );
+    expect(reminders.map((r) => r.id)).toEqual(["statement-a1"]);
+    expect(reminders[0].detail).toContain("2026-08-31");
+  }
 });
 it("predicts recurring bills conservatively and never implies that they are unpaid", () => {
   const reminders = financeReminders(

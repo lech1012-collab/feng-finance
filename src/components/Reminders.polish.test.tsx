@@ -32,6 +32,30 @@ const view = () =>
     </MemoryRouter>,
   );
 
+it("shows a GBP account's statement reminder in EUR and skips manual wallets", async () => {
+  await db.settings.put({
+    key: REMINDER_KEY,
+    value: JSON.stringify({ enabled: true, day: 1 }),
+  });
+  await db.accounts.put({
+    ...accounts[1],
+    displayName: "Cash wallet",
+    currency: "EUR",
+    tracking: "manual",
+  });
+  render(
+    <MemoryRouter>
+      <Reminders currency="EUR" settings />
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByRole("button", { name: /Update Current/ }),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("button", { name: /Update Cash wallet/ }),
+  ).toBeNull();
+});
+
 it("saves and undoes reminder visibility where it changed without touching transactions", async () => {
   const original = await db.transactions.toArray();
   view();

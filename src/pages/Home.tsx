@@ -9,6 +9,8 @@ import {
   ShoppingBag,
   ChevronRight,
 } from "lucide-react";
+import { PeriodCoverageHelp } from "../components/PeriodCoverageHelp";
+import { periodCoverageIssues } from "../analytics/period-coverage-issues";
 import { PositionSummary } from "../components/PositionSummary";
 import { ContextHelp } from "../components/ContextHelp";
 import { Toast } from "../components/Toast";
@@ -323,6 +325,7 @@ export default function Home({
         today,
         projection,
       ).complete,
+    data.transactions,
   );
   const insight = insights.items[0];
   const insightContent = insight && (
@@ -337,8 +340,14 @@ export default function Home({
     (t) => !t.parentId && isRefund(t) && t.date >= start && t.date < end,
   );
   const attentionCount = data.toReview - data.uncategorized;
-  const missingAccounts = data.accounts.filter((a) =>
-    coverage.incompleteAccountIds.includes(a.id),
+  const coverageIssues = periodCoverageIssues(
+    coverage,
+    data.accounts,
+    data.statements,
+    data.transactions,
+    start,
+    end,
+    today,
   );
   const todo = [
     ...(data.uncategorized > 0 ? [{ kind: "sort", account: undefined }] : []),
@@ -359,10 +368,12 @@ export default function Home({
     <>
       <div className="page-heading">
         <h1>Home</h1>
-        {missingAccounts.length > 0 && (
+        {coverage.incompleteAccountIds.length > 0 && (
           <ImportButton className="button primary import-main">
             <Upload size={18} />
-            Import {monthName}
+            {coverageIssues.some((issue) => issue.gaps.length > 0)
+              ? `Import ${monthName}`
+              : "Import statements"}
           </ImportButton>
         )}
       </div>
@@ -503,27 +514,35 @@ export default function Home({
             tone={coverage.complete ? "help" : "warning"}
             triggerText={coverage.status}
           >
-            <p>
-              Income, spending and net cash flow use the selected reporting
-              period. Transfers and card repayments are excluded. Refunds are
-              counted in the original purchase months.
-            </p>
+            {!coverage.complete && (
+              <PeriodCoverageHelp
+                coverage={coverage}
+                issues={coverageIssues}
+                month={month}
+                start={start}
+                end={end}
+                today={today}
+              />
+            )}
+            {coverage.hasUnverifiedStatements && (
+              <p>Monthly history is not fully verified.</p>
+            )}
             {!coverage.complete && coverage.hasData && (
               <p>
                 From imported accounts only. Asterisks mark incomplete coverage.
               </p>
             )}
-            {coverage.hasUnverifiedStatements && (
+            {coverage.complete && !previousCoverage.complete && (
               <p>
-                Monthly history is not fully verified. Statement dates or
-                balances prevent a reliable comparison.
+                Comparisons need complete coverage of the previous reporting
+                period.
               </p>
             )}
-            {(!coverage.complete || !previousCoverage.complete) && (
-              <p>
-                {`Not comparable yet: ${monthName} ${coverage.complete ? "needs a complete previous month" : coverage.hasUnverifiedStatements ? "unverified" : "incomplete"}.`}
-              </p>
-            )}
+            <p>
+              Income, spending and net cash flow use the selected reporting
+              period. Transfers and card repayments are excluded. Refunds are
+              counted in the original purchase months.
+            </p>
             {!!projection.converted && (
               <p>
                 ≈ Converted using transaction-date exchange rates. Original
@@ -684,7 +703,7 @@ export default function Home({
         </section>
       )}
 
-      {todo.length === 0 && missingAccounts.length === 0 && (
+      {todo.length === 0 && coverage.incompleteAccountIds.length === 0 && (
         <section className="card home-todos">
           <h2>All sorted</h2>
           <Link

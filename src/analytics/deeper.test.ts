@@ -196,7 +196,8 @@ it("only shows a cancellation alert for a selected month containing a later char
       value: JSON.stringify({
         groupKey,
         status: "cancelled",
-        date: "2026-06-15",
+        date: "2026-10-01",
+        effectiveDate: "2026-06-15",
         amount: 1000,
       }),
     },
@@ -220,5 +221,20 @@ it("only shows a cancellation alert for a selected month containing a later char
   expect(cancellationAlert("2026-09")).toHaveLength(1);
   // An earlier affected month still has its own evidence even if a later
   // recurring charge exists elsewhere in the imported history.
-  expect(cancellationAlert("2026-07")).toHaveLength(1);
+  expect(cancellationAlert("2026-07")[0].href).toBe("/transactions/cancel-2");
+  const eur = deeperInsights(
+    [],
+    [accounts[0]],
+    [],
+    defaultCategories,
+    settings,
+    "2026-09",
+    "EUR",
+    "2026-10-04",
+    undefined,
+    payments,
+  );
+  expect(
+    eur.items.find((item) => item.href === "/transactions/cancel-4")?.detail,
+  ).toContain("£10.00");
 });

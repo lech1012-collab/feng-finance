@@ -31,7 +31,7 @@ export function Reminders({
   const [localConfig, setLocalConfig] = useState<ReminderConfig>();
   const data = useLiveQuery(
     async () => ({
-      accounts: await db.accounts.where("currency").equals(currency).toArray(),
+      accounts: await db.accounts.toArray(),
       statements: await db.statements.toArray(),
       transactions: await db.transactions
         .where("[currency+date]")

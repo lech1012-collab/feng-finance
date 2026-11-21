@@ -63,8 +63,12 @@ import { projectedReportingTransactions, convertMinor } from "../analytics/fx";
 import { monthCoverage } from "../analytics/coverage";
 import { reportingPeriod } from "../domain/period";
 import { readBudget, budgetKey } from "../analytics/planning";
-import { detectSubscriptions } from "../analytics/subscriptions";
-import { resolveRecurringSeries } from "../analytics/recurring-identity";
+import { detectSubscriptions, reviewPrefix } from "../analytics/subscriptions";
+import {
+  resolveRecurringSeries,
+  subscriptionEndsBySeries,
+  withSubscriptionEndDates,
+} from "../analytics/recurring-identity";
 import { saveRecurringMatchDecision } from "../storage/recurring-identity";
 import "./planning-v2.css";
 import { Toast } from "./Toast";
@@ -134,6 +138,10 @@ export function PotsPanel({
   const data = useLiveQuery(
     async () => ({
       pots: await db.pots.toArray(),
+      subscriptionReviews: await db.settings
+        .where("key")
+        .startsWith(reviewPrefix)
+        .toArray(),
       rates: await db.fxRates.toArray(),
       valuations: await db.valuations.toArray(),
       accounts: await db.accounts.toArray(),
@@ -177,6 +185,7 @@ export function PotsPanel({
     data.transactions,
     currency,
     localToday(),
+    data.subscriptionReviews,
   ).filter(
     (s) =>
       s.cadence === "annual" &&
@@ -947,6 +956,12 @@ export function CalendarPanel({
     detected,
     data.settings,
   );
+  const cancellations = subscriptionEndsBySeries(
+    series,
+    data.settings,
+    data.transactions,
+  );
+  const editingCancellation = editing && cancellations.get(editing.id);
   const priceRises = [...new Set(data.transactions.map((t) => t.currency))]
     .flatMap((native) =>
       detectSubscriptions(
@@ -961,6 +976,9 @@ export function CalendarPanel({
         s.increase > 0 &&
         s.needsReview &&
         !s.stale &&
+        (!s.cancellationEffectiveDate ||
+          (s.priceChangeDate &&
+            s.priceChangeDate <= s.cancellationEffectiveDate)) &&
         !data.series.some(
           (series) =>
             series.matchKey === s.key &&
@@ -1015,7 +1033,9 @@ export function CalendarPanel({
     );
     setMoneyDirection(target.expectedAmountMinor > 0 ? "in" : "out");
     setDue(target.nextDue);
-    setEnd(target.endDate ?? "");
+    // A detected series can carry the subscription's derived end date. Only
+    // the independent end date on a saved calendar entry belongs in the form.
+    setEnd(data.series.find((saved) => saved.id === target.id)?.endDate ?? "");
     setAccount(target.accountId);
   };
   return (
@@ -1227,25 +1247,34 @@ export function CalendarPanel({
       )}
       <details>
         <summary>Recurring series ({series.length})</summary>
-        {series.map((s) => (
-          <button
-            className="planning-v2-object"
-            key={s.id}
-            onClick={() => edit(s)}
-          >
-            <span>
-              {displayMerchant({ merchant: s.name, description: s.name })}
-              <small>
-                {s.cadence[0].toUpperCase() + s.cadence.slice(1)} ·{" "}
-                {s.status[0].toUpperCase() + s.status.slice(1)} ·{" "}
-                {data.series.some((d) => d.id === s.id)
-                  ? "Confirmed"
-                  : "Detected, confirm or edit"}
-              </small>
-            </span>
-            <strong>{money(s.expectedAmountMinor, s.currency)}</strong>
-          </button>
-        ))}
+        {series.map((s) => {
+          const cancellation = cancellations.get(s.id);
+          const lastDate =
+            cancellation && (!s.endDate || cancellation < s.endDate)
+              ? cancellation
+              : s.endDate;
+          const status = lastDate
+            ? `${lastDate < localToday() ? "Ended" : "Ends"} ${formatUkDate(lastDate)}`
+            : s.status[0].toUpperCase() + s.status.slice(1);
+          return (
+            <button
+              className="planning-v2-object"
+              key={s.id}
+              onClick={() => edit(s)}
+            >
+              <span>
+                {displayMerchant({ merchant: s.name, description: s.name })}
+                <small>
+                  {s.cadence[0].toUpperCase() + s.cadence.slice(1)} · {status} ·{" "}
+                  {data.series.some((d) => d.id === s.id)
+                    ? "Confirmed"
+                    : "Detected, confirm or edit"}
+                </small>
+              </span>
+              <strong>{money(s.expectedAmountMinor, s.currency)}</strong>
+            </button>
+          );
+        })}
       </details>
       {matching && (
         <Sheet
@@ -1451,6 +1480,13 @@ export function CalendarPanel({
               End date
               <UKDateInput value={end} onChange={(e) => setEnd(e)} />
             </label>
+            {editingCancellation && (
+              <p className="muted">
+                Subscription cancellation takes effect on{" "}
+                {formatUkDate(editingCancellation)}. Change it in{" "}
+                <Link to="/subscriptions?view=cancel">Cancellation plans</Link>.
+              </p>
+            )}
             {f.feedback}
             <details className="object-menu">
               <summary>More series options</summary>
@@ -2133,7 +2169,10 @@ export function ScenarioPanel({
     async () => ({
       scenarios: await db.scenarios.toArray(),
       rates: await db.fxRates.toArray(),
-      series: await db.recurringSeries.toArray(),
+      series: withSubscriptionEndDates(
+        await db.recurringSeries.toArray(),
+        await db.settings.toArray(),
+      ),
     }),
     [currency],
   );

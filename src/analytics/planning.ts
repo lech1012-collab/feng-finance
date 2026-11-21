@@ -12,7 +12,10 @@ import { safeSum } from "../domain/money";
 import { normalizeMerchant } from "../domain/normalize";
 import { completeMonth } from "./category";
 import { datedBalanceHistory } from "./balances";
-import { readReview } from "./subscriptions";
+import {
+  subscriptionEndDates,
+  subscriptionGroupKey,
+} from "./recurring-identity";
 import {
   effectiveTransactions,
   ledgerTransactions,
@@ -173,6 +176,7 @@ interface Pattern {
   months: number;
   days: number;
   amount: number;
+  endDate?: string;
 }
 const billCategories = new Set([
   "subscriptions",
@@ -216,27 +220,15 @@ export function paymentPatterns(
     grouped.push(t);
     groups.set(key, grouped);
   }
-  const cancelled = new Set(
-    settings
-      .map((s) => readReview(s.value))
-      .filter((r) => r?.status === "cancelled")
-      .map((r) => r!.groupKey),
-  );
+  const cancellations = subscriptionEndDates(settings);
   const patterns: Pattern[] = [];
   for (const [group, all] of groups) {
     const rows = all.sort((a, b) => a.date.localeCompare(b.date)).slice(-6);
     const last = rows.at(-1)!;
-    if (
-      cancelled.has(
-        JSON.stringify([
-          last.accountId,
-          currency,
-          normalizeMerchant(last.merchant || last.description),
-          !!last.isDemo,
-        ]),
-      )
-    )
-      continue;
+    const endDate =
+      last.amount < 0
+        ? cancellations.get(subscriptionGroupKey(last))
+        : undefined;
     const gaps = rows.slice(1).map((t, i) => day(t.date) - day(rows[i].date));
     const pattern = [
       { cadence: "weekly", min: 6, max: 8, count: 4, months: 0, days: 7 },
@@ -263,6 +255,7 @@ export function paymentPatterns(
     const next = pattern.months
       ? shiftPlannedDate(last.date, pattern.months)
       : dateAt(day(last.date) + pattern.days);
+    if (endDate && next > endDate) continue;
     // Do not resurrect an old bill/income sequence after several missed cycles.
     if (day(today) - day(next) > (pattern.months ? 38 : pattern.days + 3))
       continue;
@@ -273,6 +266,7 @@ export function paymentPatterns(
       months: pattern.months,
       days: pattern.days,
       amount: last.amount > 0 ? smallest : last.amount,
+      endDate,
     });
   }
   return patterns;
@@ -290,7 +284,7 @@ function paymentEvents(
       const date = p.months
         ? shiftPlannedDate(last.date, p.months * i)
         : dateAt(day(last.date) + p.days * i);
-      if (date > end) break;
+      if (date > end || (p.endDate && date > p.endDate)) break;
       if (date <= start) continue;
       const settled = observed.some(
         (t) =>
@@ -385,27 +379,13 @@ export function planningForecast(
         normalizeMerchant(p.rows[0].merchant || p.rows[0].description) ===
           normalizeMerchant(t.merchant || t.description),
     );
-  const cancelledGroups = new Set(
-    settings
-      .map((s) => readReview(s.value))
-      .filter((r) => r?.status === "cancelled")
-      .map((r) => r!.groupKey),
-  );
-  const cancelled = (t: Transaction) =>
-    cancelledGroups.has(
-      JSON.stringify([
-        t.accountId,
-        currency,
-        normalizeMerchant(t.merchant || t.description),
-        !!t.isDemo,
-      ]),
-    );
+  const cancelledGroups = subscriptionEndDates(settings);
   const variableRows = observed.filter(
     (t) =>
       external(t) &&
       t.amount < 0 &&
       !recurring(t) &&
-      !cancelled(t) &&
+      !cancelledGroups.has(subscriptionGroupKey(t)) &&
       baseline.includes(t.date.slice(0, 7)),
   );
   const baselineDays = safeSum(
@@ -437,7 +417,11 @@ export function planningForecast(
     };
   const gapRows = observed.filter((t) => t.date > anchor.date);
   const gapVariable = gapRows.filter(
-    (t) => external(t) && t.amount < 0 && !recurring(t),
+    (t) =>
+      external(t) &&
+      t.amount < 0 &&
+      !recurring(t) &&
+      !cancelledGroups.has(subscriptionGroupKey(t)),
   );
   const estimates = events(anchor.date);
   let movement = 0;

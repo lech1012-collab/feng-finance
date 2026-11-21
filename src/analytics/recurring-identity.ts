@@ -1,6 +1,7 @@
-import type { RecurringSeries, Setting } from "../domain/models";
+import type { RecurringSeries, Setting, Transaction } from "../domain/models";
 import { displayMerchant } from "../domain/presentation";
-import { sha256 } from "../domain/normalize";
+import { normalizeMerchant, sha256 } from "../domain/normalize";
+import { cancellationEndDate, readReview, reviewPrefix } from "./subscriptions";
 
 export interface RecurringMatchDecision {
   seriesId: string;
@@ -63,6 +64,131 @@ export function recurringDecisions(
     }
   }
   return result;
+}
+
+export function subscriptionGroupKey(t: Transaction) {
+  return JSON.stringify([
+    t.accountId,
+    t.currency,
+    normalizeMerchant(t.merchant || t.description),
+    !!t.isDemo,
+  ]);
+}
+
+/** Legacy calendar entries can use a five-part directional key or a manual UUID. */
+function subscriptionKeyForSeries(series: RecurringSeries, key: string) {
+  if (series.expectedAmountMinor >= 0) return;
+  try {
+    const parts: unknown = JSON.parse(key);
+    if (
+      Array.isArray(parts) &&
+      (parts.length === 4 || (parts.length === 5 && parts[4] === false)) &&
+      parts[0] === series.accountId &&
+      parts[1] === series.currency &&
+      typeof parts[2] === "string" &&
+      parts[3] === !!series.isDemo
+    )
+      return JSON.stringify(parts.slice(0, 4));
+  } catch {
+    // Manual UUIDs identify a calendar object but do not identify a merchant.
+  }
+}
+
+export function recurringSubscriptionKeys(
+  series: RecurringSeries,
+  settings: Setting[],
+) {
+  const keys = [
+    series.matchKey,
+    ...recurringDecisions(series, settings)
+      .filter((decision) => decision.choice === "same")
+      .map((decision) => decision.matchKey),
+  ];
+  return keys
+    .map((key) => subscriptionKeyForSeries(series, key))
+    .filter((key) => key !== undefined);
+}
+
+function cancelledSubscriptions(settings: Setting[]) {
+  return settings.flatMap((setting) => {
+    if (!setting.key.startsWith(reviewPrefix)) return [];
+    const review = readReview(setting.value);
+    const endDate = cancellationEndDate(review);
+    return review && endDate ? [{ review, endDate }] : [];
+  });
+}
+
+export function subscriptionEndDates(settings: Setting[]) {
+  return new Map(
+    cancelledSubscriptions(settings).map(({ review, endDate }) => [
+      review.groupKey,
+      endDate,
+    ]),
+  );
+}
+
+export function subscriptionEndsBySeries(
+  series: RecurringSeries[],
+  settings: Setting[],
+  transactions: Transaction[] = [],
+) {
+  const reviews = cancelledSubscriptions(settings);
+  const endDates = new Map<string, string>();
+  if (!reviews.length || !series.length) return endDates;
+  const endsByKey = new Map(
+    reviews.map(({ review, endDate }) => [review.groupKey, endDate]),
+  );
+  const linkedKeys = new Map<string, Set<string>>();
+  function link(id: string, key: string) {
+    const keys = linkedKeys.get(id) ?? new Set<string>();
+    keys.add(key);
+    linkedKeys.set(id, keys);
+  }
+  for (const { review } of reviews)
+    for (const id of review.linkedSeriesIds ?? []) link(id, review.groupKey);
+  for (const t of transactions) {
+    if (
+      !t.recurringSeriesId ||
+      t.amount >= 0 ||
+      t.type === "transfer" ||
+      t.isTransfer ||
+      t.transferPairId ||
+      t.parentId
+    )
+      continue;
+    const key = subscriptionGroupKey(t);
+    if (endsByKey.has(key)) link(t.recurringSeriesId, key);
+  }
+  for (const s of series) {
+    let endDate: string | undefined;
+    const keys = recurringSubscriptionKeys(s, settings);
+    for (const linked of linkedKeys.get(s.id) ?? []) {
+      const validated = subscriptionKeyForSeries(s, linked);
+      if (validated) keys.push(validated);
+    }
+    for (const key of keys) {
+      const end = endsByKey.get(key);
+      if (end && (!endDate || end < endDate)) endDate = end;
+    }
+    if (endDate) endDates.set(s.id, endDate);
+  }
+  return endDates;
+}
+
+/** Calendar end dates and subscription cancellations are independent bounds. */
+export function withSubscriptionEndDates(
+  series: RecurringSeries[],
+  settings: Setting[],
+  transactions: Transaction[] = [],
+) {
+  const ends = subscriptionEndsBySeries(series, settings, transactions);
+  if (!ends.size) return series;
+  return series.map((s) => {
+    const endDate = ends.get(s.id);
+    return endDate && (!s.endDate || endDate < s.endDate)
+      ? { ...s, endDate }
+      : s;
+  });
 }
 
 export function resolveRecurringSeries(

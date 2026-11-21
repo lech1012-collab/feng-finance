@@ -47,6 +47,8 @@ describe("subscription evidence", () => {
       { isTransfer: true },
       { type: "transfer" as const },
       { transferPairId: "pair" },
+      { kind: "card_repayment" as const },
+      { kind: "transfer" as const },
       { date: "2027-01-01" },
     ])
       expect(detect(monthly().map((t) => ({ ...t, ...patch })))).toEqual([]);
@@ -122,6 +124,39 @@ describe("subscription evidence", () => {
         "2026-10-04",
       )[0].needsReview,
     ).toBe(false);
+  });
+  it("uses the provider end date even for a later import that breaks the usual cadence", () => {
+    const rows = monthly();
+    const [candidate] = detect(rows);
+    const setting = (effectiveDate: string) => [
+      {
+        key: reviewPrefix + "test",
+        value: JSON.stringify({
+          status: "cancelled",
+          date: "2026-10-04",
+          effectiveDate,
+          groupKey: candidate.key,
+          amount: 1500,
+        }),
+      },
+    ];
+    const after = transaction({
+      ...rows[3],
+      id: "unexpected",
+      date: "2026-09-08",
+    });
+    const reviewed = (history: typeof rows, end: string) =>
+      detectSubscriptions(history, setting(end), "GBP", "2026-10-04")[0];
+    expect(reviewed(rows, "2026-09-05").afterCancellation).toBe(false);
+    expect(reviewed([...rows, after], "2026-09-05")).toMatchObject({
+      afterCancellation: true,
+      needsReview: true,
+      cancellationEffectiveDate: "2026-09-05",
+    });
+    expect(reviewed([...rows, after], "2026-10-31").afterCancellation).toBe(
+      false,
+    );
+    expect(reviewed(rows, "2026-09-01").afterCancellation).toBe(true);
   });
   it("keeps ordinary shopping and property costs out of subscription alerts", () => {
     expect(

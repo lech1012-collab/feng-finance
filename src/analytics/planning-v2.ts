@@ -356,18 +356,17 @@ export function detectRecurringSeries(
     settings,
     currency,
     today,
-  ).filter(
-    (s) => s.cadence && !s.stale && !["ignore", "cancelled"].includes(s.status),
-  );
+  ).filter((s) => s.cadence && !s.stale && s.status !== "ignore");
   const omitted = new Set(
     settings
       .map((s) => readReview(s.value))
-      .filter((r) => r && ["ignore", "cancelled"].includes(r.status))
+      .filter((r) => r?.status === "ignore")
       .map((r) => r!.groupKey),
   );
   const result: RecurringSeries[] = subs.map((s) => ({
     id: `detected:${s.key}`,
     matchKey: s.key,
+    isDemo: s.charges[0].isDemo,
     accountId: s.accountId,
     name: s.merchant,
     currency,
@@ -376,6 +375,7 @@ export function detectRecurringSeries(
         ? "annual"
         : (s.cadence as RecurringSeries["cadence"]),
     expectedAmountMinor: -s.amount,
+    endDate: s.cancellationEffectiveDate,
     amountHistory: s.charges.map((t) => ({
       date: t.date,
       amountMinor: t.amount,
@@ -391,6 +391,7 @@ export function detectRecurringSeries(
   for (const p of paymentPatterns(transactions, settings, currency, today)) {
     const last = p.rows.at(-1)!;
     if (
+      last.amount < 0 &&
       omitted.has(
         JSON.stringify([
           last.accountId,
@@ -406,6 +407,7 @@ export function detectRecurringSeries(
       result.some(
         (s) =>
           s.accountId === last.accountId &&
+          Math.sign(s.expectedAmountMinor) === Math.sign(last.amount) &&
           normalizeMerchant(s.name) ===
             normalizeMerchant(last.merchant || last.description),
       )
@@ -418,11 +420,13 @@ export function detectRecurringSeries(
     result.push({
       id: `detected:${p.group}`,
       matchKey: p.group,
+      isDemo: last.isDemo,
       accountId: last.accountId,
       name: last.merchant || last.description,
       currency,
       cadence,
       expectedAmountMinor: p.amount,
+      endDate: p.endDate,
       amountHistory: p.rows.map((t) => ({
         date: t.date,
         amountMinor: t.amount,
@@ -431,7 +435,7 @@ export function detectRecurringSeries(
       status: "active",
     });
   }
-  return result;
+  return result.filter((s) => !s.endDate || s.nextDue <= s.endDate);
 }
 export function nextSeriesDate(
   date: string,
@@ -499,6 +503,7 @@ export function recurringCalendar(
         (currency === "*" || t.currency === currency),
     ),
     settings,
+    transactions,
   ).map((event) => {
     const s = byId.get(event.id.slice(0, -11))!;
     return {

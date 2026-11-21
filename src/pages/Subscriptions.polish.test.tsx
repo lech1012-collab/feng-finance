@@ -11,6 +11,8 @@ import { MemoryRouter } from "react-router-dom";
 import { db, initializeDatabase } from "../storage/database";
 import { accounts, transaction } from "../tests/helpers";
 import Subscriptions from "./Subscriptions";
+import { savedBill } from "../tests/recurring-fixtures";
+import { readReview, reviewPrefix } from "../analytics/subscriptions";
 
 beforeEach(async () => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -225,4 +227,89 @@ it("shows compact duplicate and stale-charge warnings with their explanations av
   expect(
     within(staleHelp).getByText(/This does not prove cancellation/),
   ).toBeVisible();
+});
+
+it("records and edits a provider end date and surfaces matching imported charges", async () => {
+  await db.recurringSeries.put({
+    ...savedBill,
+    accountId: "a3",
+    endDate: "2026-12-31",
+  });
+  await db.transactions.update("netflix-polish-2", {
+    recurringSeriesId: savedBill.id,
+  });
+  render(
+    <MemoryRouter initialEntries={["/subscriptions?view=all"]}>
+      <Subscriptions currency="GBP" />
+    </MemoryRouter>,
+  );
+  const card = await screen.findByRole("article", { name: "NETFLIX" });
+  fireEvent.click(within(card).getByText("More status options"));
+  fireEvent.click(within(card).getByRole("button", { name: "I cancelled" }));
+  const editor = await screen.findByRole("dialog", {
+    name: "Record cancellation",
+  });
+  const field = within(editor).getByRole("textbox", {
+    name: "Effective cancellation date",
+  });
+  const save = within(editor).getByRole("button", {
+    name: "Save cancellation",
+  });
+  expect(field).toHaveValue("14/10/2026");
+  fireEvent.change(field, { target: { value: "31/09/2026" } });
+  expect(save).toBeDisabled();
+  fireEvent.change(field, { target: { value: "04/09/2026" } });
+  fireEvent.click(save);
+  const alert = await within(card).findByRole("link", {
+    name: /Charge after cancellation/,
+  });
+  expect(alert).toHaveAttribute("href", "/transactions/netflix-polish-3");
+  const setting = await db.settings
+    .where("key")
+    .startsWith(reviewPrefix)
+    .first();
+  expect(readReview(setting?.value)).toMatchObject({
+    date: "2026-10-14",
+    effectiveDate: "2026-09-04",
+    linkedSeriesIds: [savedBill.id],
+  });
+  expect((await db.recurringSeries.get(savedBill.id))?.endDate).toBe(
+    "2026-12-31",
+  );
+  fireEvent.click(
+    within(card).getByRole("button", {
+      name: /Edit effective cancellation date/,
+    }),
+  );
+  const edit = await screen.findByRole("dialog", {
+    name: "Record cancellation",
+  });
+  const date = within(edit).getByRole("textbox", {
+    name: "Effective cancellation date",
+  });
+  expect(date).toHaveValue("04/09/2026");
+  fireEvent.change(date, { target: { value: "04/10/2026" } });
+  fireEvent.click(
+    within(edit).getByRole("button", { name: "Save cancellation" }),
+  );
+  await waitFor(() =>
+    expect(
+      within(card).queryByRole("link", { name: /Charge after cancellation/ }),
+    ).toBeNull(),
+  );
+  await db.transactions.put(
+    transaction({
+      id: "new-debit",
+      merchant: "NETFLIX",
+      accountId: "a3",
+      date: "2026-10-11",
+      categoryId: "subscriptions",
+      amount: -1499,
+    }),
+  );
+  expect(
+    await within(card).findByRole("link", {
+      name: /Charge after cancellation/,
+    }),
+  ).toHaveAttribute("href", "/transactions/new-debit");
 });

@@ -341,3 +341,34 @@ it("does not double-count recurring payments or observed discretionary spending 
     1,
   );
 });
+
+it("includes a detected bill through its effective end date and keeps payments received from the same merchant", () => {
+  const settings = [
+    {
+      key: "subscription:hash",
+      value: JSON.stringify({
+        status: "cancelled",
+        date: "2026-10-07",
+        effectiveDate: "2026-11-10",
+        groupKey: JSON.stringify(["a1", "GBP", "NETFLIX", false]),
+        amount: 1200,
+      }),
+    },
+  ];
+  const ledger = rows.map((t) =>
+    t.amount > 0 ? { ...t, merchant: "NETFLIX" } : t,
+  );
+  const forecast = plan(
+    ledger,
+    docs,
+    [accounts[0]],
+    "2026-10-07",
+    90,
+    settings,
+  );
+  expect(
+    forecast.upcoming.filter((e) => e.amount < 0).map((e) => e.date),
+  ).toEqual(["2026-10-10", "2026-11-10"]);
+  expect(forecast.upcoming.filter((e) => e.amount > 0)).toHaveLength(3);
+  expect(forecast.bills).toBe(2400);
+});

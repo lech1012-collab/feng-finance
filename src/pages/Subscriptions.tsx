@@ -2,6 +2,9 @@ import { recurringReportingTotal } from "../analytics/subscription-summary";
 import { ImportButton } from "../components/ImportPicker";
 import { Toast } from "../components/Toast";
 import { ContextHelp } from "../components/ContextHelp";
+import { Sheet } from "../components/Sheet";
+import { UKDateInput } from "../components/UKDateInput";
+import { recurringSubscriptionKeys } from "../analytics/recurring-identity";
 import { displayMerchant } from "../domain/presentation";
 import { localToday } from "../analytics/reminders";
 import { sha256 } from "../domain/normalize";
@@ -12,12 +15,13 @@ import { useSwipe } from "../components/useSwipe";
 import {
   type Subscription,
   type SubscriptionStatus,
+  readReview,
   reviewPrefix,
 } from "../analytics/subscriptions";
 import { db } from "../storage/database";
 import { money } from "../domain/money";
 import { convertMinor } from "../analytics/fx";
-import { formatUkDate } from "../domain/dates";
+import { formatUkDate, parseDate } from "../domain/dates";
 import { auditedMutation } from "../storage/audit";
 import { undoChange } from "../storage/audit";
 import "../components/planning-v2.css";
@@ -41,28 +45,63 @@ function SubscriptionCard({
   const location = useLocation();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  async function save(status: SubscriptionStatus) {
+  const [dateDraft, setDateDraft] = useState<string>();
+  const lastCharge = s.charges.at(-1)!;
+  const editCancellation = () => {
+    setError("");
+    setDateDraft(s.cancellationEffectiveDate ?? localToday());
+  };
+  async function save(status: SubscriptionStatus, effectiveDate?: string) {
     if (busy) return;
     setBusy(true);
     setError("");
     try {
+      if (
+        status === "cancelled" &&
+        (!effectiveDate || parseDate(effectiveDate) !== effectiveDate)
+      )
+        throw new Error("Invalid cancellation date.");
       const key =
         reviewPrefix + (await sha256(new TextEncoder().encode(s.key)));
       const result = await auditedMutation(
         "Review recurring charge",
         ["settings", "recurringSeries"],
         async () => {
+          const previous = readReview((await db.settings.get(key))?.value);
+          const linkedSeries = new Set(previous?.linkedSeriesIds ?? []);
+          for (const charge of s.charges) {
+            if (charge.recurringSeriesId)
+              linkedSeries.add(charge.recurringSeriesId);
+          }
+          const identities = await db.settings
+            .where("key")
+            .startsWith("recurring:match:")
+            .toArray();
           await db.settings.put({
             key,
             value: JSON.stringify({
               status,
               groupKey: s.key,
               date: localToday(),
+              effectiveDate: status === "cancelled" ? effectiveDate : undefined,
+              linkedSeriesIds:
+                status === "cancelled" && linkedSeries.size
+                  ? [...linkedSeries]
+                  : undefined,
               amount: s.amount,
             }),
           });
           await db.recurringSeries.toCollection().modify((series) => {
-            if (series.matchKey === s.key) {
+            const matches =
+              recurringSubscriptionKeys(series, identities).includes(s.key) ||
+              linkedSeries.has(series.id);
+            if (
+              matches &&
+              series.accountId === s.accountId &&
+              series.currency === s.currency &&
+              !!series.isDemo === !!lastCharge.isDemo &&
+              series.expectedAmountMinor < 0
+            ) {
               series.status =
                 status === "ignore"
                   ? "ignored"
@@ -70,11 +109,21 @@ function SubscriptionCard({
                     ? "cancel-planned"
                     : "active";
               if (status === "keep") series.lastAcknowledgedAmount = s.amount;
-              if (status === "cancelled") series.endDate = localToday();
+              // Older versions copied the review date to the exact-match series.
+              // New cancellations are applied alongside the separate calendar end date.
+              if (
+                previous?.status === "cancelled" &&
+                !previous.effectiveDate &&
+                series.matchKey === s.key &&
+                series.endDate === previous.date
+              ) {
+                delete series.endDate;
+              }
             }
           });
         },
       );
+      setDateDraft(undefined);
       onReviewed(
         `${s.merchant}: ${statuses.find(([value]) => value === status)?.[1]}. You can change this under All detected.`,
         result.changeId,
@@ -138,9 +187,14 @@ function SubscriptionCard({
         <div className="context-help-heading">
           <div className="context-help-row">
             {s.afterCancellation && (
-              <StatusChip tone="warning">
-                Charged after you marked this cancelled
-              </StatusChip>
+              <Link
+                to={`/transactions/${lastCharge.id}`}
+                state={{ returnTo: location.pathname + location.search }}
+              >
+                Charge after cancellation ·{" "}
+                {money(lastCharge.amount, lastCharge.currency)} ·{" "}
+                {formatUkDate(lastCharge.date)} · {account}
+              </Link>
             )}
             {s.increase > 0 && (
               <StatusChip tone="warning">
@@ -171,8 +225,9 @@ function SubscriptionCard({
           >
             {s.afterCancellation && (
               <p>
-                A charge was recorded after you marked this cancelled. Check the
-                merchant’s confirmation and the charge date.
+                Check the charge against the effective date in the provider’s
+                confirmation. All later payments are marked in the charge
+                history.
               </p>
             )}
             {s.increase > 0 && (
@@ -221,13 +276,22 @@ function SubscriptionCard({
         <details className="object-menu">
           <summary>More status options</summary>
           {statuses
-            .filter(([status]) => status !== "keep" && status !== "cancel")
+            .filter(
+              ([status]) =>
+                status !== "keep" &&
+                status !== "cancel" &&
+                !(status === "cancelled" && s.status === "cancelled"),
+            )
             .map(([status, label]) => (
               <button
                 disabled={busy}
                 key={status}
                 aria-pressed={s.status === status}
-                onClick={() => void save(status)}
+                onClick={() =>
+                  status === "cancelled"
+                    ? editCancellation()
+                    : void save(status)
+                }
               >
                 {label}
               </button>
@@ -256,13 +320,60 @@ function SubscriptionCard({
           </p>
         </div>
       )}
-      {s.status === "cancelled" && (
-        <p className="muted">
-          Marked cancelled by you. Feng does not contact the provider or cancel
-          payments.
-        </p>
+      {s.cancellationEffectiveDate && (
+        <div>
+          <p className="muted">Marked cancelled by you.</p>
+          <button
+            type="button"
+            className="link-button"
+            disabled={busy}
+            onClick={editCancellation}
+          >
+            Edit effective cancellation date ·{" "}
+            <time dateTime={s.cancellationEffectiveDate}>
+              {formatUkDate(s.cancellationEffectiveDate)}
+            </time>
+          </button>
+        </div>
       )}
-      {error && <p role="alert">{error}</p>}
+      {dateDraft !== undefined && (
+        <Sheet
+          title="Record cancellation"
+          onClose={() => {
+            if (!busy) setDateDraft(undefined);
+          }}
+          footer={
+            <button
+              className="primary"
+              disabled={busy || !dateDraft}
+              onClick={() => void save("cancelled", dateDraft)}
+            >
+              Save cancellation
+            </button>
+          }
+        >
+          <p>
+            {displayMerchant({ merchant: s.merchant, description: s.merchant })}{" "}
+            · {account}
+          </p>
+          <label htmlFor="cancellation-effective-date">
+            Effective cancellation date
+          </label>
+          <UKDateInput
+            id="cancellation-effective-date"
+            value={dateDraft}
+            onChange={setDateDraft}
+            disabled={busy}
+            required
+          />
+          <p className="muted">
+            Use the end date on your provider’s confirmation. Feng flags
+            payments dated after that day.
+          </p>
+          {error && <p role="alert">{error}</p>}
+        </Sheet>
+      )}
+      {dateDraft === undefined && error && <p role="alert">{error}</p>}
       <details>
         <summary>
           View {s.charges.length} charge{s.charges.length === 1 ? "" : "s"} and
@@ -286,6 +397,16 @@ function SubscriptionCard({
                 meta={
                   <>
                     <time dateTime={t.date}>{formatUkDate(t.date)}</time>
+                    {s.cancellationEffectiveDate &&
+                      t.date > s.cancellationEffectiveDate && (
+                        <>
+                          {" "}
+                          ·{" "}
+                          <StatusChip tone="warning">
+                            After cancellation
+                          </StatusChip>
+                        </>
+                      )}
                     {s.increase > 0 && t.id === s.charges.at(-1)?.id && (
                       <>
                         {" · "}

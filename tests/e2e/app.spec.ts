@@ -2139,16 +2139,38 @@ test("subscription notification centre supports review, cancellation plans and p
   await netflix
     .getByRole("button", { name: "I cancelled", exact: true })
     .click();
+  const cancellation = page.getByRole("dialog", {
+    name: "Record cancellation",
+  });
+  const effectiveDate = cancellation.getByRole("textbox", {
+    name: "Effective cancellation date",
+  });
+  await expect(effectiveDate).toHaveValue("08/10/2026");
+  await effectiveDate.fill("01/09/2026");
+  await cancellation.getByRole("button", { name: "Save cancellation" }).click();
+  await expect(cancellation).toHaveCount(0);
   await page
     .getByRole("button", { name: "Cancellation plans", exact: true })
     .click();
   await expect(netflix).toContainText("Marked cancelled by you");
   await page.reload();
   await page.getByRole("button", { name: "All detected", exact: true }).click();
+  const laterCharge = netflix.getByRole("link", {
+    name: /Charge after cancellation/,
+  });
+  await expect(laterCharge).toContainText("£14.99");
+  await laterCharge.click();
+  await expect(page).toHaveURL(/transactions\/demo-transaction-2026-09-/);
+  await page.locator(".back-link").click();
+  await netflix
+    .getByRole("button", { name: /Edit effective cancellation date/ })
+    .click();
+  await expect(effectiveDate).toHaveValue("01/09/2026");
+  await effectiveDate.fill("04/09/2026");
+  await cancellation.getByRole("button", { name: "Save cancellation" }).click();
+  await expect(cancellation).toHaveCount(0);
+  await expect(laterCharge).toHaveCount(0);
   await netflix.getByText("More status options", { exact: true }).click();
-  await expect(
-    netflix.getByRole("button", { name: "I cancelled", exact: true }),
-  ).toHaveAttribute("aria-pressed", "true");
   await netflix.getByText(/View .*charges? and source evidence/).click();
   const evidence = netflix.getByRole("group", {
     name: "Charge evidence",

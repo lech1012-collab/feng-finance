@@ -47,7 +47,7 @@ export function financeReminders(
   accounts: Account[],
   statements: Statement[],
   transactions: Transaction[],
-  currency: string,
+  billCurrency: string,
   today: string,
   config: ReminderConfig,
 ): FinanceReminder[] {
@@ -55,14 +55,14 @@ export function financeReminders(
   const result: FinanceReminder[] = [];
   const due = `${today.slice(0, 7)}-${String(config.day).padStart(2, "0")}`;
   const needed = monthOffset(today.slice(0, 7), -1);
-  for (const a of accounts.filter(
-    (a) => a.currency === currency && !a.isDemo,
+  for (const account of accounts.filter(
+    (a) => a.tracking !== "manual" && !a.isDemo,
   )) {
     const latest = statements
       .filter(
         (s) =>
-          s.accountId === a.id &&
-          s.currency === currency &&
+          s.accountId === account.id &&
+          s.currency === account.currency &&
           s.statementPeriodEnd <= today &&
           !s.isDemo,
       )
@@ -71,8 +71,8 @@ export function financeReminders(
       .at(-1);
     if ((!latest || latest < `${needed}-01`) && due <= today)
       result.push({
-        id: `statement-${a.id}`,
-        title: `Update ${a.displayName}`,
+        id: `statement-${account.id}`,
+        title: `Update ${account.displayName}`,
         date: due,
         detail: `Import a statement ending in ${needed} or later. ${latest ? `Latest imported ending: ${latest}.` : "No statement imported."}`,
         href: "/import",
@@ -91,7 +91,7 @@ export function financeReminders(
   ]);
   for (const t of transactions)
     if (
-      t.currency === currency &&
+      t.currency === billCurrency &&
       t.date <= today &&
       !t.isDemo &&
       t.amount < 0 &&

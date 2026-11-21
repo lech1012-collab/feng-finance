@@ -1,5 +1,6 @@
 import { test, expect, type Page } from "./fixtures";
 import { accounts, transaction } from "../../src/tests/helpers";
+import type { Statement } from "../../src/domain/models";
 
 async function seed(page: Page, records: Record<string, object[]>) {
   await page.clock.setFixedTime(new Date("2026-10-20T12:00:00Z"));
@@ -358,4 +359,87 @@ test("a bill in the Home review count opens in the queue and evidence returns to
   await expect(
     page.getByRole("button", { name: "All detected", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+});
+
+test("Home coverage distinguishes an unfinished month, a missing date range and an imported statement to check", async ({
+  page,
+}) => {
+  const account = { ...accounts[2], displayName: "Example Rewards" };
+  const warning =
+    "The printed closing balance differs from the extracted rows.";
+  const statements = ["2026-08-31", "2026-09-05", "2026-10-20"].map(
+    (end, index): Statement => ({
+      id: `card-${end}`,
+      institution: account.institution,
+      accountId: account.id,
+      currency: account.currency,
+      sourceFileHash: `fixture-${end}`,
+      sourceFilename: `example-rewards-${end}.pdf`,
+      statementPeriodStart: `${end.slice(0, 7)}-01`,
+      statementPeriodEnd: end,
+      periodSource: "printed",
+      openingBalance: 0,
+      closingBalance: index === 0 ? -1250 : -1000,
+      validationStatus: index === 0 ? "warning" : "reconciled",
+      extractionMethod: "embedded-text",
+      importedAt: account.createdAt,
+      parserVersion: "test",
+      transactionCount: 1,
+      warnings: index === 0 ? [warning] : [],
+    }),
+  );
+  await seed(page, {
+    accounts: [account],
+    statements,
+    transactions: statements.map((s) =>
+      transaction({
+        id: `purchase-${s.id}`,
+        statementId: s.id,
+        accountId: account.id,
+        date: s.statementPeriodEnd,
+        categoryId: "groceries",
+        amount: -1000,
+      }),
+    ),
+  });
+  const month = page.getByLabel("Selected month");
+  const dialog = page.getByRole("dialog", { name: "This month explained" });
+  const partial = page.getByRole("button", {
+    name: "Partial: This month explained",
+  });
+  await month.fill("2026-10");
+  await partial.click();
+  await expect(dialog).toContainText(/in progress|still open/i);
+  await expect(
+    dialog.getByRole("button", { name: "Select statements" }),
+  ).toHaveCount(0);
+  await dialog
+    .getByRole("button", { name: "Close This month explained" })
+    .click();
+
+  await month.fill("2026-09");
+  await partial.click();
+  await expect(dialog).toContainText(account.displayName);
+  await expect(dialog).toContainText(account.maskedAccountIdentifier);
+  await expect(dialog).toContainText("6 to 30 Sep 2026");
+  const [picker] = await Promise.all([
+    page.waitForEvent("filechooser"),
+    dialog.getByRole("button", { name: "Select statements" }).click(),
+  ]);
+  expect(picker.isMultiple()).toBe(true);
+  await picker.setFiles([]);
+
+  await page.keyboard.press("Escape");
+  await month.fill("2026-08");
+  await page
+    .getByRole("button", { name: "Unverified: This month explained" })
+    .click();
+  await expect(
+    dialog.getByRole("button", { name: "Select statements" }),
+  ).toHaveCount(0);
+  await dialog.getByRole("link", { name: /View statement/ }).click();
+  await expect(page).toHaveURL(/statement=card-2026-08-31/);
+  await expect(page.getByText(warning, { exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "‹ Home", exact: true }).click();
+  await expect(month).toHaveValue("2026-08");
 });

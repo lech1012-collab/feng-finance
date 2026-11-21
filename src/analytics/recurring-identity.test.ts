@@ -180,3 +180,73 @@ it("one imported payment fulfils only one explicitly separate bill, preferring i
   ).toEqual([]);
   expect(row).toEqual(before);
 });
+
+it("ends expected payments at the effective date for an approved alias and keeps actual later payments visible", () => {
+  const review: Setting = {
+    key: "subscription:hash",
+    value: JSON.stringify({
+      status: "cancelled",
+      date: "2026-12-01",
+      effectiveDate: "2026-10-04",
+      groupKey: detectedBill.matchKey,
+      amount: 1249,
+    }),
+  };
+  const settings = [review, decision("same")];
+  const dates = (s: typeof savedBill, settings: Setting[]) =>
+    confirmedPaymentEvents([s], "2026-09-30", "2026-11-30", [], settings).map(
+      (p) => p.date,
+    );
+  expect(dates(savedBill, settings)).toEqual(["2026-10-04"]);
+  expect(dates({ ...savedBill, endDate: "2026-09-20" }, settings)).toEqual([]);
+  expect(dates(savedBill, [review, decision("separate")])).toEqual([
+    "2026-10-04",
+    "2026-11-04",
+  ]);
+  const posted = transaction({
+    id: "posted",
+    merchant: "NETFLIX.COM",
+    date: "2026-11-10",
+    amount: -1249,
+  });
+  expect(
+    recurringCalendar([savedBill], [posted], "2026-11", "GBP", settings),
+  ).toMatchObject([
+    { expected: false, transactionId: "posted", amountMinor: -1249 },
+  ]);
+  expect(savedBill.endDate).toBeUndefined();
+});
+
+it("limits manual calendar entries by explicit charge links within the same account and currency", () => {
+  const groupKey = detectedBill.matchKey;
+  const payload = {
+    status: "cancelled",
+    date: "2026-10-01",
+    groupKey,
+    amount: 1249,
+  };
+  const settings = [
+    {
+      key: "subscription:hash",
+      value: JSON.stringify({ ...payload, linkedSeriesIds: [savedBill.id] }),
+    },
+  ];
+  const due = (s: typeof savedBill) =>
+    confirmedPaymentEvents([s], "2026-10-01", "2026-10-31", [], settings);
+  expect(due(savedBill)).toEqual([]);
+  expect(due({ ...savedBill, expectedAmountMinor: 1099 })).toHaveLength(1);
+  expect(due({ ...savedBill, accountId: "a2" })).toHaveLength(1);
+  expect(due({ ...savedBill, currency: "EUR" })).toHaveLength(1);
+  expect(due({ ...savedBill, isDemo: true })).toHaveLength(1);
+  expect(due({ ...savedBill, id: "separate" })).toHaveLength(1);
+  const olderRow = transaction({
+    merchant: "NETFLIX.COM",
+    date: "2026-09-04",
+    recurringSeriesId: savedBill.id,
+  });
+  expect(
+    recurringCalendar([savedBill], [olderRow], "2026-10", "GBP", [
+      { key: "subscription:hash", value: JSON.stringify(payload) },
+    ]),
+  ).toEqual([]);
+});

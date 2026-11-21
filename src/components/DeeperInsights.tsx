@@ -44,9 +44,9 @@ export function DeeperInsights({
   proposals?: TransferProposal[];
 }) {
   const settings = useLiveQuery(() => db.settings.toArray());
-  if (!transactions.length || months?.length === 0) return null;
-  const today = localToday();
   const ledger = rawTransactions ?? transactions;
+  if (!ledger.length || months?.length === 0) return null;
+  const today = localToday();
   const preferences = reportingSettings ?? settings ?? [];
   const documents = verifiedStatements(statements, ledger, today);
   const selected = months ?? [month];
@@ -76,6 +76,7 @@ export function DeeperInsights({
             ).complete
           : monthCoverage(accounts, statements, ledger, m, currency, today)
               .complete,
+      rawTransactions,
     ),
   }));
   const result = results.at(-1)!;

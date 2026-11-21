@@ -80,6 +80,52 @@ afterEach(async () => {
   vi.useRealTimers();
   await db.delete();
 });
+it("shows an ended subscription while retaining its independent calendar end date", async () => {
+  const key = JSON.stringify(["a1", "GBP", "NETFLIX", false]);
+  await db.recurringSeries.put({
+    ...savedBill,
+    matchKey: key,
+    endDate: "2026-12-31",
+  });
+  await db.settings.put({
+    key: "subscription:test",
+    value: JSON.stringify({
+      status: "cancelled",
+      groupKey: key,
+      date: "2026-10-01",
+      effectiveDate: "2026-09-20",
+      amount: 1099,
+    }),
+  });
+  render(
+    <MemoryRouter>
+      <CalendarPanel currency="GBP" month="2026-10" />
+    </MemoryRouter>,
+  );
+  fireEvent.click(await screen.findByText("Recurring series (1)"));
+  fireEvent.click(
+    screen.getByRole("button", { name: /Netflix.*Ended 20 Sep/ }),
+  );
+  const sheet = await screen.findByRole("dialog", {
+    name: "Recurring payment",
+  });
+  expect(
+    within(sheet).getByText(/Subscription cancellation takes effect on 20 Sep/),
+  ).toBeVisible();
+  expect(
+    within(sheet).getByRole("link", { name: "Cancellation plans" }),
+  ).toHaveAttribute("href", "/subscriptions?view=cancel");
+  expect(within(sheet).getByRole("textbox", { name: "End date" })).toHaveValue(
+    "31/12/2026",
+  );
+  fireEvent.click(
+    within(sheet).getByRole("button", { name: "Confirm series" }),
+  );
+  await waitFor(() => expect(sheet).not.toBeInTheDocument());
+  expect((await db.recurringSeries.get(savedBill.id))?.endDate).toBe(
+    "2026-12-31",
+  );
+});
 it("creates a £540 irregular-cost pot, confirms October's £90 contribution and provides Undo", async () => {
   render(
     <MemoryRouter>

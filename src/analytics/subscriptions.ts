@@ -1,12 +1,16 @@
 import type { Setting, Transaction } from "../domain/models";
 import { normalizeMerchant } from "../domain/normalize";
 import { currencyPrecision } from "../domain/money";
+import { parseDate } from "../domain/dates";
+import { financialType } from "../domain/transaction-type";
 export type SubscriptionStatus =
   "review" | "keep" | "cancel" | "cancelled" | "ignore";
 export interface SubscriptionReview {
   status: SubscriptionStatus;
   groupKey: string;
   date: string;
+  effectiveDate?: string;
+  linkedSeriesIds?: string[];
   amount: number;
 }
 export interface Subscription {
@@ -25,6 +29,7 @@ export interface Subscription {
   overlap: boolean;
   stale: boolean;
   afterCancellation: boolean;
+  cancellationEffectiveDate?: string;
   status: SubscriptionStatus;
   needsReview: boolean;
   known: boolean;
@@ -41,7 +46,15 @@ export function readReview(value?: string): SubscriptionReview | undefined {
       ) ||
       typeof v.groupKey !== "string" ||
       typeof v.date !== "string" ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(v.date) ||
+      parseDate(v.date) !== v.date ||
+      (v.effectiveDate !== undefined &&
+        (typeof v.effectiveDate !== "string" ||
+          parseDate(v.effectiveDate) !== v.effectiveDate)) ||
+      (v.linkedSeriesIds !== undefined &&
+        (!Array.isArray(v.linkedSeriesIds) ||
+          !v.linkedSeriesIds.every(
+            (id) => typeof id === "string" && id.length > 0,
+          ))) ||
       !Number.isSafeInteger(v.amount) ||
       Number(v.amount) < 0
     )
@@ -50,6 +63,12 @@ export function readReview(value?: string): SubscriptionReview | undefined {
   } catch {
     return;
   }
+}
+/** Earlier cancellations used the day the review was recorded. */
+export function cancellationEndDate(review: SubscriptionReview | undefined) {
+  return review?.status === "cancelled"
+    ? (review.effectiveDate ?? review.date)
+    : undefined;
 }
 const knownService =
   /\b(NETFLIX|SPOTIFY|ADOBE|DISNEY|AUDIBLE|APPLE\.COM\/BILL|APPLE MUSIC|ICLOUD|YOUTUBE PREMIUM|MICROSOFT 365|DROPBOX|AMAZON PRIME|OPENAI|CHATGPT)\b/;
@@ -92,10 +111,7 @@ export function detectSubscriptions(
   for (const t of transactions) {
     if (
       t.currency !== currency ||
-      t.amount >= 0 ||
-      t.isTransfer ||
-      t.type === "transfer" ||
-      t.transferPairId ||
+      financialType(t) !== "expense" ||
       t.parentId ||
       t.date > today
     )
@@ -162,17 +178,22 @@ export function detectSubscriptions(
         "fees",
       ].includes(last.categoryId ?? "") ||
       last.categoryId?.startsWith("property-");
-    if (!known && (everydayCategory || !(pattern && stable))) continue;
+    const review = reviews.get(key);
+    const cancellationEffectiveDate = cancellationEndDate(review);
+    // An unexpected debit can break the old cadence of a cancelled bill.
+    if (
+      !cancellationEffectiveDate &&
+      !known &&
+      (everydayCategory || !(pattern && stable))
+    )
+      continue;
     const cadence = pattern && stable ? pattern : undefined;
     const amount = -last.amount;
     const rise = subscriptionPriceRise(charges, currency);
     const increase = cadence ? rise.increase : 0;
-    const review = reviews.get(key);
     const status = review?.status ?? "review";
     const afterCancellation =
-      status === "cancelled" &&
-      !!review &&
-      charges.some((t) => t.date > review.date);
+      !!cancellationEffectiveDate && last.date > cancellationEffectiveDate;
     const stale = day(today) - day(last.date) > (cadence?.max ?? 45) * 1.5;
     const needsReview =
       status === "review" ||
@@ -202,6 +223,7 @@ export function detectSubscriptions(
       overlap: false,
       stale,
       afterCancellation,
+      cancellationEffectiveDate,
       status,
       needsReview,
       known,

@@ -250,6 +250,13 @@ a different calendar month. Selecting Refunds shows refund receipts for those
 dates. A transfer review includes a match when either side falls in the period.
 Home's recurring-charge review opens with both bills and subscriptions visible.
 
+Tap the status badge on **This month** for the accounts and dates behind the
+figures. A past gap can be followed up with a statement. When an imported
+statement needs checking, its saved evidence is available in Statement history.
+Statement reminders use each bank or card account's own currency. Changing
+the display currency leaves those reminders available. Manually tracked
+accounts do not receive statement reminders.
+
 In Activity, sorting handles missing categories. Open a labelled source, refund
 or split exception to resolve it. Bulk selection follows the visible payments
 when filters change. Manual cash balances use the opening amount and recorded
@@ -296,6 +303,11 @@ unit against the previous three-charge median and suppresses repeat alerts at
 that same price. Keep dismisses that change; Cancel planned creates a reminder.
 Feng cannot determine usage or cancel a service. Complete cancellation with its
 provider and check future imported charges.
+
+Select **I cancelled** to record the provider's effective cancellation date.
+The date defaults to today and can be edited later. Feng flags matching debits
+dated after that day, including payments already in the ledger. Open the payment
+to check the amount, account and source.
 
 Debt planning compares avalanche, snowball and custom order using balances,
 APR, minimum payments and the available monthly amount. Assumptions, including

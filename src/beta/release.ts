@@ -12,12 +12,14 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-11-20",
+  date: "2026-11-21",
   points: [
-    "On mobile, Activity and the pending Import count now have the same names on screen and in assistive technology.",
+    "Tap the monthly coverage badge on Home to see which accounts and dates need attention.",
+    "Statement reminders follow your bank and card accounts across display currencies. Manual wallets stay out of the reminder list.",
+    "Record the date your subscription cancellation takes effect to spot later charges and open the payment.",
   ],
   pleaseTest: [
-    "Select two statements, open Activity, then use the Import (2) tab to resume the review.",
+    "Check a partial month on Home. Record a cancellation date for a recurring charge and inspect any payment after that date.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -25,6 +27,18 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.2.33",
+    date: "2026-11-20",
+    points: [
+      "On mobile, Activity and the pending Import count now have the same names on screen and in assistive technology.",
+    ],
+    pleaseTest: [
+      "Select two statements, open Activity, then use the Import (2) tab to resume the review.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.32",
     date: "2026-11-19",
