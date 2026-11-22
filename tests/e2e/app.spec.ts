@@ -1800,6 +1800,41 @@ test("System default, persistent appearance and mobile layouts without overlappi
         }),
       );
       expect(overlap, `${route} at ${width}px`).toBe(false);
+      if (route === "/analysis" && width === 768) {
+        const strip = page.locator(".metric-strip");
+        for (const family of ["sans-serif", "DejaVu Sans, sans-serif"]) {
+          await page.evaluate((font) => {
+            document.documentElement.style.fontFamily = font;
+          }, family);
+          await expect
+            .poll(() =>
+              strip.evaluate((card) => {
+                const bounds = card.getBoundingClientRect();
+                return (
+                  document.documentElement.scrollWidth <= innerWidth + 1 &&
+                  Array.from(card.querySelectorAll(".metric strong")).every(
+                    (value) => {
+                      const range = document.createRange();
+                      range.selectNodeContents(value);
+                      const column =
+                        value.parentElement!.getBoundingClientRect();
+                      return Array.from(range.getClientRects()).every(
+                        (line) =>
+                          line.left >= Math.max(bounds.left, column.left) - 1 &&
+                          line.right <=
+                            Math.min(bounds.right, column.right) + 1,
+                      );
+                    },
+                  )
+                );
+              }),
+            )
+            .toBe(true);
+        }
+        await page.evaluate(() => {
+          document.documentElement.style.removeProperty("font-family");
+        });
+      }
     }
   }
   await page.setViewportSize({ width: 390, height: 844 });

@@ -68,8 +68,21 @@
   margin: 4px 0 12px;
 }
 .app[data-page="analysis"] .metric-strip {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 16px 12px;
+}
+/* Let the figures determine how many columns fit, including currency and coverage marks. */
+.app[data-page="analysis"] .metric-strip > .metric {
+  flex: 1 1 max-content;
+  min-inline-size: min(100%, 10rem);
+  max-inline-size: 100%;
+}
+.app[data-page="analysis"] .metric-strip .metric strong,
+.app[data-page="analysis"] .metric-strip .metric .amount {
+  max-inline-size: 100%;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }
 .app .metric-strip [data-tone="income"] .amount {
   color: var(--chart-income);
