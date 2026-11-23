@@ -1,11 +1,7 @@
 import { expect, test, type Locator } from "./fixtures";
 import { loadDemoUi } from "./flows";
 
-async function expectNavigationTargets(
-  navigation: Locator,
-  names: string[],
-  visibleLabels: boolean,
-) {
+async function expectNavigationTargets(navigation: Locator, names: string[]) {
   const links = navigation.getByRole("link");
   await expect(links).toHaveCount(names.length);
   for (const name of names)
@@ -13,7 +9,7 @@ async function expectNavigationTargets(
       navigation.getByRole("link", { name, exact: true }),
     ).toBeVisible();
 
-  const issues = await links.evaluateAll((links, visibleLabels) => {
+  const issues = await links.evaluateAll((links) => {
     const problems: string[] = [];
     const boxes = links.map((link) => link.getBoundingClientRect());
     links.forEach((link, index) => {
@@ -39,8 +35,7 @@ async function expectNavigationTargets(
       )
         problems.push(`${name} overlaps another target`);
 
-      // In compact layouts the accessible name can accompany an icon alone.
-      // If the label is drawn, its complete text must fit in its own target.
+      // Every visible link title must fit inside its own hit target.
       const range = document.createRange();
       const walker = document.createTreeWalker(link, NodeFilter.SHOW_TEXT);
       let labelVisible = false;
@@ -59,11 +54,10 @@ async function expectNavigationTargets(
           }
         }
       }
-      if (visibleLabels && !labelVisible)
-        problems.push(`${name} has no visible label`);
+      if (!labelVisible) problems.push(`${name} has no visible label`);
     });
     return problems;
-  }, visibleLabels);
+  });
   expect(issues).toEqual([]);
 }
 
@@ -75,7 +69,13 @@ for (const layout of [
     fontSize: "200%",
     labels: phoneLabels,
     next: "Analyse",
-    visibleLabels: false,
+  },
+  {
+    name: "390px phone with 200% text",
+    width: 390,
+    fontSize: "200%",
+    labels: phoneLabels,
+    next: "Analyse",
   },
   {
     name: "390px phone",
@@ -83,7 +83,6 @@ for (const layout of [
     fontSize: "100%",
     labels: phoneLabels,
     next: "Analyse",
-    visibleLabels: true,
   },
   {
     name: "desktop",
@@ -91,7 +90,6 @@ for (const layout of [
     fontSize: "100%",
     labels: ["Home", "Transactions", "Analyse", "Planning", "Settings"],
     next: "Transactions",
-    visibleLabels: true,
   },
 ]) {
   test(`navigation and final settings action stay reachable on ${layout.name}`, async ({
@@ -136,11 +134,7 @@ for (const layout of [
     const navigation = page.getByRole("navigation", {
       name: "Main navigation",
     });
-    await expectNavigationTargets(
-      navigation,
-      layout.labels,
-      layout.visibleLabels,
-    );
+    await expectNavigationTargets(navigation, layout.labels);
     await navigation.getByRole("link", { name: "Home", exact: true }).focus();
     await page.keyboard.press("Tab");
     const next = navigation.getByRole("link", {
@@ -163,6 +157,17 @@ for (const layout of [
       page.getByRole("heading", { name: layout.next, exact: true, level: 1 }),
     ).toBeVisible();
     await expect(next).toHaveAttribute("aria-current", "page");
+    const destination = page.getByRole("main", {
+      name: layout.next,
+      exact: true,
+    });
+    await expect(destination).toBeFocused();
+    await page.keyboard.press("Tab");
+    expect(
+      await destination.evaluate((main) =>
+        main.contains(document.activeElement),
+      ),
+    ).toBe(true);
   });
 }
 

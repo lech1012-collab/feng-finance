@@ -183,6 +183,9 @@
   /* Padding keeps the safe-area gap in the measured height used by sticky actions. */
   .app .mobile-navigation {
     --dock-gap: max(8px, env(safe-area-inset-bottom));
+    display: flex;
+    flex-wrap: wrap;
+    container: dock / inline-size;
     isolation: isolate;
     inset: auto max(8px, env(safe-area-inset-right)) 0
       max(8px, env(safe-area-inset-left));
@@ -209,6 +212,8 @@
   }
 
   .app .mobile-navigation > a {
+    flex: 1 1 0;
+    min-width: max-content;
     pointer-events: auto;
     padding: 4px 1px;
     min-height: 52px;
@@ -246,8 +251,18 @@
   }
 }
 
-@container navitem (max-width: 4.2em) {
-  .app .mobile-navigation > a > span {
+/* At enlarged text sizes keep every title visible. Let the actual words
+   determine how many destinations share a row, even with a pending count. */
+@container dock (max-width: 17rem) {
+  .app .mobile-navigation > a {
+    flex-basis: max-content;
+    min-inline-size: 44px;
+    max-inline-size: 100%;
+    padding-inline: 6px;
+    min-height: 44px;
+    overflow-wrap: anywhere;
+  }
+  .app .mobile-navigation > a svg {
     display: none;
   }
 }

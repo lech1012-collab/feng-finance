@@ -1,3 +1,4 @@
+import { invalidateImportReview } from "../import/interrupted-review";
 import { Sheet, SheetFooter } from "./Sheet";
 import { Toast } from "./Toast";
 import { useEffect, useState } from "react";
@@ -48,6 +49,7 @@ export function SafetyRecovery({
     setNotice("");
     try {
       await restorePreviousData(database, preview.capturedAt);
+      invalidateImportReview();
       setNotice(
         "Previous data restored. Reopening Feng with the earlier settings.",
       );

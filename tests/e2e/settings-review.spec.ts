@@ -1,5 +1,5 @@
 import { saveReadableBackup, settingsSection, loadDemoUi } from "./flows";
-import { expect, test, type Page, acknowledgeBeta } from "./fixtures";
+import { expect, test, type Page } from "./fixtures";
 import { readFile } from "node:fs/promises";
 
 async function settings(page: Page) {
@@ -308,17 +308,12 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
   await phrase.fill("ERASE");
   await expect(wipe).toBeEnabled();
   await wipe.click();
-  // Erase also removes consent preferences, so acknowledge the fresh notice
-  // before continuing the recovery journey with the downloaded backup.
-  await expect(
-    page.getByRole("dialog", { name: "Welcome to Feng" }),
-  ).toBeVisible();
-  await acknowledgeBeta(page);
-  await settingsSection(page, "danger");
-  await expect(phrase).toHaveValue("");
-  await settingsSection(page, "backup");
-  await expect(page.locator("#backup")).toContainText("No backup saved yet.");
-  await page.getByLabel("Choose Feng backup", { exact: true }).setInputFiles({
+  const welcome = page.getByRole("dialog", { name: "Welcome to Feng" });
+  await expect(welcome).toBeVisible();
+  const chooserEvent = page.waitForEvent("filechooser");
+  await welcome.getByRole("button", { name: "Restore a backup" }).click();
+  const chooser = await chooserEvent;
+  await chooser.setFiles({
     name: file.filename,
     mimeType: "application/json",
     buffer: Buffer.from(file.contents),
@@ -329,7 +324,7 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
   });
   await preview
     .getByLabel(
-      "I understand that this replaces all existing data on this device.",
+      "Replace the existing data in my demo workspace.",
     )
     .check();
   await preview
@@ -342,7 +337,7 @@ test("Erasing every record requires ERASE and a downloaded backup can restore it
     page.getByRole("heading", { name: "Home", exact: true }),
   ).toBeVisible();
   await settingsSection(page, "backup");
-  await expect(page.locator(".backup-status")).toContainText("Last backup:");
+  await expect(page.locator(".backup-status")).toContainText("Last export ·");
 });
 
 test("Personal rules preview scope and can be edited or deleted without touching unmatched payments", async ({

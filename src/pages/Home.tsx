@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
@@ -22,7 +23,7 @@ import { CashChart } from "../components/Chart";
 import { db } from "../storage/database";
 import { auditedMutation, undoChange } from "../storage/audit";
 import { SegmentedControl } from "../components/UIPrimitives";
-import { loadDemo } from "../storage/demo";
+import { openDemoLedger } from "../storage/ledgers";
 import { monthBounds, monthOffset } from "../domain/dates";
 import { displayDate, displayMerchant } from "../domain/presentation";
 import { financialType } from "../domain/transaction-type";
@@ -154,6 +155,7 @@ export default function Home({
           const indexedRows = new Map(transactions.map((row) => [row.id, row]));
           for (const row of [...sourceRows, ...manualWalletRows])
             indexedRows.set(row.id, row);
+          const pending = await pendingTransferAttention();
           return {
             transactions: [...indexedRows.values()],
             categories: await db.categories.toArray(),
@@ -161,12 +163,16 @@ export default function Home({
             statements,
             settings: await db.settings.toArray(),
             count: await db.transactions.count(),
-            uncategorized: await db.transactions.filter(needsCategory).count(),
-            toReview: await db.transactions.filter(needsReview).count(),
+            uncategorized: await db.transactions
+              .filter((row) => !pending.ids.has(row.id) && needsCategory(row))
+              .count(),
+            toReview: await db.transactions
+              .filter((row) => !pending.ids.has(row.id) && needsReview(row))
+              .count(),
             rates: await db.fxRates.toArray(),
             valuations: await db.valuations.toArray(),
             pots: await db.pots.toArray(),
-            proposals: await db.transferProposals.toArray(),
+            proposals: pending.proposals,
             recurringSeries: await db.recurringSeries.toArray(),
           };
         },
@@ -191,12 +197,22 @@ export default function Home({
               Import statements to see your financial position. Everything stays
               on this device.
             </p>
+            {setupError && <p role="alert">{setupError}</p>}
             <div className="actions">
               <ImportButton className="button primary">
                 <Upload aria-hidden="true" size={17} />
                 Import your first statement
               </ImportButton>
-              <button onClick={() => void loadDemo()}>
+              <button
+                onClick={() => {
+                  setSetupError("");
+                  void openDemoLedger().catch(() =>
+                    setSetupError(
+                      "Demo data could not be opened. Please try again.",
+                    ),
+                  );
+                }}
+              >
                 Try fictitious demo data
                 <ArrowRight aria-hidden="true" size={16} />
               </button>
@@ -469,7 +485,7 @@ export default function Home({
               <Link to="/settings#backup">
                 <span>Save backup</span>
                 <span className="setup-state">
-                  {health.lastExportAt ? "✓ Saved" : "Not saved"}
+                  {health.lastExportAt ? "✓ Exported" : "Not exported"}
                 </span>
               </Link>
               <Link to="/settings#transfers">
@@ -805,7 +821,9 @@ export default function Home({
         ) : (
           <p className="muted">
             {categories.length > 0
-              ? "Categorise transactions to see spending by category."
+              ? coverage.pendingTransfers > 0 && !data.uncategorized
+                ? "Review the possible transfers to see which payments count as spending."
+                : "Categorise transactions to see spending by category."
               : coverage.hasData
                 ? "No spending for this month."
                 : "Import statements to see spending."}
@@ -1038,7 +1056,7 @@ export default function Home({
         >
           {health.lastExportAt ? (
             <>
-              Last backup:{" "}
+              Last export ·{" "}
               <time className="date-value" dateTime={health.lastExportAt}>
                 {displayDate(health.lastExportAt.slice(0, 10))}
               </time>

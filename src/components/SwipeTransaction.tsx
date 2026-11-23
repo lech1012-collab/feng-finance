@@ -13,6 +13,7 @@ import { useSwipe } from "./useSwipe";
 import { displayMerchant } from "../domain/presentation";
 export function SwipeTransaction({
   transaction: t,
+  pendingTransfer,
   returnTo,
   onCategorize,
   children,
@@ -24,6 +25,7 @@ export function SwipeTransaction({
   accessibleLabel,
 }: {
   transaction: Transaction;
+  pendingTransfer?: boolean;
   returnTo?: string;
   onCategorize: () => void;
   children: ReactNode;
@@ -59,6 +61,7 @@ export function SwipeTransaction({
     };
   }, [isDragging]);
   const enabled =
+    !pendingTransfer &&
     !t.isTransfer &&
     t.type !== "transfer" &&
     !t.transferPairId &&

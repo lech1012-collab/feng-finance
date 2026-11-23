@@ -184,12 +184,20 @@ test("all-ready review is compact and duplicate-only completion releases the rev
     .setInputFiles(fixture("barclays-current"));
   await expect(
     view(page).getByRole("button", {
-      name: "Needs attention (0)",
+      name: "All statements (1)",
       exact: true,
     }),
   ).toHaveAttribute("aria-pressed", "true");
-  await expect(page.locator(".import-statement-card:visible")).toHaveCount(0);
-  await expect(page.getByText(/No statements need attention\./)).toBeVisible();
+  const receipt = page.locator(".import-ready-receipt:visible > summary");
+  await expect(receipt).toContainText("known-bank-barclays-current.pdf");
+  await expect(receipt).toContainText("6 transactions");
+  await expect(receipt.locator("time")).toHaveCount(2);
+  await receipt.click();
+  await expect(page.getByLabel("Statement money movement")).toContainText(
+    "Money out",
+  );
+  await expect(receipt).toContainText("Reported closing");
+  await receipt.click();
   const confirm = finalSummary(page).getByRole("button", {
     name: "Confirm import",
     exact: true,

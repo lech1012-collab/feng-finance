@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import { displayAccountName } from "../domain/presentation";
 import { Toast } from "../components/Toast";
 import { undoChange } from "../storage/audit";
@@ -62,6 +63,7 @@ export default function TransactionDetail() {
     return {
       t,
       refundMonths,
+      pendingTransfer: (await pendingTransferAttention([t.id])).ids.has(t.id),
       account: await db.accounts.get(t.accountId),
       statement: await db.statements.get(t.statementId),
       rule: t.categoryRuleId ? await db.rules.get(t.categoryRuleId) : undefined,
@@ -116,6 +118,7 @@ function Editor({
     possible: Transaction[];
     rule?: Rule;
     refundMonths: string[];
+    pendingTransfer: boolean;
   };
 }) {
   const { t, account, statement, categories, possible, rule, refundMonths } =
@@ -174,7 +177,7 @@ function Editor({
     setBusy(true);
     setError("");
     try {
-      if (!decision) {
+      if (!decision && !data.pendingTransfer) {
         const conflicting = conflictingCategoryRule(
           t,
           {
@@ -232,12 +235,15 @@ function Editor({
           </p>
         )}
         <h2>{displayMerchant(t)}</h2>
+        <TransferReview transactionIds={[t.id]} />
         <div className="detail-action-row">
-          <TransactionAccuracy
-            transaction={t}
-            categories={categories}
-            showRefundSummary={false}
-          />
+          {!data.pendingTransfer && (
+            <TransactionAccuracy
+              transaction={t}
+              categories={categories}
+              showRefundSummary={false}
+            />
+          )}
           {t.kind !== "split_parent" &&
             !(t.kind === "refund" && t.refundAllocations?.length) && (
               <button type="button" onClick={() => setTagSheetOpen(true)}>
@@ -345,7 +351,9 @@ function Editor({
                   ? "Linked to another account"
                   : t.isTransfer
                     ? `${t.kind === "card_repayment" ? "Card repayment" : "Transfer"} · other side not in Feng`
-                    : "Not a transfer"
+                    : data.pendingTransfer
+                      ? "Awaiting transfer confirmation"
+                      : "Not a transfer"
               }
             />
           </div>
@@ -353,16 +361,18 @@ function Editor({
         {t.kind !== "split_parent" &&
           !(t.kind === "refund" && t.refundAllocations?.length) && (
             <>
-              <div className="context-help-heading">
-                <h3>Classification</h3>
-                <ContextHelp title="How this counts">
-                  <p>
-                    Money in counts as income; money out counts as spending.
-                    Transfers move account balances and are excluded from cash
-                    flow. A refund reduces the original spending.
-                  </p>
-                </ContextHelp>
-              </div>
+              {!data.pendingTransfer && (
+                <div className="context-help-heading">
+                  <h3>Classification</h3>
+                  <ContextHelp title="How this counts">
+                    <p>
+                      Money in counts as income; money out counts as spending.
+                      Transfers move account balances and are excluded from cash
+                      flow. A refund reduces the original spending.
+                    </p>
+                  </ContextHelp>
+                </div>
+              )}
               <div className="form-grid">
                 <label>
                   Display name
@@ -378,100 +388,73 @@ function Editor({
                     maxLength={500}
                   />
                 </label>
-                <label>
-                  Transaction type
-                  <select
-                    aria-label="Transaction type"
-                    disabled={busy}
-                    value={type}
-                    onChange={(e) => {
-                      const next = e.target.value as Transaction["type"];
-                      setType(next);
-                      void save(undefined, {
-                        type: next,
-                        categoryId:
-                          next === "transfer"
-                            ? undefined
-                            : category || undefined,
-                        subcategoryId:
-                          next === "transfer"
-                            ? undefined
-                            : subcategory || undefined,
-                      });
-                      if (e.target.value === "transfer") {
-                        setCategory("");
-                        setSubcategory("");
-                      }
-                    }}
-                  >
-                    {["income", "expense", "transfer"].map((v) => (
-                      <option
-                        value={v}
-                        key={v}
-                        disabled={
-                          v !== "transfer" && v !== amountType(t.amount)
-                        }
-                      >
-                        {v[0].toUpperCase() + v.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Category
-                  <select
-                    aria-label="Category"
-                    disabled={busy || type === "transfer"}
-                    value={category}
-                    onChange={(e) => {
-                      setCategory(e.target.value);
-                      setSubcategory("");
-                      setType(amountType(t.amount));
-                      void save(undefined, {
-                        categoryId: e.target.value || undefined,
-                        subcategoryId: undefined,
-                        type: amountType(t.amount),
-                      });
-                    }}
-                  >
-                    <option value="">Uncategorised</option>
-                    {categories
-                      .filter(
-                        (c) =>
-                          !c.parentId &&
-                          (!c.archived || c.id === category) &&
-                          (t.amount >= 0 ||
-                            c.kind !== "income" ||
-                            c.id === category),
-                      )
-                      .map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                {category !== "property" &&
-                  categories.some((c) => c.parentId === category) && (
+                {!data.pendingTransfer && (
+                  <>
                     <label>
-                      Subcategory
+                      Transaction type
                       <select
-                        aria-label="Subcategory"
-                        disabled={busy || !category || type === "transfer"}
-                        value={subcategory}
+                        aria-label="Transaction type"
+                        disabled={busy}
+                        value={type}
                         onChange={(e) => {
-                          setSubcategory(e.target.value);
+                          const next = e.target.value as Transaction["type"];
+                          setType(next);
                           void save(undefined, {
-                            subcategoryId: e.target.value || undefined,
+                            type: next,
+                            categoryId:
+                              next === "transfer"
+                                ? undefined
+                                : category || undefined,
+                            subcategoryId:
+                              next === "transfer"
+                                ? undefined
+                                : subcategory || undefined,
+                          });
+                          if (e.target.value === "transfer") {
+                            setCategory("");
+                            setSubcategory("");
+                          }
+                        }}
+                      >
+                        {["income", "expense", "transfer"].map((v) => (
+                          <option
+                            value={v}
+                            key={v}
+                            disabled={
+                              v !== "transfer" && v !== amountType(t.amount)
+                            }
+                          >
+                            {v[0].toUpperCase() + v.slice(1)}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Category
+                      <select
+                        aria-label="Category"
+                        disabled={busy || type === "transfer"}
+                        value={category}
+                        onChange={(e) => {
+                          setCategory(e.target.value);
+                          setSubcategory("");
+                          setType(amountType(t.amount));
+                          void save(undefined, {
+                            categoryId: e.target.value || undefined,
+                            subcategoryId: undefined,
+                            type: amountType(t.amount),
                           });
                         }}
                       >
-                        <option value="">None</option>
+                        <option value="">Uncategorised</option>
                         {categories
                           .filter(
                             (c) =>
-                              c.parentId === category &&
-                              (!c.archived || c.id === subcategory),
+                              !c.parentId &&
+                              (!c.archived || c.id === category) &&
+                              (t.amount >= 0 ||
+                                c.kind !== "income" ||
+                                c.id === category),
                           )
                           .map((c) => (
                             <option key={c.id} value={c.id}>
@@ -480,7 +463,38 @@ function Editor({
                           ))}
                       </select>
                     </label>
-                  )}
+                    {category !== "property" &&
+                      categories.some((c) => c.parentId === category) && (
+                        <label>
+                          Subcategory
+                          <select
+                            aria-label="Subcategory"
+                            disabled={busy || !category || type === "transfer"}
+                            value={subcategory}
+                            onChange={(e) => {
+                              setSubcategory(e.target.value);
+                              void save(undefined, {
+                                subcategoryId: e.target.value || undefined,
+                              });
+                            }}
+                          >
+                            <option value="">None</option>
+                            {categories
+                              .filter(
+                                (c) =>
+                                  c.parentId === category &&
+                                  (!c.archived || c.id === subcategory),
+                              )
+                              .map((c) => (
+                                <option key={c.id} value={c.id}>
+                                  {c.name}
+                                </option>
+                              ))}
+                          </select>
+                        </label>
+                      )}
+                  </>
+                )}
               </div>
               <p className="coverage-note">Changes save automatically.</p>
               {error && !tagSheetOpen && (
@@ -491,8 +505,7 @@ function Editor({
             </>
           )}
       </section>
-      <TransferReview transactionIds={[t.id]} />
-      {!t.transferPairId && possible.length > 0 && (
+      {!data.pendingTransfer && !t.transferPairId && possible.length > 0 && (
         <section className="card">
           <div className="context-help-heading">
             <h2>Link an internal transfer</h2>

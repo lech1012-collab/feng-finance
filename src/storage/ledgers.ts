@@ -93,18 +93,49 @@ function freshLedger(): LedgerRows {
   };
 }
 
+// Split children and a few older statement records inherit ownership from
+// their source. File previews and the migration must make the same decision.
+type OwnershipRecord = {
+  id?: unknown;
+  accountId?: unknown;
+  isDemo?: unknown;
+  source?: unknown;
+  parentId?: unknown;
+  statementId?: unknown;
+};
+function legacyOwnership(
+  accounts: OwnershipRecord[],
+  statements: OwnershipRecord[],
+  transactions: OwnershipRecord[],
+) {
+  const accountIds = new Set(accounts.filter((row) => row.isDemo).map((row) => row.id));
+  const statementIds = new Set(
+    statements.filter((row) => row.isDemo ||
+      (accountIds.has(row.accountId) && String(row.id).startsWith("demo-")))
+      .map((row) => row.id),
+  );
+  const txIds = new Set(
+    transactions.filter((row) => row.isDemo || statementIds.has(row.statementId)).map((row) => row.id),
+  );
+  for (const row of transactions) {
+    if (txIds.has(row.parentId)) txIds.add(row.id);
+  }
+  return { accountIds, statementIds, txIds };
+}
+
 export function backupLedger(
-  backup: Pick<Backup, "ledger" | "accounts" | "transactions" | "statements">,
+  backup: Pick<Backup, "ledger" | "accounts" | "transactions" | "statements" | "valuations">,
 ): Ledger {
   if (backup.ledger) return backup.ledger;
-  const scoped = [
-    ...backup.accounts,
-    ...backup.transactions,
-    ...backup.statements,
-  ];
-  return scoped.length && scoped.every((row) => row.isDemo)
-    ? "demo"
-    : "personal";
+  const { accountIds, statementIds, txIds } = legacyOwnership(
+    backup.accounts, backup.statements, backup.transactions,
+  );
+  return accountIds.size > 0 &&
+    accountIds.size === backup.accounts.length &&
+    statementIds.size === backup.statements.length &&
+    txIds.size === backup.transactions.length &&
+    (backup.valuations ?? []).every((row) => row.isDemo)
+    ? "demo" : "personal";
 }
 
 export async function currentLedger(database = db): Promise<Ledger> {
@@ -137,19 +168,7 @@ export function partitionLegacyRows(
   all: LedgerRows,
 ): { personal: LedgerRows; demo: LedgerRows } | undefined {
   if (!all.accounts.some((row) => row.isDemo)) return;
-  const accountIds = byId(all.accounts.filter((r) => r.isDemo));
-  const statements = all.statements.filter(
-    (r) =>
-      r.isDemo ||
-      (accountIds.has(r.accountId) && String(r.id).startsWith("demo-")),
-  );
-  const statementIds = byId(statements);
-  const demoTransactions = all.transactions.filter(
-    (r) => r.isDemo || statementIds.has(r.statementId),
-  );
-  const txIds = byId(demoTransactions);
-  for (const row of all.transactions)
-    if (row.source === "split" && txIds.has(row.parentId)) txIds.add(row.id);
+  const {accountIds, statementIds, txIds} = legacyOwnership(all.accounts, all.statements, all.transactions);
   const realTransactions = all.transactions.filter((row) => !txIds.has(row.id));
   const realStatements = all.statements.filter(
     (row) => !statementIds.has(row.id),

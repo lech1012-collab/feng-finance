@@ -1,6 +1,13 @@
 import { UKDateInput } from "./UKDateInput";
 import { Link } from "react-router-dom";
-import { useRef, useState, type ReactNode } from "react";
+import {
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+  type ReactNode,
+  type Ref,
+} from "react";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -40,7 +47,13 @@ import {
   type ReviewSection,
 } from "./StatementReviewWorkspace";
 
+export interface StatementReviewHandle {
+  openQuestion: () => boolean;
+}
+
 export function ImportStatementReview({
+  ref,
+  compactReceipt = false,
   entry,
   accounts,
   categories,
@@ -58,6 +71,8 @@ export function ImportStatementReview({
   onMapping,
   onSaveTemplate,
 }: {
+  ref?: Ref<StatementReviewHandle>;
+  compactReceipt?: boolean;
   entry: FileReview;
   accounts: Account[];
   categories: Category[];
@@ -83,6 +98,8 @@ export function ImportStatementReview({
   const d = entry.draft;
   const [showRisk, setShowRisk] = useState(false);
   const [guided, setGuided] = useState(false);
+  const reviewTrigger = useRef<HTMLElement | null>(null);
+  const headingRef = useRef<HTMLElement>(null);
   const [detailsVisited, setDetailsVisited] = useState(false);
   const [workspace, setWorkspace] = useState<ReviewSection>();
   const [diagnostics, setDiagnostics] = useState(false);
@@ -95,6 +112,48 @@ export function ImportStatementReview({
   const [newAccountCurrency, setNewAccountCurrency] = useState("GBP");
   const [newAccountSuffix, setNewAccountSuffix] = useState("");
   const [accountError, setAccountError] = useState("");
+  // Rechecking an amount can replace the intermediate sheet. Remember the
+  // original trigger across that whole journey, including WebKit touch input.
+  useEffect(() => {
+    if (guided || workspace || !reviewTrigger.current) return;
+    const trigger = reviewTrigger.current;
+    reviewTrigger.current = null;
+    const target =
+      trigger.isConnected && !trigger.closest("[hidden], [inert]")
+        ? trigger
+        : headingRef.current;
+    if (target && !target.closest("[hidden], [inert]"))
+      target.focus({ preventScroll: true });
+  }, [guided, workspace]);
+  const beginReview = () => {
+    reviewTrigger.current =
+      document.activeElement instanceof HTMLElement
+        ? document.activeElement
+        : headingRef.current;
+    setGuided(true);
+    // A recognized account is not a question for the user. When
+    // native figures fail their checks, open its source exceptions
+    // directly rather than sending the user through reading details.
+    if (
+      d?.bankSource?.parsed.accountIdentifier &&
+      d.bankSource.sourceCoverageIssues.some((issue) =>
+        /Some printed transaction rows were not fully matched|Some printed running balances were not read/.test(
+          issue,
+        ),
+      ) &&
+      !entry.optionsChanged &&
+      !entry.requiresBatchRecheck
+    )
+      onPrepareSource?.();
+  };
+  useImperativeHandle(ref, () => ({
+    openQuestion() {
+      const step = guidedReviewStep(entry);
+      if (step.kind === "error" || step.kind === "complete") return false;
+      beginReview();
+      return true;
+    },
+  }));
   if (entry.extracted?.summary)
     return (
       <ImportAnnualSummary
@@ -233,17 +292,20 @@ export function ImportStatementReview({
                 : "Balance unavailable";
   return (
     <details
-      className={`card import-statement-card ${blocking ? "import-statement-blocking" : ""} ${entry.skip || exactSkipped ? "import-statement-skipped" : ""}`}
+      className={`card import-statement-card ${compactReceipt ? "import-ready-receipt" : ""} ${blocking ? "import-statement-blocking" : ""} ${entry.skip || exactSkipped ? "import-statement-skipped" : ""}`}
       open={entry.open}
       onToggle={(event) => {
         if (entry.open !== event.currentTarget.open)
           patch({ open: event.currentTarget.open });
       }}
     >
-      <summary className="import-statement-heading">
+      <summary className="import-statement-heading" ref={headingRef}>
         <FileText size={20} aria-hidden="true" />
         <span className="import-statement-heading-text">
           <h2>{d ? d.statement.institution : "Statement needs attention"}</h2>
+          {compactReceipt && (
+            <span className="import-receipt-filename">{entry.file.name}</span>
+          )}
           <span>
             {d ? (
               <>
@@ -256,7 +318,14 @@ export function ImportStatementReview({
                 <ImportPeriod
                   start={d.statement.statementPeriodStart}
                   end={d.statement.statementPeriodEnd}
-                />{" "}
+                />
+                {compactReceipt && (
+                  <>
+                    {" "}
+                    · {d.transactions.length} transaction
+                    {d.transactions.length === 1 ? "" : "s"}
+                  </>
+                )}
               </>
             ) : (
               <span
@@ -306,44 +375,48 @@ export function ImportStatementReview({
         <ChevronDown size={18} aria-hidden="true" />
       </summary>
       <div className="import-statement-content">
-        {!entry.skip && !exactSkipped && entry.state !== "saved" && (
-          <div className="import-guided-intro">
-            <p
-              role={
-                guidedReviewStep(entry).kind === "error" ? "alert" : undefined
-              }
-            >
-              {guidedReviewCopy(entry)}
-            </p>
-            {blocking && (
-              <button
-                type="button"
-                className="primary"
-                disabled={busy}
-                onClick={(event) => {
-                  event.currentTarget.focus({ preventScroll: true });
-                  setGuided(true);
-                  // A recognized account is not a question for the user. When
-                  // native figures fail their checks, open its source exceptions
-                  // directly rather than sending the user through reading details.
-                  if (
-                    d?.bankSource?.parsed.accountIdentifier &&
-                    d.bankSource.sourceCoverageIssues.some((issue) =>
-                      /Some printed transaction rows were not fully matched|Some printed running balances were not read/.test(
-                        issue,
-                      ),
-                    ) &&
-                    !entry.optionsChanged &&
-                    !entry.requiresBatchRecheck
-                  )
-                    onPrepareSource?.();
-                }}
-              >
-                Review statement
-              </button>
-            )}
-          </div>
+        {compactReceipt && d && flow && (
+          <dl
+            className="import-receipt-movements"
+            aria-label="Statement money movement"
+          >
+            <div>
+              <dt>Money in</dt>
+              <dd>{money(flow.moneyIn, d.statement.currency)}</dd>
+            </div>
+            <div>
+              <dt>Money out</dt>
+              <dd>{money(flow.moneyOut, d.statement.currency)}</dd>
+            </div>
+          </dl>
         )}
+        {!compactReceipt &&
+          !entry.skip &&
+          !exactSkipped &&
+          entry.state !== "saved" && (
+            <div className="import-guided-intro">
+              <p
+                role={
+                  guidedReviewStep(entry).kind === "error" ? "alert" : undefined
+                }
+              >
+                {guidedReviewCopy(entry)}
+              </p>
+              {blocking && (
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={busy}
+                  onClick={(event) => {
+                    event.currentTarget.focus({ preventScroll: true });
+                    beginReview();
+                  }}
+                >
+                  Review statement
+                </button>
+              )}
+            </div>
+          )}
         {exactSkipped && !diagnostics && (
           <p className="import-duplicate-note">
             {entry.duplicateInBatch

@@ -372,7 +372,7 @@ test("existing Safari imports warn about separate storage and retain their overd
     previouslySeen,
   );
   await backupNotice.getByRole("button", { name: "I understand" }).click();
-  await expect(backupNotice).toContainText("Backup due");
+  await expect(backupNotice).toContainText("Backup export due");
   await backupNotice
     .getByRole("button", { name: "About Keeping a backup" })
     .click();
@@ -409,7 +409,7 @@ test("existing Safari imports warn about separate storage and retain their overd
   await expect(backupNotice).toHaveCount(0);
 });
 
-test("first-launch notice fits narrow iPhones and large text without hiding either choice", async ({
+test("first-launch notice fits narrow iPhones and large text without hiding a choice", async ({
   page,
 }) => {
   await safariTab(page);
@@ -428,7 +428,7 @@ test("first-launch notice fits narrow iPhones and large text without hiding eith
         ),
       )
       .toBe(true);
-    for (const name of ["Explore with demo data", "Import my statements"]) {
+    for (const name of ["Explore with demo data", "Import my statements", "Restore a backup"]) {
       const choice = notice.getByRole("button", { name, exact: true });
       await choice.scrollIntoViewIfNeeded();
       await expect(choice).toBeInViewport();

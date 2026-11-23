@@ -1,3 +1,4 @@
+import { rememberImportFiles } from "../import/interrupted-review";
 import {
   sourceCorrectionRow,
   type SourceCorrectionTarget,
@@ -20,7 +21,10 @@ import {
   sourceReview,
   type FileReview,
 } from "../import/review-model";
-import { ImportStatementReview } from "../components/ImportStatementReview";
+import {
+  ImportStatementReview,
+  type StatementReviewHandle,
+} from "../components/ImportStatementReview";
 import { validatePeriod } from "../parsers/period";
 import { id, transactionKey } from "../domain/normalize";
 import type { ImportDraft } from "../domain/models";
@@ -56,6 +60,7 @@ import {
 export default function ImportPage({
   onImported,
   selectedFiles,
+  onSelectFiles,
   onFilesStarted,
   active: visible = true,
   onPendingChange,
@@ -63,12 +68,20 @@ export default function ImportPage({
   active?: boolean;
   onPendingChange?: (count: number) => void;
   selectedFiles?: File[];
+  onSelectFiles: (files: File[]) => void;
   onFilesStarted?: () => void;
   onImported: (month: string, currency: string) => void;
 }) {
   const [entries, setEntries] = useState<FileReview[]>([]);
-  const [reviewFilter, setReviewFilter] =
-    useState<StatementReviewFilter>("attention");
+  useEffect(() => {
+    if (entries.length)
+      rememberImportFiles(
+        entries
+          .filter((entry) => !entry.skip && entry.state !== "saved")
+          .map((entry) => entry.file.name),
+      );
+  }, [entries]);
+  const [chosenFilter, setReviewFilter] = useState<StatementReviewFilter>();
   const [retainedAttentionId, setRetainedAttentionId] = useState<string>();
   const [discarding, setDiscarding] = useState(false);
   const scrollPosition = useRef(0);
@@ -103,6 +116,7 @@ export default function ImportPage({
   const initialTransferLinkIds = useRef(new Set<string>());
   const navigate = useNavigate();
   const localPicker = useRef<HTMLInputElement>(null);
+  const reviewHandles = useRef(new Map<string, StatementReviewHandle>());
   const statementCards = useRef(new Map<string, HTMLDivElement>());
   const confirmation = useRef<HTMLElement>(null);
   const reviewFocus = useRef<{ entryId?: string } | undefined>(undefined);
@@ -169,8 +183,9 @@ export default function ImportPage({
     releaseAllSessions();
     reviewedInclusions.current.clear();
     initialTransferLinkIds.current.clear();
+    rememberImportFiles([]);
     setEntries([]);
-    setReviewFilter("attention");
+    setReviewFilter(undefined);
     setRetainedAttentionId(undefined);
     reviewFocus.current = undefined;
     setSourceCorrection(undefined);
@@ -463,7 +478,7 @@ export default function ImportPage({
   const selectFiles = async (files: File[]) => {
     if (!files.length || busy) return;
     if (!entries.length) {
-      setReviewFilter("attention");
+      setReviewFilter(undefined);
       setRetainedAttentionId(undefined);
     }
     const token = ++operation.current;
@@ -753,6 +768,11 @@ export default function ImportPage({
   );
   const hasChanges = newCount > 0 || balanceStatements.length > 0;
   const batch = batchPresentation(entries);
+  const showReadyReceipts =
+    batch.readyCount > 0 && batch.attention.length === 0;
+  const reviewFilter =
+    chosenFilter ??
+    (showReadyReceipts && !retainedAttentionId ? "all" : "attention");
   const visibleReviewIds = new Set(
     entries
       .filter((entry) =>
@@ -786,7 +806,9 @@ export default function ImportPage({
   }, [entries, reviewFilter, phase, visible]);
   const reviewNextStatement = () => {
     const next = nextAttentionStatement(entries);
-    reviewFocus.current = { entryId: next?.id };
+    const openedQuestion =
+      next && reviewHandles.current.get(next.id)?.openQuestion();
+    reviewFocus.current = openedQuestion ? undefined : { entryId: next?.id };
     setRetainedAttentionId(next?.id);
     setEntries((current) => expandBatchStatement(current, next?.id));
   };
@@ -890,6 +912,7 @@ export default function ImportPage({
           setCommitStatus(`Saving ${entry?.file.name ?? "statement"}…`);
         },
       );
+      if (!alive.current) return;
       const allOutcomes = [
         ...entries
           .filter((entry) => entry.state === "saved" && entry.draft)
@@ -949,6 +972,7 @@ export default function ImportPage({
                 .toArray(),
             )
           : latest.slice(0, 7);
+        if (!alive.current) return;
         onImported(month, currency);
       }
       const importedIds = new Set(importedRows.map((row) => row.id));
@@ -960,9 +984,11 @@ export default function ImportPage({
             link.transactionIds.some((id) => importedIds.has(id)),
         )
         .count();
+      if (!alive.current) return;
       releaseAllSessions();
+      rememberImportFiles([]);
       setEntries([]);
-      setReviewFilter("attention");
+      setReviewFilter(undefined);
       setRetainedAttentionId(undefined);
       reviewedInclusions.current.clear();
       setSelectedTransferIds([]);
@@ -1012,7 +1038,7 @@ export default function ImportPage({
         }}
         onDrop={(event) => {
           event.preventDefault();
-          if (!busy) void selectFiles(Array.from(event.dataTransfer.files));
+          if (!busy) onSelectFiles(Array.from(event.dataTransfer.files));
         }}
       >
         <div className="page-heading">
@@ -1044,7 +1070,7 @@ export default function ImportPage({
                     onChange={(e) => {
                       const files = Array.from(e.target.files ?? []);
                       e.target.value = "";
-                      void selectFiles(files);
+                      onSelectFiles(files);
                     }}
                   />
                 </label>
@@ -1158,7 +1184,7 @@ export default function ImportPage({
                 onChange={(e) => {
                   const files = Array.from(e.target.files ?? []);
                   e.target.value = "";
-                  void selectFiles(files);
+                  onSelectFiles(files);
                 }}
               />
             </label>
@@ -1281,7 +1307,13 @@ export default function ImportPage({
                   Resolve the statements needing attention, or leave them out.
                   Ready statements will be included when you confirm.
                 </p>
-                <button disabled={busy} onClick={reviewNextStatement}>
+                <button
+                  disabled={busy}
+                  onClick={(event) => {
+                    event.currentTarget.focus({ preventScroll: true });
+                    reviewNextStatement();
+                  }}
+                >
                   Review next statement
                 </button>
               </>
@@ -1351,6 +1383,14 @@ export default function ImportPage({
                         />
                       )}
                     <ImportStatementReview
+                      ref={(handle) => {
+                        if (handle) reviewHandles.current.set(entry.id, handle);
+                        else reviewHandles.current.delete(entry.id);
+                      }}
+                      compactReceipt={
+                        showReadyReceipts &&
+                        statementPresentation(entry).state === "ready"
+                      }
                       key={entry.id}
                       entry={entry}
                       accounts={accounts ?? []}

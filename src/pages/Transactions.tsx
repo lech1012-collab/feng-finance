@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import { UKDateInput } from "../components/UKDateInput";
 import { displayAccountName } from "../domain/presentation";
 import { Sheet } from "../components/Sheet";
@@ -266,7 +267,9 @@ export default function Transactions({
     const refundOriginals = (await db.transactions.bulkGet(refundIds)).filter(
       (row): row is Transaction => !!row,
     );
+    const pending = await pendingTransferAttention();
     return {
+      pendingLegIds: pending.ids,
       items,
       refundOriginals,
       periodRows,
@@ -285,8 +288,12 @@ export default function Transactions({
           statementBalanceEvidence(statement, balanceRows),
         ]),
       ),
-      uncategorizedCount: await db.transactions.filter(needsCategory).count(),
-      reviewCount: await db.transactions.filter(needsReview).count(),
+      uncategorizedCount: await db.transactions
+        .filter((row) => !pending.ids.has(row.id) && needsCategory(row))
+        .count(),
+      reviewCount: await db.transactions
+        .filter((row) => !pending.ids.has(row.id) && needsReview(row))
+        .count(),
       tags: await db.tags.toArray(),
       rates: await db.fxRates.toArray(),
     };
@@ -305,7 +312,8 @@ export default function Transactions({
       db.transaction("r", db.transactions, async () => ({
         key: queueKey,
         rows: (await db.transactions.bulkGet(queueIds)).filter(
-          (row): row is Transaction => !!row && needsCategory(row),
+          (row): row is Transaction =>
+            !!row && !data?.pendingLegIds.has(row.id) && needsCategory(row),
         ),
       })),
     [queueKey, data],
@@ -403,7 +411,9 @@ export default function Transactions({
       baseFiltered.filter(
         (t) =>
           (!toReview ||
-            (needsReview(t) && (!exceptionsOnly || !needsCategory(t)))) &&
+            (!data?.pendingLegIds.has(t.id) &&
+              needsReview(t) &&
+              (!exceptionsOnly || !needsCategory(t)))) &&
           (!category ||
             category === "uncategorized" ||
             matchesTransactionCategory(t, category, categoryIndex)) &&
@@ -411,12 +421,14 @@ export default function Transactions({
             (type === "income"
               ? matchesTransactionIncome(t)
               : financialType(t) === type)) &&
-          (!uncategorized || needsCategory(t)) &&
+          (!uncategorized ||
+            (!data?.pendingLegIds.has(t.id) && needsCategory(t))) &&
           (!property ||
             matchesQuickTransactionFilter(t, "property", categoryIndex)),
       ),
     [
       baseFiltered,
+      data,
       categoryIndex,
       toReview,
       exceptionsOnly,
@@ -431,21 +443,26 @@ export default function Transactions({
     [filtered, page],
   );
   const selectedIds = useMemo(
-    () => selection.filter((id) => visibleIds.has(id)),
-    [selection, visibleIds],
+    () =>
+      selection.filter(
+        (id) => visibleIds.has(id) && !data?.pendingLegIds.has(id),
+      ),
+    [selection, visibleIds, data],
   );
   useEffect(() => {
     if (selection.length !== selectedIds.length) setSelectedIds(selectedIds);
     if (selectionAnchor.current && !visibleIds.has(selectionAnchor.current))
       selectionAnchor.current = undefined;
   }, [selection, selectedIds, visibleIds]);
-  const toSort =
-    toReview || uncategorized ? filtered.filter(needsCategory) : [];
+  const sortable = (t: Transaction) =>
+    !data?.pendingLegIds.has(t.id) && needsCategory(t);
+  const toSort = toReview || uncategorized ? filtered.filter(sortable) : [];
   const reset = () => setPage(0);
   const beginSort = (
     t: Transaction,
     start?: { x: number; y: number; pointerId: number },
   ) => {
+    if (data?.pendingLegIds.has(t.id)) return;
     setUndoError("");
     if (start && window.matchMedia("(min-width: 1100px)").matches) {
       queueScope.current = [];
@@ -460,8 +477,7 @@ export default function Transactions({
       return;
     }
     setDragStart(start);
-    const pool =
-      !start && needsCategory(t) ? filtered.filter(needsCategory) : [];
+    const pool = !start && needsCategory(t) ? filtered.filter(sortable) : [];
     queueScope.current = pool.map((p) => p.id);
     skippedQueueIds.current.clear();
     setQueueIds(pool.map((p) => p.id));
@@ -483,7 +499,10 @@ export default function Transactions({
       // remain in the progress denominator or reappear as the next card.
       const pending = (await db.transactions.bulkGet(queueIds)).filter(
         (p): p is Transaction =>
-          !!p && needsCategory(p) && !removedIds.includes(p.id),
+          !!p &&
+          !data?.pendingLegIds.has(p.id) &&
+          needsCategory(p) &&
+          !removedIds.includes(p.id),
       );
       const current = Math.max(0, queueIds.indexOf(sorting?.id ?? ""));
       for (let step = 1; step <= queueIds.length; step++) {
@@ -614,7 +633,10 @@ export default function Transactions({
         : receipt.before.filter(needsCategory).map((t) => t.id);
       const pending = (await db.transactions.bulkGet(scope)).filter(
         (t): t is Transaction =>
-          !!t && needsCategory(t) && !skippedQueueIds.current.has(t.id),
+          !!t &&
+          !data?.pendingLegIds.has(t.id) &&
+          needsCategory(t) &&
+          !skippedQueueIds.current.has(t.id),
       );
       const restored =
         pending.find((t) => t.id === receipt.before[0].id) ?? pending[0];
@@ -633,7 +655,7 @@ export default function Transactions({
   useEffect(() => {
     if (!data || autoQueueStarted.current || params.get("sort") !== "1") return;
     autoQueueStarted.current = true;
-    const first = filtered.find(needsCategory);
+    const first = filtered.find(sortable);
     if (first) beginSort(first);
   });
   useEffect(() => {
@@ -1425,7 +1447,8 @@ export default function Transactions({
               )}
               <SwipeTransaction
                 transaction={t}
-                accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${financialType(t) === "transfer" ? "Transfer" : t.kind === "split_parent" ? "Split payment" : t.kind === "refund" ? "Refund" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId) ? displayAccountName(data.accounts.find((a) => a.id === t.accountId)!) : "Account"}, ${money(t.amount, t.currency, true)}`}
+                pendingTransfer={data?.pendingLegIds.has(t.id)}
+                accessibleLabel={`${displayMerchant(t)}, ${displayDate(t.date)}, ${data?.pendingLegIds.has(t.id) ? "Review transfer" : financialType(t) === "transfer" ? "Transfer" : t.kind === "split_parent" ? "Split payment" : t.kind === "refund" ? "Refund" : (data?.categories.find((c) => c.id === (t.categoryId ?? t.subcategoryId))?.name ?? "Needs category")}, ${data?.accounts.find((a) => a.id === t.accountId) ? displayAccountName(data.accounts.find((a) => a.id === t.accountId)!) : "Account"}, ${money(t.amount, t.currency, true)}`}
                 returnTo={returnTo}
                 selected={selectedIds.includes(t.id)}
                 onSelect={(event) => selectRow(t, event)}
@@ -1442,15 +1465,20 @@ export default function Transactions({
               >
                 <div className="transaction-description">
                   <strong>{displayMerchant(t)}</strong>
-                  {needsReview(t) && !needsCategory(t) && (
-                    <StatusChip className="review-status" tone="warning">
-                      {transactionReviewReason(t) === "source"
-                        ? "Check source"
-                        : transactionReviewReason(t) === "split"
-                          ? "Confirm split"
-                          : "Link refund"}
-                    </StatusChip>
+                  {data?.pendingLegIds.has(t.id) && (
+                    <StatusChip tone="warning">Review transfer</StatusChip>
                   )}
+                  {!data?.pendingLegIds.has(t.id) &&
+                    needsReview(t) &&
+                    !needsCategory(t) && (
+                      <StatusChip className="review-status" tone="warning">
+                        {transactionReviewReason(t) === "source"
+                          ? "Check source"
+                          : transactionReviewReason(t) === "split"
+                            ? "Confirm split"
+                            : "Link refund"}
+                      </StatusChip>
+                    )}
                   {t.kind === "split_parent" && (
                     <StatusChip className="transaction-status">
                       Split ·{" "}
@@ -1476,32 +1504,35 @@ export default function Transactions({
                         : " · link a purchase"}
                     </StatusChip>
                   )}
-                  {t.kind !== "split_parent" && t.kind !== "refund" && (
-                    <span
-                      className={`transaction-status activity-category-label ${financialType(t) === "transfer" ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
-                      style={
-                        {
-                          "--activity-label-color":
-                            financialType(t) === "transfer"
-                              ? "var(--chart-transfer)"
-                              : t.categoryId || t.subcategoryId
-                                ? categoryColor(
-                                    (t.categoryId ?? t.subcategoryId)!,
-                                  )
-                                : "var(--warning-ink, #ffd179)",
-                        } as CSSProperties
-                      }
-                    >
-                      {financialType(t) === "transfer"
-                        ? "Transfer"
-                        : t.categoryId || t.subcategoryId
-                          ? (data?.categories.find(
-                              (c) => c.id === (t.categoryId ?? t.subcategoryId),
-                            )?.name ?? "Category unavailable")
-                          : "Needs category"}
-                    </span>
-                  )}
-                  {t.categorySource && (
+                  {!data?.pendingLegIds.has(t.id) &&
+                    t.kind !== "split_parent" &&
+                    t.kind !== "refund" && (
+                      <span
+                        className={`transaction-status activity-category-label ${financialType(t) === "transfer" ? "transfer" : t.categoryId || t.subcategoryId ? "categorized" : "uncategorized"}`}
+                        style={
+                          {
+                            "--activity-label-color":
+                              financialType(t) === "transfer"
+                                ? "var(--chart-transfer)"
+                                : t.categoryId || t.subcategoryId
+                                  ? categoryColor(
+                                      (t.categoryId ?? t.subcategoryId)!,
+                                    )
+                                  : "var(--warning-ink, #ffd179)",
+                          } as CSSProperties
+                        }
+                      >
+                        {financialType(t) === "transfer"
+                          ? "Transfer"
+                          : t.categoryId || t.subcategoryId
+                            ? (data?.categories.find(
+                                (c) =>
+                                  c.id === (t.categoryId ?? t.subcategoryId),
+                              )?.name ?? "Category unavailable")
+                            : "Needs category"}
+                      </span>
+                    )}
+                  {!data?.pendingLegIds.has(t.id) && t.categorySource && (
                     <small className="transaction-origin">
                       {t.categorySource === "manual" ? "Set by you" : "Rule"}
                     </small>

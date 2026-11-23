@@ -4,9 +4,11 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 export function BetaNotice({
   onAccept,
   installHelp,
+  recovery,
 }: {
   onAccept: (choice: "demo" | "import") => Promise<void>;
   installHelp?: ReactNode;
+  recovery?: ReactNode;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [busy, setBusy] = useState(false);
@@ -83,6 +85,7 @@ export function BetaNotice({
               Import my statements
             </button>
           </div>
+          {recovery}
           {installHelp && (
             <div className="beta-introduction-install">{installHelp}</div>
           )}

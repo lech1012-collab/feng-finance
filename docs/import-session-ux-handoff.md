@@ -6,6 +6,15 @@ be typed, transaction objects still move horizontally, and navigating to
 another tab loses an unconfirmed batch. Treat these as unresolved failures;
 the previous automated pass is not evidence that the user's journey works.
 
+## Current import journey
+
+A clean batch shows a receipt for each ready file before confirmation. In a
+mixed batch the initial view presents the unresolved files. Review next opens
+the pending correction directly for a recognised statement. In-app navigation
+retains the review. If the browser reloads a tab and retains its session storage,
+Feng offers the list of filenames to reselect. Confirmation and explicit
+discard clear it. A restored tab must obtain the source files again from Files.
+
 ## Measured baseline and review status
 
 The principal engineer reproduced the deployed behaviour with fictitious PDFs,

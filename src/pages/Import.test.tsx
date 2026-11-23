@@ -84,13 +84,21 @@ function extracted(cancelled = false): ExtractedFile {
   };
 }
 function show(files = [new File(["fictitious"], "fictitious.pdf")]) {
+  function ImportRoute() {
+    const [selected, setSelected] = useState(files);
+    return (
+      <ImportPage
+        selectedFiles={selected}
+        onSelectFiles={setSelected}
+        onFilesStarted={() => setSelected([])}
+        onImported={vi.fn()}
+      />
+    );
+  }
   return render(
     <MemoryRouter initialEntries={["/import"]}>
       <Routes>
-        <Route
-          path="/import"
-          element={<ImportPage selectedFiles={files} onImported={vi.fn()} />}
-        />
+        <Route path="/import" element={<ImportRoute />} />
         <Route path="/" element={<h1>Home</h1>} />
       </Routes>
     </MemoryRouter>,
@@ -104,6 +112,22 @@ function showAllStatements() {
   expect(all).toBeVisible();
   fireEvent.click(all);
   expect(all).toHaveAttribute("aria-pressed", "true");
+}
+
+async function recheckFromBatch() {
+  fireEvent.click(
+    screen.getByRole("button", { name: "Review next statement" }),
+  );
+  const question = await screen.findByRole("dialog", {
+    name: "Recheck statement",
+  });
+  fireEvent.click(
+    within(question).getByRole("button", { name: "Recheck statement" }),
+  );
+  const checked = await screen.findByRole("dialog", {
+    name: "Statement checked",
+  });
+  fireEvent.click(within(checked).getByRole("button", { name: "Done" }));
 }
 
 function showStatementDetails(target?: HTMLElement) {
@@ -147,6 +171,7 @@ function RetainedReview({
         <ImportPage
           active={visible}
           selectedFiles={selected}
+          onSelectFiles={setSelected}
           onFilesStarted={() => setSelected([])}
           onPendingChange={pending}
           onImported={vi.fn()}
@@ -333,11 +358,7 @@ describe("PDF review session lifecycle", () => {
     expect(
       screen.getByRole("button", { name: "Confirm import" }),
     ).toBeDisabled();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review next statement" }),
-    );
-    showStatementDetails();
-    fireEvent.click(screen.getByRole("button", { name: "Recheck statement" }));
+    await recheckFromBatch();
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Confirm import" }),
@@ -399,15 +420,8 @@ describe("PDF review session lifecycle", () => {
     expect(
       screen.getByRole("button", { name: "Confirm import" }),
     ).toBeDisabled();
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review next statement" }),
-    );
-    showStatementDetails();
-    fireEvent.click(
-      within(regenerated()).getByRole("button", {
-        name: "Recheck statement",
-      }),
-    );
+    await recheckFromBatch();
+    showStatementDetails(regenerated());
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Confirm import" }),
@@ -434,15 +448,8 @@ describe("PDF review session lifecycle", () => {
         name: "Include transaction",
       }),
     );
-    fireEvent.click(
-      screen.getByRole("button", { name: "Review next statement" }),
-    );
-    showStatementDetails();
-    fireEvent.click(
-      within(regenerated()).getByRole("button", {
-        name: "Recheck statement",
-      }),
-    );
+    await recheckFromBatch();
+    showStatementDetails(regenerated());
     await waitFor(() =>
       expect(
         screen.getByRole("button", { name: "Confirm import" }),

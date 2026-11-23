@@ -1,3 +1,4 @@
+import { invalidateImportReview } from "../import/interrupted-review";
 import { CategoriesManager } from "../components/CategoriesManager";
 import { ContextHelp } from "../components/ContextHelp";
 import { StatusChip } from "../components/UIPrimitives";
@@ -49,7 +50,12 @@ import {
   clearLocalData,
   deleteImportedRecords,
 } from "../storage/backup";
-import { loadDemo, deleteDemo } from "../storage/demo";
+import {
+  activateLedger,
+  currentLedger,
+  deleteDemoLedger,
+  openDemoLedger,
+} from "../storage/ledgers";
 import { id } from "../domain/normalize";
 import {
   APP_VERSION,
@@ -78,7 +84,12 @@ export interface BetaSettingsProps {
 export default function Settings({
   beta,
   initialSection,
-}: { beta?: BetaSettingsProps; initialSection?: string } = {}) {
+  importPending = false,
+}: {
+  beta?: BetaSettingsProps;
+  initialSection?: string;
+  importPending?: boolean;
+} = {}) {
   const currency = useGlobalCurrency();
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
@@ -94,6 +105,7 @@ export default function Settings({
   const requestedRule = searchParams.get("rule");
   const data = useLiveQuery(
     async () => ({
+      ledger: await currentLedger(),
       accounts: await db.accounts.toArray(),
       taxEnabled:
         (await db.settings.get("property-tax-report"))?.value === "true",
@@ -415,34 +427,57 @@ export default function Settings({
           </div>
         </section>
       )}
-      {activeSection === "demo" && (
+      {activeSection === "demo" && data && (
         <section className="card">
           <h2>Demo data</h2>
           <p className="muted">
-            Explore with fictitious data; deleting it keeps your imported
-            records.
+            {data.ledger === "demo"
+              ? "You’re exploring fictitious finances. Importing a statement opens your personal finances automatically."
+              : "Explore a separate set of fictitious accounts. Your personal finances stay saved on this device."}
           </p>
+          {data.ledger === "personal" && importPending && (
+            <p role="status">
+              Finish or discard your open statement review before switching to
+              demo data.
+            </p>
+          )}
           <div className="actions demo-actions">
-            <button
-              disabled={busy}
-              onClick={() => void run(loadDemo, "Fictitious demo data added.")}
-            >
-              Load demo data
-            </button>
-            <button
-              disabled={busy}
-              className="danger"
-              onClick={() => {
-                if (
-                  window.confirm(
-                    "Delete fictitious demo data? Imported records and your categories are kept. You can undo this change.",
-                  )
-                )
-                  void run(deleteDemo, "Demo data deleted.");
-              }}
-            >
-              Delete demo data
-            </button>
+            {data.ledger === "personal" ? (
+              <button
+                disabled={busy || importPending}
+                onClick={() => void run(openDemoLedger, "Demo data opened.")}
+              >
+                Open demo data
+              </button>
+            ) : (
+              <>
+                <button
+                  disabled={busy}
+                  onClick={() =>
+                    void run(
+                      () => activateLedger("personal"),
+                      "Personal finances opened.",
+                    )
+                  }
+                >
+                  Return to personal finances
+                </button>
+                <button
+                  disabled={busy}
+                  className="danger"
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Delete the demo data and any changes you made to it? Your personal finances will reopen.",
+                      )
+                    )
+                      void run(deleteDemoLedger, "Demo data deleted.");
+                  }}
+                >
+                  Delete demo data
+                </button>
+              </>
+            )}
           </div>
         </section>
       )}
@@ -511,6 +546,7 @@ export default function Settings({
                   if (erasePhrase !== "ERASE")
                     throw new Error("Type ERASE before deleting all data.");
                   await clearLocalData();
+                  invalidateImportReview();
                   setErasePhrase("");
                 }, "All local financial data was cleared.")
               }

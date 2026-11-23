@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import { UKDateInput } from "../components/UKDateInput";
 import { merchantExpenses } from "../analytics/merchant-expenses";
 import { useSearchParams, useLocation } from "react-router-dom";
@@ -103,7 +104,7 @@ export default function Analysis({
       statements: await db.statements.toArray(),
       settings: await db.settings.toArray(),
       rates: await db.fxRates.toArray(),
-      proposals: await db.transferProposals.toArray(),
+      proposals: (await pendingTransferAttention()).proposals,
       tags: await db.tags.toArray(),
     }),
     [],

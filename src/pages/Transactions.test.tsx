@@ -733,3 +733,32 @@ it("updating the conflicting auto rule changes its default and Undo restores the
   );
   expect(await db.transactions.get(next.id)).toEqual(next);
 }, 15000);
+
+it("finds card repayments in category search and only shows the empty message for an unmatched query", async () => {
+  const payment = transaction({ id: "single-side", merchant: "CARD PAYMENT" });
+  await db.transactions.put(payment);
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const board = within(
+    await screen.findByRole("dialog", {}, { timeout: 8000 }),
+  );
+  const search = board.getByRole("searchbox", { name: "Find a category" });
+  fireEvent.change(search, { target: { value: "  cArD RePaYmEnT  " } });
+  expect(
+    board.getByRole("button", { name: "Categorise as Card repayment" }),
+  ).toBeVisible();
+  expect(board.queryByText("No matching categories.")).toBeNull();
+  expect(
+    board.queryByRole("button", { name: "Categorise as Transfer" }),
+  ).toBeNull();
+  fireEvent.change(search, { target: { value: "no such category" } });
+  expect(board.getByText("No matching categories.")).toBeVisible();
+  expect(
+    board.queryByRole("button", { name: "Categorise as Card repayment" }),
+  ).toBeNull();
+}, 15000);

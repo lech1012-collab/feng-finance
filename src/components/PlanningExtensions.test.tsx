@@ -223,6 +223,15 @@ it("connects accessible Planning tabs to their own panels and presents no foreca
   expect(
     screen.getByRole("button", { name: "Import recent statements" }),
   ).toBeVisible();
+  expect(screen.queryByLabelText("Selected month")).not.toBeInTheDocument();
+  const horizon = within(
+    screen.getByRole("group", { name: "Forecast horizon" }),
+  );
+  expect(screen.getByText("3 Oct to 2 Nov 2026")).toBeVisible();
+  fireEvent.click(horizon.getByRole("button", { name: "60 days" }));
+  expect(screen.getByText("3 Oct to 2 Dec 2026")).toBeVisible();
+  fireEvent.click(horizon.getByRole("button", { name: "90 days" }));
+  expect(screen.getByText("3 Oct 2026 to 1 Jan 2027")).toBeVisible();
   expect(
     screen.queryByText(/Cash and savings minus card debt/),
   ).not.toBeInTheDocument();
@@ -232,6 +241,89 @@ it("connects accessible Planning tabs to their own panels and presents no foreca
   expect(
     screen.getByRole("dialog", { name: "Forecast inputs and assumptions" }),
   ).toHaveTextContent(/does not change imported balances or reporting totals/);
+});
+it("takes a forecast missing exchange rates directly to currency settings", async () => {
+  render(
+    <MemoryRouter initialEntries={["/planning?tab=forecast"]}>
+      <Planning currency="EUR" month="2026-09" setMonth={() => {}} />
+    </MemoryRouter>,
+  );
+  expect(
+    await screen.findByRole("link", { name: "Review exchange rates" }),
+  ).toHaveAttribute("href", "/settings?section=currency#global-currency");
+  expect(
+    screen.queryByRole("button", { name: "Import recent statements" }),
+  ).not.toBeInTheDocument();
+});
+it("keeps the historical month and marks complete statements with an unresolved transfer as partial cash-flow coverage", async () => {
+  const [cash, travel] = accounts;
+  await db.accounts.put(travel);
+  for (const [account, amount] of [
+    [cash, -17500],
+    [travel, 17500],
+  ] as const) {
+    const doc = `september-${account.id}`;
+    await db.transactions.put(
+      transaction({
+        id: account.id,
+        accountId: account.id,
+        statementId: doc,
+        amount,
+        type: amount < 0 ? "expense" : "income",
+      }),
+    );
+    await db.statements.put({
+      id: doc,
+      accountId: account.id,
+      institution: account.institution,
+      currency: "GBP",
+      statementPeriodStart: "2026-09-01",
+      statementPeriodEnd: "2026-09-30",
+      periodSource: "printed",
+      openingBalance: 50000,
+      closingBalance: 50000 + amount,
+      transactionCount: 1,
+      sourceFilename: "synthetic.pdf",
+      sourceFileHash: doc,
+      importedAt: "2026-10-01T00:00:00Z",
+      parserVersion: "test",
+      extractionMethod: "embedded-text",
+      validationStatus: "reconciled",
+      warnings: [],
+    });
+  }
+  await db.transferProposals.put({
+    id: "pair",
+    status: "pending",
+    debitTxId: cash.id,
+    creditTxId: travel.id,
+    score: 1,
+  });
+  render(
+    <MemoryRouter>
+      <Planning currency="GBP" month="2026-09" setMonth={() => {}} />
+    </MemoryRouter>,
+  );
+  expect(await screen.findByText(/Cash-flow coverage · Partial/)).toBeVisible();
+  expect(screen.getByText(/Statement coverage · Complete/)).toBeVisible();
+  expect(
+    screen.getByRole("link", { name: "1 transfer to confirm" }),
+  ).toHaveAttribute(
+    "href",
+    "/transactions?transfers=1&month=2026-09&allDates=0",
+  );
+  fireEvent.click(screen.getByRole("tab", { name: "Forecast" }));
+  expect(screen.getByText("3 Oct to 2 Nov 2026")).toBeVisible();
+  expect(screen.queryByLabelText("Selected month")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByRole("tab", { name: "Calendar" }));
+  expect(screen.getByLabelText("Selected month")).toHaveValue("2026-09");
+  await db.transferProposals.update("pair", { status: "rejected" });
+  expect(
+    await screen.findByText(/Cash-flow coverage · Complete/),
+  ).toBeVisible();
+  expect(
+    screen.queryByRole("link", { name: "1 transfer to confirm" }),
+  ).not.toBeInTheDocument();
 });
 it("shows the median-based price change with yearly impact and respects Keep on the next review", async () => {
   const dates = ["2026-06-04", "2026-07-04", "2026-08-04", "2026-09-04"];

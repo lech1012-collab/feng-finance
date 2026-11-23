@@ -67,6 +67,7 @@ export function reportingCoverage(
     !staleRates;
   return {
     ...coverage,
+    statementStatus: coverage.status,
     complete,
     status:
       missingRates || staleRates

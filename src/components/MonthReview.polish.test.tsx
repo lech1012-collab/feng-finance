@@ -80,7 +80,7 @@ function ledger() {
     accounts: [accounts[0]],
     settings: [] as { key: string; value: string }[],
     rates: [],
-    proposals: [],
+    pending: { proposals: [], ids: new Set<string>() },
     pots: [] as Pot[],
     valuations: [],
     closed: undefined,
