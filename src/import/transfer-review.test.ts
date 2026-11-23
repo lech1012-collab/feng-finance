@@ -177,6 +177,17 @@ describe("transfer confirmation before import", () => {
     const { refreshTransferProposals } = await import("../storage/accuracy");
     await refreshTransferProposals();
     expect(await db.transferLinks.count()).toBe(0);
+    const repeated = await pair();
+    expect(repeated.every((draft) => draft.exactDuplicate)).toBe(true);
+    expect((await previewImportTransfers(repeated)).proposals).toHaveLength(0);
+    await expect(commitDraft(repeated[0])).rejects.toThrow(
+      "already been imported",
+    );
+    expect(await db.transactions.count()).toBe(2);
+    expect(await db.transferProposals.count()).toBe(1);
+    expect(
+      (await db.transferProposals.get(preview.proposals[0].id))?.status,
+    ).toBe("rejected");
   });
   it("does not link prematurely when a later file adds a competing credit", async () => {
     await db.settings.put({ key: "transferMatching", value: "automatic" });

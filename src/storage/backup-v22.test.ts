@@ -53,7 +53,7 @@ it("portable backups contain validated layouts but never raw diagnostics/safety/
     ],
   });
   const backup = await createBackup({}, database);
-  expect(backup.schemaVersion).toBe(4);
+  expect(backup.schemaVersion).toBe(5);
   expect(backup.layoutTemplates).toEqual([template]);
   expect(validateBackup(backup).layoutTemplates).toEqual([template]);
   expect(JSON.stringify(backup)).not.toContain("SYNTHETIC SNAPSHOT SECURITY");
@@ -208,7 +208,7 @@ it("round-trips exact PDF evidence without changing legacy validation policy or 
   await database.transactions.put(transaction);
   const portable = validateBackup(await createBackup({}, database));
   expect(portable.version).toBe(1);
-  expect(portable.schemaVersion).toBe(4);
+  expect(portable.schemaVersion).toBe(5);
   expect(portable.statements).toEqual([statement]);
   expect(portable.transactions).toEqual([transaction]);
   const restored = createDatabase();

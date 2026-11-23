@@ -1,3 +1,4 @@
+import { eligiblePair } from "./transfer-attention";
 import type {
   Transaction,
   TransferLink,
@@ -444,23 +445,7 @@ export async function applyTransferProposal(
 ): Promise<TransferLink> {
   const debit = await db.transactions.get(proposal.debitTxId),
     credit = await db.transactions.get(proposal.creditTxId);
-  if (
-    !debit ||
-    !credit ||
-    debit.accountId === credit.accountId ||
-    debit.amount >= 0 ||
-    credit.amount <= 0 ||
-    debit.transferPairId ||
-    credit.transferPairId ||
-    debit.parentId ||
-    credit.parentId ||
-    debit.kind === "refund" ||
-    credit.kind === "refund" ||
-    debit.kind === "split_parent" ||
-    credit.kind === "split_parent" ||
-    (!proposal.crossCurrency &&
-      (debit.currency !== credit.currency || debit.amount !== -credit.amount))
-  )
+  if (!debit || !credit || !eligiblePair(proposal, debit, credit))
     throw new Error(
       "These transactions no longer form an unlinked transfer pair. Review the list again.",
     );
@@ -469,8 +454,6 @@ export async function applyTransferProposal(
       throw new Error(
         "Cross-currency transfer pairs always require manual confirmation.",
       );
-    if (debit.currency === credit.currency)
-      throw new Error("This pair does not require currency conversion.");
     const rates = await db.fxRates.toArray();
     const currency = (await db.settings.get("currency"))?.value ?? "GBP";
     const outgoing = convertMinor(

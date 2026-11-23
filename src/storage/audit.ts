@@ -5,7 +5,7 @@ import { db, type FinanceDB } from "./database";
 import { assertUndoReferences } from "./audit-references";
 import { assertUndoMonths } from "./audit-month-closes";
 
-const operationalTables = new Set(["safetyBackups", "importDiagnostics"]);
+const operationalTables = new Set(["safetyBackups", "importDiagnostics", "ledgerArchives"]);
 const RETENTION_MS = 90 * 24 * 60 * 60 * 1000;
 const readBlob = (blob: Blob): Promise<ArrayBuffer> =>
   typeof blob.arrayBuffer === "function"
@@ -53,6 +53,9 @@ async function independentAuditBlobs(
       ),
     );
   return value;
+}
+export async function copyStoredBlobs<T>(value: T): Promise<T> {
+  return containsAuditBlob(value) ? await independentAuditBlobs(value, new WeakMap()) as T : value;
 }
 function containsAuditBlob(value: unknown): boolean {
   if (value instanceof Blob) return true;

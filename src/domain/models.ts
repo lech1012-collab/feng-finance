@@ -17,8 +17,8 @@ export type {
   RowCheck,
   TableRowKind,
 } from "../import/generic/types";
-export const APP_VERSION = "2.3.0";
-export const SCHEMA_VERSION = 4;
+export const APP_VERSION = "2.3.1";
+export const SCHEMA_VERSION = 5;
 export type Institution = "Barclays" | "American Express" | "Revolut" | "Other";
 export type TransactionType = "income" | "expense" | "transfer";
 export type TransactionKind =
@@ -166,6 +166,7 @@ export interface Setting {
   value: string;
 }
 export interface Backup {
+  ledger?: "personal" | "demo";
   format: "feng-finance";
   version: 1;
   schemaVersion: number;

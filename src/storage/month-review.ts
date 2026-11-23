@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "./transfer-attention";
 import type { Transaction, MonthClose } from "../domain/models";
 import { db } from "./database";
 import { auditedMutation } from "./audit";
@@ -51,12 +52,12 @@ export async function authorizeMonthEdit(rows: Pick<Transaction, "date">[]) {
     return true;
   }
 }
-async function snapshot(month: string, currency: string) {
+async function snapshot(month: string, currency: string, database = db) {
   const [rows, settings, rates, categories] = await Promise.all([
-    db.transactions.toArray(),
-    db.settings.toArray(),
-    db.fxRates.toArray(),
-    db.categories.toArray(),
+    database.transactions.toArray(),
+    database.settings.toArray(),
+    database.fxRates.toArray(),
+    database.categories.toArray(),
   ]);
   const [from, to] = reportingPeriod(month, settings, rows);
   const projected = projectedReportingTransactions(
@@ -85,10 +86,10 @@ async function snapshot(month: string, currency: string) {
   };
 }
 /** Refund exception: update existing snapshots in the SAME audit transaction as the allocation. */
-export async function updateClosedMonthSnapshots() {
-  for (const close of await db.monthCloses.toArray())
-    await db.monthCloses.update(close.month, {
-      snapshot: await snapshot(close.month, close.currency ?? "GBP"),
+export async function updateClosedMonthSnapshots(database = db) {
+  for (const close of await database.monthCloses.toArray())
+    await database.monthCloses.update(close.month, {
+      snapshot: await snapshot(close.month, close.currency ?? "GBP", database),
       updatedAt: new Date().toISOString(),
     });
 }
@@ -108,7 +109,7 @@ export async function closeMonth(month: string, currency: string) {
           db.transactions.toArray(),
           db.settings.toArray(),
           db.fxRates.toArray(),
-          db.transferProposals.toArray(),
+          pendingTransferAttention().then((attention) => attention.proposals),
         ]);
       const coverage = reportingCoverage(
         accounts,
@@ -154,7 +155,7 @@ export async function autoCloseEligibleMonths() {
       db.statements.toArray(),
       db.settings.toArray(),
       db.fxRates.toArray(),
-      db.transferProposals.toArray(),
+      pendingTransferAttention().then((attention) => attention.proposals),
       db.monthCloses.toArray(),
     ]);
   if (settings.some((s) => s.key === "review:autoClose" && s.value === "false"))

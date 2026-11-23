@@ -150,7 +150,7 @@ describe("atomic pre-migration safety backup", () => {
         .table<SafetyBackup>(SAFETY_BACKUP_STORE)
         .get("latest");
       expect(snapshot?.sourceNativeVersion).toBe(version * 10);
-      expect(snapshot?.targetNativeVersion).toBe(40);
+      expect(snapshot?.targetNativeVersion).toBe(50);
       expect(
         snapshot?.tables.some((table) => table.name === SAFETY_BACKUP_STORE),
       ).toBe(false);

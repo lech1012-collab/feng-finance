@@ -13,12 +13,15 @@ import {
 } from "../domain/models";
 import { decimalMoney } from "../domain/money";
 import { backupSchema, auditRecordSchemas } from "./backup-schema";
+import { updateClosedMonthSnapshots } from "./month-review";
 import { auditedMutation } from "./audit";
 import { UnsupportedBackupVersionError } from "./backup-error";
 import {
   BackupFileTooLargeError,
   MAX_BACKUP_FILE_BYTES,
 } from "./backup-limits";
+import { activateLedger, currentLedger, backupLedger, partitionLegacyRows, mergeArchivedDemo, type LedgerRows } from "./ledgers";
+import { SAFETY_RECOVERY_STATE_KEY } from "./safety-backup";
 import { SECURITY_CHANGE_EVENT } from "../security/events";
 
 const extraTables = [
@@ -41,22 +44,13 @@ const securityKey = (key: string) => key.startsWith("security:");
 const sum = (values: number[]) =>
   values.reduce((total, value) => total + BigInt(value), 0n);
 
-export function validateBackup(input: unknown): Backup {
-  if (input && typeof input === "object") {
-    const header = input as {
-      format?: unknown;
-      version?: unknown;
-      schemaVersion?: unknown;
-    };
-    if (
-      header.format === "feng-finance" &&
-      ((typeof header.version === "number" && header.version > 1) ||
-        (typeof header.schemaVersion === "number" &&
-          header.schemaVersion > SCHEMA_VERSION))
-    )
-      throw new UnsupportedBackupVersionError();
-  }
-  const b = backupSchema.parse(input);
+type FinancialRecords = Omit<Backup, "attachments"> & {
+  attachments?: Pick<SerializedAttachment, "id" | "transactionId">[];
+};
+
+// Both sides of a legacy merge can be valid individually while the combined
+// statement count, linked payment or split total is inconsistent.
+function validateFinancialRecords(b: FinancialRecords) {
   const unique = (items: { id: string }[]) =>
     new Set(items.map((x) => x.id)).size === items.length;
   const idCollections = [
@@ -296,17 +290,7 @@ export function validateBackup(input: unknown): Backup {
     )
       throw new Error("Invalid recurring-series account.");
   for (const row of b.attachments ?? []) {
-    const decodedBytes =
-      (row.dataBase64.length * 3) / 4 -
-      (row.dataBase64.endsWith("==")
-        ? 2
-        : row.dataBase64.endsWith("=")
-          ? 1
-          : 0);
-    if (
-      !transactions.get(row.transactionId)?.attachmentIds?.includes(row.id) ||
-      decodedBytes !== row.sizeBytes
-    )
+    if (!transactions.get(row.transactionId)?.attachmentIds?.includes(row.id))
       throw new Error("Invalid attachment data or owner.");
   }
   for (const row of b.transferProposals ?? []) {
@@ -326,6 +310,31 @@ export function validateBackup(input: unknown): Backup {
           !links.has(debit.transferPairId)))
     )
       throw new Error("Invalid transfer proposal.");
+  }
+}
+
+export function validateBackup(input: unknown): Backup {
+  if (input && typeof input === "object") {
+    const header = input as {
+      format?: unknown;
+      version?: unknown;
+      schemaVersion?: unknown;
+    };
+    if (
+      header.format === "feng-finance" &&
+      ((typeof header.version === "number" && header.version > 1) ||
+        (typeof header.schemaVersion === "number" &&
+          header.schemaVersion > SCHEMA_VERSION))
+    )
+      throw new UnsupportedBackupVersionError();
+  }
+  const b = backupSchema.parse(input);
+  validateFinancialRecords(b);
+  for (const attachment of b.attachments ?? []) {
+    const { dataBase64, sizeBytes } = attachment;
+    const padding = dataBase64.endsWith("==") ? 2 : dataBase64.endsWith("=") ? 1 : 0;
+    if ((dataBase64.length * 3) / 4 - padding !== sizeBytes)
+      throw new Error("Invalid attachment data or owner.");
   }
   const tableNames = new Set([
     "accounts",
@@ -439,6 +448,7 @@ export async function createBackup(
     "r",
     database.tables,
     async () => ({
+      ledger: await currentLedger(database),
       format: "feng-finance" as const,
       version: 1 as const,
       schemaVersion: SCHEMA_VERSION,
@@ -488,7 +498,7 @@ export async function createBackup(
     (entry) =>
       !entry.changes.some(
         (change) =>
-          ["safetyBackups", "importDiagnostics"].includes(change.table) ||
+          ["safetyBackups", "importDiagnostics", "ledgerArchives"].includes(change.table) ||
           (change.table === "settings" && securityKey(change.key)) ||
           (!includeAttachments &&
             (change.table === "attachments" ||
@@ -520,33 +530,44 @@ export async function restoreBackup(input: unknown, database: FinanceDB = db) {
     }),
   );
   const history = decodeAuditValue(backup.changeLog ?? []) as ChangeLog[];
-  return auditedMutation(
-    "Restore backup",
-    database.tables.map((table) => table.name),
-    async () => {
-      const localSecurity = await database.settings
-        .filter((setting) => securityKey(setting.key))
-        .toArray();
-      for (const table of database.tables) await table.clear();
-      await database.accounts.bulkAdd(backup.accounts);
-      await database.statements.bulkAdd(backup.statements);
-      await database.transactions.bulkAdd(backup.transactions);
-      await database.categories.bulkAdd(backup.categories);
-      await database.rules.bulkAdd(backup.rules);
-      await database.transferLinks.bulkAdd(backup.transferLinks);
-      await database.settings.bulkPut(
-        backup.settings.filter((setting) => !securityKey(setting.key)),
-      );
+  const replacementTables = database.tables.filter(table => !["ledgerArchives","safetyBackups"].includes(table.name));
+  const destination = backupLedger(backup);
+  const portableRows = {...backup, settings:backup.settings.filter(s => !securityKey(s.key)), attachments, changeLog:history};
+  const all: LedgerRows = Object.fromEntries(replacementTables.map(({name}) => {
+    const values = portableRows[name as keyof typeof portableRows];
+    return [name, Array.isArray(values) ? values.map((row): Record<string, unknown> => ({ ...row })) : []];
+  }));
+  const partition = !backup.ledger && destination === "personal" ? partitionLegacyRows(all) : undefined;
+  const rows = partition?.personal ?? all;
+  return database.transaction("rw", database.tables, async () => {
+    await activateLedger(destination, database);
+    await database.safetyBackups.delete(SAFETY_RECOVERY_STATE_KEY);
+    if (partition) {
+      const mergedDemo = await mergeArchivedDemo(database, partition.demo);
+      // The inputs consist solely of database rows and the schema-validated backup.
+      // Recheck their relationships after the local versions win identifier collisions.
+      for (const ledger of [mergedDemo, rows]) {
+        try {
+          validateFinancialRecords(ledger as unknown as FinancialRecords);
+        } catch (cause) {
+          throw new Error(
+            "This older backup has conflicting records after separating demo and personal finances. Your current data was kept. Restore the file in a fresh browser profile to inspect it.",
+            { cause },
+          );
+        }
+      }
+    }
+    return auditedMutation("Restore backup", replacementTables.map(table => table.name), async () => {
+      const localSecurity = await database.settings.filter(setting => securityKey(setting.key)).toArray();
+      for (const table of replacementTables) {
+        await table.clear();
+        await table.bulkPut(rows[table.name]);
+      }
       await database.settings.bulkPut(localSecurity);
-      for (const name of extraTables)
-        if (name !== "attachments" && name !== "changeLog")
-          await database.table(name).bulkAdd(backup[name] ?? []);
-      await database.attachments.bulkAdd(attachments);
-      await database.changeLog.bulkAdd(history);
-      await database.settings.put({ key: "initialized", value: "true" });
-    },
-    database,
-  );
+      await database.settings.put({key:"initialized",value:"true"});
+      if (partition && rows.monthCloses.length) await updateClosedMonthSnapshots(database);
+    }, database);
+  });
 }
 export async function clearLocalData() {
   await db.transaction("rw", db.tables, async () => {
@@ -644,13 +665,26 @@ export function backupExportSettings(
 }
 /** Call only after a download handoff succeeds; this does not prove that Files saved it. */
 export async function markBackupExported(
-  backup: Pick<Backup, "exportedAt" | "transactions">,
+  backup: Pick<Backup, "ledger" | "exportedAt" | "transactions" | "statements">,
   database: FinanceDB = db,
 ) {
   return auditedMutation(
     "Record backup export",
-    ["settings"],
-    async () => database.settings.bulkPut(backupExportSettings(backup)),
+    ["settings", "ledgerArchives", "statements"],
+    async () => {
+      // Encryption and the Files handoff can outlive the workspace that began the export.
+      if (backup.ledger !== await currentLedger(database)) return;
+      const previous = await database.settings.get("backup:lastExportAt");
+      if (previous && previous.value > backup.exportedAt) return;
+      const included = new Set(backup.statements.map((statement) => statement.id));
+      const outstanding = (await database.statements.toCollection().primaryKeys())
+        .filter((id) => !included.has(id)).length;
+      await database.settings.bulkPut(backupExportSettings(backup).map((setting) =>
+        setting.key === "backup:importsSinceExport"
+          ? { ...setting, value: String(outstanding) }
+          : setting,
+      ));
+    },
     database,
   );
 }

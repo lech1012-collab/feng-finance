@@ -1,4 +1,5 @@
 import Dexie, { type EntityTable } from "dexie";
+import { separateLegacyLedger, type LedgerArchive } from "./ledgers";
 import { APP_VERSION } from "../domain/models";
 import {
   captureBeforeMigration,
@@ -33,6 +34,7 @@ import type {
   ChangeLog,
 } from "../domain/models";
 export class FinanceDB extends Dexie {
+  ledgerArchives!: EntityTable<LedgerArchive, "name">;
   safetyBackups!: EntityTable<SafetyBackupRecord, "key">;
   layoutTemplates!: EntityTable<LayoutTemplate, "id">;
   importDiagnostics!: EntityTable<ImportDiagnostics, "id">;
@@ -156,6 +158,12 @@ export class FinanceDB extends Dexie {
       })
       .upgrade(async (tx) => {
         await captureBeforeMigration(tx, context, APP_VERSION);
+      });
+    this.version(5)
+      .stores({ ledgerArchives: "name" })
+      .upgrade(async (tx) => {
+        await captureBeforeMigration(tx, context, APP_VERSION);
+        await separateLegacyLedger(this);
       });
   }
 }

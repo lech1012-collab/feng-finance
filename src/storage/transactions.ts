@@ -1,7 +1,8 @@
+import { pendingTransferAttention } from "./transfer-attention";
 import type { Rule, Transaction, TransferLink } from "../domain/models";
 import { db } from "./database";
 import { id } from "../domain/normalize";
-import { amountType } from "../domain/transaction-type";
+import { amountType, financialType } from "../domain/transaction-type";
 import { rememberCategory } from "./category-memory";
 import { auditedMutation } from "./audit";
 import { ensureMonthsOpen } from "./month-review";
@@ -30,6 +31,25 @@ export async function editTransaction(
       const current = await db.transactions.get(tid);
       if (!current) throw new Error("Transaction no longer exists.");
       await ensureMonthsOpen([current]);
+      if ((await pendingTransferAttention([tid])).ids.has(tid)) {
+        if (
+          rule ||
+          patch.type !== financialType(current) ||
+          patch.categoryId !== current.categoryId ||
+          patch.subcategoryId !== current.subcategoryId
+        )
+          throw new Error(
+            "Review the possible transfer before changing its category.",
+          );
+        await db.transactions.update(tid, {
+          merchant: patch.merchant,
+          sourceMerchant:
+            current.sourceMerchant ?? (current.merchant || current.description),
+          tags: patch.tags,
+          updatedAt: new Date().toISOString(),
+        });
+        return;
+      }
       if (current.kind === "split_parent")
         throw new Error(
           "Edit the split lines or unsplit this transaction first.",

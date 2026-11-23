@@ -12,13 +12,14 @@ export interface ReleaseNotes {
 // Keep this version aligned with APP_VERSION and the release tag.
 export const CURRENT_RELEASE: ReleaseNotes = {
   version: APP_VERSION,
-  date: "2026-11-21",
+  date: "2026-11-23",
   points: [
-    "Home brings balances and monthly cash flow into focus, with a new glass navigation dock on iPhone.",
-    "Navigation and sheets follow your theme, contrast and transparency preferences.",
+    "Personal statements and demo finances now have separate totals, transactions and tasks.",
+    "A ready import shows which statements will be saved. You can open a needed correction directly.",
+    "Review a possible transfer once, see the forecast’s actual date range, and restore a backup from Welcome.",
   ],
   pleaseTest: [
-    "Move between Home, Activity and Import, open a coverage badge, and try the same journey in light and dark appearance.",
+    "Explore the demo, then import a personal statement and compare Home with the statement. Try a backup restore on a fresh profile.",
   ],
   betaRound: 1,
   mainTask: "Import one month of statements and categorise everything.",
@@ -26,6 +27,19 @@ export const CURRENT_RELEASE: ReleaseNotes = {
 
 export const RELEASE_HISTORY: readonly ReleaseNotes[] = [
   CURRENT_RELEASE,
+  {
+    version: "2.3.0",
+    date: "2026-11-21",
+    points: [
+      "Home brings balances and monthly cash flow into focus, with a new glass navigation dock on iPhone.",
+      "Navigation and sheets follow your theme, contrast and transparency preferences.",
+    ],
+    pleaseTest: [
+      "Move between Home, Activity and Import, open a coverage badge, and try the same journey in light and dark appearance.",
+    ],
+    betaRound: 1,
+    mainTask: "Import one month of statements and categorise everything.",
+  },
   {
     version: "2.2.34",
     date: "2026-11-21",

@@ -303,7 +303,7 @@ for (const version of [1, 2, 3] as const) {
     }[];
     const snapshot = safety.find((row) => row.key === "latest")!.value;
     expect(snapshot.sourceNativeVersion).toBe(version * 10);
-    expect(snapshot.targetNativeVersion).toBe(40);
+    expect(snapshot.targetNativeVersion).toBe(50);
     expect(
       Object.fromEntries(
         snapshot.tables.map((table) => [table.name, table.rows]),
