@@ -29,7 +29,7 @@ it("keeps accounts, rules, attachments, settings and Undo with their ledger, inc
   await initializeDatabase(database);
   await database.settings.bulkPut([
     { key: "security:pin", value: "secret" },
-    { key: "fxSource", value: "manual" },
+    { key: "fx:download", value: "false" },
     { key: "periodDay", value: "15" },
   ]);
   await database.accounts.add(accounts[0]);
@@ -54,7 +54,7 @@ it("keeps accounts, rules, attachments, settings and Undo with their ledger, inc
   expect(await currentLedger(database)).toBe("demo");
   expect(await database.attachments.count()).toBe(0);
   expect(await database.settings.get("periodDay")).toBeUndefined();
-  expect((await database.settings.get("fxSource"))?.value).toBe("manual");
+  expect((await database.settings.get("fx:download"))?.value).toBe("false");
   expect((await database.settings.get("security:pin"))?.value).toBe("secret");
   await database.accounts.add({ ...accounts[0], displayName: "Demo only" });
   const backup = validateBackup(await createBackup({}, database));

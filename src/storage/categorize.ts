@@ -1,3 +1,4 @@
+import { needsCategory } from "../analytics/effective-transactions";
 import { pendingTransferAttention } from "./transfer-attention";
 import type { Transaction, Rule } from "../domain/models";
 import { db } from "./database";
@@ -19,6 +20,20 @@ export interface CategoryReceipt {
   categoryName: string;
   changeId?: string;
   splitRuleOffer?: { transaction: Transaction; lines: Transaction[] };
+}
+/** Read both eligibility and source rows together when a sorting session advances. */
+export async function readCategoryQueue(ids: string[]) {
+  if (!ids.length) return [];
+  return db.transaction("r", db.transactions, db.transferProposals, async () => {
+    const [rows, pending] = await Promise.all([
+      db.transactions.bulkGet(ids),
+      pendingTransferAttention(ids),
+    ]);
+    return rows.filter(
+      (row): row is Transaction =>
+        !!row && !pending.ids.has(row.id) && needsCategory(row),
+    );
+  });
 }
 export async function matchingUncategorized(
   t: Transaction,

@@ -11,6 +11,7 @@ import { MemoryRouter } from "react-router-dom";
 import { BackupCentre } from "./BackupCentre";
 import { db, initializeDatabase } from "../storage/database";
 import * as backupApi from "../storage/backup";
+import { activateLedger, currentLedger } from "../storage/ledgers";
 import { encryptBackup } from "../security/backup-encryption";
 import { accounts, transaction } from "../tests/helpers";
 
@@ -115,7 +116,9 @@ it("previews an old JSON backup without overwriting, cancels safely and replaces
   });
   sheet = await screen.findByRole("dialog", { name: "Restore backup" });
   fireEvent.click(
-    within(sheet).getByRole("checkbox", { name: /I understand/ }),
+    within(sheet).getByRole("checkbox", {
+      name: "Replace the existing data in my personal workspace.",
+    }),
   );
   fireEvent.click(
     within(sheet).getByRole("button", { name: "Replace data with backup" }),
@@ -149,4 +152,75 @@ it("accepts older encrypted backups with an eight-character password and keeps w
   fireEvent.click(ui.getByRole("button", { name: "Unlock and preview" }));
   await screen.findByRole("dialog", { name: "Restore backup" });
   expect(await db.transactions.count()).toBe(1);
+});
+
+it("identifies the destination before replacing an inactive workspace and preserves the open ledger on cancellation", async () => {
+  const backup = await backupApi.createBackup();
+  await activateLedger("demo");
+  await db.accounts.put({ ...accounts[0], displayName: "Example account" });
+  view();
+  const choose = () =>
+    fireEvent.change(screen.getByLabelText("Choose Feng backup"), {
+      target: { files: [file(backup, "personal.json")] },
+    });
+  choose();
+  const preview = await screen.findByRole("dialog", { name: "Restore backup" });
+  expect(
+    within(preview).getByRole("heading", {
+      name: "Restore your personal workspace?",
+    }),
+  ).toBeVisible();
+  expect(
+    within(preview).queryByRole("button", {
+      name: "Back up current data first",
+    }),
+  ).toBeNull();
+  fireEvent.click(
+    within(preview).getByRole("button", { name: "Cancel restore" }),
+  );
+  expect(await currentLedger()).toBe("demo");
+  choose();
+  const second = await screen.findByRole("dialog", { name: "Restore backup" });
+  fireEvent.click(
+    within(second).getByRole("checkbox", {
+      name: "Replace the existing data in my personal workspace.",
+    }),
+  );
+  fireEvent.click(
+    within(second).getByRole("button", { name: "Replace data with backup" }),
+  );
+  await waitFor(async () =>
+    expect((await db.transactions.get("original"))?.merchant).toBe(
+      "FICTITIOUS SHOP",
+    ),
+  );
+  expect(await currentLedger()).toBe("personal");
+  await activateLedger("demo");
+  expect((await db.accounts.get(accounts[0].id))?.displayName).toBe(
+    "Example account",
+  );
+});
+
+it("discloses how older mixed backups are split and returns from backing up first to one preview", async () => {
+  const backup = await backupApi.createBackup();
+  delete backup.ledger;
+  backup.accounts.push({ ...accounts[0], id: "demo-account", isDemo: true });
+  view();
+  fireEvent.change(screen.getByLabelText("Choose Feng backup"), {
+    target: { files: [file(backup, "mixed.json")] },
+  });
+  const preview = await screen.findByRole("dialog", { name: "Restore backup" });
+  expect(within(preview).getByText(/keeps your local version/)).toBeVisible();
+  fireEvent.click(
+    await within(preview).findByRole("button", {
+      name: "Back up current data first",
+    }),
+  );
+  const save = await screen.findByRole("dialog", { name: "Save backup" });
+  expect(screen.getAllByRole("dialog")).toHaveLength(1);
+  fireEvent.click(within(save).getByRole("button", { name: "Cancel" }));
+  expect(
+    await screen.findByRole("dialog", { name: "Restore backup" }),
+  ).toBeVisible();
+  expect(await db.accounts.count()).toBe(accounts.length);
 });

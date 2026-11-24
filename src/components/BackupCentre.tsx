@@ -3,7 +3,11 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
 import { APP_VERSION, type Backup } from "../domain/models";
-import { betaPreferences, needsBetaNotice, noticeAcknowledgedSettings } from "../beta/policy";
+import {
+  betaPreferences,
+  needsBetaNotice,
+  noticeAcknowledgedSettings,
+} from "../beta/policy";
 import { backupLedger, currentLedger } from "../storage/ledgers";
 import { db } from "../storage/database";
 import {
@@ -216,12 +220,13 @@ export function BackupCentre({
     try {
       // Accept the Welcome notice only when replacement succeeds, including
       // when an older backup predates that notice. Cancel leaves settings intact.
-      const lifecycle = firstLaunch || needsBetaNotice(betaPreferences(pending.settings))
-        ? [
-            ...noticeAcknowledgedSettings(),
-            { key: "lastSeenVersion", value: APP_VERSION },
-          ]
-        : [];
+      const lifecycle =
+        firstLaunch || needsBetaNotice(betaPreferences(pending.settings))
+          ? [
+              ...noticeAcknowledgedSettings(),
+              { key: "lastSeenVersion", value: APP_VERSION },
+            ]
+          : [];
       await restoreBackup(
         lifecycle.length
           ? {
@@ -248,6 +253,11 @@ export function BackupCentre({
     }
   };
   const targetLedger = pending && backupLedger(pending);
+  const legacyMixed =
+    pending &&
+    !pending.ledger &&
+    targetLedger === "personal" &&
+    pending.accounts.some((account) => account.isDemo);
   const dates = pending?.transactions.map((row) => row.date).sort() ?? [];
   return (
     <div
@@ -260,8 +270,10 @@ export function BackupCentre({
             <h2>Backup and restore</h2>
             <ContextHelp title="Backups">
               <p>
-                A portable copy of your accounts, transactions and rules.
-                This file contains the open workspace. Password protection happens on this device. Keep the exported file in Files or another safe location.
+                A portable copy of your accounts, transactions and rules. This
+                file contains the open workspace. Password protection happens on
+                this device. Keep the exported file in Files or another safe
+                location.
               </p>
             </ContextHelp>
           </div>
@@ -450,7 +462,7 @@ export function BackupCentre({
           </form>
         </Sheet>
       )}
-      {pending && (
+      {pending && !saving && (
         <Sheet
           title="Restore backup"
           onClose={cancelRestore}
@@ -513,15 +525,28 @@ export function BackupCentre({
               <p>Backup version {pending.version}</p>
             </details>
             <p>
-              Accounts, transactions, categories, rules and settings in your {targetLedger} workspace will be replaced.
+              Accounts, transactions, categories, rules and settings in your{" "}
+              {targetLedger} workspace will be replaced.
             </p>
-            {!firstLaunch && (data?.ledger === targetLedger ? (
-              <button type="button" disabled={busy} onClick={openSave}>
-                Back up current data first
-              </button>
-            ) : (
-              <p>To back up that workspace first, cancel and open your {targetLedger} workspace.</p>
-            ))}
+            {legacyMixed && (
+              <p>
+                This older backup also contains demo records. Feng adds them to
+                your demo workspace and keeps your local version of any matching
+                record.
+              </p>
+            )}
+            {!firstLaunch &&
+              data &&
+              (data.ledger === targetLedger ? (
+                <button type="button" disabled={busy} onClick={openSave}>
+                  Back up current data first
+                </button>
+              ) : (
+                <p>
+                  To back up that workspace first, cancel and open your{" "}
+                  {targetLedger} workspace.
+                </p>
+              ))}
             <label className="check">
               <input
                 type="checkbox"

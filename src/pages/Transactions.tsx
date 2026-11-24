@@ -66,6 +66,7 @@ import { authorizeMonthEdit } from "../storage/month-review";
 import {
   undoCategory,
   categorizeCards,
+  readCategoryQueue,
   TRANSFER_TARGET,
   type CategoryReceipt,
 } from "../storage/categorize";
@@ -308,15 +309,8 @@ export default function Transactions({
   const from = customFrom ?? data?.from ?? "";
   const to = customTo ?? data?.to ?? "";
   const queueRecords = useLiveQuery(
-    () =>
-      db.transaction("r", db.transactions, async () => ({
-        key: queueKey,
-        rows: (await db.transactions.bulkGet(queueIds)).filter(
-          (row): row is Transaction =>
-            !!row && !data?.pendingLegIds.has(row.id) && needsCategory(row),
-        ),
-      })),
-    [queueKey, data],
+    async () => ({ key: queueKey, rows: await readCategoryQueue(queueIds) }),
+    [queueKey],
   );
   const searchItems = useMemo(
     () =>
@@ -497,12 +491,8 @@ export default function Transactions({
       // A completed save can precede Dexie's list refresh. Read committed
       // records so backfilled, deleted or externally categorized rows do not
       // remain in the progress denominator or reappear as the next card.
-      const pending = (await db.transactions.bulkGet(queueIds)).filter(
-        (p): p is Transaction =>
-          !!p &&
-          !data?.pendingLegIds.has(p.id) &&
-          needsCategory(p) &&
-          !removedIds.includes(p.id),
+      const pending = (await readCategoryQueue(queueIds)).filter(
+        (row) => !removedIds.includes(row.id),
       );
       const current = Math.max(0, queueIds.indexOf(sorting?.id ?? ""));
       for (let step = 1; step <= queueIds.length; step++) {
@@ -631,12 +621,8 @@ export default function Transactions({
       const scope = queueScope.current.length
         ? queueScope.current
         : receipt.before.filter(needsCategory).map((t) => t.id);
-      const pending = (await db.transactions.bulkGet(scope)).filter(
-        (t): t is Transaction =>
-          !!t &&
-          !data?.pendingLegIds.has(t.id) &&
-          needsCategory(t) &&
-          !skippedQueueIds.current.has(t.id),
+      const pending = (await readCategoryQueue(scope)).filter(
+        (row) => !skippedQueueIds.current.has(row.id),
       );
       const restored =
         pending.find((t) => t.id === receipt.before[0].id) ?? pending[0];
@@ -644,7 +630,7 @@ export default function Transactions({
       setQueueIndex(
         restored ? pending.findIndex((t) => t.id === restored.id) : 0,
       );
-      setSorting(restored ?? receipt.before[0]);
+      setSorting(scope.length ? restored : receipt.before[0]);
       setReceipt(undefined);
     } catch (err) {
       setUndoError(err instanceof Error ? err.message : "Undo failed.");

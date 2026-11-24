@@ -45,6 +45,7 @@ function sharedSetting(key: string) {
       "currency",
       "reportingCurrency",
       "fxSource",
+      "fx:download",
       "lastSeenVersion",
       "storagePersisted",
       "separateStorageWarningSeen",

@@ -535,6 +535,41 @@ it("refreshes a live queue when records are deleted or categorized elsewhere", a
   expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
 }, 15000);
 
+it("moves past a payment when a matching transfer appears in an open sorting session", async () => {
+  const debit = transaction({ id: "debit", date: "2026-09-05", amount: -500 });
+  const credit = transaction({
+    id: "credit",
+    date: "2026-09-04",
+    accountId: "a2",
+    amount: 500,
+  });
+  const shop = transaction({
+    id: "shop",
+    date: "2026-09-03",
+    merchant: "LAST SHOP",
+  });
+  await db.transactions.bulkPut([debit, credit, shop]);
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const board = within(
+    await screen.findByRole("dialog", {}, { timeout: 8000 }),
+  );
+  expect(board.getByText("1 of 3 to sort")).toBeVisible();
+  await db.transferProposals.put({
+    id: "new-match",
+    debitTxId: debit.id,
+    creditTxId: credit.id,
+    status: "pending",
+    score: 1,
+  });
+  expect(await board.findByText("1 of 1 to sort")).toBeVisible();
+  expect(board.getByText("Last Shop")).toBeVisible();
+});
 it("keeps skipped cards deferred when Undo reopens a completed sorting queue", async () => {
   const saveCategory = vi.spyOn(categoryStorage, "categorizeCards");
   const undoCategory = vi.spyOn(categoryStorage, "undoCategory");

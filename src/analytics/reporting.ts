@@ -72,7 +72,7 @@ export function reportingCoverage(
     status:
       missingRates || staleRates
         ? ("Unverified" as const)
-        : pendingTransfers
+        : pendingTransfers && coverage.complete
           ? ("Partial" as const)
           : coverage.status,
     pendingTransfers,

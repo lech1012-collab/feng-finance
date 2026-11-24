@@ -1301,23 +1301,20 @@ export default function ImportPage({
                 All statements ({entries.length})
               </button>
             </div>
-            {batch.attention.length > 0 && (
-              <>
-                <p>
-                  Resolve the statements needing attention, or leave them out.
-                  Ready statements will be included when you confirm.
-                </p>
-                <button
-                  disabled={busy}
-                  onClick={(event) => {
-                    event.currentTarget.focus({ preventScroll: true });
-                    reviewNextStatement();
-                  }}
-                >
-                  Review next statement
-                </button>
-              </>
-            )}
+            <p hidden={!batch.attention.length}>
+              Resolve the statements needing attention, or leave them out.
+              Ready statements will be included when you confirm.
+            </p>
+            <button
+              hidden={!batch.attention.length}
+              disabled={busy}
+              onClick={(event) => {
+                event.currentTarget.focus({ preventScroll: true });
+                reviewNextStatement();
+              }}
+            >
+              Review next statement
+            </button>
             {reviewFilter === "attention" && !batch.attention.length && (
               <p className="import-review-clear" role="status">
                 {hasChanges
