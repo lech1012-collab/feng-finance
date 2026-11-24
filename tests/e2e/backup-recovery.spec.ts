@@ -50,7 +50,7 @@ async function confirmRestore(page: Page) {
   ).toBeVisible();
 }
 
-test("a fresh backup link accepts an encrypted file, allows cancellation, and Welcome restores a legacy personal backup", async ({
+test("a fresh backup link allows cancellation and Welcome restores an encrypted legacy personal backup", async ({
   page,
 }) => {
   for (const url of ["/#/settings?section=backup", "/#/settings#backup"]) {
@@ -98,7 +98,11 @@ test("a fresh backup link accepts an encrypted file, allows cancellation, and We
   await expect(
     page.getByRole("dialog", { name: "Welcome to Feng" }),
   ).toBeVisible();
-  await (await choose()).setFiles(uploaded(backup));
+  await (await choose()).setFiles(
+    uploaded(protectedBackup, "synthetic-backup.feng"),
+  );
+  await password.fill("synthetic recovery passphrase");
+  await unlock.getByRole("button", { name: "Unlock and preview" }).click();
   await confirmRestore(page);
   await page.reload();
   await expect(
