@@ -446,7 +446,14 @@ currencies, statement counts, exact split sums, refund allocations, transfer
 links and portable receipt bytes before replacing data. A newer schema is
 rejected with an Update instruction. Replace restore requires explicit UI
 confirmation and runs atomically. Preview and cancellation leave existing data
-untouched; save a current backup first to preserve it before replacement. Merge is not supported.
+untouched. Save a current backup first to keep a copy before replacement.
+A personal export replaces personal finances. A demo export replaces the demo.
+
+If an older file contains both, Feng previews that distinction, replaces personal
+finances and puts the sample records in the demo. Existing demo edits take
+precedence when a record ID occurs in both demo sets. If the combined records
+would leave an invalid financial relationship, the entire restore rolls back.
+The original backup can still be opened in a fresh browser profile.
 
 IndexedDB schema 1 is preserved. Schema 2 added merchant/review metadata. Schema
 3 additively introduces v2 tables and optional fields, retaining legacy amounts,
@@ -454,6 +461,11 @@ original descriptions, account IDs, rules and links. Existing confirmed transfer
 are not retrospectively unlinked by the new manual default. Migration tests open
 old databases and restore old-format backups without resetting financial data.
 Schema 4 adds import layouts, optional diagnostics and local migration recovery.
+Schema 5 separates the ledgers. It preserves personal activity that used an
+example account in an earlier version and gives that activity an account in
+personal finances. The sample statement balances stay in the demo. Feng
+switches all financial tables in one IndexedDB transaction, including receipts
+and Undo history. The app lock and appearance settings apply to both ledgers.
 A pre-update safety snapshot keeps the previous data for 14 days; it is separate
 from a portable backup and is not uploaded. Restore previous data requires
 confirmation because changes made after the update will be replaced.

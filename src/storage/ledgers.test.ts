@@ -5,6 +5,7 @@ import { accounts, transaction } from "../tests/helpers";
 import { FinanceDB, db, initializeDatabase } from "./database";
 import {
   activateLedger,
+  backupLedger,
   currentLedger,
   deleteDemoLedger,
   openDemoLedger,
@@ -121,30 +122,26 @@ it("migrates a mixed v4 installation atomically, keeps private manual activity a
   await legacy
     .table("accounts")
     .bulkAdd([accounts[0], { ...accounts[1], isDemo: true }]);
-  await legacy
-    .table("transactions")
-    .bulkAdd([
-      transaction({
-        id: "example-tx",
-        accountId: "a2",
-        isDemo: true,
-        source: "manual",
-        statementId: "manual",
-      }),
-      transaction({
-        id: "personal-tx",
-        accountId: "a2",
-        source: "manual",
-        statementId: "manual",
-      }),
-    ]);
-  await legacy
-    .table("attachments")
-    .add({
-      id: "demo-receipt",
-      transactionId: "example-tx",
-      blob: new Blob(["sample"]),
-    });
+  await legacy.table("transactions").bulkAdd([
+    transaction({
+      id: "example-tx",
+      accountId: "a2",
+      isDemo: true,
+      source: "manual",
+      statementId: "manual",
+    }),
+    transaction({
+      id: "personal-tx",
+      accountId: "a2",
+      source: "manual",
+      statementId: "manual",
+    }),
+  ]);
+  await legacy.table("attachments").add({
+    id: "demo-receipt",
+    transactionId: "example-tx",
+    blob: new Blob(["sample"]),
+  });
   legacy.close();
   await database.open();
   expect((await previousDataPreview(database))?.sourceNativeVersion).toBe(40);
@@ -242,4 +239,75 @@ it("restores only personal Undo history from a mixed backup, merging unique samp
   expect(validateBackup(await createBackup({}, database)).accounts.length).toBe(
     2,
   );
+});
+
+it("identifies a legacy sample-only backup when split children have no ownership flag", () => {
+  const sample = {
+    accounts: [{ ...accounts[0], isDemo: true }],
+    statements: [],
+    transactions: [
+      transaction({ id: "child", source: "split", parentId: "parent" }),
+      transaction({
+        id: "parent",
+        source: "manual",
+        kind: "split_parent",
+        isDemo: true,
+      }),
+    ],
+  };
+  expect(backupLedger(sample)).toBe("demo");
+  expect(
+    backupLedger({
+      ...sample,
+      valuations: [
+        {
+          id: "owner-value",
+          accountId: "a1",
+          date: "2026-09-01",
+          valueMinor: 100,
+        },
+      ],
+    }),
+  ).toBe("personal");
+});
+
+it("rolls back both ledgers if combining a legacy mixed backup would attach a transaction to the wrong currency", async () => {
+  const database = instance();
+  await initializeDatabase(database);
+  await database.accounts.add(accounts[0]);
+  const backup = await createBackup({}, database);
+  delete backup.ledger;
+  backup.schemaVersion = 4;
+  backup.accounts = [
+    { ...accounts[0], displayName: "Replacement personal" },
+    { ...accounts[1], currency: "EUR", isDemo: true },
+  ];
+  backup.transactions = [
+    transaction({
+      accountId: "a2",
+      currency: "EUR",
+      source: "manual",
+      statementId: "",
+      isDemo: true,
+    }),
+  ];
+  validateBackup(backup);
+  await activateLedger("demo", database);
+  await database.accounts.add({
+    ...accounts[1],
+    displayName: "Existing GBP sample",
+    isDemo: true,
+  });
+  await expect(restoreBackup(backup, database)).rejects.toThrow(
+    "conflicting records",
+  );
+  expect(await currentLedger(database)).toBe("demo");
+  expect((await database.accounts.get("a2"))?.currency).toBe("GBP");
+  expect(await database.transactions.count()).toBe(0);
+  await activateLedger("personal", database);
+  expect(await database.accounts.toArray()).toEqual([accounts[0]]);
+  expect(await database.transactions.count()).toBe(0);
+  expect(
+    (await database.changeLog.toArray()).map((entry) => entry.label),
+  ).not.toContain("Restore backup");
 });

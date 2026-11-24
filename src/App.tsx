@@ -689,8 +689,10 @@ function Shell() {
                   )}
                   {initialized && !initError && (
                     <CurrencyViewNotice
+                      key={ledger}
                       currency={currency}
                       allowAutomaticDownload={
+                        ledger === "personal" &&
                         !exactRecovery &&
                         !!betaData &&
                         !needsBetaNotice(betaData.prefs) &&

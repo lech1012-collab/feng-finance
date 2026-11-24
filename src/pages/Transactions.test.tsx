@@ -567,8 +567,12 @@ it("moves past a payment when a matching transfer appears in an open sorting ses
     status: "pending",
     score: 1,
   });
-  expect(await board.findByText("1 of 1 to sort")).toBeVisible();
-  expect(board.getByText("Last Shop")).toBeVisible();
+  // Advancing to the next transaction mounts its own dialog.
+  await waitFor(() => {
+    const current = within(screen.getByRole("dialog"));
+    expect(current.getByText("1 of 1 to sort")).toBeVisible();
+    expect(current.getByText("Last Shop")).toBeVisible();
+  });
 });
 it("keeps skipped cards deferred when Undo reopens a completed sorting queue", async () => {
   const saveCategory = vi.spyOn(categoryStorage, "categorizeCards");
@@ -605,8 +609,9 @@ it("keeps skipped cards deferred when Undo reopens a completed sorting queue", a
     await saveCategory.mock.results[0].value;
   });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const undo = await screen.findByRole("button", { name: "Undo" });
   await act(async () => {
-    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    fireEvent.click(undo);
     await undoCategory.mock.results[0].value;
   });
   await waitFor(() =>

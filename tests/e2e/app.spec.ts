@@ -350,7 +350,12 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
     mimeType: "application/json",
     buffer: bytes,
   });
-  await page.getByLabel(/I understand that this replaces/).check();
+  await page
+    .getByRole("checkbox", {
+      name: "Replace the existing data in my personal workspace.",
+      exact: true,
+    })
+    .check();
   await page
     .getByRole("button", { name: "Replace data with backup", exact: true })
     .click();
@@ -1277,7 +1282,12 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   await expect(
     page.getByRole("button", { name: "Replace data with backup", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel(/I understand that this replaces/).check();
+  await page
+    .getByRole("checkbox", {
+      name: "Replace the existing data in my demo workspace.",
+      exact: true,
+    })
+    .check();
   await page
     .getByRole("button", { name: "Replace data with backup", exact: true })
     .click();
@@ -1443,7 +1453,7 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     name: "Transaction category filters",
   });
   await expect(quick.getByRole("button")).toHaveText([
-    "Uncategorised 2",
+    "Uncategorised 0",
     /Groceries\s*3/,
     /Income\s*3/,
     /Property\s*4/,
@@ -1466,14 +1476,15 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
       .locator(".transaction-row")
       .filter({ hasText: "FICTITIOUS EURO CAFE" }),
   ).toContainText("−€45.99");
+  // Both unassigned demo entries belong to one possible transfer. The full ledger
+  // retains both sides, while the ordinary categorisation queue is empty.
+  await expect(
+    page.locator(".transaction-row").filter({ hasText: "Review transfer" }),
+  ).toHaveCount(2);
   await quick
-    .getByRole("button", { name: "Uncategorised 2", exact: true })
+    .getByRole("button", { name: "Uncategorised 0", exact: true })
     .click();
-  await expect(page.locator(".transaction-row")).toHaveCount(2);
-  await expect(page.locator(".transaction-row .transaction-status")).toHaveText(
-    ["Needs category", "Needs category"],
-  );
-  await expect(page.locator(".transaction-row .review-status")).toHaveCount(0);
+  await expect(page.locator(".transaction-row")).toHaveCount(0);
   await page.screenshot({
     path: `test-results/dashboard-${test.info().project.name}.png`,
     fullPage: true,

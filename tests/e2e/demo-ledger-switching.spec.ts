@@ -7,6 +7,11 @@ test("cancel keeps demo open, and switching ledgers in another tab clears a pend
   context,
 }) => {
   const pdf = resolve("tests/fixtures/barclays-planning-09.pdf");
+  const publicRateRequests: string[] = [];
+  page.on("request", (request) => {
+    if (new URL(request.url()).hostname === "data-api.ecb.europa.eu")
+      publicRateRequests.push(request.url());
+  });
   await page.goto("/#/");
   await page.getByRole("button", { name: "Explore with demo data" }).click();
   const demoChip = page.locator(".ui-demo-chip").filter({ visible: true });
@@ -30,6 +35,7 @@ test("cancel keeps demo open, and switching ledgers in another tab clears a pend
     exact: true,
   });
   await expect(confirm).toBeEnabled();
+  expect(publicRateRequests).toEqual([]);
   await expect(demoChip).toHaveCount(0);
   await page.goto("/#/settings?section=demo");
   await expect(

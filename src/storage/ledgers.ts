@@ -109,14 +109,22 @@ function legacyOwnership(
   statements: OwnershipRecord[],
   transactions: OwnershipRecord[],
 ) {
-  const accountIds = new Set(accounts.filter((row) => row.isDemo).map((row) => row.id));
+  const accountIds = new Set(
+    accounts.filter((row) => row.isDemo).map((row) => row.id),
+  );
   const statementIds = new Set(
-    statements.filter((row) => row.isDemo ||
-      (accountIds.has(row.accountId) && String(row.id).startsWith("demo-")))
+    statements
+      .filter(
+        (row) =>
+          row.isDemo ||
+          (accountIds.has(row.accountId) && String(row.id).startsWith("demo-")),
+      )
       .map((row) => row.id),
   );
   const txIds = new Set(
-    transactions.filter((row) => row.isDemo || statementIds.has(row.statementId)).map((row) => row.id),
+    transactions
+      .filter((row) => row.isDemo || statementIds.has(row.statementId))
+      .map((row) => row.id),
   );
   for (const row of transactions) {
     if (txIds.has(row.parentId)) txIds.add(row.id);
@@ -125,18 +133,24 @@ function legacyOwnership(
 }
 
 export function backupLedger(
-  backup: Pick<Backup, "ledger" | "accounts" | "transactions" | "statements" | "valuations">,
+  backup: Pick<
+    Backup,
+    "ledger" | "accounts" | "transactions" | "statements" | "valuations"
+  >,
 ): Ledger {
   if (backup.ledger) return backup.ledger;
   const { accountIds, statementIds, txIds } = legacyOwnership(
-    backup.accounts, backup.statements, backup.transactions,
+    backup.accounts,
+    backup.statements,
+    backup.transactions,
   );
   return accountIds.size > 0 &&
     accountIds.size === backup.accounts.length &&
     statementIds.size === backup.statements.length &&
     txIds.size === backup.transactions.length &&
     (backup.valuations ?? []).every((row) => row.isDemo)
-    ? "demo" : "personal";
+    ? "demo"
+    : "personal";
 }
 
 export async function currentLedger(database = db): Promise<Ledger> {
@@ -169,7 +183,11 @@ export function partitionLegacyRows(
   all: LedgerRows,
 ): { personal: LedgerRows; demo: LedgerRows } | undefined {
   if (!all.accounts.some((row) => row.isDemo)) return;
-  const {accountIds, statementIds, txIds} = legacyOwnership(all.accounts, all.statements, all.transactions);
+  const { accountIds, statementIds, txIds } = legacyOwnership(
+    all.accounts,
+    all.statements,
+    all.transactions,
+  );
   const realTransactions = all.transactions.filter((row) => !txIds.has(row.id));
   const realStatements = all.statements.filter(
     (row) => !statementIds.has(row.id),

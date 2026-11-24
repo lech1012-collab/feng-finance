@@ -20,7 +20,14 @@ import {
   BackupFileTooLargeError,
   MAX_BACKUP_FILE_BYTES,
 } from "./backup-limits";
-import { activateLedger, currentLedger, backupLedger, partitionLegacyRows, mergeArchivedDemo, type LedgerRows } from "./ledgers";
+import {
+  activateLedger,
+  currentLedger,
+  backupLedger,
+  partitionLegacyRows,
+  mergeArchivedDemo,
+  type LedgerRows,
+} from "./ledgers";
 import { SAFETY_RECOVERY_STATE_KEY } from "./safety-backup";
 import { SECURITY_CHANGE_EVENT } from "../security/events";
 
@@ -332,7 +339,11 @@ export function validateBackup(input: unknown): Backup {
   validateFinancialRecords(b);
   for (const attachment of b.attachments ?? []) {
     const { dataBase64, sizeBytes } = attachment;
-    const padding = dataBase64.endsWith("==") ? 2 : dataBase64.endsWith("=") ? 1 : 0;
+    const padding = dataBase64.endsWith("==")
+      ? 2
+      : dataBase64.endsWith("=")
+        ? 1
+        : 0;
     if ((dataBase64.length * 3) / 4 - padding !== sizeBytes)
       throw new Error("Invalid attachment data or owner.");
   }
@@ -498,7 +509,9 @@ export async function createBackup(
     (entry) =>
       !entry.changes.some(
         (change) =>
-          ["safetyBackups", "importDiagnostics", "ledgerArchives"].includes(change.table) ||
+          ["safetyBackups", "importDiagnostics", "ledgerArchives"].includes(
+            change.table,
+          ) ||
           (change.table === "settings" && securityKey(change.key)) ||
           (!includeAttachments &&
             (change.table === "attachments" ||
@@ -530,14 +543,31 @@ export async function restoreBackup(input: unknown, database: FinanceDB = db) {
     }),
   );
   const history = decodeAuditValue(backup.changeLog ?? []) as ChangeLog[];
-  const replacementTables = database.tables.filter(table => !["ledgerArchives","safetyBackups"].includes(table.name));
+  const replacementTables = database.tables.filter(
+    (table) => !["ledgerArchives", "safetyBackups"].includes(table.name),
+  );
   const destination = backupLedger(backup);
-  const portableRows = {...backup, settings:backup.settings.filter(s => !securityKey(s.key)), attachments, changeLog:history};
-  const all: LedgerRows = Object.fromEntries(replacementTables.map(({name}) => {
-    const values = portableRows[name as keyof typeof portableRows];
-    return [name, Array.isArray(values) ? values.map((row): Record<string, unknown> => ({ ...row })) : []];
-  }));
-  const partition = !backup.ledger && destination === "personal" ? partitionLegacyRows(all) : undefined;
+  const portableRows = {
+    ...backup,
+    settings: backup.settings.filter((s) => !securityKey(s.key)),
+    attachments,
+    changeLog: history,
+  };
+  const all: LedgerRows = Object.fromEntries(
+    replacementTables.map(({ name }) => {
+      const values = portableRows[name as keyof typeof portableRows];
+      return [
+        name,
+        Array.isArray(values)
+          ? values.map((row): Record<string, unknown> => ({ ...row }))
+          : [],
+      ];
+    }),
+  );
+  const partition =
+    !backup.ledger && destination === "personal"
+      ? partitionLegacyRows(all)
+      : undefined;
   const rows = partition?.personal ?? all;
   return database.transaction("rw", database.tables, async () => {
     await activateLedger(destination, database);
@@ -557,16 +587,24 @@ export async function restoreBackup(input: unknown, database: FinanceDB = db) {
         }
       }
     }
-    return auditedMutation("Restore backup", replacementTables.map(table => table.name), async () => {
-      const localSecurity = await database.settings.filter(setting => securityKey(setting.key)).toArray();
-      for (const table of replacementTables) {
-        await table.clear();
-        await table.bulkPut(rows[table.name]);
-      }
-      await database.settings.bulkPut(localSecurity);
-      await database.settings.put({key:"initialized",value:"true"});
-      if (partition && rows.monthCloses.length) await updateClosedMonthSnapshots(database);
-    }, database);
+    return auditedMutation(
+      "Restore backup",
+      replacementTables.map((table) => table.name),
+      async () => {
+        const localSecurity = await database.settings
+          .filter((setting) => securityKey(setting.key))
+          .toArray();
+        for (const table of replacementTables) {
+          await table.clear();
+          await table.bulkPut(rows[table.name]);
+        }
+        await database.settings.bulkPut(localSecurity);
+        await database.settings.put({ key: "initialized", value: "true" });
+        if (partition && rows.monthCloses.length)
+          await updateClosedMonthSnapshots(database);
+      },
+      database,
+    );
   });
 }
 export async function clearLocalData() {
@@ -673,17 +711,22 @@ export async function markBackupExported(
     ["settings", "ledgerArchives", "statements"],
     async () => {
       // Encryption and the Files handoff can outlive the workspace that began the export.
-      if (backup.ledger !== await currentLedger(database)) return;
+      if (backup.ledger !== (await currentLedger(database))) return;
       const previous = await database.settings.get("backup:lastExportAt");
       if (previous && previous.value > backup.exportedAt) return;
-      const included = new Set(backup.statements.map((statement) => statement.id));
-      const outstanding = (await database.statements.toCollection().primaryKeys())
-        .filter((id) => !included.has(id)).length;
-      await database.settings.bulkPut(backupExportSettings(backup).map((setting) =>
-        setting.key === "backup:importsSinceExport"
-          ? { ...setting, value: String(outstanding) }
-          : setting,
-      ));
+      const included = new Set(
+        backup.statements.map((statement) => statement.id),
+      );
+      const outstanding = (
+        await database.statements.toCollection().primaryKeys()
+      ).filter((id) => !included.has(id)).length;
+      await database.settings.bulkPut(
+        backupExportSettings(backup).map((setting) =>
+          setting.key === "backup:importsSinceExport"
+            ? { ...setting, value: String(outstanding) }
+            : setting,
+        ),
+      );
     },
     database,
   );

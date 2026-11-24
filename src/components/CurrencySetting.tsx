@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { db } from "../storage/database";
+import { currentLedger } from "../storage/ledgers";
 import { auditedMutation, undoChange } from "../storage/audit";
 import { currencyPrecision } from "../domain/money";
 import { downloadEcbRates, workingDayAge } from "../analytics/fx";
@@ -24,11 +25,14 @@ export function useGlobalCurrency() {
   }
 }
 async function refreshRates() {
+  const destination = await currentLedger();
   const rates = await downloadEcbRates();
   return auditedMutation(
     "Update exchange rates",
-    ["fxRates", "settings"],
+    ["fxRates", "settings", "ledgerArchives"],
     async () => {
+      // The user may have switched workspaces while the public table downloaded.
+      if ((await currentLedger()) !== destination) return;
       // A manual override remains authoritative and is not overwritten by an ECB table.
       await db.fxRates.bulkPut(rates);
       await db.settings.put({

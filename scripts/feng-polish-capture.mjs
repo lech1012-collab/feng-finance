@@ -440,14 +440,18 @@ async function closeSheet(page) {
   await page.keyboard.press("Escape");
   await page.waitForTimeout(100);
 }
+async function discardReview(page) {
+  const discard = page.getByRole("button", { name: "Discard review", exact: true });
+  if (!(await discard.isVisible())) return;
+  await discard.click();
+  await page.getByRole("dialog", { name: "Discard this review?" })
+    .getByRole("button", { name: "Discard review", exact: true }).click();
+  await expect(discard).toHaveCount(0);
+}
 async function select(page, names) {
-  // Each captured scene starts a new review; adding in the UI now preserves a batch.
-  const close = page.getByRole("link", {
-    name: "Leave review",
-    exact: true,
-  });
-  if (await close.isVisible()) await close.click();
   await go(page, "/import");
+  // Leaving the page preserves the batch. Each capture scenario needs a fresh selection.
+  await discardReview(page);
   await page
     .getByLabel("Select statements", { exact: true })
     .setInputFiles(names.map(fixture));
@@ -455,18 +459,25 @@ async function select(page, names) {
     names.length,
     { timeout: 120000 },
   );
-  await expect(page.locator(".import-review-list")).toBeVisible({
+  await expect(page.getByRole("region", { name: "Batch review" })).toBeVisible({
     timeout: 120000,
   });
-  await page.waitForTimeout(250);
 }
-async function card(page, name) {
+async function card(page, name, { diagnostics = false } = {}) {
   const c = page.locator(".import-statement-card").filter({
     has: page.locator(".import-source-name").filter({ hasText: name + ".pdf" }),
   });
   await expect(c).toHaveCount(1);
+  if (!(await c.isVisible()))
+    await page.getByRole("button", { name: /^All statements \(\d+\)$/ }).click();
   if (!(await c.evaluate((e) => e.open)))
     await c.locator(":scope > summary").click();
+  if (diagnostics) {
+    await c.locator(".import-statement-details > summary").click();
+    const overview = page.getByRole("dialog", { name: "Statement overview" });
+    await overview.getByText("Source and technical tools", { exact: true }).click();
+    await overview.getByRole("button", { name: "Open diagnostic tools" }).click();
+  }
   const figures = c.locator(".import-statement-figures");
   if ((await figures.count()) && !(await figures.evaluate((node) => node.open)))
     await figures.locator(":scope > summary").click();
@@ -1245,7 +1256,7 @@ async function importStates(setup) {
       "Exact duplicate statement is skipped",
     );
     await select(page, ["known-bank-hsbc"]);
-    const hsbc = await card(page, "known-bank-hsbc");
+    const hsbc = await card(page, "known-bank-hsbc", { diagnostics: true });
     await snap(page, "import-generic", "Unfamiliar bank generic reader", {
       focus: hsbc,
     });
@@ -1268,7 +1279,7 @@ async function importStates(setup) {
     );
     await closeSheet(page);
     await select(page, ["known-bank-barclays-malformed"]);
-    const bad = await card(page, "known-bank-barclays-malformed");
+    const bad = await card(page, "known-bank-barclays-malformed", { diagnostics: true });
     await snap(
       page,
       "import-t11-mismatch",
@@ -1317,6 +1328,7 @@ async function importStates(setup) {
       await closeSheet(page);
     }
     await go(page, "/import");
+    await discardReview(page);
     await page.getByLabel("Select statements", { exact: true }).setInputFiles({
       name: "fictitious-invalid.pdf",
       mimeType: "application/pdf",
@@ -1406,8 +1418,7 @@ async function backupStates(setup) {
     );
     await page
       .getByLabel(
-        "I understand that this replaces all existing data on this device.",
-        { exact: true },
+        /Replace the existing data in my (personal|demo) workspace/,
       )
       .check();
     await snap(
