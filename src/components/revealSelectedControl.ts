@@ -20,5 +20,15 @@ export function revealSelectedControl(button: HTMLButtonElement | null) {
   observer.observe(strip);
   // Text zoom can change a preceding label's width without resizing the strip.
   for (const option of strip.children) observer.observe(option);
-  return () => observer.disconnect();
+  // A font-size change can briefly remove overflow and reset scrollLeft.
+  // If the old size returns in the same frame, ResizeObserver sees no resize.
+  const rootStyle = new MutationObserver(reveal);
+  rootStyle.observe(strip.ownerDocument.documentElement, {
+    attributes: true,
+    attributeFilter: ["style", "class"],
+  });
+  return () => {
+    observer.disconnect();
+    rootStyle.disconnect();
+  };
 }

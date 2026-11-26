@@ -265,7 +265,15 @@ function Shell() {
       statements,
       prefs.firstRealImportAt,
     );
-    return { prefs, hasRealImports: statements.length > 0 };
+    // Before the first acknowledgement, a new installation can enter portable
+    // restore directly. An existing owner can also have manual accounts or a
+    // pre-update recovery copy without ever having imported a statement.
+    const freshWorkspace =
+      needsBetaNotice(prefs) &&
+      !statements.length &&
+      !(await db.accounts.count()) &&
+      !(await db.safetyBackups.count());
+    return { prefs, hasRealImports: statements.length > 0, freshWorkspace };
   }, [initialized]);
   useEffect(() => {
     if (!betaData) return;
@@ -809,6 +817,7 @@ function Shell() {
             ) : !initialized || !betaData || !ledger ? (
               <p role="status">Opening your local finances…</p>
             ) : needsBetaNotice(betaData.prefs) || betaBusy || betaFlowError ? (
+              betaData.freshWorkspace &&
               location.pathname === "/settings" &&
               (new URLSearchParams(location.search).get("section") ===
                 "backup" ||

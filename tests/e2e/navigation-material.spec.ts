@@ -96,19 +96,16 @@ for (const layout of [
     page,
   }) => {
     await page.setViewportSize({ width: layout.width, height: 844 });
+    // Set Dynamic Type before opening Settings, as it is on the device.
+    await page.evaluate((size) => {
+      document.documentElement.style.fontSize = size;
+    }, layout.fontSize);
     await page.goto("/#/settings");
     const sections = page.getByRole("navigation", {
       name: "Settings sections",
     });
     const lastAction = sections.getByRole("link").last();
     await expect(lastAction).toBeVisible();
-    await page.evaluate((size) => {
-      document.documentElement.style.fontSize = size;
-      window.scrollTo({
-        top: document.documentElement.scrollHeight,
-        behavior: "instant",
-      });
-    }, layout.fontSize);
     await expect
       .poll(() =>
         page.evaluate(
@@ -121,15 +118,21 @@ for (const layout of [
     await expect
       .poll(() =>
         lastAction.evaluate((link) => {
+          // Scroll to the action once layout has its current font and dock size.
+          link.scrollIntoView({ block: "end", behavior: "instant" });
           const box = link.getBoundingClientRect();
           const hit = document.elementFromPoint(
             box.x + box.width / 2,
             box.bottom - 1,
           );
-          return link.contains(hit);
+          if (!link.contains(hit)) return "action is covered at its lower edge";
+          const dock = document.querySelector(".mobile-navigation")?.getBoundingClientRect();
+          if (dock?.height && box.bottom > dock.top + 1)
+            return "action extends behind the tab bar";
+          return "fully reachable";
         }),
       )
-      .toBe(true);
+      .toBe("fully reachable");
 
     const navigation = page.getByRole("navigation", {
       name: "Main navigation",

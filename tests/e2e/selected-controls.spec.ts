@@ -50,6 +50,16 @@ test("direct Forecast and YTD links reveal the selected control on a narrow phon
   });
   await expectVisibleInStrip(ytd);
 
+  // WebKit resets the scroll offset as soon as the smaller labels fit. Exercise
+  // the case where both layouts happen before the next resize notification.
+  await ytd.evaluate((button) => {
+    const root = button.ownerDocument.documentElement;
+    root.style.fontSize = "100%";
+    button.getBoundingClientRect();
+    root.style.fontSize = "200%";
+  });
+  await expectVisibleInStrip(ytd);
+
   // Changing only the tray's width must reveal YTD without moving the document.
   const strip = ytd.locator("..");
   expect(await strip.evaluate((node) => node.scrollWidth)).toBeGreaterThan(

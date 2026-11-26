@@ -142,6 +142,12 @@
 }
 
 @media (max-width: 760px) {
+  /* Keep controls revealed by keyboard or in-page navigation above the dock.
+     Its measured height includes wrapped labels and the bottom safe area. */
+  html {
+    scroll-padding-block-end: var(--mobile-nav-height, 78px);
+  }
+
   .app .mobile-header {
     padding: max(8px, env(safe-area-inset-top))
       max(16px, env(safe-area-inset-right)) 8px
