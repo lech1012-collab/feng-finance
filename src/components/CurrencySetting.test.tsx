@@ -10,6 +10,7 @@ import { MemoryRouter } from "react-router-dom";
 import { CurrencySetting, CurrencyViewNotice } from "./CurrencySetting";
 import { db, initializeDatabase } from "../storage/database";
 import * as fx from "../analytics/fx";
+import { activateLedger, currentLedger } from "../storage/ledgers";
 
 beforeEach(async () => {
   await db.delete();
@@ -218,7 +219,7 @@ it("keeps exact recovery read-only until the user requests exchange rates", asyn
   const before = await db.settings.toArray();
   render(
     <MemoryRouter>
-      <CurrencyViewNotice currency="GBP" allowAutomaticDownload={false} />
+      <CurrencyViewNotice allowAutomaticDownload={false} />
     </MemoryRouter>,
   );
   await screen.findByRole("link", {
@@ -227,4 +228,44 @@ it("keeps exact recovery read-only until the user requests exchange rates", asyn
   expect(fetcher).not.toHaveBeenCalled();
   expect(await db.fxRates.count()).toBe(0);
   expect(await db.settings.toArray()).toEqual(before);
+});
+
+it("uses the active ledger's accounts when a workspace switch and shell update arrive separately", async () => {
+  await activateLedger("demo");
+  const account = {
+    id: "foreign",
+    institution: "Revolut" as const,
+    displayName: "Synthetic",
+    accountType: "current" as const,
+    currency: "EUR",
+    maskedAccountIdentifier: "Fictitious",
+    createdAt: "2026-10-01T12:00:00Z",
+    updatedAt: "2026-10-01T12:00:00Z",
+  };
+  await db.accounts.add(account);
+  const requestLedgers: string[] = [];
+  const download = vi
+    .spyOn(fx, "downloadEcbRates")
+    .mockImplementation(async () => {
+      requestLedgers.push(await currentLedger());
+      return [];
+    });
+  // The outer shell still grants permission from the preceding personal view.
+  render(
+    <MemoryRouter>
+      <CurrencyViewNotice allowAutomaticDownload />
+    </MemoryRouter>,
+  );
+  const missing = await screen.findByRole("link", {
+    name: /Exchange rates needed/,
+  });
+  await activateLedger("personal");
+  await waitFor(() => expect(missing).not.toBeInTheDocument());
+  expect(download).not.toHaveBeenCalled();
+
+  await db.accounts.add({ ...account, id: "personal-foreign" });
+  await waitFor(() => expect(requestLedgers).toEqual(["personal"]));
+  await waitFor(async () =>
+    expect(await db.settings.get("fx:lastDownloaded")).toBeDefined(),
+  );
 });

@@ -142,10 +142,10 @@
 }
 
 @media (max-width: 760px) {
-  /* Keep controls revealed by keyboard or in-page navigation above the dock.
-     Its measured height includes wrapped labels and the bottom safe area. */
+  /* Leave room for the focus outline above the dock when the browser
+     scrolls a control into view. The dock height includes its safe area. */
   html {
-    scroll-padding-block-end: var(--mobile-nav-height, 78px);
+    scroll-padding-block-end: calc(var(--mobile-nav-height, 78px) + 8px);
   }
 
   .app .mobile-header {
