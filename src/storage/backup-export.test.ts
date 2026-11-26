@@ -1,6 +1,7 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
 import { db } from "./database";
-import { clearLocalData, exportBackupFile, validateBackup } from "./backup";
+import { clearLocalData, createBackup, exportBackupFile, markBackupExported, validateBackup } from "./backup";
+import { activateLedger } from "./ledgers";
 import { loadDemo } from "./demo";
 
 beforeEach(async () => {
@@ -34,6 +35,15 @@ describe("backup export traceability", () => {
       value: "0",
     });
     expect(HTMLAnchorElement.prototype.click).toHaveBeenCalledOnce();
+  });
+  it("keeps a late export receipt out of a different ledger and counts imports after the snapshot", async () => {
+    const backup = await createBackup();
+    await db.statements.add({ ...backup.statements[0], id: "newer-statement" });
+    await markBackupExported(backup);
+    expect((await db.settings.get("backup:importsSinceExport"))?.value).toBe("1");
+    await activateLedger("demo");
+    await markBackupExported(backup);
+    expect(await db.settings.get("backup:lastExportAt")).toBeUndefined();
   });
   it("does not update last-backup metadata if download handoff fails", async () => {
     const old = "2026-09-01T09:00:00.000Z";

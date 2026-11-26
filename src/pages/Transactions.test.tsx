@@ -535,6 +535,45 @@ it("refreshes a live queue when records are deleted or categorized elsewhere", a
   expect(await db.rules.filter((r) => !r.builtIn).count()).toBe(0);
 }, 15000);
 
+it("moves past a payment when a matching transfer appears in an open sorting session", async () => {
+  const debit = transaction({ id: "debit", date: "2026-09-05", amount: -500 });
+  const credit = transaction({
+    id: "credit",
+    date: "2026-09-04",
+    accountId: "a2",
+    amount: 500,
+  });
+  const shop = transaction({
+    id: "shop",
+    date: "2026-09-03",
+    merchant: "LAST SHOP",
+  });
+  await db.transactions.bulkPut([debit, credit, shop]);
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const board = within(
+    await screen.findByRole("dialog", {}, { timeout: 8000 }),
+  );
+  expect(board.getByText("1 of 3 to sort")).toBeVisible();
+  await db.transferProposals.put({
+    id: "new-match",
+    debitTxId: debit.id,
+    creditTxId: credit.id,
+    status: "pending",
+    score: 1,
+  });
+  // Advancing to the next transaction mounts its own dialog.
+  await waitFor(() => {
+    const current = within(screen.getByRole("dialog"));
+    expect(current.getByText("1 of 1 to sort")).toBeVisible();
+    expect(current.getByText("Last Shop")).toBeVisible();
+  });
+});
 it("keeps skipped cards deferred when Undo reopens a completed sorting queue", async () => {
   const saveCategory = vi.spyOn(categoryStorage, "categorizeCards");
   const undoCategory = vi.spyOn(categoryStorage, "undoCategory");
@@ -570,8 +609,9 @@ it("keeps skipped cards deferred when Undo reopens a completed sorting queue", a
     await saveCategory.mock.results[0].value;
   });
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
+  const undo = await screen.findByRole("button", { name: "Undo" });
   await act(async () => {
-    fireEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    fireEvent.click(undo);
     await undoCategory.mock.results[0].value;
   });
   await waitFor(() =>
@@ -732,4 +772,33 @@ it("updating the conflicting auto rule changes its default and Undo restores the
     { timeout: 8000 },
   );
   expect(await db.transactions.get(next.id)).toEqual(next);
+}, 15000);
+
+it("finds card repayments in category search and only shows the empty message for an unmatched query", async () => {
+  const payment = transaction({ id: "single-side", merchant: "CARD PAYMENT" });
+  await db.transactions.put(payment);
+  render(
+    <MemoryRouter
+      initialEntries={["/transactions?uncategorized=1&allDates=1&sort=1"]}
+    >
+      <Transactions month="2026-09" currency="GBP" />
+    </MemoryRouter>,
+  );
+  const board = within(
+    await screen.findByRole("dialog", {}, { timeout: 8000 }),
+  );
+  const search = board.getByRole("searchbox", { name: "Find a category" });
+  fireEvent.change(search, { target: { value: "  cArD RePaYmEnT  " } });
+  expect(
+    board.getByRole("button", { name: "Categorise as Card repayment" }),
+  ).toBeVisible();
+  expect(board.queryByText("No matching categories.")).toBeNull();
+  expect(
+    board.queryByRole("button", { name: "Categorise as Transfer" }),
+  ).toBeNull();
+  fireEvent.change(search, { target: { value: "no such category" } });
+  expect(board.getByText("No matching categories.")).toBeVisible();
+  expect(
+    board.queryByRole("button", { name: "Categorise as Card repayment" }),
+  ).toBeNull();
 }, 15000);

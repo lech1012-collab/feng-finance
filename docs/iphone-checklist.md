@@ -112,6 +112,37 @@ The seven browser setups and the screenshots in `FINAL-POLISH-REPORT.md` are aut
 - [ ] Compare a small iPhone, a large iPhone and a desktop; record any chart, light-theme or 200%-text issue.
 - [ ] Review a recurring same-bill/separate-bills choice and Undo without changing original imported amounts.
 
+## Release-review journeys for 2.3.1
+
+Record results separately for Safari and the installed PWA. Use disposable
+profiles and fictitious statements for recovery, migration and deletion checks.
+
+- [ ] Import the synthetic September planning statement into a fresh profile.
+  Repeat after exploring the demo in a second profile. Cancel Files once and
+  check that the demo is still open. After confirmation and reload, both
+  personal profiles show one account, three transactions, £3,000 income, £122
+  spending, +£2,878 net cash flow and £9,636 cash for September. Compare
+  Activity, outstanding tasks, category totals and the same forecast horizon.
+- [ ] Upgrade a disposable profile containing demo and personal records. Check
+  each ledger's source statements, rules, attachments and history. Switch back
+  twice while offline and verify both ledgers retain their edits.
+- [ ] Select four clean Files together. Identify all four receipts before
+  confirming. Repeat with an ambiguous transaction. Open its correction in one
+  tap, type with the decimal keyboard, background Feng, and resume. Record
+  separately what survives ordinary navigation and an actual iOS process eviction.
+- [ ] With Larger Text and VoiceOver, navigate all five named tabs. Test the
+  external keyboard, focus after closing a sheet, landscape and the home indicator.
+- [ ] Resolve one matched card repayment, Undo, decline and confirm the
+  resulting review counts. Check that the confirmed pair contributes zero to
+  income and spending.
+- [ ] Open Forecast from a historical month. Read its future start and end
+  dates. Change horizon, return to Calendar and verify the historical month.
+- [ ] Export an encrypted backup and locate its named file in Files. Follow
+  the restore link on a disposable fresh install. Cancel a preview, try a
+  wrong password, then explicitly replace the destination and verify totals.
+  Check device lock and Face ID after backgrounding. Import a reminder into
+  Calendar and observe the alert while Feng is closed.
+
 ## Chart inspection
 
 - On Home, tap a month in Cash flow and drag horizontally. The readout stays

@@ -246,6 +246,16 @@ test("a mixed batch exposes one exception at a time and a failed balance cannot 
   await page
     .getByRole("button", { name: "Review next statement", exact: true })
     .click();
+  // The unreadable file has no editable question. The remaining statement
+  // has a totals discrepancy, so the batch action opens it directly.
+  const question = page.getByRole("dialog", {
+    name: "Check statement totals",
+    exact: true,
+  });
+  await expect(question).toBeVisible();
+  await question
+    .getByRole("button", { name: "Back to statements", exact: true })
+    .click();
   const remaining = page.locator(".import-statement-card[open]");
   await remaining
     .getByRole("button", { name: "Leave out this statement", exact: true })

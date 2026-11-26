@@ -107,6 +107,14 @@ export function CategoryBoard({
     [t.id, t.updatedAt],
   );
   const others = matches?.filter((p) => p.id !== t.id) ?? [];
+  const query = search.trim().toLowerCase();
+  const matchesSearch = (name: string) => name.toLowerCase().includes(query);
+  const showTransfer = matchesSearch("Transfer");
+  const showCardRepayment = matchesSearch("Card repayment");
+  const showRefund = t.amount > 0 && matchesSearch("Refund");
+  const showSplit =
+    !t.parentId && !t.isTransfer && matchesSearch("Split between categories");
+  const showTagsAction = matchesSearch("Add tag");
   const available = categories.filter(
     (c) =>
       !c.archived &&
@@ -117,7 +125,7 @@ export function CategoryBoard({
       c.id !== "refund" &&
       `${categories.find((p) => p.id === c.parentId)?.name ?? ""} ${c.name}`
         .toLowerCase()
-        .includes(search.toLowerCase()),
+        .includes(query),
   );
   useEffect(() => {
     const el = dialog.current!;
@@ -538,38 +546,49 @@ export function CategoryBoard({
           {available
             .filter((c) => !suggested.some((s) => s.id === c.id))
             .map((c) => tile(c))}
-          {!available.length && <p>No matching categories.</p>}
+          {!available.length &&
+            !showTransfer &&
+            !showCardRepayment &&
+            !showRefund &&
+            !showSplit &&
+            !showTagsAction && <p>No matching categories.</p>}
         </div>
-        <h3>Not spending</h3>
-        <button
-          className={`transfer-tile ${target === TRANSFER_TARGET ? "drop-target" : ""}`}
-          data-category-target={TRANSFER_TARGET}
-          aria-label="Categorise as Transfer"
-          disabled={busy}
-          onClick={() => void choose(TRANSFER_TARGET)}
-        >
-          <span aria-hidden="true">↔</span>
-          <span>
-            <strong>Transfer</strong>
-            <small>Between your own accounts</small>
-          </span>
-        </button>
-        <button
-          className={`transfer-tile ${target === CARD_REPAYMENT_TARGET ? "drop-target" : ""}`}
-          data-category-target={CARD_REPAYMENT_TARGET}
-          disabled={busy}
-          onClick={() => void choose(CARD_REPAYMENT_TARGET)}
-          aria-label="Categorise as Card repayment"
-        >
-          <span aria-hidden="true">↔</span>
-          <span>
-            <strong>Card repayment</strong>
-            <small>
-              Payment to your own credit card; excluded from spending
-            </small>
-          </span>
-        </button>
-        {t.amount > 0 && (
+        {(showTransfer || showCardRepayment || showRefund) && (
+          <h3>Not spending</h3>
+        )}
+        {showTransfer && (
+          <button
+            className={`transfer-tile ${target === TRANSFER_TARGET ? "drop-target" : ""}`}
+            data-category-target={TRANSFER_TARGET}
+            aria-label="Categorise as Transfer"
+            disabled={busy}
+            onClick={() => void choose(TRANSFER_TARGET)}
+          >
+            <span aria-hidden="true">↔</span>
+            <span>
+              <strong>Transfer</strong>
+              <small>Between your own accounts</small>
+            </span>
+          </button>
+        )}
+        {showCardRepayment && (
+          <button
+            className={`transfer-tile ${target === CARD_REPAYMENT_TARGET ? "drop-target" : ""}`}
+            data-category-target={CARD_REPAYMENT_TARGET}
+            disabled={busy}
+            onClick={() => void choose(CARD_REPAYMENT_TARGET)}
+            aria-label="Categorise as Card repayment"
+          >
+            <span aria-hidden="true">↔</span>
+            <span>
+              <strong>Card repayment</strong>
+              <small>
+                Payment to your own credit card; excluded from spending
+              </small>
+            </span>
+          </button>
+        )}
+        {showRefund && (
           <button
             className={`transfer-tile ${target === "refund" ? "drop-target" : ""}`}
             data-category-target="refund"
@@ -582,8 +601,8 @@ export function CategoryBoard({
             </span>
           </button>
         )}
-        <h3>More</h3>
-        {!t.parentId && !t.isTransfer && (
+        {(showSplit || showTagsAction) && <h3>More</h3>}
+        {showSplit && (
           <button
             className="transfer-tile"
             data-category-target="__split"
@@ -593,15 +612,19 @@ export function CategoryBoard({
             Split between categories
           </button>
         )}
-        <button
-          className="transfer-tile"
-          disabled={busy}
-          onClick={() => setShowTags((value) => !value)}
-          aria-expanded={showTags}
-        >
-          Add tag
-        </button>
-        {showTags && <TagPicker value={tags} onChange={setTags} />}
+        {showTagsAction && (
+          <button
+            className="transfer-tile"
+            disabled={busy}
+            onClick={() => setShowTags((value) => !value)}
+            aria-expanded={showTags}
+          >
+            Add tag
+          </button>
+        )}
+        {showTagsAction && showTags && (
+          <TagPicker value={tags} onChange={setTags} />
+        )}
         {error && (
           <p className="notice warning" role="alert">
             {error}

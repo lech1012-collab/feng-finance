@@ -1,3 +1,4 @@
+import { activateLedger, currentLedger } from "./ledgers";
 import { db, initializeDatabase } from "./database";
 import type {
   Account,
@@ -17,9 +18,9 @@ import { auditedMutation } from "./audit";
 import { updateClosedMonthSnapshots } from "./month-review";
 
 /** Entirely fictitious examples cover the v2 journeys without any personal statement data. */
-export async function loadDemo() {
+export async function loadDemo(openIsolatedLedger = false) {
   await initializeDatabase();
-  if (await db.accounts.get("demo-barclays"))
+  if (!openIsolatedLedger && await db.accounts.get("demo-barclays"))
     return { result: undefined, changeId: "" };
   const now = new Date().toISOString(),
     // Demo statements are completed history, never a fictional future balance.
@@ -548,7 +549,7 @@ export async function loadDemo() {
       rate: "0.86425",
       source: "manual",
     });
-  return auditedMutation(
+  const seed = () => auditedMutation(
     "Load demo data",
     [
       "accounts",
@@ -591,6 +592,12 @@ export async function loadDemo() {
       }
     },
   );
+  if (!openIsolatedLedger) return seed();
+  return db.transaction("rw", db.tables, async () => {
+    const alreadyExists = await currentLedger() === "demo" || await db.ledgerArchives.where(":id").equals("demo").count() > 0;
+    await activateLedger("demo");
+    return alreadyExists ? {result: undefined, changeId: ""} : seed();
+  });
 }
 
 /** Delete only demo rows. Real accounts, learned rules, goals, receipts and rates survive. */

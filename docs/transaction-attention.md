@@ -10,8 +10,14 @@ The shared attention predicate now asks what decision is missing:
 - Ordinary payments need a category only when no category or subcategory is
   assigned. A saved-rule, built-in or manual category does not require another
   confirmation, regardless of the old manual review stamp.
-- Transfers and card repayments do not need expense categories. Existing
-  pending transfer suggestions retain their separate confirmation workflow.
+- A possible transfer appears once in Home’s “Transfers to confirm” queue.
+  Both entries stay visible in Activity. Opening either one shows the two
+  accounts and amounts together. “Confirm pair” excludes both entries from
+  income and spending. “These are separate payments” returns each uncategorised
+  entry to sorting. Both decisions support Undo. While the decision is pending,
+  the user can rename or tag either entry without teaching a categorisation rule.
+- A card payment recorded on only one account can be found by searching for
+  “Card repayment” in the category chooser.
 - An unlinked refund still needs a purchase link or an explicit decision to
   treat it as ordinary income. Marking it reviewed does not bypass that task.
 - An unconfirmed automatic split still needs confirmation of its allocation.

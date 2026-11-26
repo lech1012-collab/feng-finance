@@ -99,9 +99,9 @@ export function MonthPicker({
         <ChevronLeft size={18} />
       </button>
       <label>
-        <span className="sr-only">Selected month</span>
         <input
           type="month"
+          aria-label="Selected month"
           value={month}
           onChange={(e) => e.target.value && onChange(e.target.value)}
         />

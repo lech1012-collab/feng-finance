@@ -75,7 +75,22 @@ test("four PDFs survive navigation during reading and review, including category
     choosers++;
   });
   await page.getByRole("link", { name: "Import (4)", exact: true }).click();
-  await expect(page.locator(".import-statement-card")).toHaveCount(4);
+  const receipts = page.locator(".import-ready-receipt:visible > summary");
+  await expect(receipts).toHaveCount(4);
+  for (const [profile, count] of [
+    ["barclays-current", 6],
+    ["barclaycard", 6],
+    ["amex", 7],
+    ["revolut", 6],
+  ] as const) {
+    const receipt = receipts.filter({ hasText: `known-bank-${profile}.pdf` });
+    await expect(receipt).toContainText(`${count} transactions`);
+    await expect(receipt).toContainText("••••");
+    await expect(receipt.locator("time")).toHaveCount(2);
+    expect(
+      await receipt.evaluate((el) => el.scrollWidth <= el.clientWidth + 1),
+    ).toBe(true);
+  }
   const current = statement(page, "known-bank-barclaycard.pdf");
   await expand(current);
   await current

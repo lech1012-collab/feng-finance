@@ -202,7 +202,7 @@ test("encrypted backups expose no financial text and wrong-password/cancel resto
       page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
     )
     .toBeLessThanOrEqual(1);
-  await expect(page.locator(".backup-status")).toContainText("Last backup:");
+  await expect(page.locator(".backup-status")).toContainText("Last export ·");
   await expect(page.locator(".backup-status time")).toBeVisible();
   await page.evaluate(() => {
     document.documentElement.style.fontSize = "";

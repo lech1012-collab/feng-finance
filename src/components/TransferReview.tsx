@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import { Toast } from "./Toast";
 import { ContextHelp } from "./ContextHelp";
 import { useState } from "react";
@@ -11,7 +12,6 @@ import { authorizeMonthEdit } from "../storage/month-review";
 import { undoChange } from "../storage/audit";
 import { money } from "../domain/money";
 import { displayDate, displayMerchant } from "../domain/presentation";
-import type { Transaction } from "../domain/models";
 import "./accuracy.css";
 
 export function TransferReview({
@@ -25,36 +25,11 @@ export function TransferReview({
 }) {
   const scopeKey = JSON.stringify(transactionIds);
   const data = useLiveQuery(async () => {
-    const proposals = await db.transferProposals
-      .where("status")
-      .equals("pending")
-      .toArray();
-    const ids = transactionIds && new Set(transactionIds);
-    const visible = proposals.filter(
-      (proposal) =>
-        !ids || ids.has(proposal.debitTxId) || ids.has(proposal.creditTxId),
-    );
-    const transactions = new Map(
-      (
-        await db.transactions.bulkGet([
-          ...new Set(
-            visible.flatMap((proposal) => [
-              proposal.debitTxId,
-              proposal.creditTxId,
-            ]),
-          ),
-        ])
-      )
-        .filter((row): row is Transaction => !!row)
-        .map((row) => [row.id, row]),
-    );
+    const { proposals, transactions } =
+      await pendingTransferAttention(transactionIds);
     return {
       scopeKey,
-      proposals: visible.filter(
-        (proposal) =>
-          transactions.has(proposal.debitTxId) &&
-          transactions.has(proposal.creditTxId),
-      ),
+      proposals,
       transactions,
       accounts: await db.accounts.toArray(),
     };
@@ -317,10 +292,10 @@ export function TransferSettings() {
 function AutomaticOffer({ onClose }: { onClose: () => void }) {
   const eligible = useLiveQuery(async () => {
     const { eligibleAutomaticProposals } = await import("../transfers/engine");
-    return eligibleAutomaticProposals(
-      await db.transferProposals.where("status").equals("pending").toArray(),
-      await db.transactions.toArray(),
-    );
+    const pending = await pendingTransferAttention();
+    return eligibleAutomaticProposals(pending.proposals, [
+      ...pending.transactions.values(),
+    ]);
   });
   if (!eligible?.length)
     return (

@@ -120,9 +120,11 @@ npm run dev
 ```
 
 Open the printed development URL. Start empty, select a generated synthetic PDF
-from `tests/fixtures`, or choose **Explore demo**. Demo records are fictitious and
-identified separately; **Delete demo data** preserves real records. Development
-mode does not install a service worker. Use a production build and preview to
+from `tests/fixtures`, or choose **Explore with demo data**. Demo and personal
+finances have separate accounts, transactions, rules, review queues and forecasts.
+Selecting your own statements opens your personal finances before parsing. Cancelling
+the picker keeps the current view. Settings lets you revisit or delete the demo.
+Development mode does not install a service worker. Use a production build and preview to
 test offline installation.
 
 ```sh
@@ -149,21 +151,27 @@ before disconnecting. Physical iPhone checks are documented separately in the
 
 1. On Home, Import opens the file picker directly. Select several PDFs together,
    or use **Select statements** on Import. Desktop also accepts dropped files.
-2. Feng checks files locally and presents one batch: ready, needing attention
-   and skipped. Reconciled statements stay closed. **Add statements** appends
-   more files without clearing corrections; cancelling keeps the batch.
-3. Review exceptions one statement at a time. **Review next statement** focuses
-   the next unresolved file. Statement figures, all transactions and reading
-   settings open on demand. A file can be left out and included/rechecked later.
+2. Feng checks the batch locally. A clean batch shows a compact receipt for
+   each file. Open a receipt to inspect its figures. When a batch has exceptions,
+   the initial view shows the files that need a decision. **Add statements**
+   appends files and keeps existing corrections.
+3. **Review next statement** opens the outstanding question for a recognised
+   statement. Statement figures, source rows and reading settings are available
+   on demand. A file can be left out and included or rechecked later.
    Possible duplicates stay excluded by default. Uncertain amounts require their
    own correction or confirmation; categorisation can wait. Optional transfer
    linking stays available without becoming another mandatory review step.
 4. **Confirm import** saves the batch once and returns Home. Failed balances,
    incomplete pages and invalid source values retain their original gates.
    Importing unverified figures requires a separate explicit confirmation;
-   acceptance never makes those figures reconciled. **To review** includes both
-   uncategorised and categorised-but-unreviewed transactions.
-5. Sort the remaining records, then use the four-step monthly review to inspect
+   acceptance never makes those figures reconciled. Switching tabs inside Feng
+   keeps an unfinished review. After a reload, if the browser retained the tab
+   session, Feng lists the filenames to select again. Corrections and PDF contents
+   live only in memory until confirmation.
+5. Review a suggested transfer or card repayment once for both accounts.
+   Confirming excludes both sides from income and spending. Declining releases
+   eligible entries for ordinary categorisation. Sort the remaining records,
+   then use the four-step monthly review to inspect
    changes, confirm pot contributions, review rules/backups and close the month.
 
 Unknown CSV layouts open a mapping preview. Map date, description and either a
@@ -177,8 +185,8 @@ Tap a transaction to open its sorting sheet. Suggested categories include a
 reason and are ranked from local rules, prior choices and description clues.
 There are also Transfer, Card repayment, Refund, Split and Tag actions. Saving
 advances the queue; Skip leaves the record to review. Uncategorized records leave
-that filter immediately after saving a category. The broader To review filter
-also includes records that have a category but still need confirmation.
+that filter immediately after saving a category. To review also covers categorised records with a specific outstanding question.
+A suggested transfer pair appears in transfer review until you resolve it.
 
 On desktop, drag the transaction itself onto a category in the drop rail. Batch
 selection and sorting remain available. Keyboard shortcuts include **C** to sort,
@@ -401,13 +409,13 @@ Portable JSON remains readable, including older schema versions:
 {
   "format": "feng-finance",
   "version": 1,
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "moneyUnit": "minor",
   "exportedAt": "2026-10-08T12:00:00.000Z"
 }
 ```
 
-The full file additionally contains accounts, statements, transactions,
+Each new export identifies the ledger it contains. The full file additionally contains accounts, statements, transactions,
 categories, rules, transfer links/settings, valuations, pots, monthly budgets,
 tags, recurring series, closed months, rates, proposals, saved views/reports,
 scenarios, saved import layouts and local audit history. Raw import diagnostics
@@ -418,9 +426,12 @@ Local PIN hashes, salts, platform credential IDs and other `security:` settings
 are excluded, including audit snapshots. Restore keeps the current device's lock
 configuration; moving devices requires configuring that device's lock.
 
-Settings → Backup and restore provides one **Save backup** wizard, protected by
-default with a confirmed password of at least 12 characters. Restore accepts old
-JSON and `.feng` files, including older eight-character passwords.
+Settings → Backup and restore provides a **Save backup** wizard, protected by
+default with a confirmed password of at least 12 characters. **Last export**
+records when Feng handed the file to the browser. Save the named file in Files
+and check that you can find it there. **Restore a backup** is also available
+from Welcome. Restore accepts old JSON and `.feng` files, including older
+eight-character passwords. The preview identifies the ledger to replace.
 
 Use an encrypted **`.feng`** backup for a portable protected copy. It uses
 AES-GCM-256, PBKDF2-SHA256 with 600,000 iterations and fresh random salt/IV.
@@ -435,7 +446,14 @@ currencies, statement counts, exact split sums, refund allocations, transfer
 links and portable receipt bytes before replacing data. A newer schema is
 rejected with an Update instruction. Replace restore requires explicit UI
 confirmation and runs atomically. Preview and cancellation leave existing data
-untouched; save a current backup first to preserve it before replacement. Merge is not supported.
+untouched. Save a current backup first to keep a copy before replacement.
+A personal export replaces personal finances. A demo export replaces the demo.
+
+If an older file contains both, Feng previews that distinction, replaces personal
+finances and puts the sample records in the demo. Existing demo edits take
+precedence when a record ID occurs in both demo sets. If the combined records
+would leave an invalid financial relationship, the entire restore rolls back.
+The original backup can still be opened in a fresh browser profile.
 
 IndexedDB schema 1 is preserved. Schema 2 added merchant/review metadata. Schema
 3 additively introduces v2 tables and optional fields, retaining legacy amounts,
@@ -443,6 +461,11 @@ original descriptions, account IDs, rules and links. Existing confirmed transfer
 are not retrospectively unlinked by the new manual default. Migration tests open
 old databases and restore old-format backups without resetting financial data.
 Schema 4 adds import layouts, optional diagnostics and local migration recovery.
+Schema 5 separates the ledgers. It preserves personal activity that used an
+example account in an earlier version and gives that activity an account in
+personal finances. The sample statement balances stay in the demo. Feng
+switches all financial tables in one IndexedDB transaction, including receipts
+and Undo history. The app lock and appearance settings apply to both ledgers.
 A pre-update safety snapshot keeps the previous data for 14 days; it is separate
 from a portable backup and is not uploaded. Restore previous data requires
 confirmation because changes made after the update will be replaced.

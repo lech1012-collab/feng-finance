@@ -176,8 +176,6 @@ input[aria-invalid="true"] {
   flex: none;
 }
 .app .mobile-navigation > a {
-  container-name: navitem;
-  container-type: inline-size;
   font-size: 0.75rem;
   overflow: visible;
 }
@@ -185,11 +183,6 @@ input[aria-invalid="true"] {
   overflow: visible;
   white-space: nowrap;
   text-overflow: clip;
-}
-@container navitem (max-width: 4.8em) {
-  .mobile-navigation > a > span {
-    display: none;
-  }
 }
 .app .planning-v2-tabs {
   display: flex;

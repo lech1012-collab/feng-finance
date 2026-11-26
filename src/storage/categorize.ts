@@ -1,3 +1,5 @@
+import { needsCategory } from "../analytics/effective-transactions";
+import { pendingTransferAttention } from "./transfer-attention";
 import type { Transaction, Rule } from "../domain/models";
 import { db } from "./database";
 import { normalizeMerchant } from "../domain/normalize";
@@ -19,14 +21,33 @@ export interface CategoryReceipt {
   changeId?: string;
   splitRuleOffer?: { transaction: Transaction; lines: Transaction[] };
 }
-export async function matchingUncategorized(t: Transaction) {
+/** Read both eligibility and source rows together when a sorting session advances. */
+export async function readCategoryQueue(ids: string[]) {
+  if (!ids.length) return [];
+  return db.transaction("r", db.transactions, db.transferProposals, async () => {
+    const [rows, pending] = await Promise.all([
+      db.transactions.bulkGet(ids),
+      pendingTransferAttention(ids),
+    ]);
+    return rows.filter(
+      (row): row is Transaction =>
+        !!row && !pending.ids.has(row.id) && needsCategory(row),
+    );
+  });
+}
+export async function matchingUncategorized(
+  t: Transaction,
+  pendingIds?: ReadonlySet<string>,
+) {
   const merchant = normalizeMerchant(t.sourceMerchant ?? t.merchant);
   if (!merchant) return [];
+  const excluded = pendingIds ?? (await pendingTransferAttention()).ids;
   return db.transactions
     .where("accountId")
     .equals(t.accountId)
     .filter(
       (p) =>
+        !excluded.has(p.id) &&
         !p.categoryId &&
         !p.subcategoryId &&
         !p.isTransfer &&
@@ -59,7 +80,14 @@ export async function categorizeCards(
     throw new Error("Choose a transaction first.");
   return auditedMutation(
     "Categorize transactions",
-    ["transactions", "categories", "rules", "settings", "monthCloses"],
+    [
+      "transactions",
+      "categories",
+      "rules",
+      "settings",
+      "monthCloses",
+      "transferProposals",
+    ],
     async () => {
       const transfer =
         categoryId === TRANSFER_TARGET || categoryId === CARD_REPAYMENT_TARGET;
@@ -91,6 +119,11 @@ export async function categorizeCards(
           "A transaction changed. Reopen it before categorizing.",
         );
       const chosen = current as Transaction[];
+      const pending = await pendingTransferAttention();
+      if (chosen.some((row) => pending.ids.has(row.id)))
+        throw new Error(
+          "Review the possible transfer before changing its category.",
+        );
       if (
         chosen.some(
           (transaction) =>
@@ -123,7 +156,7 @@ export async function categorizeCards(
           ]);
           if (scopes.has(scope)) continue;
           scopes.add(scope);
-          for (const match of await matchingUncategorized(t))
+          for (const match of await matchingUncategorized(t, pending.ids))
             if (!ids.has(match.id)) {
               ids.add(match.id);
               before.push(match);

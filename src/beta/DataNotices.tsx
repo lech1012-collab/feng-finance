@@ -43,7 +43,9 @@ export function DataNotices({
     <section className="notice beta-data-notice" aria-label="Save a backup">
       <div>
         <div className="context-help-heading">
-          <strong>{separate ? "Data is separate here" : "Backup due"}</strong>
+          <strong>
+            {separate ? "Data is separate here" : "Backup export due"}
+          </strong>
           <ContextHelp
             title={
               separate
@@ -55,7 +57,7 @@ export function DataNotices({
             <p>
               {separate
                 ? "Data in this Safari tab is separate from the installed app. Save a backup and restore it in the installed app."
-                : "You imported your first statements a week ago. Save a backup in Files or iCloud Drive to protect your data."}
+                : "You imported your first statements a week ago. Export your first backup and keep the file in Files or iCloud Drive."}
             </p>
           </ContextHelp>
         </div>

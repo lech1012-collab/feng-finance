@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { reportingMonthlySeries } from "./reporting";
 import { cashFlow, statementIsCurrent } from "./calculations";
 import {
   coverageMonthlySeries,
@@ -40,6 +41,49 @@ const statement = (patch: Partial<Statement> = {}): Statement => ({
 const today = "2026-10-07";
 
 describe("financial display coverage", () => {
+  it("keeps an unverified month unplotted while its transfer pair is pending", () => {
+    const rows = [
+      transaction({
+        id: "debit",
+        date: "2026-09-02",
+        accountId: cash.id,
+        amount: -800,
+      }),
+      transaction({
+        id: "credit",
+        date: "2026-09-02",
+        accountId: card.id,
+        amount: 800,
+      }),
+    ];
+    const [month] = reportingMonthlySeries(
+      rows,
+      [cash, card],
+      [],
+      "2026-09",
+      1,
+      "GBP",
+      [],
+      [],
+      [
+        {
+          id: "pair",
+          debitTxId: "debit",
+          creditTxId: "credit",
+          status: "pending",
+          score: 1,
+        },
+      ],
+      today,
+    );
+    expect(month.coverage).toMatchObject({
+      statementStatus: "Unverified",
+      status: "Unverified",
+      pendingTransfers: 1,
+    });
+    expect(month.expenses).toBeNull();
+    expect(month.net).toBeNull();
+  });
   it("keeps missing months null and a fully verified zero-income month zero", () => {
     const series = coverageMonthlySeries(
       [],

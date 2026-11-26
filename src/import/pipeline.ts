@@ -34,6 +34,7 @@ import {
   type TextImportFormat,
 } from "./formats";
 import { sha256 } from "../domain/normalize";
+import { currentLedger } from "../storage/ledgers";
 import { auditedMutation } from "../storage/audit";
 import { consumeRuleApplications } from "../storage/rules";
 import { transactionSplitRows } from "../storage/accuracy";
@@ -848,6 +849,7 @@ export async function commitDraft(
   await auditedMutation(
     `Import ${draft.statement.sourceFilename}`,
     [
+      "ledgerArchives",
       "accounts",
       "statements",
       "transactions",
@@ -863,6 +865,7 @@ export async function commitDraft(
       "layoutTemplates",
     ],
     async () => {
+      if (await currentLedger() !== "personal") throw new Error("Your workspace changed. Return to your personal workspace before importing.");
       await ensureMonthsOpen(await importMonthGuardDates([draft]));
       const categories = await db.categories.toArray();
       for (const t of incoming) {

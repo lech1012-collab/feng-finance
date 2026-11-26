@@ -1,3 +1,5 @@
+import { separateLegacyLedger } from "./ledgers";
+import type { FinanceDB } from "./database";
 import Dexie, { type Transaction as DexieTransaction } from "dexie";
 
 /** Local structured-clone data; deliberately never portable or audited. */
@@ -315,6 +317,10 @@ export async function restorePreviousData(
             : store.put(row.value),
         );
     }
+    // A snapshot from before workspace separation can contain both kinds of
+    // accounts. Recover the rows into their own workspaces in this transaction.
+    if (record.sourceNativeVersion < 50 && available.has("ledgerArchives"))
+      await separateLegacyLedger(database as FinanceDB);
     const recovery: SafetyRecoveryState = {
       key: SAFETY_RECOVERY_STATE_KEY,
       format: "feng-native-recovery-state",

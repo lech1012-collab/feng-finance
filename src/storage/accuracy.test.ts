@@ -247,6 +247,8 @@ describe("persistent accuracy operations and Undo", () => {
     await db.transferProposals.update(proposals.pending[0].id, {
       status: "pending",
     });
+    const { pendingTransferAttention } = await import("./transfer-attention");
+    expect((await pendingTransferAttention()).proposals).toEqual([]);
     await expect(
       confirmTransferProposals([proposals.pending[0].id]),
     ).rejects.toThrow("Unlink the refunds");
@@ -512,4 +514,72 @@ describe("persistent accuracy operations and Undo", () => {
     await undoChange(result.changeId);
     expect(await db.transactions.get(refund.id)).toEqual(refund);
   });
+});
+
+it("reserves a pending pair for one decision and restores category sorting when rejected", async () => {
+  const { categorizeCards, matchingUncategorized } =
+    await import("./categorize");
+  const { pendingTransferAttention } = await import("./transfer-attention");
+  const { editTransaction } = await import("./transactions");
+  const { rejectTransferProposal } = await import("./accuracy");
+  const debit = transaction({
+    id: "current-debit",
+    date: "2026-09-30",
+    amount: -17500,
+  });
+  const credit = transaction({
+    id: "card-credit",
+    date: "2026-10-01",
+    accountId: "a3",
+    amount: 17500,
+    type: "income",
+  });
+  const purchase = transaction({ id: "other-purchase", amount: -2200 });
+  await db.transactions.bulkAdd([debit, credit, purchase]);
+  const [proposal] = (await refreshTransferProposals()).pending;
+  expect((await pendingTransferAttention([credit.id])).ids).toEqual(
+    new Set([debit.id, credit.id]),
+  );
+  expect((await pendingTransferAttention([purchase.id])).proposals).toEqual([]);
+  expect((await matchingUncategorized(purchase)).map((t) => t.id)).toEqual([
+    purchase.id,
+  ]);
+  const rules = await db.rules.toArray();
+  await expect(categorizeCards([debit], "groceries")).rejects.toThrow(
+    "Review the possible transfer",
+  );
+  const patch = {
+    merchant: "My card payment",
+    tags: [],
+    type: debit.type,
+    categoryId: undefined,
+    subcategoryId: undefined,
+  };
+  await expect(
+    editTransaction(debit.id, { ...patch, categoryId: "groceries" }),
+  ).rejects.toThrow("Review the possible transfer");
+  await editTransaction(debit.id, patch);
+  expect(await db.rules.toArray()).toEqual(rules);
+  expect(await db.transactions.get(debit.id)).toMatchObject({
+    merchant: patch.merchant,
+    sourceMerchant: debit.merchant,
+    isTransfer: false,
+  });
+  expect((await pendingTransferAttention()).ids.size).toBe(2);
+  const receipt = await rejectTransferProposal(proposal.id);
+  expect((await pendingTransferAttention()).proposals).toEqual([]);
+  expect((await matchingUncategorized(purchase)).map((t) => t.id)).toEqual(
+    expect.arrayContaining([purchase.id, debit.id]),
+  );
+  await refreshTransferProposals();
+  expect((await pendingTransferAttention()).proposals).toEqual([]);
+  await undoChange(receipt.changeId);
+  expect((await pendingTransferAttention()).ids).toEqual(
+    new Set([debit.id, credit.id]),
+  );
+  await db.transactions.delete(credit.id);
+  expect((await pendingTransferAttention()).ids.size).toBe(0);
+  expect((await matchingUncategorized(purchase)).map((t) => t.id)).toContain(
+    debit.id,
+  );
 });

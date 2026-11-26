@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import {
   chartTickFontSize,
   useRootFontSize,
@@ -25,15 +26,20 @@ import {
   PotsPanel,
   ScenarioPanel,
 } from "../components/PlanningExtensions";
-import { reportingPeriod, reportingPeriodLabel } from "../domain/period";
+import { reportingPeriodLabel } from "../domain/period";
 import { localToday } from "../analytics/reminders";
 import { money, currencyPrecision } from "../domain/money";
 import { MonthPicker } from "../components/common";
 import { ImportButton } from "../components/ImportPicker";
-import { monthOffset, monthLabel, formatUkDate } from "../domain/dates";
-import { monthCoverage, verifiedStatements } from "../analytics/coverage";
+import { monthOffset, formatDateRange, formatUkDate } from "../domain/dates";
+import { verifiedStatements } from "../analytics/coverage";
+import { reportingCoverage } from "../analytics/reporting";
+import { shiftDate } from "../analytics/analysis-period";
+import { SegmentedControl } from "../components/UIPrimitives";
 import { displayMerchant } from "../domain/presentation";
 import { ContextHelp } from "../components/ContextHelp";
+
+const horizons = [30, 60, 90] as const;
 
 export default function Planning({
   month,
@@ -46,14 +52,15 @@ export default function Planning({
 }) {
   const chartRem = useRootFontSize();
   const today = localToday();
-  const earliest = [
-    `${Number(today.slice(0, 4)) - 3}-01-01`,
-    `${monthOffset(month, -6)}-01`,
-  ].sort()[0];
   const [horizon, setHorizon] = useState<30 | 60 | 90>(30);
   const [params, setParams] = useSearchParams();
   const tabs = ["budgets", "pots", "calendar", "debt", "forecast"] as const;
   const tab = tabs.find((t) => t === params.get("tab")) ?? "budgets";
+  const forecastStart = `${Number(today.slice(0, 4)) - 3}-01-01`;
+  const earliest =
+    tab === "forecast"
+      ? forecastStart
+      : [forecastStart, `${monthOffset(month, -6)}-01`].sort()[0];
   const data = useLiveQuery(
     async () => ({
       accounts: await db.accounts.toArray(),
@@ -61,6 +68,7 @@ export default function Planning({
       statements: await db.statements.toArray(),
       categories: await db.categories.toArray(),
       settings: await db.settings.toArray(),
+      proposals: (await pendingTransferAttention()).proposals,
       recurringSeries: await db.recurringSeries.toArray(),
       transactions: await db.transactions
         .where("date")
@@ -89,15 +97,20 @@ export default function Planning({
     data.transactions,
     today,
   );
-  const coverage = monthCoverage(
-    data.accounts,
-    data.statements,
-    data.transactions,
-    month,
-    "*",
-    today,
-    reportingPeriod(month, data.settings, data.transactions),
-  );
+  const coverage =
+    tab === "forecast"
+      ? undefined
+      : reportingCoverage(
+          data.accounts,
+          data.statements,
+          data.transactions,
+          month,
+          currency,
+          data.rates,
+          data.settings,
+          data.proposals,
+          today,
+        );
   const recentCutoff = new Date(
     Date.parse(`${today}T00:00:00Z`) - 35 * 86400000,
   )
@@ -118,7 +131,13 @@ export default function Planning({
   const forecastSummary = forecast.reason ? (
     <div className="notice">
       <p>{forecast.reason}</p>
-      <ImportButton>Import recent statements</ImportButton>
+      {forecast.income === undefined ? (
+        <Link to="/settings?section=currency#global-currency">
+          Review exchange rates
+        </Link>
+      ) : (
+        <ImportButton>Import recent statements</ImportButton>
+      )}
     </div>
   ) : (
     end && (
@@ -158,13 +177,6 @@ export default function Planning({
           <h1>Planning</h1>
         </div>
       </div>
-      <div className="planning-period-row">
-        <MonthPicker month={month} onChange={setMonth} />
-        <p className="coverage-note">
-          {reportingPeriodLabel(month, data.settings, data.transactions)} ·{" "}
-          {coverage.status}
-        </p>
-      </div>
       <div
         className="planning-v2-tabs"
         role="tablist"
@@ -198,6 +210,30 @@ export default function Planning({
           </button>
         ))}
       </div>
+      {coverage && (
+        <div className="planning-period-row">
+          <MonthPicker month={month} onChange={setMonth} />
+          <p className="coverage-note">
+            {reportingPeriodLabel(month, data.settings, data.transactions)} ·
+            Cash-flow coverage · {coverage.status}
+            {coverage.statementStatus !== coverage.status &&
+              ` · Statement coverage · ${coverage.statementStatus}`}
+            {coverage.pendingTransfers > 0 && (
+              <>
+                {" "}
+                ·{" "}
+                <Link
+                  to={`/transactions?transfers=1&month=${month}&allDates=0`}
+                >
+                  {coverage.pendingTransfers}{" "}
+                  {coverage.pendingTransfers === 1 ? "transfer" : "transfers"}{" "}
+                  to confirm
+                </Link>
+              </>
+            )}
+          </p>
+        </div>
+      )}
       <div className="planning-v2-panels">
         {tab === "budgets" && (
           <div
@@ -323,42 +359,38 @@ export default function Planning({
                     )}
                   </ContextHelp>
                 </div>
-                <select
-                  aria-label="Forecast horizon"
-                  value={horizon}
-                  onChange={(e) =>
-                    setHorizon(Number(e.target.value) as 30 | 60 | 90)
-                  }
-                >
-                  {[30, 60, 90].map((d) => (
-                    <option key={d} value={d}>
-                      {d} days
-                    </option>
-                  ))}
-                </select>
               </div>
-              {forecastSummary}
-              <p className="coverage-note">
-                From{" "}
-                <time className="date-value" dateTime={today}>
-                  {formatUkDate(today)}
-                </time>{" "}
-                · next {horizon} days · Estimated
-                {forecast.converted ? " · ≈ Converted" : ""}{" "}
-                {forecast.rateDates.length > 0 && (
-                  <>
-                    · Rates as of{" "}
-                    {forecast.rateDates.map((date, index) => (
-                      <span key={date}>
-                        {index > 0 ? ", " : ""}
-                        <time className="date-value" dateTime={date}>
-                          {formatUkDate(date)}
-                        </time>
-                      </span>
-                    ))}
-                  </>
-                )}
+              <p className="forecast-window">
+                {formatDateRange(today, shiftDate(today, horizon))}
               </p>
+              <SegmentedControl
+                label="Forecast horizon"
+                value={horizon}
+                onChange={setHorizon}
+                options={horizons.map((days) => ({
+                  value: days,
+                  label: `${days} days`,
+                }))}
+              />
+              {forecastSummary}
+              {(forecast.converted || forecast.rateDates.length > 0) && (
+                <p className="coverage-note">
+                  {forecast.converted && "≈ Converted"}
+                  {forecast.rateDates.length > 0 && (
+                    <>
+                      {forecast.converted && " · "}Rates as of{" "}
+                      {forecast.rateDates.map((date, index) => (
+                        <span key={date}>
+                          {index > 0 ? ", " : ""}
+                          <time className="date-value" dateTime={date}>
+                            {formatUkDate(date)}
+                          </time>
+                        </span>
+                      ))}
+                    </>
+                  )}
+                </p>
+              )}
               <p className="forecast-inputs">
                 Based on {forecast.baselineMonths} complete previous month
                 {forecast.baselineMonths === 1 ? "" : "s"} ·{" "}
@@ -393,7 +425,9 @@ export default function Planning({
                       >
                         <ResponsiveContainer width="100%" height={260}>
                           <LineChart
-                            data={forecast.points}
+                            data={forecast.points.filter(
+                              (point) => point.date >= today,
+                            )}
                             margin={{ top: 13, right: 8, left: -15, bottom: 0 }}
                           >
                             <CartesianGrid

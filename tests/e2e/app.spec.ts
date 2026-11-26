@@ -22,6 +22,7 @@ import {
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { startStaticHost, type LocalHost } from "./static-host";
+import { SCHEMA_VERSION } from "../../src/domain/models";
 import { PARSER_VERSION } from "../../src/parsers/interface";
 const test = base.extend<{ offlineHost: LocalHost }>({
   offlineHost: async ({}, use) => {
@@ -349,7 +350,12 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
     mimeType: "application/json",
     buffer: bytes,
   });
-  await page.getByLabel(/I understand that this replaces/).check();
+  await page
+    .getByRole("checkbox", {
+      name: "Replace the existing data in my personal workspace.",
+      exact: true,
+    })
+    .check();
   await page
     .getByRole("button", { name: "Replace data with backup", exact: true })
     .click();
@@ -379,9 +385,14 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
   ).toHaveValue("2026-10");
   await expect(groceries).toContainText("£100.00 left");
   await page.getByRole("tab", { name: "Forecast", exact: true }).click();
-  await page
-    .getByRole("combobox", { name: "Forecast horizon", exact: true })
-    .selectOption("90");
+  await expect(page.getByLabel("Selected month", { exact: true })).toHaveCount(
+    0,
+  );
+  const horizon = page.getByRole("group", { name: "Forecast horizon" });
+  await horizon.getByRole("button", { name: "90 days", exact: true }).click();
+  await expect(
+    horizon.getByRole("button", { name: "90 days" }),
+  ).toHaveAttribute("aria-pressed", "true");
   await expect(page.locator(".forecast-card")).toContainText("5 Jan 2027");
   await expect(page.locator(".forecast-card")).toContainText("£9,000.00");
   for (const width of [320, 390, 430]) {
@@ -403,8 +414,8 @@ test("Planning budgets persist, recurring timeline and forecast horizons stay co
     .click();
   await page.getByRole("tab", { name: "Forecast", exact: true }).click();
   await expect(
-    page.getByRole("combobox", { name: "Forecast horizon", exact: true }),
-  ).toHaveValue("30");
+    horizon.getByRole("button", { name: "30 days", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await page.setViewportSize({ width: 1440, height: 900 });
   const nav = page
     .getByRole("navigation", { name: "Main navigation" })
@@ -1188,7 +1199,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   ).toBeVisible();
   await settingsSection(page, "demo");
   await page
-    .getByRole("button", { name: "Load demo data", exact: true })
+    .getByRole("button", { name: "Open demo data", exact: true })
     .click();
   await expectTransactionCount(page, 176);
   const downloadEvent = page.waitForEvent("download");
@@ -1198,7 +1209,7 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   const bytes = await readFile(path!);
   const json = JSON.parse(bytes.toString());
   expect(json.format).toBe("feng-finance");
-  expect(json.schemaVersion).toBe(4);
+  expect(json.schemaVersion).toBe(SCHEMA_VERSION);
   expect(json.accounts).toHaveLength(8);
   expect(json.transactions).toHaveLength(176);
   expect(
@@ -1271,7 +1282,12 @@ test("backup, destructive confirmation, restore and demo deletion", async ({
   await expect(
     page.getByRole("button", { name: "Replace data with backup", exact: true }),
   ).toBeDisabled();
-  await page.getByLabel(/I understand that this replaces/).check();
+  await page
+    .getByRole("checkbox", {
+      name: "Replace the existing data in my demo workspace.",
+      exact: true,
+    })
+    .check();
   await page
     .getByRole("button", { name: "Replace data with backup", exact: true })
     .click();
@@ -1392,12 +1408,12 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
   ).toBeVisible();
   await settingsSection(page, "demo");
   await page
-    .getByRole("button", { name: "Load demo data", exact: true })
+    .getByRole("button", { name: "Open demo data", exact: true })
     .click();
   // Demo loading commits asynchronously and changes the shared app layout.
   // Wait for both the completed action and its live-query banner before tapping.
   await expect(
-    page.getByRole("status").filter({ hasText: "Fictitious demo data added." }),
+    page.getByRole("status").filter({ hasText: "Demo data opened." }),
   ).toBeVisible();
   await expect(
     page.locator(".ui-demo-chip").filter({ visible: true }),
@@ -1437,7 +1453,7 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
     name: "Transaction category filters",
   });
   await expect(quick.getByRole("button")).toHaveText([
-    "Uncategorised 2",
+    "Uncategorised 0",
     /Groceries\s*3/,
     /Income\s*3/,
     /Property\s*4/,
@@ -1460,14 +1476,15 @@ test("mobile layout, navigation, property and demo analysis are usable", async (
       .locator(".transaction-row")
       .filter({ hasText: "FICTITIOUS EURO CAFE" }),
   ).toContainText("−€45.99");
+  // Both unassigned demo entries belong to one possible transfer. The full ledger
+  // retains both sides, while the ordinary categorisation queue is empty.
+  await expect(
+    page.locator(".transaction-row").filter({ hasText: "Review transfer" }),
+  ).toHaveCount(2);
   await quick
-    .getByRole("button", { name: "Uncategorised 2", exact: true })
+    .getByRole("button", { name: "Uncategorised 0", exact: true })
     .click();
-  await expect(page.locator(".transaction-row")).toHaveCount(2);
-  await expect(page.locator(".transaction-row .transaction-status")).toHaveText(
-    ["Needs category", "Needs category"],
-  );
-  await expect(page.locator(".transaction-row .review-status")).toHaveCount(0);
+  await expect(page.locator(".transaction-row")).toHaveCount(0);
   await page.screenshot({
     path: `test-results/dashboard-${test.info().project.name}.png`,
     fullPage: true,
@@ -1484,7 +1501,7 @@ test("service worker update is explicit and preserves stored records", async ({
   await offlineInstalled(page);
   await settingsSection(page, "demo");
   await page
-    .getByRole("button", { name: "Load demo data", exact: true })
+    .getByRole("button", { name: "Open demo data", exact: true })
     .click();
   await expectTransactionCount(page, 176);
   offlineHost.advanceWorker();
@@ -1732,7 +1749,7 @@ test("System default, persistent appearance and mobile layouts without overlappi
   await expect(page.locator("html")).toHaveAttribute("data-theme", "light");
   await settingsSection(page, "demo");
   await page
-    .getByRole("button", { name: "Load demo data", exact: true })
+    .getByRole("button", { name: "Open demo data", exact: true })
     .click();
   await expectTransactionCount(page, 176);
   await settingsSection(page, "appearance");
@@ -2289,7 +2306,7 @@ test("category overview, income shares, central Home navigation and page palette
   await gotoRoute(page, "/settings");
   await settingsSection(page, "demo");
   await page
-    .getByRole("button", { name: "Load demo data", exact: true })
+    .getByRole("button", { name: "Open demo data", exact: true })
     .click();
   await page
     .getByRole("navigation", { name: "Main navigation" })
@@ -2438,7 +2455,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
     .click();
   await (await choose).setFiles(fixture("barclays-sort"));
   await expect(
-    page.getByRole("button", { name: "Needs attention (0)", exact: true }),
+    page.getByRole("button", { name: "All statements (1)", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
   await expect(
     page.getByRole("region", { name: "Batch review", exact: true }),
@@ -2446,7 +2463,7 @@ test("Home selects PDFs immediately and completed imports return Home", async ({
   await expect(page.locator(".import-statement-heading h2")).toHaveText(
     "Barclays",
   );
-  await expect(page.locator(".import-statement-card:visible")).toHaveCount(0);
+  await expect(page.locator(".import-statement-card:visible")).toHaveCount(1);
   await confirmImport(page);
   await expect(
     page.getByRole("heading", { name: "Home", exact: true }),

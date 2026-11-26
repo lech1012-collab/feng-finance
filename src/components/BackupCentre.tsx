@@ -1,7 +1,14 @@
+import { invalidateImportReview } from "../import/interrupted-review";
 import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useLiveQuery } from "dexie-react-hooks";
-import type { Backup } from "../domain/models";
+import { APP_VERSION, type Backup } from "../domain/models";
+import {
+  betaPreferences,
+  needsBetaNotice,
+  noticeAcknowledgedSettings,
+} from "../beta/policy";
+import { backupLedger, currentLedger } from "../storage/ledgers";
 import { db } from "../storage/database";
 import {
   backupExportSettings,
@@ -70,14 +77,18 @@ function Password({
 export function BackupCentre({
   requestSave = 0,
   onSaveOpened,
+  firstLaunch = false,
+  onRestored,
 }: {
   requestSave?: number;
   onSaveOpened?: () => void;
+  firstLaunch?: boolean;
+  onRestored?: () => void;
 }) {
   const navigate = useNavigate();
   const data = useLiveQuery(
     async () => ({
-      count: await db.transactions.count(),
+      ledger: await currentLedger(),
       last: (await db.settings.get("backup:lastExportAt"))?.value,
       exported: (await db.settings.get("backup:lastExportCount"))?.value,
     }),
@@ -162,7 +173,9 @@ export function BackupCentre({
       setSaving(false);
       setPassword("");
       setConfirmation("");
-      setNotice(`Backup ready. ${name}. Save it in Files.`);
+      setNotice(
+        `Backup ready. Save ${name} in Files or another safe location.`,
+      );
     } catch (failure) {
       setError(
         failure instanceof Error
@@ -205,48 +218,89 @@ export function BackupCentre({
     setBusy(true);
     setError("");
     try {
-      await restoreBackup(pending);
+      // Accept the Welcome notice only when replacement succeeds, including
+      // when an older backup predates that notice. Cancel leaves settings intact.
+      const lifecycle =
+        firstLaunch || needsBetaNotice(betaPreferences(pending.settings))
+          ? [
+              ...noticeAcknowledgedSettings(),
+              { key: "lastSeenVersion", value: APP_VERSION },
+            ]
+          : [];
+      await restoreBackup(
+        lifecycle.length
+          ? {
+              ...pending,
+              settings: [
+                ...pending.settings.filter(
+                  (setting) =>
+                    !lifecycle.some((item) => item.key === setting.key),
+                ),
+                ...lifecycle,
+              ],
+            }
+          : pending,
+      );
+      invalidateImportReview();
       setPending(undefined);
       setAcknowledged(false);
-      navigate("/", { state: { backupRestored: true } });
+      onRestored?.();
+      navigate("/", { replace: true, state: { backupRestored: true } });
     } catch (failure) {
       setError(backupErrorMessage(failure, "restore"));
     } finally {
       setBusy(false);
     }
   };
+  const targetLedger = pending && backupLedger(pending);
+  const legacyMixed =
+    pending &&
+    !pending.ledger &&
+    targetLedger === "personal" &&
+    pending.accounts.some((account) => account.isDemo);
   const dates = pending?.transactions.map((row) => row.date).sort() ?? [];
   return (
-    <section className="card backup-centre" id="backup">
-      <div className="context-help-heading">
-        <h2>Backup and restore</h2>
-        <ContextHelp title="Backups">
-          <p>
-            A portable copy of your accounts, transactions and rules. Password
-            protection happens on this device.
+    <div
+      className={firstLaunch ? "welcome-recovery" : "card backup-centre"}
+      id="backup"
+    >
+      {!firstLaunch && (
+        <>
+          <div className="context-help-heading">
+            <h2>Backup and restore</h2>
+            <ContextHelp title="Backups">
+              <p>
+                A portable copy of your accounts, transactions and rules. This
+                file contains the open workspace. Password protection happens on
+                this device. Keep the exported file in Files or another safe
+                location.
+              </p>
+            </ContextHelp>
+          </div>
+          <p className="backup-status">
+            <Archive size={16} aria-hidden="true" />
+            <span>
+              {data?.last ? (
+                <>
+                  Last export ·{" "}
+                  <time className="date-value" dateTime={data.last}>
+                    {formatUkDate(data.last.slice(0, 10))}
+                  </time>{" "}
+                  · {data.exported ?? 0} transactions
+                </>
+              ) : (
+                "No backup exported yet."
+              )}
+            </span>
           </p>
-        </ContextHelp>
-      </div>
-      <p className="backup-status">
-        <Archive size={16} aria-hidden="true" />
-        <span>
-          {data?.last ? (
-            <>
-              Last backup:{" "}
-              <time className="date-value" dateTime={data.last}>
-                {formatUkDate(data.last.slice(0, 10))}
-              </time>{" "}
-              · {data.exported ?? 0} transactions
-            </>
-          ) : (
-            "No backup saved yet. Save your first backup."
-          )}
-        </span>
-      </p>
-      <div className="actions">
-        <button className="primary" onClick={openSave} disabled={busy}>
-          Save backup
-        </button>
+        </>
+      )}
+      <div className={firstLaunch ? undefined : "actions"}>
+        {!firstLaunch && (
+          <button className="primary" onClick={openSave} disabled={busy}>
+            Save backup
+          </button>
+        )}
         <button
           onClick={() => {
             setError("");
@@ -254,7 +308,7 @@ export function BackupCentre({
           }}
           disabled={busy}
         >
-          Restore
+          {firstLaunch ? "Restore a backup" : "Restore"}
         </button>
       </div>
       <input
@@ -408,7 +462,7 @@ export function BackupCentre({
           </form>
         </Sheet>
       )}
-      {pending && (
+      {pending && !saving && (
         <Sheet
           title="Restore backup"
           onClose={cancelRestore}
@@ -429,7 +483,7 @@ export function BackupCentre({
           }
         >
           <div className="restore-warning">
-            <h3>Replace all local financial data?</h3>
+            <h3>Restore your {targetLedger} workspace?</h3>
             <dl className="settings-preview" aria-label="Backup contents">
               {[
                 ["Accounts", pending.accounts.length],
@@ -471,12 +525,28 @@ export function BackupCentre({
               <p>Backup version {pending.version}</p>
             </details>
             <p>
-              Accounts, transactions, categories, rules and settings will be
-              replaced. Save your current data first if you need to keep it.
+              Accounts, transactions, categories, rules and settings in your{" "}
+              {targetLedger} workspace will be replaced.
             </p>
-            <button type="button" disabled={busy} onClick={openSave}>
-              Back up current data first
-            </button>
+            {legacyMixed && (
+              <p>
+                This older backup also contains demo records. Feng adds them to
+                your demo workspace and keeps your local version of any matching
+                record.
+              </p>
+            )}
+            {!firstLaunch &&
+              data &&
+              (data.ledger === targetLedger ? (
+                <button type="button" disabled={busy} onClick={openSave}>
+                  Back up current data first
+                </button>
+              ) : (
+                <p>
+                  To back up that workspace first, cancel and open your{" "}
+                  {targetLedger} workspace.
+                </p>
+              ))}
             <label className="check">
               <input
                 type="checkbox"
@@ -484,16 +554,19 @@ export function BackupCentre({
                 disabled={busy}
                 onChange={(event) => setAcknowledged(event.target.checked)}
               />
-              I understand that this replaces all existing data on this device.
+              Replace the existing data in my {targetLedger} workspace.
             </label>
             {error && <p role="alert">{error}</p>}
           </div>
         </Sheet>
       )}
+      {busy && !saving && !passwordFile && !pending && (
+        <p role="status">Reading your backup…</p>
+      )}
       {error && !saving && !passwordFile && !pending && (
         <p role="alert">{error}</p>
       )}
       {notice && <Toast message={notice} />}
-    </section>
+    </div>
   );
 }

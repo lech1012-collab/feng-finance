@@ -51,9 +51,11 @@ test("a recognized Barclaycard opens its unread transaction directly without ask
     .locator(".import-statement-card:visible")
     .filter({ hasText: "4444" });
   await expect(card).toHaveCount(1);
-  await card
-    .getByRole("button", { name: "Review statement", exact: true })
-    .click();
+  const next = page.getByRole("button", {
+    name: "Review next statement",
+    exact: true,
+  });
+  await next.click();
   const editor = amountEditor(page);
   await expect(editor).toBeVisible({ timeout: 30000 });
   await expect(
@@ -62,6 +64,18 @@ test("a recognized Barclaycard opens its unread transaction directly without ask
   await expect(editor).toContainText("WAITROSE");
   await expect(editor).toContainText("Transaction 1 of 1 to check");
   await expect(editor).toContainText("4444");
+  await editor.getByLabel("Amount (GBP)", { exact: true }).fill("80.");
+  await editor
+    .getByRole("button", { name: "Cancel correction", exact: true })
+    .click();
+  await expect(next).toBeFocused();
+  await expect(page.locator(".import-statement-card:visible")).toHaveCount(1);
+  await next.click();
+  await expect(editor).toBeVisible();
+  await expect(
+    editor.getByLabel("Amount (GBP)", { exact: true }),
+  ).not.toHaveValue("80.");
+
   await page.screenshot({
     path: testInfo.outputPath("known-card-direct-amount.png"),
   });

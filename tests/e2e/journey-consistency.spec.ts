@@ -203,10 +203,16 @@ test("Home transfer review follows both sides of the period boundary and preserv
       },
     ],
   });
-  await page
-    .locator(".home-todos")
-    .getByRole("link", { name: /transfer/i })
-    .click();
+  const todos = page.locator(".home-todos");
+  await expect(
+    todos.getByRole("link", { name: "1 transfer to confirm" }),
+  ).toBeVisible();
+  await expect(
+    todos.getByRole("link", {
+      name: /categorise|transactions need attention/i,
+    }),
+  ).toHaveCount(0);
+  await todos.getByRole("link", { name: "1 transfer to confirm" }).click();
   const queue = page.getByRole("region", { name: "Transfers to confirm" });
   await expect(queue).toContainText("Match 0");
   await expect(queue).toContainText("Match 1");
@@ -219,6 +225,24 @@ test("Home transfer review follows both sides of the period boundary and preserv
   ).toBeVisible();
   await page.getByRole("button", { name: "Undo", exact: true }).click();
   await expect(queue).toBeVisible();
+  await page.goto("/#/transactions?month=2026-09");
+  const row = page.getByRole("link", { name: /^Match 0,.*Review transfer/i });
+  await expect(row).toBeVisible();
+  await row.click();
+  await expect(queue).toContainText("Match 1");
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toHaveCount(0);
+  await queue
+    .getByRole("button", { name: "These are separate payments" })
+    .click();
+  await expect(
+    page.getByRole("combobox", { name: "Category", exact: true }),
+  ).toBeVisible();
+  await page.goto("/#/");
+  await expect(
+    todos.getByRole("link", { name: "Categorise 2 transactions" }),
+  ).toBeVisible();
   await page.goto("/#/transactions?transfers=1&month=2026-08");
   await expect(queue).toContainText("Match 2");
   await expect(queue).not.toContainText("Match 0");

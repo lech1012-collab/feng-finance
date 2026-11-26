@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import { reportingPeriodLabel } from "../domain/period";
 import { CategoryAnalysisPicker } from "../components/CategoryAnalysisPicker";
 import { ContextHelp } from "../components/ContextHelp";
@@ -70,7 +71,7 @@ export default function CategoryPage({
       statements: await db.statements.toArray(),
       settings: await db.settings.toArray(),
       rates: await db.fxRates.toArray(),
-      proposals: await db.transferProposals.toArray(),
+      proposals: (await pendingTransferAttention()).proposals,
     }),
     [],
   );

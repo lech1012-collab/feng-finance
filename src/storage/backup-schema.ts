@@ -433,6 +433,7 @@ export const settingSchema = z.object({ key: identifier, value: text });
 export const backupSchema = z.object({
   format: z.literal("feng-finance"),
   version: z.literal(1),
+  ledger: z.enum(["personal", "demo"]).optional(),
   schemaVersion: z.number().int().min(1).max(SCHEMA_VERSION),
   moneyUnit: z.literal("minor"),
   exportedAt: timestamp,

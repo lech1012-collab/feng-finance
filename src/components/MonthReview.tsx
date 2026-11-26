@@ -1,3 +1,4 @@
+import { pendingTransferAttention } from "../storage/transfer-attention";
 import { Toast } from "./Toast";
 import { SuggestedRules } from "./SuggestedRules";
 import { useState } from "react";
@@ -49,13 +50,13 @@ export function MonthReview({
   const closeTo = returnTarget(location.state?.returnTo, "/analysis").to;
   const data = useLiveQuery(
     async () => ({
+      pending: await pendingTransferAttention(),
       rows: await db.transactions.toArray(),
       accounts: await db.accounts.toArray(),
       statements: await db.statements.toArray(),
       categories: await db.categories.toArray(),
       settings: await db.settings.toArray(),
       rates: await db.fxRates.toArray(),
-      proposals: await db.transferProposals.toArray(),
       pots: await db.pots.toArray(),
       valuations: await db.valuations.toArray(),
       closed: await db.monthCloses.get(month),
@@ -124,10 +125,14 @@ export function MonthReview({
     currency,
     data.rates,
     data.settings,
-    data.proposals,
+    data.pending.proposals,
   );
   const reviewCount = data.rows.filter(
-    (t) => t.date >= from && t.date < to && needsReview(t),
+    (t) =>
+      t.date >= from &&
+      t.date < to &&
+      !data.pending.ids.has(t.id) &&
+      needsReview(t),
   ).length;
   const past = reportingMonthlySeries(
     data.rows,
@@ -138,7 +143,7 @@ export function MonthReview({
     currency,
     data.rates,
     data.settings,
-    data.proposals,
+    data.pending.proposals,
   )
     .filter((p) => p.coverage.complete)
     .slice(-3);
@@ -601,7 +606,7 @@ export function MonthReview({
             Review learned rules
           </Link>
           {!lastBackup || (!!latestImport && lastBackup < latestImport) ? (
-            <p>A new import has been added since your last backup.</p>
+            <p>A new import has been added since your last export.</p>
           ) : (
             <p>Your backup is newer than the latest import.</p>
           )}

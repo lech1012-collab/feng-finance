@@ -32,10 +32,10 @@ export async function loadDemoUi(page: Page) {
     .uncheck();
   await settingsSection(page, "demo");
   await page
-    .getByRole("button", { name: "Load demo data", exact: true })
+    .getByRole("button", { name: "Open demo data", exact: true })
     .click();
   await expect(
-    page.getByRole("status").filter({ hasText: "Fictitious demo data added." }),
+    page.getByRole("status").filter({ hasText: "Demo data opened." }),
   ).toBeVisible();
 }
 

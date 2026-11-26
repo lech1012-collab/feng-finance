@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useLiveQuery } from "dexie-react-hooks";
 import { Link } from "react-router-dom";
 import { db } from "../storage/database";
+import { currentLedger } from "../storage/ledgers";
 import { auditedMutation, undoChange } from "../storage/audit";
 import { currencyPrecision } from "../domain/money";
 import { downloadEcbRates, workingDayAge } from "../analytics/fx";
@@ -14,21 +15,74 @@ import { Sheet } from "./Sheet";
 import { SwitchRow } from "./UIPrimitives";
 import { ContextHelp } from "./ContextHelp";
 
-export function useGlobalCurrency() {
-  const setting = useLiveQuery(() => db.settings.get("currency"), []);
+function reportingCurrency(value = "GBP") {
   try {
-    currencyPrecision(setting?.value ?? "GBP");
-    return setting?.value ?? "GBP";
+    currencyPrecision(value);
+    return value;
   } catch {
     return "GBP";
   }
 }
-async function refreshRates() {
+export function useGlobalCurrency() {
+  const setting = useLiveQuery(() => db.settings.get("currency"), []);
+  return reportingCurrency(setting?.value);
+}
+
+// Read these together inside the caller's transaction. During a workspace switch
+// neither a foreign account nor a download preference can come from the old ledger.
+async function readRateContext() {
+  const [ledger, accounts, [currency, download, lastDownload]] =
+    await Promise.all([
+      currentLedger(),
+      db.accounts.toArray(),
+      db.settings.bulkGet(["currency", "fx:download", "fx:lastDownloaded"]),
+    ]);
+  const reportCurrency = reportingCurrency(currency?.value);
+  const foreign = accounts.filter(
+    (account) => account.currency !== reportCurrency,
+  );
+  return {
+    ledger,
+    currency: reportCurrency,
+    foreign,
+    downloadEnabled: download?.value !== "false",
+    lastDownloadDay: lastDownload?.value.slice(0, 10),
+  };
+}
+
+function automaticRatesDue(
+  context: Awaited<ReturnType<typeof readRateContext>>,
+  day: string,
+) {
+  return (
+    context.ledger === "personal" &&
+    context.foreign.length > 0 &&
+    context.downloadEnabled &&
+    context.lastDownloadDay !== day
+  );
+}
+
+async function refreshRates(automatic = false) {
+  const destination = automatic
+    ? await db.transaction(
+        "r",
+        [db.ledgerArchives, db.accounts, db.settings],
+        async () => {
+          const context = await readRateContext();
+          return automaticRatesDue(context, localToday())
+            ? context.ledger
+            : undefined;
+        },
+      )
+    : await currentLedger();
+  if (!destination) return { changeId: "" };
   const rates = await downloadEcbRates();
   return auditedMutation(
     "Update exchange rates",
-    ["fxRates", "settings"],
+    ["fxRates", "settings", "ledgerArchives"],
     async () => {
+      // The user may have switched workspaces while the public table downloaded.
+      if ((await currentLedger()) !== destination) return;
       // A manual override remains authoritative and is not overwritten by an ECB table.
       await db.fxRates.bulkPut(rates);
       await db.settings.put({
@@ -290,50 +344,43 @@ export function CurrencySetting() {
 }
 /** Only downloads the fixed public ECB table. Import never sends financial data. */
 export function CurrencyViewNotice({
-  currency,
   allowAutomaticDownload = true,
 }: {
-  currency: string;
   allowAutomaticDownload?: boolean;
 }) {
   const data = useLiveQuery(
-    async () => ({
-      accounts: await db.accounts.toArray(),
-      rates: await db.fxRates.toArray(),
-      settings: await db.settings.toArray(),
-    }),
+    () =>
+      db.transaction(
+        "r",
+        [db.ledgerArchives, db.accounts, db.settings, db.fxRates],
+        async () => ({
+          ...(await readRateContext()),
+          rates: await db.fxRates.toArray(),
+        }),
+      ),
     [],
   );
-  const running = useRef(false);
+  const attempted = useRef("");
   const [failed, setFailed] = useState(false);
-  const foreign = (data?.accounts ?? []).filter((a) => a.currency !== currency);
   const last = data?.rates
     .filter((rate) => rate.date <= localToday())
     .map((r) => r.date)
     .sort()
     .at(-1);
-  const enabled = !data?.settings.some(
-    (s) => s.key === "fx:download" && s.value === "false",
-  );
   const today = localToday();
+  const shouldDownload =
+    !!data && allowAutomaticDownload && automaticRatesDue(data, today);
   useEffect(() => {
-    if (
-      !data ||
-      !allowAutomaticDownload ||
-      !foreign.length ||
-      !enabled ||
-      !navigator.onLine ||
-      running.current
-    )
+    if (!shouldDownload) {
+      attempted.current = "";
       return;
-    const downloaded = data.settings
-      .find((s) => s.key === "fx:lastDownloaded")
-      ?.value.slice(0, 10);
-    if (downloaded === today) return;
-    running.current = true;
-    void refreshRates().catch(() => setFailed(true));
-  }, [!!data, foreign.length, enabled, today, allowAutomaticDownload]);
-  if (!foreign.length) return null;
+    }
+    if (!navigator.onLine || attempted.current === today) return;
+    attempted.current = today;
+    void refreshRates(true).catch(() => setFailed(true));
+  }, [shouldDownload, today]);
+  if (!data?.foreign.length) return null;
+  const { foreign, currency } = data;
   const stale = last && workingDayAge(last, today) > 3;
   const missing = foreign.some(
     (account) =>

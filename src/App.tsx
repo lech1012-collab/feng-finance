@@ -1,3 +1,9 @@
+import {
+  importReviewGeneration,
+  subscribeImportReplacement,
+  readInterruptedReview,
+  rememberImportFiles,
+} from "./import/interrupted-review";
 import Accounts from "./pages/Accounts";
 import { autoCloseEligibleMonths } from "./storage/month-review";
 import { ImportPickerContext } from "./components/ImportPicker";
@@ -9,6 +15,7 @@ import { sectionForPath } from "./navigation/section";
 import { ThemeSync } from "./components/Theme";
 import {
   useEffect,
+  useLayoutEffect,
   useState,
   useRef,
   useSyncExternalStore,
@@ -17,6 +24,7 @@ import {
   Component,
   type ReactNode,
   type ErrorInfo,
+  type MouseEvent,
 } from "react";
 import {
   HashRouter,
@@ -51,6 +59,7 @@ import {
 } from "./storage/write-activity";
 import { APP_VERSION, type Setting } from "./domain/models";
 import { BetaNotice } from "./beta/BetaNotice";
+import { BackupCentre } from "./components/BackupCentre";
 import { InstallBanner, InstallHelp } from "./beta/InstallGuidance";
 import { DataNotices } from "./beta/DataNotices";
 import {
@@ -74,7 +83,12 @@ import { ToastProvider } from "./components/Toast";
 import { AppHeader, DemoChip } from "./components/UIPrimitives";
 import { localToday } from "./analytics/reminders";
 import "./beta/beta.css";
-import { loadDemo, deleteDemo } from "./storage/demo";
+import {
+  activateLedger,
+  currentLedger,
+  openDemoLedger,
+  type Ledger,
+} from "./storage/ledgers";
 import { periodMonth } from "./domain/period";
 import { requestedMonth } from "./domain/dates";
 import { useSearchParams } from "react-router-dom";
@@ -86,6 +100,15 @@ const Analysis = lazy(() => import("./pages/Analysis"));
 const Settings = lazy(() => import("./pages/Settings"));
 const Import = lazy(() => import("./pages/Import"));
 const Planning = lazy(() => import("./pages/Planning"));
+// The main landmark is present while a lazy screen loads.
+const navigationTitles: Record<string, string> = {
+  "/": "Home",
+  "/transactions": "Transactions",
+  "/analysis": "Analyse",
+  "/planning": "Planning",
+  "/import": "Import statements",
+  "/settings": "Settings",
+};
 let applyUpdate: (reload?: boolean) => Promise<void>;
 function ReviewRoute({ month, currency }: { month: string; currency: string }) {
   const [params] = useSearchParams();
@@ -105,12 +128,56 @@ function Shell() {
   const navigate = useNavigate();
   const fileInput = useRef<HTMLInputElement>(null);
   const mobileNavigation = useRef<HTMLElement>(null);
+  const focusDestination = useRef<string | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [importMounted, setImportMounted] = useState(false);
   const [pendingImportCount, setPendingImportCount] = useState(0);
+  const [interruptedFiles, setInterruptedFiles] = useState(
+    readInterruptedReview,
+  );
+  useEffect(() => {
+    if (pendingImportCount)
+      setInterruptedFiles((files) => (files.length ? [] : files));
+  }, [pendingImportCount]);
   const hasPendingImport = useRef(false);
   hasPendingImport.current = !!selectedFiles.length || !!pendingImportCount;
+  const [importMessage, setImportMessage] = useState("");
+  const generation = useSyncExternalStore(
+    subscribeImportReplacement,
+    importReviewGeneration,
+  );
+  const previousGeneration = useRef(generation);
+  useLayoutEffect(() => {
+    if (previousGeneration.current === generation) return;
+    previousGeneration.current = generation;
+    rememberImportFiles([]);
+    setInterruptedFiles([]);
+    setSelectedFiles([]);
+    setPendingImportCount(0);
+    setImportMessage("");
+  }, [generation]);
   const importActive = location.pathname === "/import";
+  const preparingSelection = useRef(false);
+  const selectPersonalFiles = async (files: File[]) => {
+    if (!files.length || preparingSelection.current) return;
+    preparingSelection.current = true;
+    setImportMessage("");
+    try {
+      // A cancelled native picker never reaches the ledger switch.
+      const selectionGeneration = importReviewGeneration();
+      await activateLedger("personal");
+      if (selectionGeneration !== importReviewGeneration()) return;
+      setImportMounted(true);
+      setSelectedFiles(files);
+      if (!importActive) navigate("/import");
+    } catch {
+      setImportMessage(
+        "Your personal finances could not be opened. Choose your statements again.",
+      );
+    } finally {
+      preparingSelection.current = false;
+    }
+  };
   const previousPath = useRef(location.pathname);
   const openImportPicker = () => fileInput.current?.click();
   const openImport = () => {
@@ -118,6 +185,22 @@ function Shell() {
       setImportMounted(true);
       navigate("/import");
     } else openImportPicker();
+  };
+  const activateNavigation = (event: MouseEvent, path: string) => {
+    if (event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+      return;
+    const opensPicker = path === "/import" && !hasPendingImport.current;
+    // Keyboard and assistive activation use a click count of zero. Move into the
+    // destination on arrival. A native file picker owns focus until it closes.
+    focusDestination.current = event.detail === 0 && !opensPicker ? path : null;
+    if (focusDestination.current === location.pathname) {
+      document.getElementById("main")?.focus({ preventScroll: true });
+      focusDestination.current = null;
+    }
+    if (path === "/import") {
+      event.preventDefault();
+      openImport();
+    }
   };
   useEffect(() => {
     if (importActive) setImportMounted(true);
@@ -131,8 +214,10 @@ function Shell() {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [pendingImportCount, selectedFiles.length]);
-  const [month, setMonth] = useState(localToday().slice(0, 7));
-  const [monthChosen, setMonthChosen] = useState(false);
+  const ledger = useLiveQuery(() => currentLedger(), []);
+  const [chosenMonths, setChosenMonths] = useState<
+    Partial<Record<Ledger, string>>
+  >({});
   const latestMonth = useLiveQuery(async () => {
     const today = localToday();
     const [latestTransaction, statements] = await Promise.all([
@@ -154,12 +239,10 @@ function Shell() {
       await db.transactions.where("categoryId").equals("salary").toArray(),
     );
   }, []);
-  useEffect(() => {
-    if (!monthChosen && latestMonth) setMonth(latestMonth);
-  }, [latestMonth, monthChosen]);
+  const month =
+    (ledger && chosenMonths[ledger]) ?? latestMonth ?? localToday().slice(0, 7);
   const chooseMonth = (value: string) => {
-    setMonth(value);
-    setMonthChosen(true);
+    if (ledger) setChosenMonths((months) => ({ ...months, [ledger]: value }));
   };
   const currency = useGlobalCurrency();
   const [initialized, setInitialized] = useState(false);
@@ -182,7 +265,15 @@ function Shell() {
       statements,
       prefs.firstRealImportAt,
     );
-    return { prefs, hasRealImports: statements.length > 0 };
+    // Before the first acknowledgement, a new installation can enter portable
+    // restore directly. An existing owner can also have manual accounts or a
+    // pre-update recovery copy without ever having imported a statement.
+    const freshWorkspace =
+      needsBetaNotice(prefs) &&
+      !statements.length &&
+      !(await db.accounts.count()) &&
+      !(await db.safetyBackups.count());
+    return { prefs, hasRealImports: statements.length > 0, freshWorkspace };
   }, [initialized]);
   useEffect(() => {
     if (!betaData) return;
@@ -257,7 +348,7 @@ function Shell() {
       ]);
       await requestBetaStorage();
       if (choice === "demo") {
-        await loadDemo();
+        await openDemoLedger();
         navigate("/");
       }
     } catch (error) {
@@ -268,10 +359,26 @@ function Shell() {
     }
   };
 
-  const demoCount = useLiveQuery(
-    () => db.accounts.filter((a) => !!a.isDemo).count(),
-    [],
-  );
+  const previousLedger = useRef<Ledger | undefined>(undefined);
+  useLayoutEffect(() => {
+    if (!ledger) return;
+    const previous = previousLedger.current;
+    previousLedger.current = ledger;
+    if (previous && previous !== ledger) {
+      if (ledger === "demo") {
+        if (hasPendingImport.current)
+          setImportMessage(
+            "Demo data was opened in another tab. Reselect your statements to resume in your personal finances.",
+          );
+        setSelectedFiles([]);
+        setPendingImportCount(0);
+      }
+    }
+    if (ledger === "demo") {
+      rememberImportFiles([]);
+      setInterruptedFiles([]);
+    }
+  }, [ledger]);
   const [online, setOnline] = useState(navigator.onLine);
   const [storageWarning, setStorageWarning] = useState("");
   useEffect(() => {
@@ -398,8 +505,9 @@ function Shell() {
     if (!importActive) window.scrollTo(0, 0);
     // WebKit can retain its sequential Tab starting point inside the now inert
     // import workspace. Put focus on the visible page after leaving review.
-    if (leavingImport)
+    if (leavingImport || focusDestination.current === location.pathname)
       document.getElementById("main")?.focus({ preventScroll: true });
+    focusDestination.current = null;
     let targetId: string;
     try {
       targetId = decodeURIComponent(location.hash.slice(1));
@@ -428,6 +536,13 @@ function Shell() {
       window.clearTimeout(timeout);
     };
   }, [location.pathname, location.hash]);
+  // Keep the Settings switch/restore result visible after a successful switch.
+  // Remount financial forms so drafts and selected record IDs stay in their ledger.
+  const ledgerActionPage =
+    location.pathname === "/settings" &&
+    ["demo", "backup", "danger"].includes(
+      new URLSearchParams(location.search).get("section") ?? "",
+    );
   const updateApp = async () => {
     const permitted = () =>
       ["", "#", "#/"].includes(window.location.hash.split("?")[0]) &&
@@ -469,11 +584,7 @@ function Shell() {
           onChange={(e) => {
             const files = Array.from(e.target.files ?? []);
             e.target.value = "";
-            if (files.length) {
-              setImportMounted(true);
-              setSelectedFiles(files);
-              navigate("/import");
-            }
+            void selectPersonalFiles(files);
           }}
         />
         <ThemeSync />
@@ -498,12 +609,12 @@ function Shell() {
               Feng<span className="brand-finance">Finance</span>
             </span>
           </NavLink>
-          {initialized && !!demoCount && (
+          {initialized && ledger === "demo" && (
             <DemoChip to="/settings?section=demo#demo" />
           )}
           <button
             className="primary sidebar-import"
-            onClick={openImport}
+            onClick={(event) => activateNavigation(event, "/import")}
             aria-current={activeSection === "import" ? "page" : undefined}
           >
             <Plus size={20} />
@@ -525,16 +636,7 @@ function Shell() {
                 <Link
                   key={String(path)}
                   to={String(path)}
-                  onClick={
-                    path === "/import"
-                      ? (e) => {
-                          if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey)
-                            return;
-                          e.preventDefault();
-                          openImport();
-                        }
-                      : undefined
-                  }
+                  onClick={(event) => activateNavigation(event, String(path))}
                   className={
                     `${path === "/planning" ? "planning-nav " : ""}${active ? "active" : ""}`.trim() ||
                     undefined
@@ -576,21 +678,7 @@ function Shell() {
                 aria-label={label}
                 className={active ? "active" : undefined}
                 aria-current={active ? "page" : undefined}
-                onClick={
-                  path === "/import"
-                    ? (event) => {
-                        if (
-                          event.metaKey ||
-                          event.ctrlKey ||
-                          event.shiftKey ||
-                          event.altKey
-                        )
-                          return;
-                        event.preventDefault();
-                        openImport();
-                      }
-                    : undefined
-                }
+                onClick={(event) => activateNavigation(event, path)}
               >
                 <Icon size={21} aria-hidden="true" />
                 <span>{label}</span>
@@ -604,13 +692,14 @@ function Shell() {
             actions={
               <>
                 <div className="header-states">
-                  {initialized && !!demoCount && (
+                  {initialized && ledger === "demo" && (
                     <DemoChip to="/settings?section=demo#demo" />
                   )}
                   {initialized && !initError && (
                     <CurrencyViewNotice
-                      currency={currency}
+                      key={ledger}
                       allowAutomaticDownload={
+                        ledger === "personal" &&
                         !exactRecovery &&
                         !!betaData &&
                         !needsBetaNotice(betaData.prefs) &&
@@ -636,6 +725,7 @@ function Shell() {
                 </div>
                 <Link
                   to="/settings"
+                  onClick={(event) => activateNavigation(event, "/settings")}
                   className="mobile-settings"
                   aria-label="Settings"
                   aria-current={
@@ -667,6 +757,11 @@ function Shell() {
                 <button onClick={() => void updateApp()}>Reload</button>
               </div>
             )}
+          {importMessage && (
+            <div className="notice" role="status">
+              {importMessage}
+            </div>
+          )}
           {storageWarning && (
             <div className="notice warning" role="status">
               {storageWarning}
@@ -711,22 +806,93 @@ function Shell() {
               onClose={whatsNewPrompt.dismiss}
             />
           )}
-          <main id="main" tabIndex={-1}>
+          <main
+            id="main"
+            tabIndex={-1}
+            aria-label={navigationTitles[location.pathname]}
+          >
             {initError ? (
               <p role="alert">{initError}</p>
-            ) : !initialized || !betaData ? (
+            ) : !initialized || !betaData || !ledger ? (
               <p role="status">Opening your local finances…</p>
             ) : needsBetaNotice(betaData.prefs) || betaBusy || betaFlowError ? (
-              <BetaNotice
-                onAccept={acceptBeta}
-                installHelp={
-                  runtimeMode.ios && !runtimeMode.installed ? (
-                    <InstallHelp mode={runtimeMode} />
-                  ) : undefined
-                }
-              />
+              betaData.freshWorkspace &&
+              location.pathname === "/settings" &&
+              (new URLSearchParams(location.search).get("section") ===
+                "backup" ||
+                location.hash === "#backup") ? (
+                <>
+                  <div className="page-heading">
+                    <h1>Restore your backup</h1>
+                  </div>
+                  <section className="card">
+                    <p>
+                      Choose your Feng backup from Files. You can check its
+                      contents before replacing data on this device. Feng is in
+                      beta. Check restored figures against your statements.
+                    </p>
+                    <BackupCentre
+                      firstLaunch
+                      onRestored={() => setBetaFlowError(false)}
+                    />
+                  </section>
+                  <Link className="back-link" to="/">
+                    Back to Welcome
+                  </Link>
+                </>
+              ) : (
+                <BetaNotice
+                  onAccept={acceptBeta}
+                  recovery={
+                    <BackupCentre
+                      firstLaunch
+                      onRestored={() => setBetaFlowError(false)}
+                    />
+                  }
+                  installHelp={
+                    runtimeMode.ios && !runtimeMode.installed ? (
+                      <InstallHelp mode={runtimeMode} />
+                    ) : undefined
+                  }
+                />
+              )
             ) : (
               <>
+                {ledger === "personal" &&
+                  !!interruptedFiles.length &&
+                  !pendingImportCount &&
+                  !selectedFiles.length &&
+                  (importActive || location.pathname === "/") && (
+                    <section
+                      className="notice interrupted-review"
+                      aria-labelledby="interrupted-heading"
+                    >
+                      <h2 id="interrupted-heading">Reselect your statements</h2>
+                      <p>
+                        The previous review was interrupted. Choose the files
+                        you still want to import. Feng checks for duplicates
+                        again.
+                      </p>
+                      <ul>
+                        {interruptedFiles.map((name, index) => (
+                          <li key={index}>{name}</li>
+                        ))}
+                      </ul>
+                      <div className="actions">
+                        <button className="primary" onClick={openImport}>
+                          Choose files again
+                        </button>
+                        <button
+                          onClick={() => {
+                            rememberImportFiles([]);
+                            setInterruptedFiles([]);
+                          }}
+                        >
+                          Dismiss
+                        </button>
+                      </div>
+                    </section>
+                  )}
                 {!!pendingImportCount && !importActive && (
                   <div className="notice" role="status">
                     <span>
@@ -740,7 +906,11 @@ function Shell() {
                   </div>
                 )}
                 <Suspense
-                  key={location.pathname}
+                  key={
+                    ledgerActionPage
+                      ? location.pathname
+                      : location.pathname + ledger
+                  }
                   fallback={<p role="status">Loading…</p>}
                 >
                   <Routes>
@@ -808,6 +978,9 @@ function Shell() {
                       path="/settings"
                       element={
                         <Settings
+                          importPending={
+                            !!pendingImportCount || !!selectedFiles.length
+                          }
                           beta={{
                             mode: runtimeMode,
                             storagePersisted:
@@ -848,8 +1021,12 @@ function Shell() {
                       }
                     >
                       <Import
+                        key={`${ledger}-${generation}`}
+                        onSelectFiles={selectPersonalFiles}
                         active={importActive}
-                        selectedFiles={selectedFiles}
+                        selectedFiles={
+                          ledger === "personal" ? selectedFiles : undefined
+                        }
                         onFilesStarted={() => setSelectedFiles([])}
                         onPendingChange={setPendingImportCount}
                         onImported={(latest) => chooseMonth(latest)}

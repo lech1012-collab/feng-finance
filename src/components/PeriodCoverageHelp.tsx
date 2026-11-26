@@ -56,6 +56,12 @@ export function PeriodCoverageHelp({
 }) {
   return (
     <>
+      {coverage.statementStatus !== coverage.status && (
+        <p>
+          Statement coverage · {coverage.statementStatus}. Cash-flow coverage ·{" "}
+          {coverage.status}.
+        </p>
+      )}
       {today < start ? (
         <p>This reporting period starts on {formatUkDate(start)}.</p>
       ) : end > today ? (

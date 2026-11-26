@@ -49,7 +49,7 @@ beforeEach(() => {
     categories: [],
     settings: [],
     rates: [],
-    proposals: [],
+    pending: { proposals: [], ids: new Set<string>() },
     pots: [
       pot,
       {

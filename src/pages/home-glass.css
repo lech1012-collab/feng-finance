@@ -375,6 +375,16 @@
 .beta-introduction .beta-notice-actions svg {
   flex: none;
 }
+.beta-introduction .welcome-recovery {
+  margin-top: 8px;
+}
+.beta-introduction .welcome-recovery > div > button {
+  width: 100%;
+  min-height: 46px;
+  color: var(--accent);
+  background: transparent;
+  border-color: transparent;
+}
 .beta-introduction .beta-introduction-install {
   padding-top: 18px;
   margin-top: 18px;
